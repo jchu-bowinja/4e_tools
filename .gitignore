@@ -1,0 +1,35 @@
+# Dependencies & build output
+node_modules/
+dist/
+
+# Vite cache
+.vite/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# D&D Character Builder / licensed extracts (do not commit)
+combined.dnd40.merged.xml
+combined.*.merged.xml
+out_json/
+
+# Normalized rules text derived from extracts
+generated/
+generated_*/
+
+# Reference books (copyrighted)
+*.pdf
+
+# ETL / conversion logs
+*.jsonl
+
+# Local env
+.env
+.env.*.local
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
