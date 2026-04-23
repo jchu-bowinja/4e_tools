@@ -25,7 +25,8 @@ export function createDefaultCharacterSheetState(): CharacterSheetState {
     equipment: {},
     powers: {
       selectedPowerIds: [],
-      expendedPowerIds: []
+      expendedPowerIds: [],
+      manualOrderIds: []
     }
   };
 }

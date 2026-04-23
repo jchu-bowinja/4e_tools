@@ -188,7 +188,8 @@ export function sheetStateFromBuild(build: CharacterBuild, index: RulesIndex): C
     equipment: {},
     powers: {
       selectedPowerIds: [...build.powerIds],
-      expendedPowerIds: []
+      expendedPowerIds: [],
+      manualOrderIds: []
     }
   };
 

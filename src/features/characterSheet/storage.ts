@@ -38,7 +38,8 @@ function normalizeState(input: unknown): CharacterSheetState {
     equipment: typeof v.equipment === "object" && v.equipment ? v.equipment : {},
     powers: {
       selectedPowerIds: Array.isArray(v.powers?.selectedPowerIds) ? v.powers.selectedPowerIds : [],
-      expendedPowerIds: Array.isArray(v.powers?.expendedPowerIds) ? v.powers.expendedPowerIds : []
+      expendedPowerIds: Array.isArray(v.powers?.expendedPowerIds) ? v.powers.expendedPowerIds : [],
+      manualOrderIds: Array.isArray(v.powers?.manualOrderIds) ? v.powers.manualOrderIds : []
     },
     featIds: Array.isArray(v.featIds) ? v.featIds.filter((id): id is string => typeof id === "string") : [],
     trainedSkillIds: Array.isArray(v.trainedSkillIds) ? v.trainedSkillIds.filter((id): id is string => typeof id === "string") : [],

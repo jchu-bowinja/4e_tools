@@ -26,6 +26,7 @@ export interface CharacterSheetResources {
 export interface CharacterSheetPowerSelection {
   selectedPowerIds: string[];
   expendedPowerIds: string[];
+  manualOrderIds: string[];
 }
 
 export interface CharacterSheetState {

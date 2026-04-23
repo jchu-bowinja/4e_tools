@@ -284,6 +284,7 @@ type GlossaryKey =
 export function CharacterSheetApp({ index }: { index: RulesIndex }): JSX.Element {
   const [sheet, setSheet] = useState<CharacterSheetState>(() => loadCharacterSheetState());
   const [tab, setTab] = useState<SheetTab>("overview");
+  const [draggingPowerId, setDraggingPowerId] = useState<string | null>(null);
   const [newItemName, setNewItemName] = useState("");
   const [selectedArmorId, setSelectedArmorId] = useState("");
   const [selectedWeaponId, setSelectedWeaponId] = useState("");
@@ -578,6 +579,57 @@ export function CharacterSheetApp({ index }: { index: RulesIndex }): JSX.Element
         }
       };
     });
+  }
+
+  function getOrderedBucketPowers(bucketPowers: typeof groupedPowers.atWill): typeof groupedPowers.atWill {
+    const usedSet = new Set(sheet.powers.expendedPowerIds);
+    const manualIndexById = new Map(sheet.powers.manualOrderIds.map((id, idx) => [id, idx]));
+    const fallbackIndexById = new Map(bucketPowers.map((power, idx) => [power.id, idx]));
+    return [...bucketPowers].sort((a, b) => {
+      const aUsed = usedSet.has(a.id);
+      const bUsed = usedSet.has(b.id);
+      if (aUsed !== bUsed) return aUsed ? 1 : -1;
+      const aManual = manualIndexById.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+      const bManual = manualIndexById.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+      if (aManual !== bManual) return aManual - bManual;
+      return (fallbackIndexById.get(a.id) ?? 0) - (fallbackIndexById.get(b.id) ?? 0);
+    });
+  }
+
+  function reorderPowerCardsByDrag(bucketPowers: typeof groupedPowers.atWill, sourcePowerId: string, targetPowerId: string): void {
+    if (sourcePowerId === targetPowerId) return;
+    const ordered = getOrderedBucketPowers(bucketPowers);
+    const usedSet = new Set(sheet.powers.expendedPowerIds);
+    const source = ordered.find((power) => power.id === sourcePowerId);
+    const target = ordered.find((power) => power.id === targetPowerId);
+    if (!source || !target) return;
+    const sourceUsed = usedSet.has(source.id);
+    const targetUsed = usedSet.has(target.id);
+    // Keep "used at bottom" invariant by limiting drag reorder to same-used state.
+    if (sourceUsed !== targetUsed) return;
+
+    const sameStateIds = ordered.filter((power) => usedSet.has(power.id) === sourceUsed).map((power) => power.id);
+    const sourceIndex = sameStateIds.indexOf(sourcePowerId);
+    const targetIndex = sameStateIds.indexOf(targetPowerId);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+    const reorderedGroup = [...sameStateIds];
+    const [moved] = reorderedGroup.splice(sourceIndex, 1);
+    reorderedGroup.splice(targetIndex, 0, moved);
+
+    const groupIdSet = new Set(sameStateIds);
+    let groupCursor = 0;
+    const reorderedBucketIds = ordered.map((power) =>
+      groupIdSet.has(power.id) ? reorderedGroup[groupCursor++] : power.id
+    );
+    const bucketIdSet = new Set(reorderedBucketIds);
+
+    updateSheet((prev) => ({
+      ...prev,
+      powers: {
+        ...prev.powers,
+        manualOrderIds: [...prev.powers.manualOrderIds.filter((id) => !bucketIdSet.has(id)), ...reorderedBucketIds]
+      }
+    }));
   }
 
   function refreshSavedCharacters(): void {
@@ -1248,13 +1300,16 @@ export function CharacterSheetApp({ index }: { index: RulesIndex }): JSX.Element
               >
                 {bucket === "atWill" ? "At-Will" : bucket === "encounter" ? "Encounter" : "Daily"}
               </div>
-              {groupedPowers[bucket].length === 0 ? (
+              {(() => {
+                const orderedBucketPowers = getOrderedBucketPowers(groupedPowers[bucket]);
+                const usedSet = new Set(sheet.powers.expendedPowerIds);
+                return orderedBucketPowers.length === 0 ? (
                 <div style={{ color: "var(--text-muted)" }}>No cards selected.</div>
               ) : (
                 <div style={{ display: "grid", gap: "0.4rem", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", alignItems: "stretch" }}>
-                  {groupedPowers[bucket].map((power) => {
+                  {orderedBucketPowers.map((power) => {
                     const accent = usageAccentCardStyle(bucket);
-                    const expended = sheet.powers.expendedPowerIds.includes(power.id);
+                    const expended = usedSet.has(power.id);
                     const canExpend = bucket === "encounter" || bucket === "daily";
                     const raw = (power.raw || {}) as Record<string, unknown>;
                     const specific = (raw.specific as Record<string, unknown> | undefined) || {};
@@ -1272,7 +1327,7 @@ export function CharacterSheetApp({ index }: { index: RulesIndex }): JSX.Element
                     const special = String(specific["Special"] || "").trim();
                     const flavor = typeof raw.flavor === "string" ? raw.flavor : "";
                     const body = typeof raw.body === "string" ? raw.body : "";
-                    return (
+                      return (
                       <div
                         key={power.id}
                         style={{
@@ -1282,20 +1337,50 @@ export function CharacterSheetApp({ index }: { index: RulesIndex }): JSX.Element
                           padding: "0.55rem 0.65rem",
                           backgroundColor: accent.backgroundColor,
                           boxShadow: `inset 0 0 0 1px ${usageAccentColor(bucket)}33`,
-                          opacity: expended ? "var(--power-expended-opacity)" : 1,
+                          opacity: expended ? 0.58 : 1,
+                          filter: expended ? "grayscale(0.55) saturate(0.65) brightness(0.88) contrast(0.82)" : "none",
                           height: "100%",
                           boxSizing: "border-box",
                           display: "flex",
                           flexDirection: "column",
-                          overflow: "hidden"
+                          overflow: "hidden",
+                          cursor: "grab"
+                        }}
+                        draggable
+                        onDragStart={() => setDraggingPowerId(power.id)}
+                        onDragEnd={() => setDraggingPowerId(null)}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          if (!draggingPowerId) return;
+                          reorderPowerCardsByDrag(groupedPowers[bucket], draggingPowerId, power.id);
+                          setDraggingPowerId(null);
                         }}
                       >
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem" }}>
-                          <strong>{power.name}</strong>
+                          <strong style={{ textDecoration: expended ? "line-through" : "none" }}>{power.name}</strong>
                           <span style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>
                             Lv {power.level ?? 0} • {power.usage || "-"}
                           </span>
                         </div>
+                        {expended ? (
+                          <div
+                            style={{
+                              marginTop: "0.28rem",
+                              alignSelf: "flex-start",
+                              padding: "0.12rem 0.45rem",
+                              borderRadius: "999px",
+                              backgroundColor: "var(--status-danger)",
+                              color: "#ffffff",
+                              fontSize: "0.72rem",
+                              fontWeight: 700,
+                              letterSpacing: "0.04em",
+                              textTransform: "uppercase"
+                            }}
+                          >
+                            Used
+                          </div>
+                        ) : null}
                         {display ? <div style={{ fontSize: "0.82rem", color: "var(--text-secondary)", marginTop: "0.2rem" }}>{display}</div> : null}
                         {keywordTokens.length > 0 ? (
                           <div style={{ fontSize: "0.82rem", color: "var(--text-secondary)", marginTop: "0.2rem" }}>
@@ -1347,14 +1432,23 @@ export function CharacterSheetApp({ index }: { index: RulesIndex }): JSX.Element
                             />
                           </div>
                         ) : null}
-                        <div style={{ marginTop: "auto", paddingTop: "0.3rem" }}>
-                          {flavor ? (
-                            <p style={{ margin: "0 0 0.3rem 0", fontStyle: "italic", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
-                              {flavor}
-                            </p>
-                          ) : null}
-                        </div>
-                        <div style={{ display: "flex", gap: "0.35rem" }}>
+                        <div
+                          style={{
+                            marginTop: "auto",
+                            paddingTop: "0.35rem",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "flex-end",
+                            gap: "0.5rem"
+                          }}
+                        >
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            {flavor ? (
+                              <p style={{ margin: 0, fontStyle: "italic", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
+                                {flavor}
+                              </p>
+                            ) : null}
+                          </div>
                           {canExpend ? (
                             <button type="button" onClick={() => togglePowerExpended(power.id)}>
                               {expended ? "Mark Ready" : "Mark Used"}
@@ -1362,10 +1456,11 @@ export function CharacterSheetApp({ index }: { index: RulesIndex }): JSX.Element
                           ) : null}
                         </div>
                       </div>
-                    );
-                  })}
+                      );
+                    })}
                 </div>
-              )}
+              );
+              })()}
             </div>
           ))}
           {showRaceHoverInfo && derived.race && raceHoverPanelPos && (
