@@ -1,5 +1,5 @@
 import { CharacterBuild, Feat, RulesIndex } from "./models";
-import { evaluatePrereqs } from "./prereqEvaluator";
+import { evaluatePrereqs, hybridBaseClassNames } from "./prereqEvaluator";
 
 export interface ResolvedOption<T> {
   item: T;
@@ -12,8 +12,11 @@ export function resolveFeatOptions(index: RulesIndex, build: CharacterBuild): Re
   const classNames = new Map(index.classes.map((c) => [c.id, c.name]));
   const skillNames = new Map(index.skills.map((s) => [s.id, s.name]));
 
+  const hybridNames = hybridBaseClassNames(index, build);
   return index.feats.map((feat) => {
-    const result = evaluatePrereqs(feat.prereqTokens, build, raceNames, classNames, skillNames);
+    const result = evaluatePrereqs(feat.prereqTokens, build, raceNames, classNames, skillNames, {
+      additionalClassNamesForMatch: hybridNames.length ? hybridNames : undefined
+    });
     return {
       item: feat,
       legal: result.ok,

@@ -41,11 +41,11 @@ export function expectedClassDailyAttackSlots(level: number): number {
 }
 
 /**
- * At-will attack powers from class: 2 for all races; humans gain a third class at-will at 1st (PHB).
+ * At-will attack powers from class: 2 by default; some racial traits grant a third class at-will (e.g. Human Bonus At-Will).
  */
-export function expectedClassAtWillAttackSlots(level: number, human: boolean): number {
+export function expectedClassAtWillAttackSlots(level: number, bonusThirdClassAtWill: boolean): number {
   if (level < 1) return 0;
-  return 2 + (human ? 1 : 0);
+  return 2 + (bonusThirdClassAtWill ? 1 : 0);
 }
 
 /**

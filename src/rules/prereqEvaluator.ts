@@ -1,4 +1,4 @@
-import { CharacterBuild, PrereqToken, Tier, ValidationResult } from "./models";
+import { CharacterBuild, PrereqToken, RulesIndex, Tier, ValidationResult } from "./models";
 
 function tierFromLevel(level: number): Tier {
   if (level >= 21) {
@@ -10,17 +10,38 @@ function tierFromLevel(level: number): Tier {
   return "HEROIC";
 }
 
+export type PrereqEvaluateOptions = {
+  /** When set (e.g. hybrid), class prereqs match if the token equals any of these names or the primary class. */
+  additionalClassNamesForMatch?: string[];
+};
+
+/** Resolve PHB base class names for hybrid builds (for feat/theme prereqs). */
+export function hybridBaseClassNames(index: RulesIndex, build: CharacterBuild): string[] {
+  if (build.characterStyle !== "hybrid") return [];
+  const out: string[] = [];
+  const ha = index.hybridClasses?.find((h) => h.id === build.hybridClassIdA);
+  const hb = index.hybridClasses?.find((h) => h.id === build.hybridClassIdB);
+  for (const bid of [ha?.baseClassId, hb?.baseClassId]) {
+    if (!bid) continue;
+    const n = index.classes.find((c) => c.id === bid)?.name;
+    if (n) out.push(n);
+  }
+  return out;
+}
+
 export function evaluatePrereqs(
   prereqTokens: PrereqToken[],
   build: CharacterBuild,
   raceNameById: Map<string, string>,
   classNameById: Map<string, string>,
-  skillNameById: Map<string, string>
+  skillNameById: Map<string, string>,
+  options?: PrereqEvaluateOptions
 ): ValidationResult {
   const reasons: string[] = [];
   const tier = tierFromLevel(build.level);
   const raceName = build.raceId ? raceNameById.get(build.raceId) : undefined;
   const className = build.classId ? classNameById.get(build.classId) : undefined;
+  const extraClasses = options?.additionalClassNamesForMatch ?? [];
   const trainedSkillNames = new Set(
     build.trainedSkillIds.map((id) => (skillNameById.get(id) || "").toLowerCase())
   );
@@ -59,7 +80,10 @@ export function evaluatePrereqs(
     }
 
     if (token.kind === "class" && typeof token.value === "string") {
-      if (!className || className.toLowerCase() !== token.value.toLowerCase()) {
+      const want = token.value.toLowerCase();
+      const primaryOk = className && className.toLowerCase() === want;
+      const hybridOk = extraClasses.some((n) => n.toLowerCase() === want);
+      if (!primaryOk && !hybridOk) {
         reasons.push(`Requires class: ${token.value}`);
       }
       continue;

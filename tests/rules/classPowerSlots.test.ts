@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildClassPowerSlotDefinitions,
   orderedPowerIdsFromSlots,
-  powerPrintedLevelEligibleForSlot
+  powerPrintedLevelEligibleForSlot,
+  upcomingClassPowerSlotMilestones
 } from "../../src/rules/classPowerSlots";
 import { Power } from "../../src/rules/models";
 
@@ -16,7 +17,7 @@ describe("buildClassPowerSlotDefinitions", () => {
     expect(keys.some((k) => k.startsWith("utility:"))).toBe(false);
   });
 
-  it("adds a third at-will slot at level 1 for human", () => {
+  it("adds a third at-will slot at level 1 when bonusThirdClassAtWill is true", () => {
     const defs = buildClassPowerSlotDefinitions(1, true);
     expect(defs.filter((d) => d.bucket === "atWill")).toHaveLength(3);
   });
@@ -51,5 +52,19 @@ describe("orderedPowerIdsFromSlots", () => {
     const defs = buildClassPowerSlotDefinitions(1, false);
     const slots = { "atWill:0": "a", "atWill:1": "b", "encounter:1": "c", "daily:1": "d" };
     expect(orderedPowerIdsFromSlots(defs, slots)).toEqual(["a", "b", "c", "d"]);
+  });
+});
+
+describe("upcomingClassPowerSlotMilestones", () => {
+  it("at level 1 lists utility, encounter, then daily unlocks in level order", () => {
+    const m = upcomingClassPowerSlotMilestones(1);
+    expect(m.map((x) => x.atLevel)).toEqual([2, 3, 5]);
+    expect(m[0].label).toContain("utility");
+    expect(m[1].label).toContain("Encounter");
+    expect(m[2].label).toContain("Daily");
+  });
+
+  it("returns empty when all core slots are gained", () => {
+    expect(upcomingClassPowerSlotMilestones(30)).toEqual([]);
   });
 });

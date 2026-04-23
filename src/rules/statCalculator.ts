@@ -1,16 +1,21 @@
 import { Armor, CharacterBuild, ClassDef, Race } from "./models";
+import type { AcBreakdown } from "./defenseCalculator";
+import { bodyArmorSpeedPenalty, computeAcBreakdown, totalArmorCheckPenalty } from "./defenseCalculator";
 
 export interface DerivedStats {
   maxHp: number;
   healingSurgesPerDay: number;
   surgeValue: number;
   speed: number;
+  /** Total armor check penalty from body armor + shield (for STR/DEX skills when untrained). */
+  armorCheckPenalty: number;
   defenses: {
     ac: number;
     fortitude: number;
     reflex: number;
     will: number;
   };
+  acBreakdown: AcBreakdown;
 }
 
 function abilityMod(score: number): number {
@@ -38,23 +43,28 @@ export function computeDerivedStats(
   const healingSurgesPerDay = (cls?.healingSurgesBase || 6) + abilityMod(con);
   const surgeValue = Math.max(1, Math.floor(maxHp / 4));
 
-  const speed = race?.speed || 6;
-  const baseAC = 10;
+  const dexMod = abilityMod(dex);
+  const intMod = abilityMod(int);
+  const raceSpeed = race?.speed ?? 6;
+  const spdPen = bodyArmorSpeedPenalty(armor);
+  const speed = Math.max(0, raceSpeed - spdPen);
+
   const baseFort = 10;
   const baseRef = 10;
   const baseWill = 10;
-  const armorBonus = armor?.armorBonus || 0;
-  const shieldBonus = shield?.armorBonus || 0;
+
+  const acBreakdown = computeAcBreakdown(dexMod, intMod, armor, shield);
+  const armorCheckPenalty = totalArmorCheckPenalty(armor, shield);
 
   const defenses = {
-    ac: baseAC + armorBonus + shieldBonus + Math.max(abilityMod(dex), abilityMod(int)),
+    ac: acBreakdown.total,
     fortitude:
       baseFort +
       Math.max(abilityMod(str), abilityMod(con)) +
       (classDefenseBonuses?.Fortitude || 0),
     reflex:
       baseRef +
-      Math.max(abilityMod(dex), abilityMod(int)) +
+      Math.max(dexMod, intMod) +
       (classDefenseBonuses?.Reflex || 0),
     will:
       baseWill +
@@ -67,7 +77,9 @@ export function computeDerivedStats(
     healingSurgesPerDay,
     surgeValue,
     speed,
-    defenses
+    armorCheckPenalty,
+    defenses,
+    acBreakdown
   };
 }
 

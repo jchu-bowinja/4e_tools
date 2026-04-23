@@ -53,17 +53,17 @@ export function attackPowerBucketFromUsage(usage: string | null | undefined): "a
   return "encounter";
 }
 
-export function buildClassPowerSlotDefinitions(level: number, human: boolean): ClassPowerSlotDef[] {
+export function buildClassPowerSlotDefinitions(level: number, bonusThirdClassAtWill: boolean): ClassPowerSlotDef[] {
   const defs: ClassPowerSlotDef[] = [];
-  const nAw = expectedClassAtWillAttackSlots(level, human);
+  const nAw = expectedClassAtWillAttackSlots(level, bonusThirdClassAtWill);
   for (let i = 0; i < nAw; i++) {
     defs.push({
       key: `atWill:${i}`,
       bucket: "atWill",
       gainLevel: 1,
       label:
-        human && i === 2
-          ? "1st-level at-will (human bonus)"
+        bonusThirdClassAtWill && i === 2
+          ? "1st-level at-will (racial bonus)"
           : nAw > 1
             ? `${ordinalWord(1)}-level at-will (${i + 1} of ${nAw})`
             : `${ordinalWord(1)}-level at-will`
@@ -119,14 +119,14 @@ export function orderedPowerIdsFromSlots(
   return out;
 }
 
-/** Drop slot keys not valid for this level/human and values not legal for this class/level. */
+/** Drop slot keys not valid for this level / third at-will flag and values not legal for this class/level. */
 export function reconcileClassPowerSlotsForBuild(
   build: CharacterBuild,
   level: number,
-  human: boolean,
+  bonusThirdClassAtWill: boolean,
   index: RulesIndex
 ): { classPowerSlots?: Record<string, string>; powerIds: string[] } {
-  const defs = buildClassPowerSlotDefinitions(level, human);
+  const defs = buildClassPowerSlotDefinitions(level, bonusThirdClassAtWill);
   const validKeys = new Set(defs.map((d) => d.key));
   const attacks = getClassPowersForLevelRange(index, build.classId, level, "attack");
   const utils = getClassPowersForLevelRange(index, build.classId, level, "utility");
@@ -200,4 +200,25 @@ export function slotBucketSectionTitle(bucket: ClassPowerSlotBucket): string {
     default:
       return "Powers";
   }
+}
+
+/** Next PHB-style class power slot unlocks strictly after `level` (encounter / daily / utility schedule). */
+export function upcomingClassPowerSlotMilestones(level: number): { label: string; atLevel: number }[] {
+  const out: { label: string; atLevel: number }[] = [];
+  const nEnc = expectedClassEncounterAttackSlots(level);
+  if (nEnc < ENCOUNTER_ATTACK_SLOT_GAIN_LEVELS.length) {
+    const at = ENCOUNTER_ATTACK_SLOT_GAIN_LEVELS[nEnc];
+    if (at > level) out.push({ label: "Encounter attack slot", atLevel: at });
+  }
+  const nDaily = expectedClassDailyAttackSlots(level);
+  if (nDaily < DAILY_ATTACK_SLOT_GAIN_LEVELS.length) {
+    const at = DAILY_ATTACK_SLOT_GAIN_LEVELS[nDaily];
+    if (at > level) out.push({ label: "Daily attack slot", atLevel: at });
+  }
+  const nUtil = expectedClassUtilityPowerCount(level);
+  if (nUtil < CLASS_UTILITY_SLOT_GAIN_LEVELS.length) {
+    const at = CLASS_UTILITY_SLOT_GAIN_LEVELS[nUtil];
+    if (at > level) out.push({ label: "Class utility slot", atLevel: at });
+  }
+  return out.sort((a, b) => a.atLevel - b.atLevel);
 }

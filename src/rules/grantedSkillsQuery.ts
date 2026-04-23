@@ -6,13 +6,19 @@ function normalized(s: string): string {
 
 export function autoGrantedTrainedSkillIds(index: RulesIndex, build: CharacterBuild): string[] {
   const map = index.autoGrantedSkillTrainingNamesBySupportId ?? {};
-  const supportIds = [
-    build.raceId,
-    build.classId,
-    build.themeId,
-    build.paragonPathId,
-    build.epicDestinyId
-  ].filter((x): x is string => !!x);
+  const supportIds: string[] = [];
+  if (build.raceId) supportIds.push(build.raceId);
+  if (build.characterStyle === "hybrid") {
+    const ha = index.hybridClasses?.find((h) => h.id === build.hybridClassIdA);
+    const hb = index.hybridClasses?.find((h) => h.id === build.hybridClassIdB);
+    if (ha?.baseClassId) supportIds.push(ha.baseClassId);
+    if (hb?.baseClassId) supportIds.push(hb.baseClassId);
+  } else if (build.classId) {
+    supportIds.push(build.classId);
+  }
+  if (build.themeId) supportIds.push(build.themeId);
+  if (build.paragonPathId) supportIds.push(build.paragonPathId);
+  if (build.epicDestinyId) supportIds.push(build.epicDestinyId);
 
   const names = new Set<string>();
   for (const sid of supportIds) {
