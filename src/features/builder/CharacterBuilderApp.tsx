@@ -1,7 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Ability, AsiChoices, CharacterBuild, Feat, Power, PrereqToken, RacialTrait, RulesIndex } from "../../rules/models";
+import {
+  Ability,
+  AsiChoices,
+  CharacterBuild,
+  Feat,
+  HybridClassDef,
+  Implement,
+  Power,
+  PrereqToken,
+  RacialTrait,
+  RulesIndex,
+  Weapon
+} from "../../rules/models";
 import { defaultBuild } from "./defaultBuild";
 import { loadBuild, saveBuild } from "./storage";
+import { computeHybridDerivedStats, mergeHybridProficiencyLines, parseHybridDefenseBonuses } from "../../rules/hybridDerivedStats";
+import {
+  buildHybridPowerSlotDefinitions,
+  hybridPowerPoolUnion,
+  inferHybridClassPowerSlotsFromPowerIds,
+  powerAllowedForHybridSlot,
+  reconcileHybridClassPowerSlotsForBuild
+} from "../../rules/hybridPowerSlots";
 import { computeDerivedStats } from "../../rules/statCalculator";
 import { resolveFeatOptions } from "../../rules/optionResolver";
 import { applyAsiBonusesToScores, isHumanRace, requiredAsiMilestonesUpTo, totalFeatSlots } from "../../rules/advancement";
@@ -12,22 +32,33 @@ import {
   orderedPowerIdsFromSlots,
   powerPrintedLevelEligibleForSlot,
   reconcileClassPowerSlotsForBuild,
-  slotBucketSectionTitle
+  slotBucketSectionTitle,
+  upcomingClassPowerSlotMilestones
 } from "../../rules/classPowerSlots";
 import { getClassPowersForLevelRange, validateCharacterBuild } from "../../rules/characterValidator";
+import { getDilettanteCandidatePowers, getPowersForOwnerId } from "../../rules/classPowersQuery";
 import {
   autoGrantedClassPowers,
+  bonusClassAtWillSlotFromRaceBuild,
+  HUMAN_POWER_OPTION_RACE_KEY,
+  ID_RACIAL_TRAIT_BONUS_AT_WILL,
+  ID_RACIAL_TRAIT_HEROIC_EFFORT,
+  ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION,
   parseFeatAssociatedPowerNames,
   racePowerGroupsForRace,
+  racePowerSelectSelectionKey,
   resolvePowersByLooseNames
 } from "../../rules/grantedPowersQuery";
-import { getChildTraitIdsForSubrace, getRaceSubraceData } from "../../rules/raceSubraces";
-import { evaluatePrereqs } from "../../rules/prereqEvaluator";
+import { evaluatePrereqs, hybridBaseClassNames } from "../../rules/prereqEvaluator";
 import { applyRacialBonuses, getAbilityLabel, parseRaceAbilityBonusInfo } from "../../rules/abilityScores";
 import { getRaceSecondarySelectSlots, selectableStartingLanguages } from "../../rules/raceRuleSelects";
-import { resolveRacialTraitsForRace } from "../../rules/racialTraits";
+import { parseRacialTraitIdsFromRace, resolveRacialTraitsForRace } from "../../rules/racialTraits";
 import { getClassBuildOptions } from "../../rules/classBuildOptions";
 import { autoGrantedTrainedSkillIds } from "../../rules/grantedSkillsQuery";
+import { computeSkillSheetRows } from "../../rules/skillCalculator";
+import { multiclassFeatIds } from "../../rules/multiclassDetection";
+import { pruneStalePowerSelections } from "../../rules/powerSelections";
+import { summarizeImplementAttack, summarizeMainWeaponAttack } from "../../rules/weaponAttack";
 import { RulesRichText } from "./RulesRichText";
 import { NEUTRAL_PAGE_BG } from "../../ui/tokens";
 import {
@@ -45,12 +76,54 @@ interface Props {
   index: RulesIndex;
 }
 
+/** Synthetic / pseudoclass rows from the CB extract — not offered as playable classes. */
+const CLASS_NAMES_EXCLUDED_FROM_SELECT = new Set(["Any Class", "Order Adept Pseudoclass"]);
+
+/** Role bucket rows (Defender / Leader / etc.) stored as fake “classes” in some extracts. */
+const ROLE_LABELS_EXCLUDED_FROM_CLASS_SELECT = new Set(["defender", "leader", "striker", "controller"]);
+
+function isExcludedFromClassSelect(name: string): boolean {
+  if (CLASS_NAMES_EXCLUDED_FROM_SELECT.has(name)) return true;
+  return ROLE_LABELS_EXCLUDED_FROM_CLASS_SELECT.has(name.trim().toLowerCase());
+}
+
+function powerCardUsageAccent(usageRaw: string): { borderLeft: string; backgroundColor: string; border: string } {
+  const u = usageRaw.toLowerCase();
+  if (u.includes("at-will") || u.includes("at will")) {
+    return {
+      borderLeft: "4px solid #15803d",
+      backgroundColor: "#f0fdf4",
+      border: "1px solid #bbf7d0"
+    };
+  }
+  if (u.includes("encounter")) {
+    return {
+      borderLeft: "4px solid #dc2626",
+      backgroundColor: "#fef2f2",
+      border: "1px solid #fecaca"
+    };
+  }
+  if (u.includes("daily")) {
+    return {
+      borderLeft: "4px solid #0a0a0a",
+      backgroundColor: "#fafafa",
+      border: "1px solid #171717"
+    };
+  }
+  return {
+    borderLeft: "4px solid #cbd5e1",
+    backgroundColor: "#fff",
+    border: "1px solid #dadde7"
+  };
+}
+
 function renderPowerCard(power: Power, key?: string): JSX.Element {
   const raw = (power.raw || {}) as Record<string, unknown>;
   const specific = (power.raw?.specific as Record<string, unknown> | undefined) || {};
   const flavor = typeof raw.flavor === "string" ? raw.flavor : "";
   const body = typeof raw.body === "string" ? raw.body : "";
   const usage = String(specific["Power Usage"] || power.usage || "-");
+  const accent = powerCardUsageAccent(usage);
   const powerType = String(specific["Power Type"] || "-");
   const level = power.level ?? null;
   const display = String(specific["Display"] || power.display || "").trim();
@@ -69,8 +142,9 @@ function renderPowerCard(power: Power, key?: string): JSX.Element {
     <article
       key={key || power.id}
       style={{
-        border: "1px solid #dadde7",
-        backgroundColor: "#fff",
+        border: accent.border,
+        borderLeft: accent.borderLeft,
+        backgroundColor: accent.backgroundColor,
         borderRadius: "8px",
         padding: "0.55rem 0.65rem",
         marginTop: "0.45rem"
@@ -113,6 +187,210 @@ function renderPowerCard(power: Power, key?: string): JSX.Element {
         </div>
       )}
     </article>
+  );
+}
+
+function PowerConstructionSelects(props: {
+  power: Power;
+  build: CharacterBuild;
+  onChange: (next: CharacterBuild) => void;
+}): JSX.Element | null {
+  const groups = props.power.powerSelectionGroups;
+  if (!groups || groups.length === 0) return null;
+  const cur = props.build.powerSelections?.[props.power.id] ?? {};
+  return (
+    <div
+      style={{
+        marginTop: "0.35rem",
+        padding: "0.4rem 0.55rem",
+        backgroundColor: "#f1f5f9",
+        borderRadius: "6px",
+        border: "1px solid #cbd5e1"
+      }}
+    >
+      <div
+        style={{
+          fontSize: "0.72rem",
+          fontWeight: 700,
+          color: "#475569",
+          marginBottom: "0.35rem",
+          textTransform: "uppercase",
+          letterSpacing: "0.04em"
+        }}
+      >
+        Power options
+      </div>
+      {groups.map((g) => (
+        <label key={g.key} style={{ display: "block", marginBottom: "0.45rem", fontSize: "0.8rem", fontWeight: 600, color: "#334155" }}>
+          {g.label}
+          <select
+            value={cur[g.key] || ""}
+            onChange={(e) => {
+              const v = e.target.value;
+              const prev = props.build.powerSelections ?? {};
+              const inner = { ...(prev[props.power.id] ?? {}) };
+              if (v) inner[g.key] = v;
+              else delete inner[g.key];
+              const nextPs = { ...prev };
+              if (Object.keys(inner).length) nextPs[props.power.id] = inner;
+              else delete nextPs[props.power.id];
+              props.onChange({
+                ...props.build,
+                powerSelections: Object.keys(nextPs).length ? nextPs : undefined
+              });
+            }}
+            style={{
+              width: "100%",
+              maxWidth: "28rem",
+              marginTop: "0.2rem",
+              padding: "0.35rem",
+              borderRadius: "6px",
+              border: "1px solid #94a3b8",
+              boxSizing: "border-box",
+              fontSize: "0.82rem"
+            }}
+          >
+            <option value="">— Choose —</option>
+            {g.options.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.name}
+              </option>
+            ))}
+          </select>
+          {(() => {
+            const sel = g.options.find((o) => o.id === cur[g.key]);
+            return sel?.shortDescription ? (
+              <p style={{ margin: "0.3rem 0 0 0", fontSize: "0.78rem", color: "#64748b", lineHeight: 1.45 }}>{sel.shortDescription}</p>
+            ) : null;
+          })()}
+        </label>
+      ))}
+    </div>
+  );
+}
+
+function hybridRawSpecific(hybrid: HybridClassDef): Record<string, unknown> {
+  return (hybrid.raw?.specific as Record<string, unknown> | undefined) || {};
+}
+
+function formatHybridStatNumber(n: number | null | undefined): string {
+  if (n == null || Number.isNaN(Number(n))) return "—";
+  const x = Number(n);
+  return Number.isInteger(x) ? String(x) : String(x);
+}
+
+function HybridClassDetailPanel(props: {
+  hybrid: HybridClassDef;
+  baseClassName: string | undefined;
+  slotNote: string;
+}): JSX.Element {
+  const spec = hybridRawSpecific(props.hybrid);
+  const h = props.hybrid;
+  const hpAt1Raw = spec["Hit Points at 1st Level"];
+  const hpAt1Display =
+    typeof hpAt1Raw === "string" && String(hpAt1Raw).trim()
+      ? String(hpAt1Raw)
+      : h.hitPointsAt1 != null
+        ? `${h.hitPointsAt1} + Constitution score`
+        : "—";
+  const hpPerRaw = spec["Hit Points per Level Gained"];
+  const hpPerDisplay =
+    typeof hpPerRaw === "string" && String(hpPerRaw).trim()
+      ? String(hpPerRaw)
+      : formatHybridStatNumber(h.hitPointsPerLevel ?? null);
+  const surgesRaw = spec["Healing Surges"];
+  const surgesDisplay =
+    typeof surgesRaw === "string" && String(surgesRaw).trim()
+      ? String(surgesRaw)
+      : formatHybridStatNumber(h.healingSurgesBase ?? null);
+
+  const trainedSkills = spec["Trained Skills"];
+  const trainedDisplay = typeof trainedSkills === "string" && trainedSkills.trim() ? trainedSkills : null;
+  const body = typeof h.raw?.body === "string" ? h.raw.body : "";
+
+  return (
+    <div
+      style={{
+        border: "1px solid #e5e7eb",
+        borderRadius: "8px",
+        padding: "0.65rem 0.75rem",
+        backgroundColor: "#fafafa"
+      }}
+    >
+      <p style={{ margin: 0, fontWeight: 700, fontSize: "0.95rem", color: "#111827" }}>{h.name}</p>
+      <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.8rem", color: "#6b7280" }}>
+        {h.source ? `Source: ${h.source} · ` : ""}
+        {props.slotNote}
+      </p>
+      <p style={{ margin: "0.45rem 0 0 0", fontSize: "0.84rem", lineHeight: 1.5 }}>
+        <strong>Base class (powers):</strong> {props.baseClassName ?? "—"}
+      </p>
+      <p style={{ margin: "0.28rem 0 0 0", fontSize: "0.84rem", lineHeight: 1.5 }}>
+        <strong>Role:</strong> {String(h.role || spec["Role"] || "-")}
+      </p>
+      <p style={{ margin: "0.28rem 0 0 0", fontSize: "0.84rem", lineHeight: 1.5 }}>
+        <strong>Power Source:</strong> {String(h.powerSource || spec["Power Source"] || "-")}
+      </p>
+      <p style={{ margin: "0.28rem 0 0 0", fontSize: "0.84rem", lineHeight: 1.5 }}>
+        <strong>Key Abilities:</strong> {String(h.keyAbilities || spec["Key Abilities"] || "-")}
+      </p>
+      <p style={{ margin: "0.28rem 0 0 0", fontSize: "0.84rem", lineHeight: 1.5 }}>
+        <strong>Hit Points at 1st Level:</strong> {hpAt1Display}
+      </p>
+      <p style={{ margin: "0.28rem 0 0 0", fontSize: "0.84rem", lineHeight: 1.5 }}>
+        <strong>Hit Points per Level Gained:</strong> {hpPerDisplay}
+      </p>
+      <p style={{ margin: "0.28rem 0 0 0", fontSize: "0.84rem", lineHeight: 1.5 }}>
+        <strong>Healing Surges (without Con):</strong> {surgesDisplay}
+      </p>
+      <p style={{ margin: "0.28rem 0 0 0", fontSize: "0.84rem", lineHeight: 1.5 }}>
+        <strong>Bonus to Defense:</strong> {String(h.bonusToDefense || spec["Bonus to Defense"] || "-")}
+      </p>
+      <p style={{ margin: "0.28rem 0 0 0", fontSize: "0.84rem", lineHeight: 1.5 }}>
+        <strong>Armor Proficiencies:</strong> {String(h.armorProficiencies || spec["Armor Proficiencies"] || "-")}
+      </p>
+      <p style={{ margin: "0.28rem 0 0 0", fontSize: "0.84rem", lineHeight: 1.5 }}>
+        <strong>Weapon Proficiencies:</strong> {String(h.weaponProficiencies || spec["Weapon Proficiencies"] || "-")}
+      </p>
+      <p style={{ margin: "0.28rem 0 0 0", fontSize: "0.84rem", lineHeight: 1.5 }}>
+        <strong>Implements:</strong> {String(h.implementText || spec["Implements"] || spec["Implement"] || "-")}
+      </p>
+      <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.84rem", lineHeight: 1.5 }}>
+        <strong>Class Skills:</strong> {String(h.classSkillsRaw || spec["Class Skills"] || "—")}
+      </p>
+      {trainedDisplay && (
+        <p style={{ margin: "0.28rem 0 0 0", fontSize: "0.84rem", lineHeight: 1.5 }}>
+          <strong>Trained Skills (text):</strong> {trainedDisplay}
+        </p>
+      )}
+      {h.hybridTalentOptions &&
+      String(h.hybridTalentOptions).trim() &&
+      !(h.hybridTalentClassFeatures && h.hybridTalentClassFeatures.length > 0) ? (
+        <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.84rem", lineHeight: 1.45 }}>
+          <strong>Hybrid Talent Options:</strong> {String(h.hybridTalentOptions)}
+        </p>
+      ) : null}
+      {spec["Build Options"] ? (
+        <details open style={{ marginTop: "0.45rem" }}>
+          <summary style={{ fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}>Build Options</summary>
+          <div style={{ marginTop: "0.35rem", fontSize: "0.82rem", color: "#444" }}>
+            <RulesRichText
+              text={String(spec["Build Options"])}
+              paragraphStyle={{ fontSize: "0.82rem", color: "#444" }}
+              listItemStyle={{ fontSize: "0.82rem", color: "#444" }}
+            />
+          </div>
+        </details>
+      ) : null}
+      {body ? (
+        <details open style={{ marginTop: "0.45rem" }}>
+          <summary style={{ fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}>Description</summary>
+          <div style={{ marginTop: "0.35rem", fontSize: "0.82rem", color: "#444" }}>
+            <RulesRichText text={body} paragraphStyle={{ fontSize: "0.82rem", color: "#444" }} listItemStyle={{ fontSize: "0.82rem", color: "#444" }} />
+          </div>
+        </details>
+      ) : null}
+    </div>
   );
 }
 
@@ -244,7 +522,6 @@ function importBuildFromFile(file: File, onLoaded: (build: CharacterBuild) => vo
 }
 
 export function CharacterBuilderApp({ index }: Props): JSX.Element {
-  const SUBRACE_SELECTION_KEY = "subrace";
   const [build, setBuild] = useState<CharacterBuild>(() => loadBuild() || defaultBuild);
   const prevAutoGrantedSkillIdsRef = useRef<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<BuilderTab>("race");
@@ -258,6 +535,9 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
   const [themeSearch, setThemeSearch] = useState("");
   const [paragonSearch, setParagonSearch] = useState("");
   const [epicSearch, setEpicSearch] = useState("");
+  const [mainWeaponSearch, setMainWeaponSearch] = useState("");
+  const [offHandWeaponSearch, setOffHandWeaponSearch] = useState("");
+  const [implementSearch, setImplementSearch] = useState("");
 
   const selectedRace = index.races.find((r) => r.id === build.raceId);
   const selectedClass = index.classes.find((c) => c.id === build.classId);
@@ -266,6 +546,18 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
   const selectedEpicDestiny = index.epicDestinies.find((d) => d.id === build.epicDestinyId);
   const selectedArmor = index.armors.find((a) => a.id === build.armorId);
   const selectedShield = index.armors.find((a) => a.id === build.shieldId);
+  const selectedMainWeapon = (index.weapons ?? []).find((w) => w.id === build.mainWeaponId);
+  const selectedOffHandWeapon = (index.weapons ?? []).find((w) => w.id === build.offHandWeaponId);
+  const selectedImplement = (index.implements ?? []).find((i) => i.id === build.implementId);
+  const isHybridBuild = build.characterStyle === "hybrid";
+  const selectedHybridA: HybridClassDef | undefined = index.hybridClasses?.find((h) => h.id === build.hybridClassIdA);
+  const selectedHybridB: HybridClassDef | undefined = index.hybridClasses?.find((h) => h.id === build.hybridClassIdB);
+  const hybridBaseClassAId = selectedHybridA?.baseClassId;
+  const hybridBaseClassBId = selectedHybridB?.baseClassId;
+  const hybridBaseClassDefA = hybridBaseClassAId ? index.classes.find((c) => c.id === hybridBaseClassAId) : undefined;
+  const hybridBaseClassDefB = hybridBaseClassBId ? index.classes.find((c) => c.id === hybridBaseClassBId) : undefined;
+  const classIdForDilettante = isHybridBuild ? hybridBaseClassAId : build.classId;
+  const hybridClassSelectionComplete = isHybridBuild && !!selectedHybridA && !!selectedHybridB;
   const raceSpecific = (selectedRace?.raw?.specific as Record<string, unknown> | undefined) || {};
   const classSpecific = (selectedClass?.raw?.specific as Record<string, unknown> | undefined) || {};
   const classBuildOptions = useMemo(() => getClassBuildOptions(index, selectedClass), [index, selectedClass]);
@@ -294,33 +586,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
     () => resolveRacialTraitsForRace(selectedRace, racialTraitById),
     [selectedRace, racialTraitById]
   );
-  const raceSubraceData = useMemo(
-    () => getRaceSubraceData(selectedRace, racialTraitById),
-    [selectedRace, racialTraitById]
-  );
-  const selectedSubraceTrait = useMemo(() => {
-    const pickedId = build.raceSelections?.[SUBRACE_SELECTION_KEY];
-    if (!pickedId || !raceSubraceData) return undefined;
-    return raceSubraceData.options.find((o) => o.id === pickedId);
-  }, [build.raceSelections, raceSubraceData]);
-  const selectedSubraceChildTraitIds = useMemo(
-    () => getChildTraitIdsForSubrace(selectedSubraceTrait),
-    [selectedSubraceTrait]
-  );
-  const displayedRacialTraitRows = useMemo(() => {
-    const rows = [...racialTraitRows];
-    const seen = new Set(rows.map((r) => r.id));
-    if (selectedSubraceTrait && !seen.has(selectedSubraceTrait.id)) {
-      rows.push({ id: selectedSubraceTrait.id, trait: selectedSubraceTrait });
-      seen.add(selectedSubraceTrait.id);
-    }
-    for (const id of selectedSubraceChildTraitIds) {
-      if (seen.has(id)) continue;
-      rows.push({ id, trait: racialTraitById.get(id) });
-      seen.add(id);
-    }
-    return rows;
-  }, [racialTraitRows, selectedSubraceTrait, selectedSubraceChildTraitIds, racialTraitById]);
+  const displayedRacialTraitRows = racialTraitRows;
   const scoresAfterLevel = useMemo(
     () => applyAsiBonusesToScores(build.abilityScores, build.level, build.asiChoices),
     [build.abilityScores, build.level, build.asiChoices]
@@ -331,10 +597,104 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
   );
   const effectiveBuild = useMemo(() => ({ ...build, abilityScores: effectiveAbilityScores }), [build, effectiveAbilityScores]);
   const legality = useMemo(() => validateCharacterBuild(index, build), [index, build]);
-  const derived = useMemo(
-    () => computeDerivedStats(effectiveBuild, selectedRace, selectedClass, selectedArmor, selectedShield, legality.classDefenseBonuses),
-    [effectiveBuild, selectedRace, selectedClass, selectedArmor, selectedShield, legality.classDefenseBonuses]
+  const derived = useMemo(() => {
+    if (isHybridBuild && selectedHybridA && selectedHybridB) {
+      return computeHybridDerivedStats(
+        effectiveBuild,
+        selectedRace,
+        selectedHybridA,
+        selectedHybridB,
+        selectedArmor,
+        selectedShield,
+        parseHybridDefenseBonuses(selectedHybridA, selectedHybridB)
+      );
+    }
+    return computeDerivedStats(effectiveBuild, selectedRace, selectedClass, selectedArmor, selectedShield, legality.classDefenseBonuses);
+  }, [
+    effectiveBuild,
+    selectedRace,
+    selectedClass,
+    selectedArmor,
+    selectedShield,
+    legality.classDefenseBonuses,
+    isHybridBuild,
+    selectedHybridA,
+    selectedHybridB
+  ]);
+
+  const skillSheetRows = useMemo(() => {
+    const ids = new Set<string>([...autoGrantedSkillIds, ...build.trainedSkillIds]);
+    return computeSkillSheetRows(index, build.level, effectiveAbilityScores, ids, derived.armorCheckPenalty);
+  }, [index, build.level, effectiveAbilityScores, autoGrantedSkillIds, build.trainedSkillIds, derived.armorCheckPenalty]);
+
+  const classWeaponProfText = useMemo(() => {
+    if (isHybridBuild && selectedHybridA && selectedHybridB) {
+      return mergeHybridProficiencyLines(selectedHybridA, selectedHybridB).weaponLine;
+    }
+    return String(classSpecific["Weapon Proficiencies"] || "");
+  }, [isHybridBuild, selectedHybridA, selectedHybridB, classSpecific]);
+  const classImplementProfText = useMemo(() => {
+    if (isHybridBuild && selectedHybridA && selectedHybridB) {
+      return mergeHybridProficiencyLines(selectedHybridA, selectedHybridB).implementLine;
+    }
+    return [classSpecific["Implements"], classSpecific["Implement"]]
+      .filter((x): x is string => typeof x === "string")
+      .join("; ");
+  }, [isHybridBuild, selectedHybridA, selectedHybridB, classSpecific]);
+
+  const weaponsSorted = useMemo(
+    () =>
+      [...(index.weapons ?? [])].sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+      ),
+    [index.weapons]
   );
+  const implementsSorted = useMemo(
+    () =>
+      [...(index.implements ?? [])].sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+      ),
+    [index.implements]
+  );
+  const mainWeaponOptions = useMemo(
+    () =>
+      ensureSelectedEntityInFiltered(filterRulesEntitiesByQuery(weaponsSorted, mainWeaponSearch), build.mainWeaponId, weaponsSorted),
+    [weaponsSorted, mainWeaponSearch, build.mainWeaponId]
+  );
+  const offHandWeaponOptions = useMemo(
+    () =>
+      ensureSelectedEntityInFiltered(
+        filterRulesEntitiesByQuery(weaponsSorted, offHandWeaponSearch),
+        build.offHandWeaponId,
+        weaponsSorted
+      ),
+    [weaponsSorted, offHandWeaponSearch, build.offHandWeaponId]
+  );
+  const implementOptions = useMemo(
+    () =>
+      ensureSelectedEntityInFiltered(filterRulesEntitiesByQuery(implementsSorted, implementSearch), build.implementId, implementsSorted),
+    [implementsSorted, implementSearch, build.implementId]
+  );
+  const mainWeaponSummary = useMemo(
+    () => summarizeMainWeaponAttack(build.level, effectiveAbilityScores, selectedMainWeapon, classWeaponProfText),
+    [build.level, effectiveAbilityScores, selectedMainWeapon, classWeaponProfText]
+  );
+  const offHandWeaponSummary = useMemo(
+    () => summarizeMainWeaponAttack(build.level, effectiveAbilityScores, selectedOffHandWeapon, classWeaponProfText),
+    [build.level, effectiveAbilityScores, selectedOffHandWeapon, classWeaponProfText]
+  );
+  const implementAttackSummary = useMemo(
+    () =>
+      summarizeImplementAttack(
+        build.level,
+        effectiveAbilityScores,
+        hybridBaseClassDefA || selectedClass,
+        selectedImplement,
+        classImplementProfText
+      ),
+    [build.level, effectiveAbilityScores, hybridBaseClassDefA, selectedClass, selectedImplement, classImplementProfText]
+  );
+  const multiclassFeatIdList = useMemo(() => multiclassFeatIds(index, build), [index, build]);
 
   const featOptions = useMemo(() => resolveFeatOptions(index, effectiveBuild), [index, effectiveBuild]);
   const allLegalFeats = useMemo(() => featOptions.filter((f) => f.legal), [featOptions]);
@@ -373,27 +733,98 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
     }
     return [...values].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
   }, [featOptions]);
-  const classAttackPowers = useMemo(
-    () => getClassPowersForLevelRange(index, build.classId, build.level, "attack"),
-    [index, build.classId, build.level]
-  );
-  const classUtilityPowers = useMemo(
-    () => getClassPowersForLevelRange(index, build.classId, build.level, "utility"),
-    [index, build.classId, build.level]
-  );
-  const powerSlotDefs = useMemo(
-    () => buildClassPowerSlotDefinitions(build.level, isHumanRace(selectedRace?.name)),
-    [build.level, selectedRace?.name]
-  );
+  const classAttackPowers = useMemo(() => {
+    if (isHybridBuild && hybridBaseClassAId && hybridBaseClassBId) {
+      return hybridPowerPoolUnion(index, hybridBaseClassAId, hybridBaseClassBId, build.level, "attack");
+    }
+    return getClassPowersForLevelRange(index, build.classId, build.level, "attack");
+  }, [index, build.classId, build.level, isHybridBuild, hybridBaseClassAId, hybridBaseClassBId]);
+  const classUtilityPowers = useMemo(() => {
+    if (isHybridBuild && hybridBaseClassAId && hybridBaseClassBId) {
+      return hybridPowerPoolUnion(index, hybridBaseClassAId, hybridBaseClassBId, build.level, "utility");
+    }
+    return getClassPowersForLevelRange(index, build.classId, build.level, "utility");
+  }, [index, build.classId, build.level, isHybridBuild, hybridBaseClassAId, hybridBaseClassBId]);
+  const dilettanteCandidatePowers = useMemo(() => {
+    const cid = hybridBaseClassAId || build.classId;
+    return getDilettanteCandidatePowers(index, cid, isHybridBuild ? hybridBaseClassBId : undefined);
+  }, [index, build.classId, hybridBaseClassAId, hybridBaseClassBId, isHybridBuild]);
+  const paragonPathGrantedPowers = useMemo(() => {
+    if (!build.paragonPathId || build.level < 11) return [];
+    const atk = getPowersForOwnerId(index, build.paragonPathId, build.level, "attack");
+    const util = getPowersForOwnerId(index, build.paragonPathId, build.level, "utility");
+    return [...atk, ...util].sort((a, b) => {
+      const la = a.level ?? 0;
+      const lb = b.level ?? 0;
+      if (la !== lb) return la - lb;
+      return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    });
+  }, [index, build.paragonPathId, build.level]);
+  const epicDestinyGrantedPowers = useMemo(() => {
+    if (!build.epicDestinyId || build.level < 21) return [];
+    const atk = getPowersForOwnerId(index, build.epicDestinyId, build.level, "attack");
+    const util = getPowersForOwnerId(index, build.epicDestinyId, build.level, "utility");
+    return [...atk, ...util].sort((a, b) => {
+      const la = a.level ?? 0;
+      const lb = b.level ?? 0;
+      if (la !== lb) return la - lb;
+      return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    });
+  }, [index, build.epicDestinyId, build.level]);
+  const themeGrantedPowers = useMemo(() => {
+    if (!build.themeId) return [];
+    const atk = getPowersForOwnerId(index, build.themeId, build.level, "attack");
+    const util = getPowersForOwnerId(index, build.themeId, build.level, "utility");
+    return [...atk, ...util].sort((a, b) => {
+      const la = a.level ?? 0;
+      const lb = b.level ?? 0;
+      if (la !== lb) return la - lb;
+      return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    });
+  }, [index, build.themeId, build.level]);
+  const upcomingPowerSlotMilestones = useMemo(() => upcomingClassPowerSlotMilestones(build.level), [build.level]);
+  const bonusClassAtWill = useMemo(() => bonusClassAtWillSlotFromRaceBuild(index, build), [index, build.raceId, build.raceSelections]);
+
+  function reconcilePowerSlotsForBuild(nextBase: CharacterBuild, lv: number): { classPowerSlots?: Record<string, string>; powerIds: string[] } {
+    const bonus = bonusClassAtWillSlotFromRaceBuild(index, nextBase);
+    if (nextBase.characterStyle === "hybrid") {
+      const ha = index.hybridClasses?.find((h) => h.id === nextBase.hybridClassIdA);
+      const hb = index.hybridClasses?.find((h) => h.id === nextBase.hybridClassIdB);
+      return reconcileHybridClassPowerSlotsForBuild(nextBase, lv, bonus, index, ha?.baseClassId ?? undefined, hb?.baseClassId ?? undefined);
+    }
+    return reconcileClassPowerSlotsForBuild(nextBase, lv, bonus, index);
+  }
+
+  const humanPowerExtraTraitIds = useMemo(() => {
+    const top = parseRacialTraitIdsFromRace(selectedRace);
+    if (!top.includes(ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION)) return [];
+    const pick = build.raceSelections?.[HUMAN_POWER_OPTION_RACE_KEY];
+    if (pick === ID_RACIAL_TRAIT_HEROIC_EFFORT) return [ID_RACIAL_TRAIT_HEROIC_EFFORT];
+    return [];
+  }, [selectedRace, build.raceSelections]);
+  const powerSlotDefs = useMemo(() => {
+    if (isHybridBuild) return buildHybridPowerSlotDefinitions(build.level, bonusClassAtWill);
+    return buildClassPowerSlotDefinitions(build.level, bonusClassAtWill);
+  }, [build.level, bonusClassAtWill, isHybridBuild]);
   const racePowerGroups = useMemo(
     () =>
       racePowerGroupsForRace(selectedRace, racialTraitById, [
-        ...(selectedSubraceTrait ? [selectedSubraceTrait.id] : []),
-        ...selectedSubraceChildTraitIds
+        ...humanPowerExtraTraitIds
       ]),
-    [selectedRace, racialTraitById, selectedSubraceTrait, selectedSubraceChildTraitIds]
+    [selectedRace, racialTraitById, humanPowerExtraTraitIds]
   );
-  const classAutoGrantedPowers = useMemo(() => autoGrantedClassPowers(index, build.classId), [index, build.classId]);
+  const classAutoGrantedPowers = useMemo(() => {
+    if (isHybridBuild && hybridBaseClassAId && hybridBaseClassBId) {
+      const a = autoGrantedClassPowers(index, hybridBaseClassAId);
+      const b = autoGrantedClassPowers(index, hybridBaseClassBId);
+      const byId = new Map<string, Power>();
+      for (const p of [...a, ...b]) byId.set(p.id, p);
+      return [...byId.values()].sort((x, y) =>
+        x.name.localeCompare(y.name, undefined, { sensitivity: "base" })
+      );
+    }
+    return autoGrantedClassPowers(index, build.classId);
+  }, [index, build.classId, isHybridBuild, hybridBaseClassAId, hybridBaseClassBId]);
   const featAssociatedPowers = useMemo(() => {
     const rows: Array<{ feat: Feat; powers: Power[] }> = [];
     for (const id of build.featIds) {
@@ -423,7 +854,34 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
 
   const raceNameById = useMemo(() => new Map(index.races.map((r) => [r.id, r.name])), [index.races]);
   const classNameById = useMemo(() => new Map(index.classes.map((c) => [c.id, c.name])), [index.classes]);
+  const classesForSelect = useMemo(
+    () =>
+      ensureSelectedEntityInFiltered(
+        index.classes.filter((c) => !isExcludedFromClassSelect(c.name)),
+        build.classId,
+        index.classes
+      ),
+    [index.classes, build.classId]
+  );
+  const hybridClassesSorted = useMemo(
+    () =>
+      [...(index.hybridClasses ?? [])].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })),
+    [index.hybridClasses]
+  );
+  const hybridClassesForHybridSelect = useMemo(
+    () =>
+      ensureSelectedEntityInFiltered(
+        ensureSelectedEntityInFiltered(hybridClassesSorted, build.hybridClassIdA, hybridClassesSorted),
+        build.hybridClassIdB,
+        hybridClassesSorted
+      ),
+    [hybridClassesSorted, build.hybridClassIdA, build.hybridClassIdB]
+  );
   const skillNameById = useMemo(() => new Map(index.skills.map((s) => [s.id, s.name])), [index.skills]);
+  const hybridPrereqOptions = useMemo(
+    () => ({ additionalClassNamesForMatch: hybridBaseClassNames(index, build) }),
+    [index, build.characterStyle, build.hybridClassIdA, build.hybridClassIdB]
+  );
 
   const themesSorted = useMemo(
     () => [...index.themes].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })),
@@ -498,7 +956,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
     if (minLevel > 0 && build.level < minLevel) {
       reasons.push(`Requires level ${minLevel}+`);
     }
-    const ev = evaluatePrereqs(tokens, build, raceNameById, classNameById, skillNameById);
+    const ev = evaluatePrereqs(tokens, build, raceNameById, classNameById, skillNameById, hybridPrereqOptions);
     if (!ev.ok) reasons.push(...ev.reasons);
     return { legal: reasons.length === 0, reasons };
   }
@@ -519,6 +977,9 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
     }
     if (m === "choose a race." || m.startsWith("race:")) return "race";
     if (m === "choose a class.") return "class";
+    if (m.startsWith("power:")) return "powers";
+    if (m.includes("hybrid class")) return "class";
+    if (m.includes("hybrid talent")) return "class";
     if (m.includes("point-buy") || m.includes("ability increases")) return "abilities";
     if (m.includes("ability") || m.includes("score")) return "abilities";
     if (m.includes("trained") || m.includes("skill")) return "skills";
@@ -526,6 +987,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
     if (m.includes("utility power")) return "powers";
     if (m.includes("at-will") || m.includes("encounter") || m.includes("daily") || m.includes("power")) return "powers";
     if (m.includes("armor") || m.includes("shield") || m.includes("proficiency")) return "equipment";
+    if (m.includes("main weapon") || m.includes("off-hand weapon") || m.includes("selected implement")) return "equipment";
     return "summary";
   }
 
@@ -539,9 +1001,10 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
     );
 
     const requiresRacialChoice = raceAbilityBonusInfo.chooseOne.length > 0 && !build.racialAbilityChoice;
+    const classReady = isHybridBuild ? hybridClassSelectionComplete : !!selectedClass;
     const statuses: Record<BuilderTab, "complete" | "incomplete"> = {
       race: !!selectedRace && errorsByTab.race === 0 ? "complete" : "incomplete",
-      class: !!selectedClass && errorsByTab.class === 0 ? "complete" : "incomplete",
+      class: classReady && errorsByTab.class === 0 ? "complete" : "incomplete",
       abilities:
         errorsByTab.abilities === 0 &&
         pointBuy.remaining >= 0 &&
@@ -549,10 +1012,10 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
         !requiresRacialChoice
           ? "complete"
           : "incomplete",
-      skills: !!selectedClass && errorsByTab.skills === 0 ? "complete" : "incomplete",
+      skills: classReady && errorsByTab.skills === 0 ? "complete" : "incomplete",
       feats:
         errorsByTab.feats === 0 && build.featIds.length === expectedFeatCount ? "complete" : "incomplete",
-      powers: !!selectedClass && errorsByTab.powers === 0 ? "complete" : "incomplete",
+      powers: classReady && errorsByTab.powers === 0 ? "complete" : "incomplete",
       paths: errorsByTab.paths === 0 ? "complete" : "incomplete",
       equipment: errorsByTab.equipment === 0 ? "complete" : "incomplete",
       summary: legality.errors.length === 0 ? "complete" : "incomplete"
@@ -562,6 +1025,10 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
     legality.errors,
     selectedRace,
     selectedClass,
+    isHybridBuild,
+    hybridClassSelectionComplete,
+    selectedHybridA,
+    selectedHybridB,
     build.trainedSkillIds.length,
     build.featIds.length,
     build.powerIds.length,
@@ -581,33 +1048,97 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
   }
 
   function updateBuild(next: CharacterBuild): void {
-    setBuild(next);
-    saveBuild(next);
+    const pruned = pruneStalePowerSelections(index, next);
+    setBuild(pruned);
+    saveBuild(pruned);
+  }
+
+  function renderPowerCardWithSelections(p: Power, cardKey: string): JSX.Element {
+    return (
+      <div key={cardKey}>
+        {renderPowerCard(p, `${cardKey}-card`)}
+        <PowerConstructionSelects power={p} build={build} onChange={updateBuild} />
+      </div>
+    );
+  }
+
+  function commitRacePowerSelection(traitId: string, powerId: string): void {
+    const key = racePowerSelectSelectionKey(traitId);
+    const prevPow = build.raceSelections?.[key];
+    const next = { ...(build.raceSelections || {}) };
+    if (powerId) next[key] = powerId;
+    else delete next[key];
+    const keys = Object.keys(next);
+    let nextBuild: CharacterBuild = { ...build, raceSelections: keys.length ? next : undefined };
+    if (prevPow && prevPow !== powerId && nextBuild.powerSelections?.[prevPow]) {
+      const ps = { ...nextBuild.powerSelections };
+      delete ps[prevPow];
+      nextBuild = { ...nextBuild, powerSelections: Object.keys(ps).length ? ps : undefined };
+    }
+    updateBuild(nextBuild);
   }
 
   function commitClassPowerSlot(slotKey: string, powerId: string): void {
-    const human = isHumanRace(selectedRace?.name);
-    const defs = buildClassPowerSlotDefinitions(build.level, human);
+    const defs = powerSlotDefs;
+    const prevId = build.classPowerSlots?.[slotKey];
     const nextSlots: Record<string, string> = { ...(build.classPowerSlots || {}) };
     if (powerId) nextSlots[slotKey] = powerId;
     else delete nextSlots[slotKey];
     const trimmed = Object.keys(nextSlots).length ? nextSlots : undefined;
-    updateBuild({ ...build, classPowerSlots: trimmed, powerIds: orderedPowerIdsFromSlots(defs, trimmed) });
+    let nextBuild: CharacterBuild = {
+      ...build,
+      classPowerSlots: trimmed,
+      powerIds: orderedPowerIdsFromSlots(defs, trimmed)
+    };
+    if (prevId && prevId !== powerId && nextBuild.powerSelections?.[prevId]) {
+      const ps = { ...nextBuild.powerSelections };
+      delete ps[prevId];
+      nextBuild = { ...nextBuild, powerSelections: Object.keys(ps).length ? ps : undefined };
+    }
+    updateBuild(nextBuild);
   }
 
   useEffect(() => {
-    if (!index || !build.classId) return;
+    if (!index) return;
+    const hybrid = build.characterStyle === "hybrid";
+    if (!hybrid && !build.classId) return;
+    if (hybrid && (!build.hybridClassIdA || !build.hybridClassIdB)) return;
+
     setBuild((prev) => {
       if (prev.classPowerSlots || prev.powerIds.length === 0) return prev;
-      const human = isHumanRace(index.races.find((r) => r.id === prev.raceId)?.name);
-      const defs = buildClassPowerSlotDefinitions(prev.level, human);
-      const inferred = inferClassPowerSlotsFromPowerIds(defs, prev.powerIds, index, prev.classId, prev.level);
+      const bonus = bonusClassAtWillSlotFromRaceBuild(index, prev);
+      const hybridPrev = prev.characterStyle === "hybrid";
+      let defs;
+      let inferred: Record<string, string> | undefined;
+      if (hybridPrev) {
+        const ha = index.hybridClasses?.find((h) => h.id === prev.hybridClassIdA);
+        const hb = index.hybridClasses?.find((h) => h.id === prev.hybridClassIdB);
+        const ba = ha?.baseClassId ?? undefined;
+        const bb = hb?.baseClassId ?? undefined;
+        if (!ba || !bb) return prev;
+        defs = buildHybridPowerSlotDefinitions(prev.level, bonus);
+        inferred = inferHybridClassPowerSlotsFromPowerIds(defs, prev.powerIds, index, ba, bb, prev.level);
+      } else {
+        defs = buildClassPowerSlotDefinitions(prev.level, bonus);
+        inferred = inferClassPowerSlotsFromPowerIds(defs, prev.powerIds, index, prev.classId, prev.level);
+      }
       if (!inferred) return prev;
       const next = { ...prev, classPowerSlots: inferred, powerIds: orderedPowerIdsFromSlots(defs, inferred) };
       saveBuild(next);
       return next;
     });
-  }, [index, build.classId, build.level, build.raceId, build.powerIds.join(","), build.classPowerSlots === undefined]);
+  }, [
+    index,
+    build.classId,
+    build.characterStyle,
+    build.hybridClassIdA,
+    build.hybridClassIdB,
+    build.level,
+    build.raceId,
+    build.powerIds.join(","),
+    build.classPowerSlots === undefined,
+    JSON.stringify(build.raceSelections ?? {})
+  ]);
 
   useEffect(() => {
     const prevAuto = prevAutoGrantedSkillIdsRef.current;
@@ -665,8 +1196,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                   featIds: build.featIds.slice(0, maxFeats),
                   asiChoices: Object.keys(asiNext).length > 0 ? asiNext : undefined
                 };
-                const human = isHumanRace(selectedRace?.name);
-                const { classPowerSlots, powerIds } = reconcileClassPowerSlotsForBuild(nextBase, lv, human, index);
+                const { classPowerSlots, powerIds } = reconcilePowerSlotsForBuild(nextBase, lv);
                 updateBuild({ ...nextBase, classPowerSlots, powerIds });
               }}
               style={{
@@ -735,19 +1265,14 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
               onChange={(e) => {
                 const raceId = e.target.value || undefined;
                 const race = raceId ? index.races.find((r) => r.id === raceId) : undefined;
-                const human = isHumanRace(race?.name);
                 const nextBase: CharacterBuild = {
                   ...build,
                   raceId,
                   racialAbilityChoice: undefined,
-                  raceSelections: undefined
+                  raceSelections: undefined,
+                  powerSelections: undefined
                 };
-                const { classPowerSlots, powerIds } = reconcileClassPowerSlotsForBuild(
-                  nextBase,
-                  build.level,
-                  human,
-                  index
-                );
+                const { classPowerSlots, powerIds } = reconcilePowerSlotsForBuild(nextBase, build.level);
                 updateBuild({ ...nextBase, classPowerSlots, powerIds });
               }}
               style={{ width: "100%" }}
@@ -755,6 +1280,150 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
               <option value="">Select race</option>
               {index.races.map((race) => <option key={race.id} value={race.id}>{race.name}</option>)}
             </select>
+            {selectedRace &&
+              (raceAbilityBonusInfo.chooseOne.length > 0 ||
+                raceSecondarySlots.length > 0 ||
+                racePowerGroups.some((g) => g.choiceOnly) ||
+                parseRacialTraitIdsFromRace(selectedRace).includes(ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION)) && (
+                <div style={{ marginTop: "0.65rem", ...ui.blockInset, backgroundColor: "#f8fafc", borderColor: "#cbd5e1" }}>
+                  <h4 style={{ margin: "0 0 0.5rem 0", fontSize: "0.95rem", color: "#334155" }}>Race choices</h4>
+                  {parseRacialTraitIdsFromRace(selectedRace).includes(ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION) && (
+                    <label style={{ display: "block", marginBottom: "0.75rem" }}>
+                      <span style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem", fontSize: "0.85rem" }}>
+                        Human power option
+                      </span>
+                      <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.78rem", color: "#555", lineHeight: 1.45 }}>
+                        PHB-style characters use the third class at-will slot (default below). Pick{" "}
+                        <strong>Heroic Effort</strong> only if you use the Essentials option instead of that third at-will.
+                      </p>
+                      <select
+                        value={build.raceSelections?.[HUMAN_POWER_OPTION_RACE_KEY] || ""}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          const next = { ...(build.raceSelections || {}) };
+                          if (v) next[HUMAN_POWER_OPTION_RACE_KEY] = v;
+                          else delete next[HUMAN_POWER_OPTION_RACE_KEY];
+                          const keys = Object.keys(next);
+                          const nextBase: CharacterBuild = {
+                            ...build,
+                            raceSelections: keys.length ? next : undefined
+                          };
+                          const { classPowerSlots, powerIds } = reconcilePowerSlotsForBuild(nextBase, build.level);
+                          updateBuild({ ...nextBase, classPowerSlots, powerIds });
+                        }}
+                        style={{ width: "100%", maxWidth: "28rem", padding: "0.4rem", borderRadius: "6px", border: "1px solid #c4c5cc" }}
+                      >
+                        <option value="">Third class at-will (PHB-style default)</option>
+                        <option value={ID_RACIAL_TRAIT_BONUS_AT_WILL}>Bonus At-Will Power (same as default)</option>
+                        <option value={ID_RACIAL_TRAIT_HEROIC_EFFORT}>Heroic Effort (Essentials — no third at-will)</option>
+                      </select>
+                    </label>
+                  )}
+                  {racePowerGroups
+                    .filter((g) => g.choiceOnly)
+                    .map((g) => {
+                      const selectedPowId = build.raceSelections?.[racePowerSelectSelectionKey(g.traitId)] || "";
+                      const optionPowers = g.dilettantePick
+                        ? dilettanteCandidatePowers
+                        : g.powerIds
+                            .map((pid) => index.powers.find((p) => p.id === pid))
+                            .filter((p): p is Power => !!p);
+                      return (
+                        <label key={`race-choice-power-${g.traitId}`} style={{ display: "block", marginBottom: "0.75rem" }}>
+                          <span style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem", fontSize: "0.85rem" }}>
+                            {g.traitName}
+                          </span>
+                          <select
+                            value={selectedPowId}
+                            disabled={g.dilettantePick && !classIdForDilettante}
+                            onChange={(e) => commitRacePowerSelection(g.traitId, e.target.value)}
+                            style={{ width: "100%", maxWidth: "28rem", padding: "0.4rem", borderRadius: "6px", border: "1px solid #c4c5cc" }}
+                          >
+                            <option value="">Select power…</option>
+                            {optionPowers.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      );
+                    })}
+                  {raceAbilityBonusInfo.chooseOne.length > 0 && (
+                    <label style={{ display: "block", marginBottom: raceSecondarySlots.length > 0 ? "0.75rem" : 0 }}>
+                      <span style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem", fontSize: "0.85rem" }}>
+                        Racial ability (+2) — choose one
+                      </span>
+                      <select
+                        value={build.racialAbilityChoice || ""}
+                        onChange={(e) =>
+                          updateBuild({
+                            ...build,
+                            racialAbilityChoice: (e.target.value || undefined) as CharacterBuild["racialAbilityChoice"]
+                          })
+                        }
+                        style={{ width: "100%", maxWidth: "28rem", padding: "0.4rem", borderRadius: "6px", border: "1px solid #c4c5cc" }}
+                      >
+                        <option value="">Select ability…</option>
+                        {raceAbilityBonusInfo.chooseOne.map((ability) => (
+                          <option key={ability} value={ability}>
+                            {getAbilityLabel(ability)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                  {raceSecondarySlots.map((slot) => (
+                    <label key={slot.key} style={{ display: "block", marginBottom: "0.65rem" }}>
+                      <span style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem", fontSize: "0.85rem" }}>
+                        {slot.label}
+                      </span>
+                      {slot.kind === "language" && (
+                        <select
+                          value={(build.raceSelections || {})[slot.key] || ""}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            const next = { ...(build.raceSelections || {}) };
+                            if (v) next[slot.key] = v;
+                            else delete next[slot.key];
+                            const keys = Object.keys(next);
+                            updateBuild({ ...build, raceSelections: keys.length ? next : undefined });
+                          }}
+                          style={{ width: "100%", maxWidth: "28rem", padding: "0.4rem", borderRadius: "6px", border: "1px solid #c4c5cc" }}
+                        >
+                          <option value="">Select language…</option>
+                          {bonusLanguageOptions.map((lang) => (
+                            <option key={lang.id} value={lang.id}>
+                              {lang.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      {slot.kind === "skillBonus" && (
+                        <select
+                          value={(build.raceSelections || {})[slot.key] || ""}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            const next = { ...(build.raceSelections || {}) };
+                            if (v) next[slot.key] = v;
+                            else delete next[slot.key];
+                            const keys = Object.keys(next);
+                            updateBuild({ ...build, raceSelections: keys.length ? next : undefined });
+                          }}
+                          style={{ width: "100%", maxWidth: "28rem", padding: "0.4rem", borderRadius: "6px", border: "1px solid #c4c5cc" }}
+                        >
+                          <option value="">Select skill…</option>
+                          {skillsSortedAll.map((sk) => (
+                            <option key={sk.id} value={sk.id}>
+                              {sk.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </label>
+                  ))}
+                </div>
+              )}
             {selectedRace && (
               <div style={{ ...ui.blockInset, marginTop: "0.65rem" }}>
                 <p style={{ margin: 0 }}><strong>Source:</strong> {selectedRace.source || "Unknown"}</p>
@@ -807,23 +1476,57 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                     </div>
                   </div>
                 )}
-                {racePowerGroups.some((g) => g.powerIds.length > 0) && (
+                {racePowerGroups.some((g) => g.powerIds.length > 0 || g.dilettantePick) && (
                   <div style={{ marginTop: "0.8rem" }}>
                     <h4 style={{ margin: "0 0 0.45rem 0", fontSize: "0.95rem", color: "#333" }}>Granted powers</h4>
                     {racePowerGroups
-                      .filter((g) => g.powerIds.length > 0)
-                      .map((g) => (
-                        <div key={`race-powers-${g.traitId}`} style={{ marginBottom: "0.55rem" }}>
-                          <p style={{ margin: "0 0 0.25rem 0", fontSize: "0.84rem", color: "#374151" }}>
-                            <strong>{g.traitName}</strong>
-                            {g.choiceOnly ? " (choose one)" : ""}
-                          </p>
-                          {g.powerIds
-                            .map((pid) => index.powers.find((p) => p.id === pid))
-                            .filter((p): p is Power => !!p)
-                            .map((p) => renderPowerCard(p, `race-tab-${g.traitId}-${p.id}`))}
-                        </div>
-                      ))}
+                      .filter((g) => g.powerIds.length > 0 || g.dilettantePick)
+                      .map((g) => {
+                        const pickKey = racePowerSelectSelectionKey(g.traitId);
+                        const selectedPowId = build.raceSelections?.[pickKey] || "";
+                        const optionPowers = g.dilettantePick
+                          ? dilettanteCandidatePowers
+                          : g.powerIds
+                              .map((pid) => index.powers.find((p) => p.id === pid))
+                              .filter((p): p is Power => !!p);
+                        return (
+                          <div key={`race-powers-${g.traitId}`} style={{ marginBottom: "0.55rem" }}>
+                            <p style={{ margin: "0 0 0.25rem 0", fontSize: "0.84rem", color: "#374151" }}>
+                              <strong>{g.traitName}</strong>
+                              {g.choiceOnly && g.dilettantePick
+                                ? " — Dilettante: choose a 1st-level at-will attack from another class (you use it as an encounter power)."
+                                : g.choiceOnly
+                                  ? " — choose one racial power below."
+                                  : ""}
+                            </p>
+                            {g.dilettantePick && !classIdForDilettante ? (
+                              <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.82rem", color: "#92400e" }}>
+                                Choose a standard class or two hybrid classes on the Class tab to load powers from other classes.
+                              </p>
+                            ) : null}
+                            <div>
+                              {g.choiceOnly ? (
+                                selectedPowId ? (
+                                  (() => {
+                                    const p = index.powers.find((x) => x.id === selectedPowId);
+                                    return p ? (
+                                      renderPowerCard(p, `race-tab-${g.traitId}-${p.id}`)
+                                    ) : (
+                                      <p style={{ margin: 0, fontSize: "0.82rem", color: "#92400e" }}>
+                                        Stored power id is unknown in the index.
+                                      </p>
+                                    );
+                                  })()
+                                ) : (
+                                  <p style={{ margin: 0, fontSize: "0.82rem", color: "#6b7280" }}>Pick a power in Race choices.</p>
+                                )
+                              ) : (
+                                optionPowers.map((p) => renderPowerCard(p, `race-tab-${g.traitId}-${p.id}`))
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                   </div>
                 )}
                 {selectedRace.raw.flavor && (
@@ -860,110 +1563,6 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                     </div>
                   </details>
                 )}
-                {(!!raceSubraceData || raceAbilityBonusInfo.chooseOne.length > 0 || raceSecondarySlots.length > 0) && (
-                  <div style={{ marginTop: "0.85rem", paddingTop: "0.75rem", borderTop: "1px solid #d5d6dc" }}>
-                    <h4 style={{ margin: "0 0 0.5rem 0", fontSize: "0.95rem", color: "#333" }}>Race choices</h4>
-                    {raceSubraceData && (
-                      <label style={{ display: "block", marginBottom: "0.75rem" }}>
-                        <span style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem", fontSize: "0.85rem" }}>
-                          {raceSubraceData.parentTraitName}
-                        </span>
-                        <select
-                          value={build.raceSelections?.[SUBRACE_SELECTION_KEY] || ""}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            const next = { ...(build.raceSelections || {}) };
-                            if (v) next[SUBRACE_SELECTION_KEY] = v;
-                            else delete next[SUBRACE_SELECTION_KEY];
-                            const keys = Object.keys(next);
-                            updateBuild({ ...build, raceSelections: keys.length ? next : undefined });
-                          }}
-                          style={{ width: "100%", maxWidth: "28rem", padding: "0.4rem", borderRadius: "6px", border: "1px solid #c4c5cc" }}
-                        >
-                          <option value="">Select subrace…</option>
-                          {raceSubraceData.options.map((opt) => (
-                            <option key={opt.id} value={opt.id}>
-                              {opt.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    )}
-                    {raceAbilityBonusInfo.chooseOne.length > 0 && (
-                      <label style={{ display: "block", marginBottom: raceSecondarySlots.length > 0 ? "0.75rem" : 0 }}>
-                        <span style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem", fontSize: "0.85rem" }}>
-                          Racial ability (+2) — choose one
-                        </span>
-                        <select
-                          value={build.racialAbilityChoice || ""}
-                          onChange={(e) =>
-                            updateBuild({
-                              ...build,
-                              racialAbilityChoice: (e.target.value || undefined) as CharacterBuild["racialAbilityChoice"]
-                            })
-                          }
-                          style={{ width: "100%", maxWidth: "28rem", padding: "0.4rem", borderRadius: "6px", border: "1px solid #c4c5cc" }}
-                        >
-                          <option value="">Select ability…</option>
-                          {raceAbilityBonusInfo.chooseOne.map((ability) => (
-                            <option key={ability} value={ability}>
-                              {getAbilityLabel(ability)}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    )}
-                    {raceSecondarySlots.map((slot) => (
-                      <label key={slot.key} style={{ display: "block", marginBottom: "0.65rem" }}>
-                        <span style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem", fontSize: "0.85rem" }}>
-                          {slot.label}
-                        </span>
-                        {slot.kind === "language" && (
-                          <select
-                            value={(build.raceSelections || {})[slot.key] || ""}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              const next = { ...(build.raceSelections || {}) };
-                              if (v) next[slot.key] = v;
-                              else delete next[slot.key];
-                              const keys = Object.keys(next);
-                              updateBuild({ ...build, raceSelections: keys.length ? next : undefined });
-                            }}
-                            style={{ width: "100%", maxWidth: "28rem", padding: "0.4rem", borderRadius: "6px", border: "1px solid #c4c5cc" }}
-                          >
-                            <option value="">Select language…</option>
-                            {bonusLanguageOptions.map((lang) => (
-                              <option key={lang.id} value={lang.id}>
-                                {lang.name}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                        {slot.kind === "skillBonus" && (
-                          <select
-                            value={(build.raceSelections || {})[slot.key] || ""}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              const next = { ...(build.raceSelections || {}) };
-                              if (v) next[slot.key] = v;
-                              else delete next[slot.key];
-                              const keys = Object.keys(next);
-                              updateBuild({ ...build, raceSelections: keys.length ? next : undefined });
-                            }}
-                            style={{ width: "100%", maxWidth: "28rem", padding: "0.4rem", borderRadius: "6px", border: "1px solid #c4c5cc" }}
-                          >
-                            <option value="">Select skill…</option>
-                            {skillsSortedAll.map((sk) => (
-                              <option key={sk.id} value={sk.id}>
-                                {sk.name}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                      </label>
-                    ))}
-                  </div>
-                )}
               </div>
             )}
           </div>
@@ -972,22 +1571,370 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
         {activeTab === "class" && (
           <div>
             <h3>Class</h3>
-            <select
-              value={build.classId || ""}
-              onChange={(e) =>
-                updateBuild({
-                  ...build,
-                  classId: e.target.value || undefined,
-                  classSelections: undefined,
-                  powerIds: [],
-                  classPowerSlots: undefined
-                })
-              }
-              style={{ width: "100%" }}
-            >
-              <option value="">Select class</option>
-              {index.classes.map((cls) => <option key={cls.id} value={cls.id}>{cls.name}</option>)}
-            </select>
+            <div style={{ marginBottom: "0.65rem", display: "flex", gap: "1rem", flexWrap: "wrap", alignItems: "center" }}>
+              <label style={{ fontSize: "0.88rem", cursor: "pointer", display: "flex", gap: "0.35rem", alignItems: "center" }}>
+                <input
+                  type="radio"
+                  name="characterStyle"
+                  checked={!isHybridBuild}
+                  onChange={() =>
+                    updateBuild({
+                      ...build,
+                      characterStyle: undefined,
+                      hybridClassIdA: undefined,
+                      hybridClassIdB: undefined,
+                      hybridTalentClassFeatureIdA: undefined,
+                      hybridTalentClassFeatureIdB: undefined,
+                      hybridSideASelections: undefined,
+                      hybridSideBSelections: undefined,
+                      powerIds: [],
+                      classPowerSlots: undefined
+                    })
+                  }
+                />
+                Standard class
+              </label>
+              <label style={{ fontSize: "0.88rem", cursor: "pointer", display: "flex", gap: "0.35rem", alignItems: "center" }}>
+                <input
+                  type="radio"
+                  name="characterStyle"
+                  checked={isHybridBuild}
+                  onChange={() =>
+                    updateBuild({
+                      ...build,
+                      characterStyle: "hybrid",
+                      classId: undefined,
+                      classSelections: undefined,
+                      hybridTalentClassFeatureIdA: undefined,
+                      hybridTalentClassFeatureIdB: undefined,
+                      hybridSideASelections: undefined,
+                      hybridSideBSelections: undefined,
+                      powerIds: [],
+                      classPowerSlots: undefined
+                    })
+                  }
+                />
+                Hybrid (PHB3)
+              </label>
+            </div>
+
+            {!isHybridBuild && (
+              <select
+                value={build.classId || ""}
+                onChange={(e) => {
+                  const classId = e.target.value || undefined;
+                  const nextBase: CharacterBuild = {
+                    ...build,
+                    classId,
+                    classSelections: undefined,
+                    powerIds: [],
+                    classPowerSlots: undefined
+                  };
+                  const { classPowerSlots, powerIds } = reconcilePowerSlotsForBuild(nextBase, build.level);
+                  updateBuild({ ...nextBase, classPowerSlots, powerIds });
+                }}
+                style={{ width: "100%" }}
+              >
+                <option value="">Select class</option>
+                {classesForSelect.map((cls) => (
+                  <option key={cls.id} value={cls.id}>
+                    {cls.name}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {isHybridBuild && (
+              <>
+                <div
+                  style={{
+                    display: "grid",
+                    gap: "0.85rem",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                    alignItems: "start"
+                  }}
+                >
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem", minWidth: 0 }}>
+                    <label style={{ display: "block", margin: 0, fontSize: "0.88rem", fontWeight: 600 }}>
+                      First hybrid class
+                      <select
+                        value={build.hybridClassIdA || ""}
+                        onChange={(e) => {
+                          const hybridClassIdA = e.target.value || undefined;
+                          const nextBase: CharacterBuild = {
+                            ...build,
+                            characterStyle: "hybrid",
+                            hybridClassIdA,
+                            hybridTalentClassFeatureIdA: undefined,
+                            hybridSideASelections: undefined,
+                            classId: undefined,
+                            classSelections: undefined
+                          };
+                          const { classPowerSlots, powerIds } = reconcilePowerSlotsForBuild(nextBase, build.level);
+                          updateBuild({ ...nextBase, classPowerSlots, powerIds });
+                        }}
+                        style={{
+                          width: "100%",
+                          marginTop: "0.25rem",
+                          padding: "0.4rem",
+                          borderRadius: "6px",
+                          border: "1px solid #c4c5cc",
+                          boxSizing: "border-box"
+                        }}
+                      >
+                        <option value="">Select hybrid class…</option>
+                        {hybridClassesForHybridSelect
+                          .filter((h) => h.id !== build.hybridClassIdB)
+                          .map((h) => (
+                            <option key={h.id} value={h.id}>
+                              {h.name}
+                            </option>
+                          ))}
+                      </select>
+                    </label>
+                    {selectedHybridA?.hybridTalentClassFeatures && selectedHybridA.hybridTalentClassFeatures.length > 0 && (
+                      <label style={{ display: "block", margin: 0, fontSize: "0.88rem", fontWeight: 600 }}>
+                        Hybrid talent
+                        <select
+                          value={build.hybridTalentClassFeatureIdA || ""}
+                          onChange={(e) =>
+                            updateBuild({
+                              ...build,
+                              hybridTalentClassFeatureIdA: e.target.value || undefined
+                            })
+                          }
+                          style={{
+                            width: "100%",
+                            marginTop: "0.25rem",
+                            padding: "0.4rem",
+                            borderRadius: "6px",
+                            border: "1px solid #c4c5cc",
+                            boxSizing: "border-box"
+                          }}
+                        >
+                          <option value="">— Choose hybrid talent —</option>
+                          {selectedHybridA.hybridTalentClassFeatures.map((opt) => (
+                            <option key={opt.id} value={opt.id}>
+                              {opt.name}
+                            </option>
+                          ))}
+                        </select>
+                        {(() => {
+                          const sel = selectedHybridA.hybridTalentClassFeatures.find(
+                            (o) => o.id === build.hybridTalentClassFeatureIdA
+                          );
+                          return sel?.shortDescription ? (
+                            <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.8rem", color: "#4b5563", lineHeight: 1.45 }}>
+                              {sel.shortDescription}
+                            </p>
+                          ) : null;
+                        })()}
+                      </label>
+                    )}
+                    {selectedHybridA?.hybridSelectionGroups?.map((g) => (
+                      <label
+                        key={`hyA-${g.key}`}
+                        style={{ display: "block", margin: 0, fontSize: "0.88rem", fontWeight: 600 }}
+                      >
+                        {g.label}
+                        <select
+                          value={build.hybridSideASelections?.[g.key] || ""}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            const prev = build.hybridSideASelections ?? {};
+                            const next: Record<string, string> = { ...prev };
+                            if (v) next[g.key] = v;
+                            else delete next[g.key];
+                            updateBuild({
+                              ...build,
+                              hybridSideASelections: Object.keys(next).length > 0 ? next : undefined
+                            });
+                          }}
+                          style={{
+                            width: "100%",
+                            marginTop: "0.25rem",
+                            padding: "0.4rem",
+                            borderRadius: "6px",
+                            border: "1px solid #c4c5cc",
+                            boxSizing: "border-box"
+                          }}
+                        >
+                          <option value="">— Choose —</option>
+                          {g.options.map((opt) => (
+                            <option key={opt.id} value={opt.id}>
+                              {opt.name}
+                            </option>
+                          ))}
+                        </select>
+                        {(() => {
+                          const sel = g.options.find((o) => o.id === build.hybridSideASelections?.[g.key]);
+                          return sel?.shortDescription ? (
+                            <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.8rem", color: "#4b5563", lineHeight: 1.45 }}>
+                              {sel.shortDescription}
+                            </p>
+                          ) : null;
+                        })()}
+                      </label>
+                    ))}
+                    {selectedHybridA && (
+                      <HybridClassDetailPanel
+                        hybrid={selectedHybridA}
+                        baseClassName={hybridBaseClassDefA?.name}
+                        slotNote="Side A — at-will slot A uses this entry’s base class power list."
+                      />
+                    )}
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem", minWidth: 0 }}>
+                    <label style={{ display: "block", margin: 0, fontSize: "0.88rem", fontWeight: 600 }}>
+                      Second hybrid class
+                      <select
+                        value={build.hybridClassIdB || ""}
+                        onChange={(e) => {
+                          const hybridClassIdB = e.target.value || undefined;
+                          const nextBase: CharacterBuild = {
+                            ...build,
+                            characterStyle: "hybrid",
+                            hybridClassIdB,
+                            hybridTalentClassFeatureIdB: undefined,
+                            hybridSideBSelections: undefined,
+                            classId: undefined,
+                            classSelections: undefined
+                          };
+                          const { classPowerSlots, powerIds } = reconcilePowerSlotsForBuild(nextBase, build.level);
+                          updateBuild({ ...nextBase, classPowerSlots, powerIds });
+                        }}
+                        style={{
+                          width: "100%",
+                          marginTop: "0.25rem",
+                          padding: "0.4rem",
+                          borderRadius: "6px",
+                          border: "1px solid #c4c5cc",
+                          boxSizing: "border-box"
+                        }}
+                      >
+                        <option value="">Select hybrid class…</option>
+                        {hybridClassesForHybridSelect
+                          .filter((h) => h.id !== build.hybridClassIdA)
+                          .map((h) => (
+                            <option key={h.id} value={h.id}>
+                              {h.name}
+                            </option>
+                          ))}
+                      </select>
+                    </label>
+                    {selectedHybridB?.hybridTalentClassFeatures && selectedHybridB.hybridTalentClassFeatures.length > 0 && (
+                      <label style={{ display: "block", margin: 0, fontSize: "0.88rem", fontWeight: 600 }}>
+                        Hybrid talent
+                        <select
+                          value={build.hybridTalentClassFeatureIdB || ""}
+                          onChange={(e) =>
+                            updateBuild({
+                              ...build,
+                              hybridTalentClassFeatureIdB: e.target.value || undefined
+                            })
+                          }
+                          style={{
+                            width: "100%",
+                            marginTop: "0.25rem",
+                            padding: "0.4rem",
+                            borderRadius: "6px",
+                            border: "1px solid #c4c5cc",
+                            boxSizing: "border-box"
+                          }}
+                        >
+                          <option value="">— Choose hybrid talent —</option>
+                          {selectedHybridB.hybridTalentClassFeatures.map((opt) => (
+                            <option key={opt.id} value={opt.id}>
+                              {opt.name}
+                            </option>
+                          ))}
+                        </select>
+                        {(() => {
+                          const sel = selectedHybridB.hybridTalentClassFeatures.find(
+                            (o) => o.id === build.hybridTalentClassFeatureIdB
+                          );
+                          return sel?.shortDescription ? (
+                            <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.8rem", color: "#4b5563", lineHeight: 1.45 }}>
+                              {sel.shortDescription}
+                            </p>
+                          ) : null;
+                        })()}
+                      </label>
+                    )}
+                    {selectedHybridB?.hybridSelectionGroups?.map((g) => (
+                      <label
+                        key={`hyB-${g.key}`}
+                        style={{ display: "block", margin: 0, fontSize: "0.88rem", fontWeight: 600 }}
+                      >
+                        {g.label}
+                        <select
+                          value={build.hybridSideBSelections?.[g.key] || ""}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            const prev = build.hybridSideBSelections ?? {};
+                            const next: Record<string, string> = { ...prev };
+                            if (v) next[g.key] = v;
+                            else delete next[g.key];
+                            updateBuild({
+                              ...build,
+                              hybridSideBSelections: Object.keys(next).length > 0 ? next : undefined
+                            });
+                          }}
+                          style={{
+                            width: "100%",
+                            marginTop: "0.25rem",
+                            padding: "0.4rem",
+                            borderRadius: "6px",
+                            border: "1px solid #c4c5cc",
+                            boxSizing: "border-box"
+                          }}
+                        >
+                          <option value="">— Choose —</option>
+                          {g.options.map((opt) => (
+                            <option key={opt.id} value={opt.id}>
+                              {opt.name}
+                            </option>
+                          ))}
+                        </select>
+                        {(() => {
+                          const sel = g.options.find((o) => o.id === build.hybridSideBSelections?.[g.key]);
+                          return sel?.shortDescription ? (
+                            <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.8rem", color: "#4b5563", lineHeight: 1.45 }}>
+                              {sel.shortDescription}
+                            </p>
+                          ) : null;
+                        })()}
+                      </label>
+                    ))}
+                    {selectedHybridB && (
+                      <HybridClassDetailPanel
+                        hybrid={selectedHybridB}
+                        baseClassName={hybridBaseClassDefB?.name}
+                        slotNote="Side B — at-will slot B uses this entry’s base class power list."
+                      />
+                    )}
+                  </div>
+                </div>
+                <p style={{ margin: "0.65rem 0 0.65rem 0", fontSize: "0.82rem", color: "#555", lineHeight: 1.45 }}>
+                  Powers use each hybrid&apos;s <strong>base class</strong> lists (shown below). Pick two different hybrid entries.
+                </p>
+                {hybridClassSelectionComplete && classAutoGrantedPowers.length > 0 && (
+                  <div
+                    style={{
+                      ...ui.blockInset,
+                      marginTop: "0.35rem",
+                      paddingTop: "0.65rem",
+                      borderTop: "1px solid #e5e7eb"
+                    }}
+                  >
+                    <h4 style={{ margin: "0 0 0.45rem 0", fontSize: "0.95rem", color: "#333" }}>Granted powers (both base classes)</h4>
+                    {classAutoGrantedPowers.map((p) => renderPowerCardWithSelections(p, `hybrid-class-tab-${p.id}`))}
+                  </div>
+                )}
+              </>
+            )}
+
             {selectedClass && (
               <div style={{ ...ui.blockInset, marginTop: "0.65rem" }}>
                 <p style={{ margin: 0 }}><strong>Role:</strong> {String(classSpecific["Role"] || selectedClass.role || "-")}</p>
@@ -1019,7 +1966,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                 {classAutoGrantedPowers.length > 0 && (
                   <div style={{ marginTop: "0.8rem" }}>
                     <h4 style={{ margin: "0 0 0.45rem 0", fontSize: "0.95rem", color: "#333" }}>Granted powers</h4>
-                    {classAutoGrantedPowers.map((p) => renderPowerCard(p, `class-tab-${p.id}`))}
+                    {classAutoGrantedPowers.map((p) => renderPowerCardWithSelections(p, `class-tab-${p.id}`))}
                   </div>
                 )}
                 {classBuildOptions.length > 0 && (
@@ -1080,7 +2027,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                             {selectedClassBuildOption.powerIds
                               .map((pid) => index.powers.find((p) => p.id === pid))
                               .filter((p): p is Power => !!p)
-                              .map((p) => renderPowerCard(p, `class-build-${selectedClassBuildOption.id}-${p.id}`))}
+                              .map((p) => renderPowerCardWithSelections(p, `class-build-${selectedClassBuildOption.id}-${p.id}`))}
                           </div>
                         )}
                       </div>
@@ -1097,6 +2044,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                 )}
               </div>
             )}
+
           </div>
         )}
 
@@ -1433,8 +2381,10 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
             <p style={{ margin: "0.25rem 0 0.65rem 0", color: "#555", fontSize: "0.9rem", lineHeight: 1.45 }}>
               All skills are listed. You can only <strong>train</strong> skills from your class list (checkbox enabled). Other skills are shown for reference.
             </p>
-            {!selectedClass && (
-              <p style={{ margin: "0 0 0.65rem 0", fontSize: "0.88rem", color: "#666" }}>Choose a class on the Class tab to enable training choices.</p>
+            {(isHybridBuild ? !hybridClassSelectionComplete : !selectedClass) && (
+              <p style={{ margin: "0 0 0.65rem 0", fontSize: "0.88rem", color: "#666" }}>
+                {isHybridBuild ? "Choose two hybrid classes on the Class tab to enable training choices." : "Choose a class on the Class tab to enable training choices."}
+              </p>
             )}
             <div style={{ ...ui.blockInset, backgroundColor: "#fafafa" }}>
               {skillsSortedAll.map((skill) => {
@@ -1761,7 +2711,10 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
           <div>
             <h3>Power Selection</h3>
             <p style={{ margin: "0.25rem 0 0.65rem 0", fontSize: "0.85rem", color: "#555", lineHeight: 1.45 }}>
-              Each <strong>slot</strong> is a separate choice. The list for a slot only includes powers whose <strong>printed level</strong> is at most that slot&apos;s level (e.g. 3rd-level encounter → level 3 or lower encounter powers). Search filters the lists. Paragon path powers are not included in this MVP.
+              Each <strong>class</strong> slot is a separate choice. The list for a slot only includes <strong>class</strong> powers whose{" "}
+              <strong>printed level</strong> is at most that slot&apos;s gain level (for example, the 3rd-level encounter slot only lists encounter
+              attacks of printed level 3 or lower). Search filters the lists. Paragon path and epic destiny powers are shown below when you have
+              selected them on the Paths tab; they are extra powers on top of your class schedule, not chosen into these class slots.
             </p>
             {legality.powerSlotRules && (
               <p style={{ margin: "0 0 0.65rem 0", fontSize: "0.82rem", color: "#444" }}>
@@ -1770,37 +2723,155 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                 {legality.powerSlotRules.utility} utility.
               </p>
             )}
-            {(racePowerGroups.some((g) => g.powerIds.length > 0) ||
+            {upcomingPowerSlotMilestones.length > 0 && (
+              <p style={{ margin: "0 0 0.65rem 0", fontSize: "0.8rem", color: "#4b5563", lineHeight: 1.45 }}>
+                <strong>Next class slots (PHB schedule):</strong>{" "}
+                {upcomingPowerSlotMilestones.map((m) => `${m.label} at level ${m.atLevel}`).join("; ")}.
+              </p>
+            )}
+            {(racePowerGroups.some((g) => g.powerIds.length > 0 || g.dilettantePick) ||
               classAutoGrantedPowers.length > 0 ||
-              featAssociatedPowers.length > 0) && (
+              featAssociatedPowers.length > 0 ||
+              themeGrantedPowers.length > 0 ||
+              paragonPathGrantedPowers.length > 0 ||
+              epicDestinyGrantedPowers.length > 0) && (
               <section style={{ marginBottom: "1.1rem", padding: "0.65rem 0.75rem", backgroundColor: "#f4f6fb", borderRadius: "8px", border: "1px solid #d8dce8" }}>
-                {racePowerGroups.some((g) => g.powerIds.length > 0) && (
+                {racePowerGroups.some((g) => g.powerIds.length > 0 || g.dilettantePick) && (
                   <div style={{ marginBottom: "0.65rem" }}>
                     <div>
                       {racePowerGroups
-                        .filter((g) => g.powerIds.length > 0)
-                        .map((g) => (
-                          <div key={g.traitId} style={{ marginBottom: "0.35rem" }}>
-                            <span style={{ fontWeight: 600, fontSize: "0.82rem", color: "#333" }}>{g.traitName}</span>
-                            {g.choiceOnly ? (
-                              <span style={{ color: "#6b5a2a", fontSize: "0.78rem" }}> — choose one:</span>
-                            ) : null}
-                            <div style={{ marginTop: "0.2rem" }}>
-                              {g.powerIds.map((pid) => {
-                                const p = index.powers.find((x) => x.id === pid);
-                                return p ? renderPowerCard(p, `race-${g.traitId}-${p.id}`) : <div key={pid}>{pid}</div>;
-                              })}
+                        .filter((g) => g.powerIds.length > 0 || g.dilettantePick)
+                        .map((g) => {
+                          const pickKey = racePowerSelectSelectionKey(g.traitId);
+                          const selectedPowId = build.raceSelections?.[pickKey] || "";
+                          const optionPowers = g.dilettantePick
+                            ? filterPowersByQuery(dilettanteCandidatePowers, powerSearch)
+                            : g.powerIds
+                                .map((pid) => index.powers.find((p) => p.id === pid))
+                                .filter((p): p is Power => !!p);
+                          let selectOptions = optionPowers;
+                          if (selectedPowId && !selectOptions.some((p) => p.id === selectedPowId)) {
+                            const orphan = index.powers.find((p) => p.id === selectedPowId);
+                            if (orphan) selectOptions = [orphan, ...selectOptions];
+                          }
+                          return (
+                            <div key={g.traitId} style={{ marginBottom: "0.35rem" }}>
+                              <span style={{ fontWeight: 600, fontSize: "0.82rem", color: "#333" }}>{g.traitName}</span>
+                              {g.choiceOnly && g.dilettantePick ? (
+                                <span style={{ color: "#6b5a2a", fontSize: "0.78rem" }}>
+                                  {" "}
+                                  — Dilettante (1st at-will from another class; search above filters this list):
+                                </span>
+                              ) : g.choiceOnly ? (
+                                <span style={{ color: "#6b5a2a", fontSize: "0.78rem" }}> — pick one (same as Race tab):</span>
+                              ) : null}
+                              {g.dilettantePick && !classIdForDilettante ? (
+                                <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.78rem", color: "#92400e" }}>
+                                  Choose a standard class or hybrid classes on the Class tab to load other classes&apos; at-will powers.
+                                </p>
+                              ) : null}
+                              {g.choiceOnly && (
+                                <label style={{ display: "block", maxWidth: "28rem", marginTop: "0.35rem" }}>
+                                  <select
+                                    value={selectedPowId}
+                                    disabled={g.dilettantePick && !classIdForDilettante}
+                                    onChange={(e) => commitRacePowerSelection(g.traitId, e.target.value)}
+                                    style={{
+                                      width: "100%",
+                                      padding: "0.35rem",
+                                      borderRadius: "6px",
+                                      border: "1px solid #c4c5cc",
+                                      boxSizing: "border-box",
+                                      fontSize: "0.82rem"
+                                    }}
+                                  >
+                                    <option value="">— Choose racial power —</option>
+                                    {selectOptions.map((p) => {
+                                      const clsName = index.classes.find((c) => c.id === p.classId)?.name || "";
+                                      return (
+                                        <option key={p.id} value={p.id}>
+                                          {clsName ? `${clsName}: ` : ""}
+                                          {p.name}
+                                        </option>
+                                      );
+                                    })}
+                                  </select>
+                                </label>
+                              )}
+                              {g.choiceOnly && g.dilettantePick && build.classId && selectOptions.length === 0 && powerSearch.trim() ? (
+                                <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.76rem", color: "#92400e" }}>
+                                  No powers match this filter; clear search to see the full Dilettante list.
+                                </p>
+                              ) : null}
+                              <div style={{ marginTop: "0.2rem" }}>
+                                {g.choiceOnly ? (
+                                  selectedPowId ? (
+                                    (() => {
+                                      const p = index.powers.find((x) => x.id === selectedPowId);
+                                      return p ? (
+                                        renderPowerCardWithSelections(p, `race-${g.traitId}-${p.id}`)
+                                      ) : (
+                                        <div key={selectedPowId}>{selectedPowId}</div>
+                                      );
+                                    })()
+                                  ) : (
+                                    <span style={{ fontSize: "0.78rem", color: "#6b7280" }}>No racial power chosen yet.</span>
+                                  )
+                                ) : (
+                                  g.powerIds.map((pid) => {
+                                    const p = index.powers.find((x) => x.id === pid);
+                                    return p ? renderPowerCardWithSelections(p, `race-${g.traitId}-${p.id}`) : <div key={pid}>{pid}</div>;
+                                  })
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                     </div>
                   </div>
                 )}
                 {classAutoGrantedPowers.length > 0 && (
                   <div style={{ marginBottom: "0.65rem" }}>
-                    <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "#333", marginBottom: "0.25rem" }}>Class (automatic)</div>
+                    <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "#333", marginBottom: "0.25rem" }}>Class</div>
                     <div>
-                      {classAutoGrantedPowers.map((p) => renderPowerCard(p, `class-${p.id}`))}
+                      {classAutoGrantedPowers.map((p) => renderPowerCardWithSelections(p, `class-${p.id}`))}
+                    </div>
+                  </div>
+                )}
+                {themeGrantedPowers.length > 0 && (
+                  <div style={{ marginBottom: "0.65rem" }}>
+                    <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "#333", marginBottom: "0.25rem" }}>
+                      Theme{selectedTheme ? ` — ${selectedTheme.name}` : ""}
+                    </div>
+                    <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.78rem", color: "#555" }}>
+                      Granted by your theme when you meet each power&apos;s level; not chosen into class slots above.
+                    </p>
+                    <div>{themeGrantedPowers.map((p) => renderPowerCardWithSelections(p, `theme-${p.id}`))}</div>
+                  </div>
+                )}
+                {paragonPathGrantedPowers.length > 0 && (
+                  <div style={{ marginBottom: "0.65rem" }}>
+                    <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "#333", marginBottom: "0.25rem" }}>
+                      Paragon path{selectedParagonPath ? ` — ${selectedParagonPath.name}` : ""}
+                    </div>
+                    <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.78rem", color: "#555" }}>
+                      Granted when your level reaches each power&apos;s printed level (often 11 / 12 / 20). These are in addition to class slots above.
+                    </p>
+                    <div>
+                      {paragonPathGrantedPowers.map((p) => renderPowerCardWithSelections(p, `paragon-${p.id}`))}
+                    </div>
+                  </div>
+                )}
+                {epicDestinyGrantedPowers.length > 0 && (
+                  <div style={{ marginBottom: "0.65rem" }}>
+                    <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "#333", marginBottom: "0.25rem" }}>
+                      Epic destiny{selectedEpicDestiny ? ` — ${selectedEpicDestiny.name}` : ""}
+                    </div>
+                    <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.78rem", color: "#555" }}>
+                      Epic powers from compendium data when your level meets the printed level (commonly 26 / 30).
+                    </p>
+                    <div>
+                      {epicDestinyGrantedPowers.map((p) => renderPowerCardWithSelections(p, `epic-${p.id}`))}
                     </div>
                   </div>
                 )}
@@ -1812,7 +2883,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                         <li key={feat.id} style={{ marginBottom: "0.45rem" }}>
                           <span style={{ fontWeight: 600 }}>{feat.name}</span>
                           <div style={{ marginTop: "0.2rem" }}>
-                            {powers.map((p) => renderPowerCard(p, `${feat.id}-${p.id}`))}
+                            {powers.map((p) => renderPowerCardWithSelections(p, `${feat.id}-${p.id}`))}
                           </div>
                         </li>
                       ))}
@@ -1821,9 +2892,16 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                 )}
               </section>
             )}
-            {!selectedClass ? (
+            {isHybridBuild ? (
+              !hybridClassSelectionComplete ? (
+                <p style={{ margin: 0, color: "#666", fontSize: "0.9rem" }}>
+                  Choose two hybrid classes on the Class tab to assign powers.
+                </p>
+              ) : null
+            ) : !selectedClass ? (
               <p style={{ margin: 0, color: "#666", fontSize: "0.9rem" }}>Choose a class on the Class tab to assign powers.</p>
-            ) : (
+            ) : null}
+            {(isHybridBuild ? hybridClassSelectionComplete : !!selectedClass) && (
               <>
                 <label style={{ display: "block", fontSize: "0.88rem", marginBottom: "0.65rem" }}>
                   Search powers
@@ -1855,7 +2933,17 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                     def.bucket === "utility"
                       ? classUtilityPowers
                       : classAttackPowers.filter((p) => attackPowerBucketFromUsage(p.usage) === def.bucket);
-                  const poolForSlot = pool.filter((p) => powerPrintedLevelEligibleForSlot(p, def));
+                  let poolForSlot = pool.filter((p) => powerPrintedLevelEligibleForSlot(p, def));
+                  if (
+                    isHybridBuild &&
+                    hybridBaseClassAId &&
+                    hybridBaseClassBId &&
+                    def.key.startsWith("hybrid:")
+                  ) {
+                    poolForSlot = poolForSlot.filter((p) =>
+                      powerAllowedForHybridSlot(def.key, p, hybridBaseClassAId, hybridBaseClassBId)
+                    );
+                  }
                   const value = slotsMap[def.key] || "";
                   const selPow = value ? index.powers.find((p) => p.id === value) : undefined;
                   let candidates = poolForSlot.filter((p) => !taken.has(p.id) || p.id === slotsMap[def.key]);
@@ -1916,7 +3004,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                         {selPow && (
                           <div style={{ marginTop: "0.5rem" }}>
                             <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "#374151" }}>Selected power card</div>
-                            {renderPowerCard(selPow, `slot-${def.key}-${selPow.id}`)}
+                            {renderPowerCardWithSelections(selPow, `slot-${def.key}-${selPow.id}`)}
                           </div>
                         )}
                       </div>
@@ -2029,6 +3117,15 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                     <RulesRichText text={String(selectedTheme.raw.body)} paragraphStyle={{ fontSize: "0.9rem" }} listItemStyle={{ fontSize: "0.9rem" }} />
                   </div>
                 </details>
+              )}
+              {themeGrantedPowers.length > 0 && (
+                <div style={{ marginTop: "0.75rem" }}>
+                  <h5 style={{ margin: "0 0 0.35rem 0", fontSize: "0.88rem" }}>Powers from this theme</h5>
+                  <p style={{ margin: "0 0 0.45rem 0", fontSize: "0.78rem", color: "#555" }}>
+                    These are granted when your level reaches each power&apos;s printed level (same list as on the Powers tab).
+                  </p>
+                  <div>{themeGrantedPowers.map((p) => renderPowerCardWithSelections(p, `paths-theme-${p.id}`))}</div>
+                </div>
               )}
             </section>
 
@@ -2247,19 +3344,120 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
         {activeTab === "equipment" && (
           <div>
             <h3>Equipment</h3>
-            <div style={{ ...ui.blockInset, marginTop: "0.35rem", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.65rem", backgroundColor: "#fafafa" }}>
-              <label>
-                Armor
-                <select value={build.armorId || ""} onChange={(e) => updateBuild({ ...build, armorId: e.target.value || undefined })} style={{ width: "100%" }}>
+            <div style={{ ...ui.blockInset, marginTop: "0.35rem", display: "grid", gap: "0.75rem", backgroundColor: "#fafafa" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.65rem" }}>
+                <label>
+                  Armor
+                  <select value={build.armorId || ""} onChange={(e) => updateBuild({ ...build, armorId: e.target.value || undefined })} style={{ width: "100%" }}>
+                    <option value="">None</option>
+                    {armorOptions.map((a) => <option key={a.id} value={a.id}>{a.name} (+{a.armorBonus || 0} AC)</option>)}
+                  </select>
+                </label>
+                <label>
+                  Shield
+                  <select value={build.shieldId || ""} onChange={(e) => updateBuild({ ...build, shieldId: e.target.value || undefined })} style={{ width: "100%" }}>
+                    <option value="">None</option>
+                    {shieldOptions.map((a) => <option key={a.id} value={a.id}>{a.name} (+{a.armorBonus || 0} AC)</option>)}
+                  </select>
+                </label>
+              </div>
+              <label style={{ fontSize: "0.88rem" }}>
+                Filter main-hand weapons
+                <input
+                  type="search"
+                  value={mainWeaponSearch}
+                  onChange={(e) => setMainWeaponSearch(e.target.value)}
+                  placeholder="Name, category…"
+                  style={{
+                    width: "100%",
+                    marginTop: "0.2rem",
+                    padding: "0.35rem 0.45rem",
+                    borderRadius: "6px",
+                    border: "1px solid #c4c5cc",
+                    boxSizing: "border-box"
+                  }}
+                />
+              </label>
+              <label style={{ fontSize: "0.88rem" }}>
+                Main weapon
+                <select
+                  value={build.mainWeaponId || ""}
+                  onChange={(e) => updateBuild({ ...build, mainWeaponId: e.target.value || undefined })}
+                  style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem", borderRadius: "6px", border: "1px solid #c4c5cc", boxSizing: "border-box" }}
+                >
                   <option value="">None</option>
-                  {armorOptions.map((a) => <option key={a.id} value={a.id}>{a.name} (+{a.armorBonus || 0} AC)</option>)}
+                  {mainWeaponOptions.map((w: Weapon) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name}
+                      {w.weaponCategory ? ` (${w.weaponCategory})` : ""}
+                    </option>
+                  ))}
                 </select>
               </label>
-              <label>
-                Shield
-                <select value={build.shieldId || ""} onChange={(e) => updateBuild({ ...build, shieldId: e.target.value || undefined })} style={{ width: "100%" }}>
+              <label style={{ fontSize: "0.88rem" }}>
+                Filter off-hand weapon
+                <input
+                  type="search"
+                  value={offHandWeaponSearch}
+                  onChange={(e) => setOffHandWeaponSearch(e.target.value)}
+                  placeholder="Name, category…"
+                  style={{
+                    width: "100%",
+                    marginTop: "0.2rem",
+                    padding: "0.35rem 0.45rem",
+                    borderRadius: "6px",
+                    border: "1px solid #c4c5cc",
+                    boxSizing: "border-box"
+                  }}
+                />
+              </label>
+              <label style={{ fontSize: "0.88rem" }}>
+                Off-hand weapon / second weapon
+                <select
+                  value={build.offHandWeaponId || ""}
+                  onChange={(e) => updateBuild({ ...build, offHandWeaponId: e.target.value || undefined })}
+                  style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem", borderRadius: "6px", border: "1px solid #c4c5cc", boxSizing: "border-box" }}
+                >
                   <option value="">None</option>
-                  {shieldOptions.map((a) => <option key={a.id} value={a.id}>{a.name} (+{a.armorBonus || 0} AC)</option>)}
+                  {offHandWeaponOptions.map((w: Weapon) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name}
+                      {w.weaponCategory ? ` (${w.weaponCategory})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label style={{ fontSize: "0.88rem" }}>
+                Filter implements
+                <input
+                  type="search"
+                  value={implementSearch}
+                  onChange={(e) => setImplementSearch(e.target.value)}
+                  placeholder="Name, group…"
+                  style={{
+                    width: "100%",
+                    marginTop: "0.2rem",
+                    padding: "0.35rem 0.45rem",
+                    borderRadius: "6px",
+                    border: "1px solid #c4c5cc",
+                    boxSizing: "border-box"
+                  }}
+                />
+              </label>
+              <label style={{ fontSize: "0.88rem" }}>
+                Superior implement
+                <select
+                  value={build.implementId || ""}
+                  onChange={(e) => updateBuild({ ...build, implementId: e.target.value || undefined })}
+                  style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem", borderRadius: "6px", border: "1px solid #c4c5cc", boxSizing: "border-box" }}
+                >
+                  <option value="">None</option>
+                  {implementOptions.map((imp: Implement) => (
+                    <option key={imp.id} value={imp.id}>
+                      {imp.name}
+                      {imp.implementGroup ? ` (${imp.implementGroup})` : ""}
+                    </option>
+                  ))}
                 </select>
               </label>
             </div>
@@ -2295,14 +3493,82 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
             </p>
             <div style={{ display: "grid", gap: "0.25rem" }}>
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Race:</strong> {selectedRace?.name || "None"}</p>
-              <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Class:</strong> {selectedClass?.name || "None"}</p>
+              <p style={{ margin: 0, fontSize: "0.88rem" }}>
+                <strong>Class:</strong>{" "}
+                {isHybridBuild && (selectedHybridA || selectedHybridB)
+                  ? [selectedHybridA?.name, selectedHybridB?.name].filter(Boolean).join(" + ") || "Hybrid (incomplete)"
+                  : selectedClass?.name || "None"}
+              </p>
+              {isHybridBuild && hybridClassSelectionComplete && (
+                <>
+                  <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.82rem", color: "#444" }}>
+                    Base classes: {hybridBaseClassDefA?.name ?? "?"} · {hybridBaseClassDefB?.name ?? "?"}
+                  </p>
+                  <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.82rem", color: "#444" }}>
+                    Hybrid talents:{" "}
+                    {[
+                      selectedHybridA?.hybridTalentClassFeatures?.find((o) => o.id === build.hybridTalentClassFeatureIdA)?.name,
+                      selectedHybridB?.hybridTalentClassFeatures?.find((o) => o.id === build.hybridTalentClassFeatureIdB)?.name
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || "—"}
+                  </p>
+                  {(selectedHybridA?.hybridSelectionGroups?.length || selectedHybridB?.hybridSelectionGroups?.length) ? (
+                    <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.82rem", color: "#444" }}>
+                      Hybrid options:{" "}
+                      {[
+                        ...(selectedHybridA?.hybridSelectionGroups ?? []).map((g) => {
+                          const id = build.hybridSideASelections?.[g.key];
+                          const opt = g.options.find((o) => o.id === id);
+                          return opt ? `${g.label}: ${opt.name}` : null;
+                        }),
+                        ...(selectedHybridB?.hybridSelectionGroups ?? []).map((g) => {
+                          const id = build.hybridSideBSelections?.[g.key];
+                          const opt = g.options.find((o) => o.id === id);
+                          return opt ? `${g.label}: ${opt.name}` : null;
+                        })
+                      ]
+                        .filter(Boolean)
+                        .join(" · ") || "—"}
+                    </p>
+                  ) : null}
+                </>
+              )}
               {build.classSelections?.buildOption && (
                 <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Class Build:</strong> {build.classSelections.buildOption}</p>
               )}
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Level:</strong> {build.level}</p>
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Theme:</strong> {selectedTheme?.name || "None"}</p>
+              {themeGrantedPowers.length > 0 && (
+                <details style={{ marginTop: "0.25rem", fontSize: "0.8rem", color: "#374151" }}>
+                  <summary style={{ cursor: "pointer" }}>
+                    Theme granted powers ({themeGrantedPowers.length}) — summary
+                  </summary>
+                  <ul style={{ margin: "0.35rem 0 0 0", paddingLeft: "1.1rem" }}>
+                    {themeGrantedPowers.map((p) => (
+                      <li key={p.id}>
+                        {p.name}
+                        {p.level != null ? ` (lvl ${p.level})` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Paragon Path:</strong> {selectedParagonPath?.name || "None"}</p>
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Epic Destiny:</strong> {selectedEpicDestiny?.name || "None"}</p>
+              {multiclassFeatIdList.length > 0 && (
+                <details style={{ marginTop: "0.35rem", fontSize: "0.8rem", color: "#374151" }}>
+                  <summary style={{ cursor: "pointer" }}>
+                    Multiclass-related feats ({multiclassFeatIdList.length})
+                  </summary>
+                  <ul style={{ margin: "0.35rem 0 0 0", paddingLeft: "1.1rem" }}>
+                    {multiclassFeatIdList.map((fid) => {
+                      const f = index.feats.find((x) => x.id === fid);
+                      return <li key={fid}>{f?.name ?? fid}</li>;
+                    })}
+                  </ul>
+                </details>
+              )}
             </div>
           </div>
 
@@ -2313,6 +3579,40 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
             <div style={{ display: "grid", gap: "0.25rem" }}>
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Armor:</strong> {selectedArmor?.name || "None"}</p>
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Shield:</strong> {selectedShield?.name || "None"}</p>
+              <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Main weapon:</strong> {selectedMainWeapon?.name || "None"}</p>
+              <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Off-hand:</strong> {selectedOffHandWeapon?.name || "None"}</p>
+              <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Implement:</strong> {selectedImplement?.name || "None"}</p>
+            </div>
+          </div>
+
+          <div style={{ borderTop: "1px solid #dde1ea", paddingTop: "0.65rem" }}>
+            <p style={{ margin: "0 0 0.4rem 0", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.04em", color: "#4b5563", textTransform: "uppercase" }}>
+              Skills
+            </p>
+            <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.76rem", color: "#6b7280" }}>
+              Includes untrained skills; trained rows add +5 and ignore armor check penalty.
+            </p>
+            <div style={{ display: "grid", gap: "0.2rem", fontSize: "0.82rem", maxHeight: "11rem", overflow: "auto" }}>
+              {skillSheetRows.map((row) => (
+                <div
+                  key={row.skillId}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: "0.5rem",
+                    fontVariantNumeric: "tabular-nums"
+                  }}
+                >
+                  <span style={{ color: "#374151" }}>
+                    {row.name}
+                    {row.trained ? " (T)" : ""}
+                  </span>
+                  <span style={{ fontWeight: 600 }}>
+                    {row.modifier >= 0 ? "+" : ""}
+                    {row.modifier}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -2326,6 +3626,48 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Healing Surges:</strong> {derived.healingSurgesPerDay}</p>
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Surge Value:</strong> {derived.surgeValue}</p>
             </div>
+            {derived.armorCheckPenalty > 0 && (
+              <p style={{ margin: "0.45rem 0 0 0", fontSize: "0.82rem", color: "#92400e" }}>
+                Armor check penalty −{derived.armorCheckPenalty} on untrained Strength / Dexterity skills (see Skills).
+              </p>
+            )}
+            {(mainWeaponSummary || offHandWeaponSummary || implementAttackSummary) && (
+              <div style={{ marginTop: "0.45rem", fontSize: "0.82rem", color: "#374151", lineHeight: 1.45 }}>
+                <p style={{ margin: "0.15rem 0", color: "#6b7280" }}>
+                  Attack bonus uses half-level + relevant ability modifier + proficiency bonus (or nonproficient -2).
+                </p>
+                {mainWeaponSummary && selectedMainWeapon && (
+                  <p style={{ margin: "0.15rem 0" }}>
+                    <strong>Weapon (main):</strong> {selectedMainWeapon.name} — attack{" "}
+                    {mainWeaponSummary.attackBonus >= 0 ? "+" : ""}
+                    {mainWeaponSummary.attackBonus} vs AC ({mainWeaponSummary.abilityCode}); damage {mainWeaponSummary.damageNotation}
+                    {!mainWeaponSummary.proficient && (
+                      <span style={{ color: "#92400e", marginLeft: "0.25rem" }}>(nonproficient −2 applied in bonus)</span>
+                    )}
+                  </p>
+                )}
+                {offHandWeaponSummary && selectedOffHandWeapon && (
+                  <p style={{ margin: "0.15rem 0" }}>
+                    <strong>Weapon (off):</strong> {selectedOffHandWeapon.name} — attack{" "}
+                    {offHandWeaponSummary.attackBonus >= 0 ? "+" : ""}
+                    {offHandWeaponSummary.attackBonus} vs AC ({offHandWeaponSummary.abilityCode}); damage {offHandWeaponSummary.damageNotation}
+                    {!offHandWeaponSummary.proficient && (
+                      <span style={{ color: "#92400e", marginLeft: "0.25rem" }}>(nonproficient −2 applied in bonus)</span>
+                    )}
+                  </p>
+                )}
+                {implementAttackSummary && selectedImplement && (
+                  <p style={{ margin: "0.15rem 0" }}>
+                    <strong>Implement:</strong> {selectedImplement.name} — attack{" "}
+                    {implementAttackSummary.attackBonus >= 0 ? "+" : ""}
+                    {implementAttackSummary.attackBonus} vs AC (best key ability)
+                    {!implementAttackSummary.proficient && (
+                      <span style={{ color: "#92400e", marginLeft: "0.25rem" }}>(nonproficient −2 applied in bonus)</span>
+                    )}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <div style={{ borderTop: "1px solid #dde1ea", paddingTop: "0.65rem" }}>
@@ -2338,10 +3680,32 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Reflex:</strong> {derived.defenses.reflex}</p>
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Will:</strong> {derived.defenses.will}</p>
             </div>
+            <details style={{ marginTop: "0.45rem", fontSize: "0.78rem", color: "#4b5563" }}>
+              <summary style={{ cursor: "pointer", fontWeight: 600 }}>AC breakdown</summary>
+              <p style={{ margin: "0.25rem 0 0 0", color: "#6b7280" }}>
+                AC = 10 + armor + shield + best of DEX/INT when allowed by armor.
+              </p>
+              <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.15rem", fontVariantNumeric: "tabular-nums" }}>
+                <span>Base {derived.acBreakdown.base}</span>
+                <span>Armor +{derived.acBreakdown.armorBonus}</span>
+                <span>Shield +{derived.acBreakdown.shieldBonus}</span>
+                <span>
+                  Ability ({derived.acBreakdown.abilityLabel}){" "}
+                  {derived.acBreakdown.abilityLabel === "—" ? "—" : `${derived.acBreakdown.abilityBonus >= 0 ? "+" : ""}${derived.acBreakdown.abilityBonus}`}
+                </span>
+              </div>
+            </details>
           </div>
         </div>
         <div style={ui.blockSheetSection}>
         <h4 style={{ margin: "0 0 0.5rem 0", fontSize: "0.95rem", color: "#25252c" }}>Validation Notes</h4>
+        {legality.warnings.length > 0 && (
+          <ul style={{ margin: "0 0 0.5rem 0", paddingLeft: "1.2rem", color: "#92400e", fontSize: "0.88rem" }}>
+            {legality.warnings.map((w) => (
+              <li key={w}>{w}</li>
+            ))}
+          </ul>
+        )}
         <ul style={{ margin: 0, paddingLeft: "1.2rem" }}>
           {featOptions
             .filter((f) => !f.legal && build.featIds.includes(f.item.id))
