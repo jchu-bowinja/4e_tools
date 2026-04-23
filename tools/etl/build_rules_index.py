@@ -43,6 +43,272 @@ def normalize_name(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
 
 
+def parse_decimal_number(text: Any) -> Optional[float]:
+    """Parse integers or decimals like '2.5', '+3.5'."""
+    if text is None:
+        return None
+    if isinstance(text, (int, float)):
+        return float(text)
+    if isinstance(text, list):
+        if not text:
+            return None
+        text = " ".join(str(x) for x in text)
+    if not isinstance(text, str):
+        text = str(text)
+    text = text.strip()
+    if not text:
+        return None
+    match = re.search(r"([-+]?\d+(?:\.\d+)?)", text)
+    return float(match.group(1)) if match else None
+
+
+def resolve_hybrid_talent_class_features(
+    hybrid_talent_options_raw: Any,
+    class_feature_by_name: Dict[str, Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Map comma-separated Hybrid Talent Options names to Class Feature rows."""
+    if not hybrid_talent_options_raw or not isinstance(hybrid_talent_options_raw, str):
+        return []
+    raw_parts = [p.strip() for p in hybrid_talent_options_raw.split(",")]
+    out: List[Dict[str, Any]] = []
+    seen: Set[str] = set()
+    for part in raw_parts:
+        if not part:
+            continue
+        candidates = [part, part.rstrip("."), part.strip().rstrip(".")]
+        row = None
+        for c in candidates:
+            row = class_feature_by_name.get(c)
+            if row:
+                break
+        if not row:
+            continue
+        iid = row.get("internal_id")
+        if not iid:
+            continue
+        sid = str(iid)
+        if sid in seen:
+            continue
+        seen.add(sid)
+        sp = row.get("specific") or {}
+        out.append(
+            {
+                "id": sid,
+                "name": row.get("name"),
+                "shortDescription": sp.get("Short Description"),
+            }
+        )
+    return out
+
+
+HYBRID_DEFENSE_SUFFIXES = ("Fortitude", "Reflex", "Will")
+
+
+def resolve_hybrid_defense_options(
+    hybrid_name: str, class_features_raw: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    """Core-style Hybrid X Fortitude / Reflex / Will class features for PHB3 defense picks."""
+    if not hybrid_name or not isinstance(hybrid_name, str) or not hybrid_name.startswith("Hybrid "):
+        return []
+    prefix = hybrid_name + " "
+    out: List[Dict[str, Any]] = []
+    for row in class_features_raw:
+        n = row.get("name")
+        if not isinstance(n, str) or not n.startswith(prefix):
+            continue
+        tail = n[len(prefix) :].strip()
+        if tail not in HYBRID_DEFENSE_SUFFIXES:
+            continue
+        iid = row.get("internal_id")
+        if not iid:
+            continue
+        spec = row.get("specific") or {}
+        sd = spec.get("Short Description")
+        if not sd and isinstance(row.get("body"), str):
+            body = str(row["body"]).strip()
+            sd = body[:160] + ("…" if len(body) > 160 else "")
+        out.append({"id": str(iid), "name": n, "shortDescription": sd})
+    out.sort(key=lambda x: str(x.get("name") or ""))
+    return out
+
+
+def build_hybrid_subfeature_groups(
+    hyb: Dict[str, Any],
+    features_by_id: Dict[str, Dict[str, Any]],
+    class_feature_by_name: Dict[str, Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Mantle / tradition / bond / guild — parent class features with _PARSED_SUB_FEATURES."""
+    spec = hyb.get("specific") or {}
+    parsed = spec.get("_PARSED_CLASS_FEATURE")
+    if not parsed or not isinstance(parsed, str):
+        return []
+    groups: List[Dict[str, Any]] = []
+    for segment in [s.strip() for s in parsed.split(",")]:
+        if not segment:
+            continue
+        parent = class_feature_by_name.get(segment)
+        if not parent:
+            continue
+        pspec = parent.get("specific") or {}
+        sub_raw = pspec.get("_PARSED_SUB_FEATURES")
+        if not sub_raw:
+            continue
+        pid = parent.get("internal_id")
+        if not pid:
+            continue
+        options: List[Dict[str, Any]] = []
+        for sid in [s.strip() for s in str(sub_raw).split(",")]:
+            if not sid:
+                continue
+            row = features_by_id.get(sid)
+            if not row:
+                continue
+            sp = row.get("specific") or {}
+            options.append(
+                {
+                    "id": str(sid),
+                    "name": row.get("name"),
+                    "shortDescription": sp.get("Short Description"),
+                }
+            )
+        if not options:
+            continue
+        options.sort(key=lambda x: str(x.get("name") or ""))
+        groups.append({"key": f"cf:{pid}", "label": segment, "options": options})
+    return groups
+
+
+def build_hybrid_selection_groups(
+    hyb: Dict[str, Any],
+    class_features_raw: List[Dict[str, Any]],
+    features_by_id: Dict[str, Dict[str, Any]],
+    class_feature_by_name: Dict[str, Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Rules-driven defense pick + parsed sub-feature groups (e.g. Ardent mantle, monk tradition)."""
+    groups: List[Dict[str, Any]] = []
+    hybrid_name = hyb.get("name") or ""
+    rules = hyb.get("rules") or {}
+    for item in rules.get("select") or []:
+        attrs = item.get("attrs") or {}
+        if attrs.get("type") != "Class Feature":
+            continue
+        cat = attrs.get("Category") or ""
+        if not str(cat).endswith(" Defense"):
+            continue
+        opts = resolve_hybrid_defense_options(str(hybrid_name), class_features_raw)
+        if opts:
+            groups.append({"key": "defense", "label": "Defense bonus", "options": opts})
+        break
+    groups.extend(build_hybrid_subfeature_groups(hyb, features_by_id, class_feature_by_name))
+    return groups
+
+
+def racial_trait_has_keyword_damage_choice(trait: Dict[str, Any]) -> bool:
+    """Element/damage-type support traits (e.g. Dragon Breath Acid) add Keywords via rules.modify."""
+    rules = trait.get("rules") or {}
+    for m in rules.get("modify") or []:
+        attrs = m.get("attrs") or {}
+        if attrs.get("Field") == "Keywords" and attrs.get("list-addition"):
+            return True
+    return False
+
+
+def index_support_traits_by_power_id(
+    racial_traits_raw: List[Dict[str, Any]],
+) -> Dict[str, List[Dict[str, Any]]]:
+    out: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    for row in racial_traits_raw:
+        spec = row.get("specific") or {}
+        sid = spec.get("_SupportsID")
+        if sid and isinstance(sid, str):
+            out[sid].append(row)
+    return out
+
+
+def power_select_is_element_damage_slot(category: str, text: Any) -> bool:
+    """Split key-ability row vs damage-type row (Dragon Breath has both)."""
+    tail = str(category).split(",")[-1].strip().lower()
+    if "element" in tail:
+        return True
+    if isinstance(text, str) and "damage type" in text.lower():
+        return True
+    return False
+
+
+def category_to_power_selection_key(category: str) -> str:
+    slug = re.sub(r"[^a-zA-Z0-9]+", "-", str(category).strip()).strip("-").lower()
+    return slug or "selection"
+
+
+def build_power_selection_groups(
+    power: Dict[str, Any],
+    support_by_pid: Dict[str, List[Dict[str, Any]]],
+) -> List[Dict[str, Any]]:
+    """
+    Powers with rules.select type Racial Trait (e.g. Dragon Breath) — options from internal racial traits
+    whose specific._SupportsID matches this power.
+    """
+    pid = power.get("internal_id")
+    if not pid:
+        return []
+    traits = support_by_pid.get(str(pid)) or []
+    if not traits:
+        return []
+    rules = power.get("rules") or {}
+    selects = rules.get("select") or []
+    groups: List[Dict[str, Any]] = []
+    for item in selects:
+        attrs = item.get("attrs") or {}
+        if str(attrs.get("type")) != "Racial Trait":
+            continue
+        category = str(attrs.get("Category") or "")
+        text = item.get("text")
+        if isinstance(text, str) and text.strip():
+            label = text.strip()
+        elif category:
+            label = category
+        else:
+            label = "Selection"
+        want_damage = power_select_is_element_damage_slot(category, text)
+        pool = (
+            [t for t in traits if racial_trait_has_keyword_damage_choice(t)]
+            if want_damage
+            else [t for t in traits if not racial_trait_has_keyword_damage_choice(t)]
+        )
+        options: List[Dict[str, Any]] = []
+        for t in pool:
+            iid = t.get("internal_id")
+            if not iid:
+                continue
+            sp = t.get("specific") or {}
+            options.append(
+                {
+                    "id": str(iid),
+                    "name": t.get("name"),
+                    "shortDescription": sp.get("Short Description"),
+                }
+            )
+        options.sort(key=lambda x: str(x.get("name") or ""))
+        if not options:
+            continue
+        key = category_to_power_selection_key(category)
+        groups.append({"key": key, "label": label, "options": options})
+    return groups
+
+
+def parse_hp_first_level_constant(text: Any) -> Optional[int]:
+    """Leading integer from '6+ Constitution Score' style hybrid entries."""
+    if text is None:
+        return None
+    if isinstance(text, list):
+        text = " ".join(str(x) for x in text)
+    s = str(text).strip()
+    if not s:
+        return None
+    match = re.match(r"^(\d+)", s)
+    return int(match.group(1)) if match else parse_int_from_text(text)
+
+
 def parse_int_from_text(text: Any) -> Optional[int]:
     if text is None:
         return None
@@ -654,6 +920,8 @@ def load_raw_collections(input_path: Path) -> Dict[str, List[Dict[str, Any]]]:
         "Power": read_json("Power.json"),
         "Skill": read_json("Skill.json"),
         "Armor": read_json("Armor.json"),
+        "Weapon": read_json("Weapon.json"),
+        "Superior Implement": read_json("Superior Implement.json"),
         "Ability Score": read_json("Ability Score.json"),
         "Theme": read_json("Theme.json"),
         "Paragon Path": read_json("Paragon Path.json"),
@@ -663,6 +931,7 @@ def load_raw_collections(input_path: Path) -> Dict[str, List[Dict[str, Any]]]:
         "Class Feature": read_json("Class Feature.json"),
         "Grants": read_json("Grants.json"),
         "Skill Training": read_json("Skill Training.json"),
+        "Hybrid Class": read_json("Hybrid Class.json"),
     }
 
 
@@ -677,6 +946,8 @@ def build_index(input_path: Path, output_dir: Path) -> None:
     powers_raw = collections["Power"]
     skills_raw = collections["Skill"]
     armor_raw = collections["Armor"]
+    weapons_raw = collections["Weapon"]
+    implements_raw = collections["Superior Implement"]
     ability_score_raw = collections["Ability Score"]
     themes_raw = collections["Theme"]
     paragon_raw = collections["Paragon Path"]
@@ -685,9 +956,15 @@ def build_index(input_path: Path, output_dir: Path) -> None:
     racial_traits_raw = collections["Racial Trait"]
     class_features_raw = collections["Class Feature"]
     skill_training_raw = collections["Skill Training"]
+    hybrid_classes_raw = collections["Hybrid Class"]
     features_by_id: Dict[str, Dict[str, Any]] = {
         str(row.get("internal_id")): row for row in class_features_raw if row.get("internal_id")
     }
+    class_feature_by_name: Dict[str, Dict[str, Any]] = {}
+    for row in class_features_raw:
+        n = row.get("name")
+        if isinstance(n, str) and n.strip():
+            class_feature_by_name[n.strip()] = row
 
     grants_raw = collections["Grants"]
     auto_granted_power_ids_by_class = build_auto_granted_power_ids_by_class(grants_raw, features_by_id)
@@ -774,6 +1051,8 @@ def build_index(input_path: Path, output_dir: Path) -> None:
             }
         )
 
+    support_traits_by_power_id = index_support_traits_by_power_id(racial_traits_raw)
+
     feats: List[Dict[str, Any]] = []
     for feat in feats_raw:
         parse = parse_prereqs(feat.get("prereqs"), known_races, known_classes)
@@ -819,6 +1098,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
                 "level": parse_int_from_text(spec.get("Level")),
                 "keywords": spec.get("Keywords"),
                 "display": spec.get("Display"),
+                "powerSelectionGroups": build_power_selection_groups(power, support_traits_by_power_id),
                 "raw": power,
             }
         )
@@ -866,6 +1146,75 @@ def build_index(input_path: Path, output_dir: Path) -> None:
                 "abilityCode": ABILITY_NAME_TO_CODE.get(name),
                 "body": row.get("body"),
                 "raw": row,
+            }
+        )
+
+    weapons: List[Dict[str, Any]] = []
+    for weapon in weapons_raw:
+        spec = weapon.get("specific") or {}
+        weapons.append(
+            {
+                "id": weapon.get("internal_id"),
+                "name": weapon.get("name"),
+                "slug": normalize_name(weapon.get("name", "")),
+                "source": weapon.get("source"),
+                "proficiencyBonus": parse_int_from_text(spec.get("Proficiency Bonus")),
+                "damage": spec.get("Damage"),
+                "weaponCategory": spec.get("Weapon Category"),
+                "handsRequired": spec.get("Hands Required"),
+                "weaponGroup": spec.get("Group"),
+                "properties": spec.get("Properties"),
+                "range": spec.get("Range"),
+                "itemSlot": spec.get("Item Slot"),
+                "raw": weapon,
+            }
+        )
+
+    implements: List[Dict[str, Any]] = []
+    for imp in implements_raw:
+        spec = imp.get("specific") or {}
+        implements.append(
+            {
+                "id": imp.get("internal_id"),
+                "name": imp.get("name"),
+                "slug": normalize_name(imp.get("name", "")),
+                "source": imp.get("source"),
+                "implementGroup": spec.get("Group"),
+                "properties": spec.get("Properties"),
+                "itemSlot": spec.get("Item Slot"),
+                "raw": imp,
+            }
+        )
+
+    hybrid_classes: List[Dict[str, Any]] = []
+    for hyb in hybrid_classes_raw:
+        spec = hyb.get("specific") or {}
+        hybrid_classes.append(
+            {
+                "id": hyb.get("internal_id"),
+                "name": hyb.get("name"),
+                "slug": normalize_name(hyb.get("name", "")),
+                "source": hyb.get("source"),
+                "baseClassId": spec.get("_BaseClass"),
+                "hitPointsAt1": parse_hp_first_level_constant(spec.get("Hit Points at 1st Level")),
+                "hitPointsPerLevel": parse_decimal_number(spec.get("Hit Points per Level Gained")),
+                "healingSurgesBase": parse_decimal_number(spec.get("Healing Surges")),
+                "keyAbilities": spec.get("Key Abilities"),
+                "role": spec.get("Role"),
+                "powerSource": spec.get("Power Source"),
+                "bonusToDefense": spec.get("Bonus to Defense"),
+                "weaponProficiencies": spec.get("Weapon Proficiencies"),
+                "armorProficiencies": spec.get("Armor Proficiencies"),
+                "implementText": spec.get("Implements") or spec.get("Implement"),
+                "classSkillsRaw": spec.get("Class Skills"),
+                "hybridTalentOptions": spec.get("Hybrid Talent Options"),
+                "hybridTalentClassFeatures": resolve_hybrid_talent_class_features(
+                    spec.get("Hybrid Talent Options"), class_feature_by_name
+                ),
+                "hybridSelectionGroups": build_hybrid_selection_groups(
+                    hyb, class_features_raw, features_by_id, class_feature_by_name
+                ),
+                "raw": hyb,
             }
         )
 
@@ -956,10 +1305,13 @@ def build_index(input_path: Path, output_dir: Path) -> None:
                 "languages": len(languages),
                 "racialTraits": len(racial_traits),
                 "armors": len(armors),
+                "weapons": len(weapons),
+                "implements": len(implements),
                 "abilityScores": len(ability_scores),
                 "themes": len(themes),
                 "paragonPaths": len(paragon_paths),
                 "epicDestinies": len(epic_destinies),
+                "hybridClasses": len(hybrid_classes),
             },
         },
         "races": races,
@@ -970,10 +1322,13 @@ def build_index(input_path: Path, output_dir: Path) -> None:
         "languages": languages,
         "racialTraits": racial_traits,
         "armors": armors,
+        "weapons": weapons,
+        "implements": implements,
         "abilityScores": ability_scores,
         "themes": themes,
         "paragonPaths": paragon_paths,
         "epicDestinies": epic_destinies,
+        "hybridClasses": hybrid_classes,
         "autoGrantedPowerIdsByClassId": auto_granted_power_ids_by_class,
         "autoGrantedSkillTrainingNamesBySupportId": auto_granted_skill_training_names_by_support,
         "classBuildOptionsByClassId": class_build_options_by_class,
