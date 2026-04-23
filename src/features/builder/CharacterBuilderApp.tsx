@@ -13,7 +13,7 @@ import {
   Weapon
 } from "../../rules/models";
 import { defaultBuild } from "./defaultBuild";
-import { loadBuild, saveBuild } from "./storage";
+import { deleteSavedCharacterById, loadBuild, loadSavedCharacters, saveBuild, saveBuildToSavedCharacters } from "./storage";
 import { computeHybridDerivedStats, mergeHybridProficiencyLines, parseHybridDefenseBonuses } from "../../rules/hybridDerivedStats";
 import {
   buildHybridPowerSlotDefinitions,
@@ -91,29 +91,29 @@ function powerCardUsageAccent(usageRaw: string): { borderLeft: string; backgroun
   const u = usageRaw.toLowerCase();
   if (u.includes("at-will") || u.includes("at will")) {
     return {
-      borderLeft: "4px solid #15803d",
-      backgroundColor: "#f0fdf4",
-      border: "1px solid #bbf7d0"
+      borderLeft: "6px solid var(--power-accent-atwill-bar)",
+      backgroundColor: "var(--power-accent-atwill-bg)",
+      border: "1px solid var(--power-accent-atwill-border)"
     };
   }
   if (u.includes("encounter")) {
     return {
-      borderLeft: "4px solid #dc2626",
-      backgroundColor: "#fef2f2",
-      border: "1px solid #fecaca"
+      borderLeft: "6px solid var(--power-accent-encounter-bar)",
+      backgroundColor: "var(--power-accent-encounter-bg)",
+      border: "1px solid var(--power-accent-encounter-border)"
     };
   }
   if (u.includes("daily")) {
     return {
-      borderLeft: "4px solid #0a0a0a",
-      backgroundColor: "#fafafa",
-      border: "1px solid #171717"
+      borderLeft: "6px solid var(--power-accent-daily-bar)",
+      backgroundColor: "var(--power-accent-daily-bg)",
+      border: "1px solid var(--power-accent-daily-border)"
     };
   }
   return {
-    borderLeft: "4px solid #cbd5e1",
-    backgroundColor: "#fff",
-    border: "1px solid #dadde7"
+    borderLeft: "6px solid var(--panel-border)",
+    backgroundColor: "var(--surface-0)",
+    border: "1px solid var(--panel-border)"
   };
 }
 
@@ -151,20 +151,20 @@ function renderPowerCard(power: Power, key?: string): JSX.Element {
       }}
     >
       <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "baseline" }}>
-        <div style={{ fontWeight: 700, color: "#1f2937" }}>{power.name}</div>
-        <div style={{ fontSize: "0.78rem", color: "#374151" }}>
+        <div style={{ fontWeight: 700, color: "var(--text-primary)" }}>{power.name}</div>
+        <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
           {usage} {powerType !== "-" ? `• ${powerType}` : ""}
           {level != null && level > 0 ? ` • Lv ${level}` : ""}
         </div>
       </div>
-      {display && <div style={{ fontSize: "0.78rem", color: "#4b5563", marginTop: "0.2rem" }}>{display}</div>}
+      {display && <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "0.2rem" }}>{display}</div>}
       {keywords && (
-        <div style={{ fontSize: "0.77rem", color: "#374151", marginTop: "0.2rem" }}>
+        <div style={{ fontSize: "0.77rem", color: "var(--text-muted)", marginTop: "0.2rem" }}>
           <strong>Keywords:</strong> {keywords}
         </div>
       )}
       {(actionType || attackType || target || trigger || requirement) && (
-        <div style={{ marginTop: "0.3rem", fontSize: "0.78rem", color: "#374151", lineHeight: 1.45 }}>
+        <div style={{ marginTop: "0.3rem", fontSize: "0.78rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
           {actionType && <div><strong>Action:</strong> {actionType}</div>}
           {attackType && <div><strong>Range/Area:</strong> {attackType}</div>}
           {target && <div><strong>Target:</strong> {target}</div>}
@@ -173,17 +173,17 @@ function renderPowerCard(power: Power, key?: string): JSX.Element {
         </div>
       )}
       {(hit || miss || effect || special) && (
-        <div style={{ marginTop: "0.3rem", fontSize: "0.78rem", color: "#374151", lineHeight: 1.45 }}>
+        <div style={{ marginTop: "0.3rem", fontSize: "0.78rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
           {hit && <div><strong>Hit:</strong> {hit}</div>}
           {miss && <div><strong>Miss:</strong> {miss}</div>}
           {effect && <div><strong>Effect:</strong> {effect}</div>}
           {special && <div><strong>Special:</strong> {special}</div>}
         </div>
       )}
-      {flavor && <p style={{ margin: "0.35rem 0 0 0", fontStyle: "italic", fontSize: "0.8rem", color: "#374151" }}>{flavor}</p>}
+      {flavor && <p style={{ margin: "0.35rem 0 0 0", fontStyle: "italic", fontSize: "0.8rem", color: "var(--text-muted)" }}>{flavor}</p>}
       {body && (
-        <div style={{ marginTop: "0.35rem", fontSize: "0.8rem", color: "#444" }}>
-          <RulesRichText text={body} paragraphStyle={{ fontSize: "0.8rem", color: "#444" }} listItemStyle={{ fontSize: "0.8rem", color: "#444" }} />
+        <div style={{ marginTop: "0.35rem", fontSize: "0.8rem", color: "var(--text-muted)" }}>
+          <RulesRichText text={body} paragraphStyle={{ fontSize: "0.8rem", color: "var(--text-muted)" }} listItemStyle={{ fontSize: "0.8rem", color: "var(--text-muted)" }} />
         </div>
       )}
     </article>
@@ -203,16 +203,16 @@ function PowerConstructionSelects(props: {
       style={{
         marginTop: "0.35rem",
         padding: "0.4rem 0.55rem",
-        backgroundColor: "#f1f5f9",
+        backgroundColor: "var(--surface-2)",
         borderRadius: "6px",
-        border: "1px solid #cbd5e1"
+        border: "1px solid var(--panel-border)"
       }}
     >
       <div
         style={{
           fontSize: "0.72rem",
           fontWeight: 700,
-          color: "#475569",
+          color: "var(--text-secondary)",
           marginBottom: "0.35rem",
           textTransform: "uppercase",
           letterSpacing: "0.04em"
@@ -221,7 +221,7 @@ function PowerConstructionSelects(props: {
         Power options
       </div>
       {groups.map((g) => (
-        <label key={g.key} style={{ display: "block", marginBottom: "0.45rem", fontSize: "0.8rem", fontWeight: 600, color: "#334155" }}>
+        <label key={g.key} style={{ display: "block", marginBottom: "0.45rem", fontSize: "0.8rem", fontWeight: 600, color: "var(--text-secondary)" }}>
           {g.label}
           <select
             value={cur[g.key] || ""}
@@ -245,7 +245,7 @@ function PowerConstructionSelects(props: {
               marginTop: "0.2rem",
               padding: "0.35rem",
               borderRadius: "6px",
-              border: "1px solid #94a3b8",
+              border: "1px solid var(--panel-border-strong)",
               boxSizing: "border-box",
               fontSize: "0.82rem"
             }}
@@ -260,7 +260,7 @@ function PowerConstructionSelects(props: {
           {(() => {
             const sel = g.options.find((o) => o.id === cur[g.key]);
             return sel?.shortDescription ? (
-              <p style={{ margin: "0.3rem 0 0 0", fontSize: "0.78rem", color: "#64748b", lineHeight: 1.45 }}>{sel.shortDescription}</p>
+              <p style={{ margin: "0.3rem 0 0 0", fontSize: "0.78rem", color: "var(--text-muted)", lineHeight: 1.45 }}>{sel.shortDescription}</p>
             ) : null;
           })()}
         </label>
@@ -311,14 +311,14 @@ function HybridClassDetailPanel(props: {
   return (
     <div
       style={{
-        border: "1px solid #e5e7eb",
+        border: "1px solid var(--panel-border)",
         borderRadius: "8px",
         padding: "0.65rem 0.75rem",
-        backgroundColor: "#fafafa"
+        backgroundColor: "var(--surface-1)"
       }}
     >
-      <p style={{ margin: 0, fontWeight: 700, fontSize: "0.95rem", color: "#111827" }}>{h.name}</p>
-      <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.8rem", color: "#6b7280" }}>
+      <p style={{ margin: 0, fontWeight: 700, fontSize: "0.95rem", color: "var(--text-primary)" }}>{h.name}</p>
+      <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.8rem", color: "var(--text-muted)" }}>
         {h.source ? `Source: ${h.source} · ` : ""}
         {props.slotNote}
       </p>
@@ -373,11 +373,11 @@ function HybridClassDetailPanel(props: {
       {spec["Build Options"] ? (
         <details open style={{ marginTop: "0.45rem" }}>
           <summary style={{ fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}>Build Options</summary>
-          <div style={{ marginTop: "0.35rem", fontSize: "0.82rem", color: "#444" }}>
+          <div style={{ marginTop: "0.35rem", fontSize: "0.82rem", color: "var(--text-secondary)" }}>
             <RulesRichText
               text={String(spec["Build Options"])}
-              paragraphStyle={{ fontSize: "0.82rem", color: "#444" }}
-              listItemStyle={{ fontSize: "0.82rem", color: "#444" }}
+              paragraphStyle={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}
+              listItemStyle={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}
             />
           </div>
         </details>
@@ -385,8 +385,8 @@ function HybridClassDetailPanel(props: {
       {body ? (
         <details open style={{ marginTop: "0.45rem" }}>
           <summary style={{ fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}>Description</summary>
-          <div style={{ marginTop: "0.35rem", fontSize: "0.82rem", color: "#444" }}>
-            <RulesRichText text={body} paragraphStyle={{ fontSize: "0.82rem", color: "#444" }} listItemStyle={{ fontSize: "0.82rem", color: "#444" }} />
+          <div style={{ marginTop: "0.35rem", fontSize: "0.82rem", color: "var(--text-secondary)" }}>
+            <RulesRichText text={body} paragraphStyle={{ fontSize: "0.82rem", color: "var(--text-secondary)" }} listItemStyle={{ fontSize: "0.82rem", color: "var(--text-secondary)" }} />
           </div>
         </details>
       ) : null}
@@ -398,6 +398,7 @@ const abilities: Array<keyof CharacterBuild["abilityScores"]> = ["STR", "CON", "
 const PHYSICAL_ABILITIES: Ability[] = ["STR", "CON", "DEX"];
 const MENTAL_ABILITIES: Ability[] = ["INT", "WIS", "CHA"];
 type BuilderTab = "race" | "class" | "abilities" | "skills" | "feats" | "powers" | "paths" | "equipment" | "summary";
+type BuilderGlossaryKey = "race" | "class" | "level" | "hp" | "surges" | "surgeValue" | "skills" | "abilityScores";
 
 function abilityModifier(score: number): number {
   return Math.floor((score - 10) / 2);
@@ -449,51 +450,52 @@ const ui = {
     minHeight: "100vh",
     boxSizing: "border-box" as const,
     fontFamily: "system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
-    backgroundColor: NEUTRAL_PAGE_BG
+    backgroundColor: "var(--app-background, " + NEUTRAL_PAGE_BG + ")",
+    color: "var(--text-primary)"
   },
   mainColumn: {
-    backgroundColor: "#ffffff",
-    border: "1px solid #c8c9d0",
+    backgroundColor: "var(--surface-0)",
+    border: "1px solid var(--panel-border)",
     borderRadius: "12px",
     padding: "1.25rem 1.35rem",
     boxShadow: "0 1px 4px rgba(15, 23, 42, 0.06)"
   },
   sidebarColumn: {
-    backgroundColor: "#eceef2",
-    border: "1px solid #c8c9d0",
+    backgroundColor: "var(--surface-2)",
+    border: "1px solid var(--panel-border)",
     borderRadius: "12px",
     padding: "1.25rem 1.35rem",
     boxShadow: "0 1px 4px rgba(15, 23, 42, 0.06)"
   },
   blockTitle: {
-    backgroundColor: "#f6f6f8",
-    border: "1px solid #e2e3e7",
+    backgroundColor: "var(--surface-1)",
+    border: "1px solid var(--panel-border)",
     borderRadius: "10px",
     padding: "1rem 1.1rem",
     marginBottom: "0.9rem"
   },
   blockTabs: {
-    backgroundColor: "#ebecef",
-    border: "1px solid #d9dade",
+    backgroundColor: "var(--surface-2)",
+    border: "1px solid var(--panel-border)",
     borderRadius: "10px",
     padding: "0.55rem 0.65rem",
     marginBottom: "1rem"
   },
   blockContent: {
-    backgroundColor: "#f5f5f7",
-    border: "1px solid #dcdde2",
+    backgroundColor: "var(--surface-1)",
+    border: "1px solid var(--panel-border)",
     borderRadius: "10px",
     padding: "1rem 1.1rem"
   },
   blockInset: {
-    backgroundColor: "#f0f0f3",
-    border: "1px solid #d5d6dc",
+    backgroundColor: "var(--surface-2)",
+    border: "1px solid var(--panel-border)",
     borderRadius: "8px",
     padding: "0.65rem 0.85rem"
   },
   blockSheetSection: {
-    backgroundColor: "#e2e4e9",
-    border: "1px solid #cdd0d7",
+    backgroundColor: "var(--surface-3)",
+    border: "1px solid var(--panel-border)",
     borderRadius: "8px",
     padding: "0.75rem 0.9rem",
     marginTop: "0.75rem"
@@ -523,6 +525,8 @@ function importBuildFromFile(file: File, onLoaded: (build: CharacterBuild) => vo
 
 export function CharacterBuilderApp({ index }: Props): JSX.Element {
   const [build, setBuild] = useState<CharacterBuild>(() => loadBuild() || defaultBuild);
+  const [savedCharacters, setSavedCharacters] = useState(() => loadSavedCharacters());
+  const [selectedSavedCharacterId, setSelectedSavedCharacterId] = useState("");
   const prevAutoGrantedSkillIdsRef = useRef<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<BuilderTab>("race");
   const [featSearch, setFeatSearch] = useState("");
@@ -538,6 +542,10 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
   const [mainWeaponSearch, setMainWeaponSearch] = useState("");
   const [offHandWeaponSearch, setOffHandWeaponSearch] = useState("");
   const [implementSearch, setImplementSearch] = useState("");
+  const [showGlossaryHoverInfo, setShowGlossaryHoverInfo] = useState(false);
+  const [glossaryHoverKey, setGlossaryHoverKey] = useState<BuilderGlossaryKey | null>(null);
+  const [glossaryHoverPanelPos, setGlossaryHoverPanelPos] = useState<{ top: number; left: number } | null>(null);
+  const glossaryHoverTimerRef = useRef<number | null>(null);
 
   const selectedRace = index.races.find((r) => r.id === build.raceId);
   const selectedClass = index.classes.find((c) => c.id === build.classId);
@@ -621,6 +629,85 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
     selectedHybridA,
     selectedHybridB
   ]);
+
+  useEffect(() => {
+    return () => {
+      if (glossaryHoverTimerRef.current != null) {
+        window.clearTimeout(glossaryHoverTimerRef.current);
+      }
+    };
+  }, []);
+
+  function glossaryContent(key: BuilderGlossaryKey): JSX.Element {
+    if (key === "race") {
+      return (
+        <>
+          <div><strong>Race</strong> sets baseline traits like speed, size, and racial features.</div>
+          {selectedRace && (
+            <div style={{ marginTop: "0.2rem" }}>
+              <div><strong>Selected:</strong> {selectedRace.name}</div>
+              <div><strong>Speed:</strong> {selectedRace.speed ?? "-"}</div>
+              <div><strong>Abilities:</strong> {selectedRace.abilitySummary ?? "-"}</div>
+              <div><strong>Languages:</strong> {selectedRace.languages ?? "-"}</div>
+            </div>
+          )}
+        </>
+      );
+    }
+    if (key === "class") {
+      return (
+        <>
+          <div><strong>Class</strong> defines role, key abilities, and core combat resources.</div>
+          {selectedClass && (
+            <div style={{ marginTop: "0.2rem" }}>
+              <div><strong>Selected:</strong> {selectedClass.name}</div>
+              <div><strong>Role:</strong> {selectedClass.role ?? "-"}</div>
+              <div><strong>Power Source:</strong> {selectedClass.powerSource ?? "-"}</div>
+              <div><strong>Key Abilities:</strong> {selectedClass.keyAbilities ?? "-"}</div>
+            </div>
+          )}
+        </>
+      );
+    }
+    if (key === "level") return <div><strong>Level</strong> controls progression, available powers, and scaling math.</div>;
+    if (key === "hp") return <div><strong>HP</strong> is your maximum hit points before falling unconscious/dying.</div>;
+    if (key === "surges")
+      return <div><strong>Healing Surges</strong> are your daily healing resources; spending one restores your surge value.</div>;
+    if (key === "surgeValue") return <div><strong>Surge Value</strong> is HP restored per spent surge (usually one-quarter max HP).</div>;
+    if (key === "skills")
+      return <div><strong>Skills</strong> combine half-level, ability modifier, training bonuses, and situational modifiers.</div>;
+    return (
+      <div>
+        <strong>Ability Scores</strong> (STR/CON/DEX/INT/WIS/CHA) determine ability modifiers used by attacks, defenses, and skills.
+      </div>
+    );
+  }
+
+  function startGlossaryHover(event: React.MouseEvent<HTMLElement>, key: BuilderGlossaryKey): void {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const panelWidth = 360;
+    const left = Math.max(12, Math.min(rect.left, window.innerWidth - panelWidth - 12));
+    const top = Math.min(rect.bottom + 8, window.innerHeight - 180);
+    setGlossaryHoverPanelPos({ top, left });
+    setGlossaryHoverKey(key);
+    if (glossaryHoverTimerRef.current != null) {
+      window.clearTimeout(glossaryHoverTimerRef.current);
+    }
+    glossaryHoverTimerRef.current = window.setTimeout(() => {
+      setShowGlossaryHoverInfo(true);
+      glossaryHoverTimerRef.current = null;
+    }, 1000);
+  }
+
+  function stopGlossaryHover(): void {
+    if (glossaryHoverTimerRef.current != null) {
+      window.clearTimeout(glossaryHoverTimerRef.current);
+      glossaryHoverTimerRef.current = null;
+    }
+    setShowGlossaryHoverInfo(false);
+    setGlossaryHoverKey(null);
+    setGlossaryHoverPanelPos(null);
+  }
 
   const skillSheetRows = useMemo(() => {
     const ids = new Set<string>([...autoGrantedSkillIds, ...build.trainedSkillIds]);
@@ -878,6 +965,23 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
     [hybridClassesSorted, build.hybridClassIdA, build.hybridClassIdB]
   );
   const skillNameById = useMemo(() => new Map(index.skills.map((s) => [s.id, s.name])), [index.skills]);
+  const requiredClassSkillNamesLower = useMemo(
+    () => new Set((legality.classSkillRules?.requiredTrainedSkillNames || []).map((s) => s.toLowerCase())),
+    [legality.classSkillRules?.requiredTrainedSkillNames]
+  );
+  const trainedOptionalClassSkillCount = useMemo(() => {
+    let count = 0;
+    for (const id of build.trainedSkillIds) {
+      const lowerName = (skillNameById.get(id) || "").toLowerCase();
+      if (!lowerName) continue;
+      if (!selectedClassSkillNamesLower.has(lowerName)) continue;
+      if (requiredClassSkillNamesLower.has(lowerName)) continue;
+      count += 1;
+    }
+    return count;
+  }, [build.trainedSkillIds, skillNameById, selectedClassSkillNamesLower, requiredClassSkillNamesLower]);
+  const maxAdditionalTrainedSkills = legality.classSkillRules?.chooseAdditionalCount ?? 0;
+  const trainedSkillSelectionMaxed = trainedOptionalClassSkillCount >= maxAdditionalTrainedSkills;
   const hybridPrereqOptions = useMemo(
     () => ({ additionalClassNamesForMatch: hybridBaseClassNames(index, build) }),
     [index, build.characterStyle, build.hybridClassIdA, build.hybridClassIdB]
@@ -922,19 +1026,6 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
   const selectedFeats = useMemo((): Feat[] => {
     return build.featIds.map((id) => index.feats.find((f) => f.id === id)).filter((f): f is Feat => Boolean(f));
   }, [index.feats, build.featIds]);
-
-  const selectedFeatLore = useMemo(() => {
-    const selectedFeat = selectedFeats[0];
-    if (!selectedFeat) return null;
-    const raw = selectedFeat.raw as Record<string, unknown>;
-    const flavor = typeof raw.flavor === "string" ? raw.flavor : "";
-    const body = typeof raw.body === "string" ? raw.body : "";
-    const specific = (raw.specific as Record<string, unknown> | undefined) || {};
-    const shortFromSpecific = typeof specific["Short Description"] === "string" ? specific["Short Description"] : "";
-    const shortLine = selectedFeat.shortDescription || shortFromSpecific;
-    if (!flavor && !body && !shortLine) return null;
-    return { flavor, body, shortLine };
-  }, [selectedFeats]);
 
   const pointBuy = useMemo(() => {
     const BASE_PACKAGE_VALUE = -2;
@@ -1053,6 +1144,10 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
     saveBuild(pruned);
   }
 
+  function refreshSavedCharacters(): void {
+    setSavedCharacters(loadSavedCharacters());
+  }
+
   function renderPowerCardWithSelections(p: Power, cardKey: string): JSX.Element {
     return (
       <div key={cardKey}>
@@ -1156,8 +1251,8 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
     <div style={ui.page}>
       <div style={ui.mainColumn}>
         <div style={ui.blockTitle}>
-          <h2 style={{ margin: "0 0 0.5rem 0", fontSize: "1.35rem", fontWeight: 700, color: "#1a1a1e" }}>D&amp;D 4e Character Builder</h2>
-          <label style={{ display: "block", fontSize: "0.9rem", color: "#3a3a42" }}>
+          <h2 style={{ margin: "0 0 0.5rem 0", fontSize: "1.35rem", fontWeight: 700, color: "var(--text-primary)" }}>D&amp;D 4e Character Builder</h2>
+          <label style={{ display: "block", fontSize: "0.9rem", color: "var(--text-secondary)" }}>
             Character Name
             <input
               value={build.name}
@@ -1166,14 +1261,14 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                 width: "100%",
                 marginTop: "0.25rem",
                 padding: "0.4rem 0.5rem",
-                border: "1px solid #c4c5cc",
+                border: "1px solid var(--panel-border)",
                 borderRadius: "6px",
-                backgroundColor: "#fff",
+                backgroundColor: "var(--surface-0)",
                 boxSizing: "border-box"
               }}
             />
           </label>
-          <label style={{ display: "block", marginTop: "0.65rem", fontSize: "0.9rem", color: "#3a3a42" }}>
+          <label style={{ display: "block", marginTop: "0.65rem", fontSize: "0.9rem", color: "var(--text-secondary)" }}>
             Level (1–30)
             <input
               type="number"
@@ -1203,9 +1298,9 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                 width: "4.75rem",
                 marginTop: "0.25rem",
                 padding: "0.4rem 0.5rem",
-                border: "1px solid #c4c5cc",
+                border: "1px solid var(--panel-border)",
                 borderRadius: "6px",
-                backgroundColor: "#fff",
+                backgroundColor: "var(--surface-0)",
                 boxSizing: "border-box",
                 fontVariantNumeric: "tabular-nums"
               }}
@@ -1230,9 +1325,9 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                 type="button"
                 onClick={() => setActiveTab(id as BuilderTab)}
                 style={{
-                  border: activeTab === id ? "1px solid #9b9ca8" : "1px solid #cfd0d6",
-                  background: activeTab === id ? "#d8d9df" : "#f7f7f9",
-                  color: "#1e1e24",
+                  border: activeTab === id ? "1px solid var(--panel-border-strong)" : "1px solid var(--panel-border)",
+                  background: activeTab === id ? "var(--surface-2)" : "var(--surface-1)",
+                  color: "var(--text-primary)",
                   textAlign: "left",
                   borderRadius: "8px",
                   padding: "0.45rem 0.55rem",
@@ -1245,7 +1340,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                 <div
                   style={{
                     fontSize: "0.72rem",
-                    color: tabStatuses[id as BuilderTab] === "complete" ? "#1a6b1a" : "#5c5c66",
+                    color: tabStatuses[id as BuilderTab] === "complete" ? "var(--status-success)" : "var(--text-muted)",
                     marginTop: "0.12rem"
                   }}
                 >
@@ -1285,14 +1380,14 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                 raceSecondarySlots.length > 0 ||
                 racePowerGroups.some((g) => g.choiceOnly) ||
                 parseRacialTraitIdsFromRace(selectedRace).includes(ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION)) && (
-                <div style={{ marginTop: "0.65rem", ...ui.blockInset, backgroundColor: "#f8fafc", borderColor: "#cbd5e1" }}>
-                  <h4 style={{ margin: "0 0 0.5rem 0", fontSize: "0.95rem", color: "#334155" }}>Race choices</h4>
+                <div style={{ marginTop: "0.65rem", ...ui.blockInset, backgroundColor: "var(--surface-1)", borderColor: "var(--panel-border)" }}>
+                  <h4 style={{ margin: "0 0 0.5rem 0", fontSize: "0.95rem", color: "var(--text-secondary)" }}>Race choices</h4>
                   {parseRacialTraitIdsFromRace(selectedRace).includes(ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION) && (
                     <label style={{ display: "block", marginBottom: "0.75rem" }}>
                       <span style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem", fontSize: "0.85rem" }}>
                         Human power option
                       </span>
-                      <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.78rem", color: "#555", lineHeight: 1.45 }}>
+                      <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.78rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
                         PHB-style characters use the third class at-will slot (default below). Pick{" "}
                         <strong>Heroic Effort</strong> only if you use the Essentials option instead of that third at-will.
                       </p>
@@ -1311,7 +1406,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                           const { classPowerSlots, powerIds } = reconcilePowerSlotsForBuild(nextBase, build.level);
                           updateBuild({ ...nextBase, classPowerSlots, powerIds });
                         }}
-                        style={{ width: "100%", maxWidth: "28rem", padding: "0.4rem", borderRadius: "6px", border: "1px solid #c4c5cc" }}
+                        style={{ width: "100%", maxWidth: "28rem", padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--panel-border)" }}
                       >
                         <option value="">Third class at-will (PHB-style default)</option>
                         <option value={ID_RACIAL_TRAIT_BONUS_AT_WILL}>Bonus At-Will Power (same as default)</option>
@@ -1337,7 +1432,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                             value={selectedPowId}
                             disabled={g.dilettantePick && !classIdForDilettante}
                             onChange={(e) => commitRacePowerSelection(g.traitId, e.target.value)}
-                            style={{ width: "100%", maxWidth: "28rem", padding: "0.4rem", borderRadius: "6px", border: "1px solid #c4c5cc" }}
+                            style={{ width: "100%", maxWidth: "28rem", padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--panel-border)" }}
                           >
                             <option value="">Select power…</option>
                             {optionPowers.map((p) => (
@@ -1362,7 +1457,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                             racialAbilityChoice: (e.target.value || undefined) as CharacterBuild["racialAbilityChoice"]
                           })
                         }
-                        style={{ width: "100%", maxWidth: "28rem", padding: "0.4rem", borderRadius: "6px", border: "1px solid #c4c5cc" }}
+                        style={{ width: "100%", maxWidth: "28rem", padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--panel-border)" }}
                       >
                         <option value="">Select ability…</option>
                         {raceAbilityBonusInfo.chooseOne.map((ability) => (
@@ -1389,7 +1484,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                             const keys = Object.keys(next);
                             updateBuild({ ...build, raceSelections: keys.length ? next : undefined });
                           }}
-                          style={{ width: "100%", maxWidth: "28rem", padding: "0.4rem", borderRadius: "6px", border: "1px solid #c4c5cc" }}
+                          style={{ width: "100%", maxWidth: "28rem", padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--panel-border)" }}
                         >
                           <option value="">Select language…</option>
                           {bonusLanguageOptions.map((lang) => (
@@ -1410,7 +1505,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                             const keys = Object.keys(next);
                             updateBuild({ ...build, raceSelections: keys.length ? next : undefined });
                           }}
-                          style={{ width: "100%", maxWidth: "28rem", padding: "0.4rem", borderRadius: "6px", border: "1px solid #c4c5cc" }}
+                          style={{ width: "100%", maxWidth: "28rem", padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--panel-border)" }}
                         >
                           <option value="">Select skill…</option>
                           {skillsSortedAll.map((sk) => (
@@ -1433,14 +1528,14 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                 <p style={{ margin: "0.25rem 0 0 0" }}><strong>Languages:</strong> {String(raceSpecific["Languages"] || selectedRace.languages || "-")}</p>
                 {displayedRacialTraitRows.length > 0 && (
                   <div style={{ marginTop: "0.65rem" }}>
-                    <h4 style={{ margin: "0 0 0.45rem 0", fontSize: "0.95rem", color: "#333" }}>Racial traits</h4>
+                    <h4 style={{ margin: "0 0 0.45rem 0", fontSize: "0.95rem", color: "var(--text-primary)" }}>Racial traits</h4>
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
                       {displayedRacialTraitRows.map(({ id, trait }) => (
                         <details
                           key={id}
                           style={{
-                            backgroundColor: "#f8f8fa",
-                            border: "1px solid #e0e1e6",
+                            backgroundColor: "var(--surface-1)",
+                            border: "1px solid var(--panel-border)",
                             borderRadius: "8px",
                             padding: "0.45rem 0.55rem"
                           }}
@@ -1455,12 +1550,12 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                           >
                             {trait?.name || id}
                             {trait?.shortDescription ? (
-                              <span style={{ fontWeight: 400, color: "#555" }}> — {trait.shortDescription}</span>
+                              <span style={{ fontWeight: 400, color: "var(--text-muted)" }}> — {trait.shortDescription}</span>
                             ) : null}
                           </summary>
                           <div style={{ marginTop: "0.4rem", fontSize: "0.86rem", lineHeight: 1.45 }}>
                             {trait?.source && (
-                              <p style={{ margin: "0 0 0.35rem 0", color: "#666" }}>
+                              <p style={{ margin: "0 0 0.35rem 0", color: "var(--text-muted)" }}>
                                 <strong>Source:</strong> {trait.source}
                               </p>
                             )}
@@ -1478,7 +1573,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                 )}
                 {racePowerGroups.some((g) => g.powerIds.length > 0 || g.dilettantePick) && (
                   <div style={{ marginTop: "0.8rem" }}>
-                    <h4 style={{ margin: "0 0 0.45rem 0", fontSize: "0.95rem", color: "#333" }}>Granted powers</h4>
+                    <h4 style={{ margin: "0 0 0.45rem 0", fontSize: "0.95rem", color: "var(--text-primary)" }}>Granted powers</h4>
                     {racePowerGroups
                       .filter((g) => g.powerIds.length > 0 || g.dilettantePick)
                       .map((g) => {
@@ -1491,7 +1586,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                               .filter((p): p is Power => !!p);
                         return (
                           <div key={`race-powers-${g.traitId}`} style={{ marginBottom: "0.55rem" }}>
-                            <p style={{ margin: "0 0 0.25rem 0", fontSize: "0.84rem", color: "#374151" }}>
+                            <p style={{ margin: "0 0 0.25rem 0", fontSize: "0.84rem", color: "var(--text-secondary)" }}>
                               <strong>{g.traitName}</strong>
                               {g.choiceOnly && g.dilettantePick
                                 ? " — Dilettante: choose a 1st-level at-will attack from another class (you use it as an encounter power)."
@@ -1500,7 +1595,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                                   : ""}
                             </p>
                             {g.dilettantePick && !classIdForDilettante ? (
-                              <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.82rem", color: "#92400e" }}>
+                              <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.82rem", color: "var(--status-warning)" }}>
                                 Choose a standard class or two hybrid classes on the Class tab to load powers from other classes.
                               </p>
                             ) : null}
@@ -1512,13 +1607,13 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                                     return p ? (
                                       renderPowerCard(p, `race-tab-${g.traitId}-${p.id}`)
                                     ) : (
-                                      <p style={{ margin: 0, fontSize: "0.82rem", color: "#92400e" }}>
+                                      <p style={{ margin: 0, fontSize: "0.82rem", color: "var(--status-warning)" }}>
                                         Stored power id is unknown in the index.
                                       </p>
                                     );
                                   })()
                                 ) : (
-                                  <p style={{ margin: 0, fontSize: "0.82rem", color: "#6b7280" }}>Pick a power in Race choices.</p>
+                                  <p style={{ margin: 0, fontSize: "0.82rem", color: "var(--text-muted)" }}>Pick a power in Race choices.</p>
                                 )
                               ) : (
                                 optionPowers.map((p) => renderPowerCard(p, `race-tab-${g.traitId}-${p.id}`))
@@ -1678,7 +1773,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                           marginTop: "0.25rem",
                           padding: "0.4rem",
                           borderRadius: "6px",
-                          border: "1px solid #c4c5cc",
+                          border: "1px solid var(--panel-border)",
                           boxSizing: "border-box"
                         }}
                       >
@@ -1708,7 +1803,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                             marginTop: "0.25rem",
                             padding: "0.4rem",
                             borderRadius: "6px",
-                            border: "1px solid #c4c5cc",
+                            border: "1px solid var(--panel-border)",
                             boxSizing: "border-box"
                           }}
                         >
@@ -1724,7 +1819,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                             (o) => o.id === build.hybridTalentClassFeatureIdA
                           );
                           return sel?.shortDescription ? (
-                            <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.8rem", color: "#4b5563", lineHeight: 1.45 }}>
+                            <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.8rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
                               {sel.shortDescription}
                             </p>
                           ) : null;
@@ -1755,7 +1850,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                             marginTop: "0.25rem",
                             padding: "0.4rem",
                             borderRadius: "6px",
-                            border: "1px solid #c4c5cc",
+                            border: "1px solid var(--panel-border)",
                             boxSizing: "border-box"
                           }}
                         >
@@ -1769,7 +1864,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                         {(() => {
                           const sel = g.options.find((o) => o.id === build.hybridSideASelections?.[g.key]);
                           return sel?.shortDescription ? (
-                            <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.8rem", color: "#4b5563", lineHeight: 1.45 }}>
+                            <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.8rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
                               {sel.shortDescription}
                             </p>
                           ) : null;
@@ -1809,7 +1904,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                           marginTop: "0.25rem",
                           padding: "0.4rem",
                           borderRadius: "6px",
-                          border: "1px solid #c4c5cc",
+                          border: "1px solid var(--panel-border)",
                           boxSizing: "border-box"
                         }}
                       >
@@ -1839,7 +1934,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                             marginTop: "0.25rem",
                             padding: "0.4rem",
                             borderRadius: "6px",
-                            border: "1px solid #c4c5cc",
+                            border: "1px solid var(--panel-border)",
                             boxSizing: "border-box"
                           }}
                         >
@@ -1855,7 +1950,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                             (o) => o.id === build.hybridTalentClassFeatureIdB
                           );
                           return sel?.shortDescription ? (
-                            <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.8rem", color: "#4b5563", lineHeight: 1.45 }}>
+                            <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.8rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
                               {sel.shortDescription}
                             </p>
                           ) : null;
@@ -1886,7 +1981,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                             marginTop: "0.25rem",
                             padding: "0.4rem",
                             borderRadius: "6px",
-                            border: "1px solid #c4c5cc",
+                            border: "1px solid var(--panel-border)",
                             boxSizing: "border-box"
                           }}
                         >
@@ -1900,7 +1995,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                         {(() => {
                           const sel = g.options.find((o) => o.id === build.hybridSideBSelections?.[g.key]);
                           return sel?.shortDescription ? (
-                            <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.8rem", color: "#4b5563", lineHeight: 1.45 }}>
+                            <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.8rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
                               {sel.shortDescription}
                             </p>
                           ) : null;
@@ -1916,7 +2011,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                     )}
                   </div>
                 </div>
-                <p style={{ margin: "0.65rem 0 0.65rem 0", fontSize: "0.82rem", color: "#555", lineHeight: 1.45 }}>
+                <p style={{ margin: "0.65rem 0 0.65rem 0", fontSize: "0.82rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
                   Powers use each hybrid&apos;s <strong>base class</strong> lists (shown below). Pick two different hybrid entries.
                 </p>
                 {hybridClassSelectionComplete && classAutoGrantedPowers.length > 0 && (
@@ -1925,10 +2020,10 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                       ...ui.blockInset,
                       marginTop: "0.35rem",
                       paddingTop: "0.65rem",
-                      borderTop: "1px solid #e5e7eb"
+                      borderTop: "1px solid var(--panel-border)"
                     }}
                   >
-                    <h4 style={{ margin: "0 0 0.45rem 0", fontSize: "0.95rem", color: "#333" }}>Granted powers (both base classes)</h4>
+                    <h4 style={{ margin: "0 0 0.45rem 0", fontSize: "0.95rem", color: "var(--text-primary)" }}>Granted powers (both base classes)</h4>
                     {classAutoGrantedPowers.map((p) => renderPowerCardWithSelections(p, `hybrid-class-tab-${p.id}`))}
                   </div>
                 )}
@@ -1965,13 +2060,13 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                 )}
                 {classAutoGrantedPowers.length > 0 && (
                   <div style={{ marginTop: "0.8rem" }}>
-                    <h4 style={{ margin: "0 0 0.45rem 0", fontSize: "0.95rem", color: "#333" }}>Granted powers</h4>
+                    <h4 style={{ margin: "0 0 0.45rem 0", fontSize: "0.95rem", color: "var(--text-primary)" }}>Granted powers</h4>
                     {classAutoGrantedPowers.map((p) => renderPowerCardWithSelections(p, `class-tab-${p.id}`))}
                   </div>
                 )}
                 {classBuildOptions.length > 0 && (
-                  <div style={{ marginTop: "0.85rem", paddingTop: "0.75rem", borderTop: "1px solid #d5d6dc" }}>
-                    <h4 style={{ margin: "0 0 0.45rem 0", fontSize: "0.95rem", color: "#333" }}>Class choices</h4>
+                  <div style={{ marginTop: "0.85rem", paddingTop: "0.75rem", borderTop: "1px solid var(--panel-border)" }}>
+                    <h4 style={{ margin: "0 0 0.45rem 0", fontSize: "0.95rem", color: "var(--text-primary)" }}>Class choices</h4>
                     <label style={{ display: "block", maxWidth: "28rem" }}>
                       <span style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem", fontSize: "0.85rem" }}>
                         Build option
@@ -1992,7 +2087,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                           const keys = Object.keys(next);
                           updateBuild({ ...build, classSelections: keys.length ? next : undefined });
                         }}
-                        style={{ width: "100%", padding: "0.4rem", borderRadius: "6px", border: "1px solid #c4c5cc" }}
+                        style={{ width: "100%", padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--panel-border)" }}
                       >
                         <option value="">Select build option…</option>
                         {classBuildOptions.map((opt) => (
@@ -2004,26 +2099,26 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                     </label>
                     {selectedClassBuildOption && (
                       <div style={{ marginTop: "0.55rem" }}>
-                        <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.85rem", color: "#333" }}>
+                        <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.85rem", color: "var(--text-primary)" }}>
                           <strong>Selected:</strong> {selectedClassBuildOption.name}
                         </p>
                         {selectedClassBuildOption.shortDescription && (
-                          <p style={{ margin: "0 0 0.4rem 0", fontSize: "0.82rem", color: "#444" }}>
+                          <p style={{ margin: "0 0 0.4rem 0", fontSize: "0.82rem", color: "var(--text-secondary)" }}>
                             {selectedClassBuildOption.shortDescription}
                           </p>
                         )}
                         {selectedClassBuildOption.body && (
-                          <div style={{ fontSize: "0.82rem", color: "#444" }}>
+                          <div style={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}>
                             <RulesRichText
                               text={selectedClassBuildOption.body}
-                              paragraphStyle={{ fontSize: "0.82rem", color: "#444" }}
-                              listItemStyle={{ fontSize: "0.82rem", color: "#444" }}
+                              paragraphStyle={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}
+                              listItemStyle={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}
                             />
                           </div>
                         )}
                         {selectedClassBuildOption.powerIds.length > 0 && (
                           <div style={{ marginTop: "0.45rem" }}>
-                            <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "#374151" }}>Granted powers</div>
+                            <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--text-secondary)" }}>Granted powers</div>
                             {selectedClassBuildOption.powerIds
                               .map((pid) => index.powers.find((p) => p.id === pid))
                               .filter((p): p is Power => !!p)
@@ -2051,12 +2146,12 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
         {activeTab === "abilities" && (
           <div>
             <h3>Ability Scores</h3>
-            <p style={{ margin: "0.25rem 0 0.75rem 0", color: "#555", fontSize: "0.9rem", lineHeight: 1.45 }}>
+            <p style={{ margin: "0.25rem 0 0.75rem 0", color: "var(--text-muted)", fontSize: "0.9rem", lineHeight: 1.45 }}>
               Set <strong>base</strong> scores (8–18) using point buy. Modifiers below use your <strong>final</strong> score after level-based increases, then racial bonuses—those are what checks and attacks use.
             </p>
 
             {build.level >= 11 && (
-              <p style={{ ...ui.blockInset, marginBottom: "0.75rem", backgroundColor: "#f0f4ff", fontSize: "0.88rem", color: "#333" }}>
+              <p style={{ ...ui.blockInset, marginBottom: "0.75rem", backgroundColor: "var(--surface-2)", fontSize: "0.88rem", color: "var(--text-primary)" }}>
                 <strong>PHB tier bumps:</strong> At 11th level and 21st level, each ability score gains +1 automatically (included below). At 4, 8, 14, 18, 24, and 28, assign two different +1s in{" "}
                 <strong>Level-up ability increases</strong>.
               </p>
@@ -2067,7 +2162,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                 style={{
                   ...ui.blockInset,
                   marginBottom: "0.75rem",
-                  backgroundColor: "#fafbfc",
+                  backgroundColor: "var(--surface-1)",
                   fontSize: "0.88rem"
                 }}
               >
@@ -2099,9 +2194,9 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
             )}
 
             {requiredAsiMilestonesUpTo(build.level).length > 0 && (
-              <section style={{ ...ui.blockInset, marginBottom: "0.85rem", backgroundColor: "#f8f9ff" }}>
+              <section style={{ ...ui.blockInset, marginBottom: "0.85rem", backgroundColor: "var(--surface-1)" }}>
                 <h4 style={{ margin: "0 0 0.45rem 0" }}>Level-up ability increases</h4>
-                <p style={{ margin: "0 0 0.75rem 0", fontSize: "0.85rem", color: "#444", lineHeight: 1.45 }}>
+                <p style={{ margin: "0 0 0.75rem 0", fontSize: "0.85rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
                   At each listed level, pick two <strong>different</strong> abilities for +1 each (Player&apos;s Handbook). These stack with automatic +1 to all abilities at levels 11 and 21.
                 </p>
                 {requiredAsiMilestonesUpTo(build.level).map((m) => {
@@ -2124,7 +2219,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                                 asiChoices: { ...(build.asiChoices || {}), [String(m)]: { first, second } }
                               });
                             }}
-                            style={{ display: "block", marginTop: "0.2rem", padding: "0.3rem 0.4rem", borderRadius: "6px", border: "1px solid #c4c5cc" }}
+                            style={{ display: "block", marginTop: "0.2rem", padding: "0.3rem 0.4rem", borderRadius: "6px", border: "1px solid var(--panel-border)" }}
                           >
                             <option value="">—</option>
                             {abilities.map((a) => (
@@ -2147,7 +2242,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                                 asiChoices: { ...(build.asiChoices || {}), [String(m)]: { first, second } }
                               });
                             }}
-                            style={{ display: "block", marginTop: "0.2rem", padding: "0.3rem 0.4rem", borderRadius: "6px", border: "1px solid #c4c5cc" }}
+                            style={{ display: "block", marginTop: "0.2rem", padding: "0.3rem 0.4rem", borderRadius: "6px", border: "1px solid var(--panel-border)" }}
                           >
                             <option value="">—</option>
                             {abilities.map((a) => (
@@ -2165,29 +2260,29 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
             )}
 
             {(build.level >= 11 || build.level >= 21) && (
-              <section style={{ ...ui.blockInset, marginBottom: "0.85rem", backgroundColor: "#f8f9ff" }}>
+              <section style={{ ...ui.blockInset, marginBottom: "0.85rem", backgroundColor: "var(--surface-1)" }}>
                 {build.level >= 11 && (
                   <div style={{ marginBottom: build.level >= 21 ? "0.55rem" : 0 }}>
                     <div style={{ fontWeight: 700, marginBottom: "0.2rem", fontSize: "0.88rem" }}>Paragon Tier</div>
-                    <p style={{ margin: 0, fontSize: "0.84rem", color: "#444" }}>All ability scores increase by +1 automatically.</p>
+                    <p style={{ margin: 0, fontSize: "0.84rem", color: "var(--text-secondary)" }}>All ability scores increase by +1 automatically.</p>
                   </div>
                 )}
                 {build.level >= 21 && (
                   <div>
                     <div style={{ fontWeight: 700, marginBottom: "0.2rem", fontSize: "0.88rem" }}>Epic Tier</div>
-                    <p style={{ margin: 0, fontSize: "0.84rem", color: "#444" }}>All ability scores increase by +1 automatically.</p>
+                    <p style={{ margin: 0, fontSize: "0.84rem", color: "var(--text-secondary)" }}>All ability scores increase by +1 automatically.</p>
                   </div>
                 )}
               </section>
             )}
 
-            <section style={{ ...ui.blockInset, marginBottom: "0.85rem", backgroundColor: "#f8f9fc", borderColor: "#d7d9e1" }}>
-              <div style={{ marginBottom: "0.55rem", fontSize: "0.82rem", fontWeight: 700, color: "#374151", letterSpacing: "0.01em" }}>
+            <section style={{ ...ui.blockInset, marginBottom: "0.85rem", backgroundColor: "var(--surface-1)", borderColor: "var(--panel-border)" }}>
+              <div style={{ marginBottom: "0.55rem", fontSize: "0.82rem", fontWeight: 700, color: "var(--text-secondary)", letterSpacing: "0.01em" }}>
                 Point-Buy Budget
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", alignItems: "stretch", gap: "0.75rem 1rem" }}>
                 <label style={{ display: "flex", flexDirection: "column", gap: "0.3rem", width: "fit-content" }}>
-                  <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "#4b5563", textTransform: "uppercase", letterSpacing: "0.03em" }}>Budget</span>
+                  <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.03em" }}>Budget</span>
                   <input
                     type="number"
                     min={0}
@@ -2201,30 +2296,30 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                       textAlign: "center",
                       fontVariantNumeric: "tabular-nums",
                       borderRadius: "6px",
-                      border: "1px solid #bcc1ce",
-                      backgroundColor: "#fff",
+                      border: "1px solid var(--panel-border-strong)",
+                      backgroundColor: "var(--surface-0)",
                       fontWeight: 600
                     }}
                   />
                 </label>
                 <div style={{ flex: "1 1 14rem", display: "grid", gap: "0.35rem" }}>
                   <p style={{ margin: 0, fontSize: "0.9rem", display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                    <strong style={{ color: "#374151" }}>Points spent:</strong>
+                    <strong style={{ color: "var(--text-secondary)" }}>Points spent:</strong>
                     <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>{pointBuy.total}</span>
-                    <span style={{ color: "#6b7280" }}>/</span>
+                    <span style={{ color: "var(--text-muted)" }}>/</span>
                     <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>{pointBuy.budget}</span>
                   </p>
                   <p
                     style={{
                       margin: 0,
                       fontSize: "0.9rem",
-                      color: pointBuy.remaining < 0 ? "crimson" : pointBuy.remaining === 0 ? "#1a6b1a" : "#333",
+                      color: pointBuy.remaining < 0 ? "crimson" : pointBuy.remaining === 0 ? "var(--status-success)" : "var(--text-primary)",
                       display: "flex",
                       alignItems: "center",
                       gap: "0.35rem"
                     }}
                   >
-                    <strong style={{ color: "#374151" }}>Remaining:</strong>
+                    <strong style={{ color: "var(--text-secondary)" }}>Remaining:</strong>
                     <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>{pointBuy.remaining}</span>
                   </p>
                   {pointBuy.invalidScores.length > 0 && (
@@ -2244,8 +2339,8 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                 gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
                 gap: "1rem",
                 alignItems: "start",
-                backgroundColor: "#f8f9fc",
-                borderColor: "#d7d9e1"
+                backgroundColor: "var(--surface-1)",
+                borderColor: "var(--panel-border)"
               }}
             >
               {(
@@ -2254,15 +2349,15 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                   { title: "Mental", list: MENTAL_ABILITIES }
                 ] as const
               ).map(({ title, list }) => (
-                <div key={title} style={{ backgroundColor: "#ffffff", border: "1px solid #e3e5ec", borderRadius: "8px", padding: "0.5rem 0.65rem" }}>
+                <div key={title} style={{ backgroundColor: "var(--surface-0)", border: "1px solid var(--panel-border)", borderRadius: "8px", padding: "0.5rem 0.65rem" }}>
                   <h4
                     style={{
                       margin: "0 0 0.45rem 0",
                       fontSize: "0.85rem",
-                      color: "#374151",
+                      color: "var(--text-secondary)",
                       textTransform: "uppercase",
                       letterSpacing: "0.04em",
-                      borderBottom: "1px solid #e6e8ef",
+                      borderBottom: "1px solid var(--panel-border)",
                       paddingBottom: "0.3rem"
                     }}
                   >
@@ -2270,7 +2365,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                   </h4>
                   <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: "0.86rem" }}>
                     <thead>
-                      <tr style={{ textAlign: "left", color: "#6b7280", borderBottom: "1px solid #edf0f5" }}>
+                      <tr style={{ textAlign: "left", color: "var(--text-muted)", borderBottom: "1px solid var(--panel-border)" }}>
                         <th style={{ padding: "0.3rem 0.25rem 0.35rem 0", fontWeight: 700 }}>Ability</th>
                         <th style={{ padding: "0.3rem 0.25rem 0.35rem 0.25rem", fontWeight: 700, width: "4rem", textAlign: "center" }}>Base</th>
                         <th style={{ padding: "0.3rem 0", fontWeight: 700, width: "3.25rem", textAlign: "right" }}>Level</th>
@@ -2291,7 +2386,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                           <tr key={ability}>
                             <td style={{ padding: "0.45rem 0.25rem 0.45rem 0", verticalAlign: "middle" }}>
                               <span style={{ fontWeight: 600 }}>{ability}</span>
-                              <span style={{ display: "block", fontSize: "0.78rem", color: "#666", fontWeight: 400 }}>{getAbilityLabel(ability)}</span>
+                              <span style={{ display: "block", fontSize: "0.78rem", color: "var(--text-muted)", fontWeight: 400 }}>{getAbilityLabel(ability)}</span>
                             </td>
                             <td style={{ padding: "0.35rem 0.25rem", verticalAlign: "middle", textAlign: "center", width: "3.75rem" }}>
                               <input
@@ -2312,9 +2407,9 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                                   padding: "0.3rem 0.42rem",
                                   textAlign: "center",
                                   fontVariantNumeric: "tabular-nums",
-                                  border: "1px solid #c8cedb",
+                                  border: "1px solid var(--panel-border)",
                                   borderRadius: "6px",
-                                  backgroundColor: "#fff",
+                                  backgroundColor: "var(--surface-0)",
                                   fontWeight: 600
                                 }}
                                 aria-label={`${getAbilityLabel(ability)} base score`}
@@ -2353,7 +2448,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
               ))}
             </div>
 
-            <details style={{ ...ui.blockInset, marginTop: "1rem", backgroundColor: "#ffffff" }}>
+            <details style={{ ...ui.blockInset, marginTop: "1rem", backgroundColor: "var(--surface-0)" }}>
               <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: "0.9rem" }}>What do these abilities mean?</summary>
               <div style={{ marginTop: "0.65rem", display: "flex", flexDirection: "column", gap: "0.65rem" }}>
                 {abilities.map((ability) => {
@@ -2364,8 +2459,8 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                       <p style={{ margin: 0, fontWeight: 600, fontSize: "0.88rem" }}>
                         {ability} — {getAbilityLabel(ability)}
                       </p>
-                      <div style={{ margin: "0.25rem 0 0 0", fontSize: "0.82rem", color: "#444" }}>
-                        <RulesRichText text={lore} paragraphStyle={{ fontSize: "0.82rem", color: "#444" }} listItemStyle={{ fontSize: "0.82rem", color: "#444" }} />
+                      <div style={{ margin: "0.25rem 0 0 0", fontSize: "0.82rem", color: "var(--text-secondary)" }}>
+                        <RulesRichText text={lore} paragraphStyle={{ fontSize: "0.82rem", color: "var(--text-secondary)" }} listItemStyle={{ fontSize: "0.82rem", color: "var(--text-secondary)" }} />
                       </div>
                     </div>
                   );
@@ -2378,20 +2473,30 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
         {activeTab === "skills" && (
           <div>
             <h3>Skills</h3>
-            <p style={{ margin: "0.25rem 0 0.65rem 0", color: "#555", fontSize: "0.9rem", lineHeight: 1.45 }}>
+            <p style={{ margin: "0.25rem 0 0.65rem 0", color: "var(--text-muted)", fontSize: "0.9rem", lineHeight: 1.45 }}>
               All skills are listed. You can only <strong>train</strong> skills from your class list (checkbox enabled). Other skills are shown for reference.
             </p>
             {(isHybridBuild ? !hybridClassSelectionComplete : !selectedClass) && (
-              <p style={{ margin: "0 0 0.65rem 0", fontSize: "0.88rem", color: "#666" }}>
+              <p style={{ margin: "0 0 0.65rem 0", fontSize: "0.88rem", color: "var(--text-muted)" }}>
                 {isHybridBuild ? "Choose two hybrid classes on the Class tab to enable training choices." : "Choose a class on the Class tab to enable training choices."}
               </p>
             )}
-            <div style={{ ...ui.blockInset, backgroundColor: "#fafafa" }}>
+            {(isHybridBuild ? hybridClassSelectionComplete : !!selectedClass) && (
+              <p style={{ margin: "0 0 0.65rem 0", fontSize: "0.88rem", color: "var(--text-muted)" }}>
+                Trained class skills:{" "}
+                <strong>
+                  {trainedOptionalClassSkillCount} / {maxAdditionalTrainedSkills}
+                </strong>
+              </p>
+            )}
+            <div style={{ ...ui.blockInset, backgroundColor: "var(--surface-1)" }}>
               {skillsSortedAll.map((skill) => {
                 const checked = build.trainedSkillIds.includes(skill.id);
                 const trainable = !!(selectedClass && selectedClassSkillNamesLower.has(skill.name.toLowerCase()));
                 const autoGranted = autoGrantedSkillIdSet.has(skill.id);
-                const canInteract = (trainable || checked) && !autoGranted;
+                const requiredSkill = requiredClassSkillNamesLower.has(skill.name.toLowerCase());
+                const disableBecauseMaxed = trainedSkillSelectionMaxed && !checked && trainable && !requiredSkill;
+                const canInteract = (trainable || checked) && !autoGranted && !disableBecauseMaxed;
                 const skillBody = typeof skill.raw?.body === "string" ? skill.raw.body : "";
                 const skillScore = calculateSkillScore(build, effectiveAbilityScores, skill.keyAbility, checked);
                 return (
@@ -2399,7 +2504,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                     key={skill.id}
                     style={{
                       marginBottom: "0.35rem",
-                      opacity: trainable || checked ? 1 : 0.72
+                      opacity: trainable || checked ? (disableBecauseMaxed ? 0.58 : 1) : 0.72
                     }}
                   >
                     <label style={{ display: "block", cursor: canInteract ? "pointer" : "default" }}>
@@ -2416,17 +2521,22 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                       <span style={{ fontWeight: trainable || checked ? 600 : 400 }}>
                         {skill.name} ({skill.keyAbility || "N/A"})
                       </span>
-                      <span style={{ marginLeft: "0.4rem", fontSize: "0.84rem", color: "#333", fontWeight: 600 }}>
+                      <span style={{ marginLeft: "0.4rem", fontSize: "0.84rem", color: "var(--text-primary)", fontWeight: 600 }}>
                         {skillScore === null ? "Score —" : `Score ${formatAbilityMod(skillScore)}`}
                       </span>
                       {autoGranted && (
-                        <span style={{ marginLeft: "0.35rem", fontSize: "0.78rem", color: "#0f5132", fontWeight: 600 }}>
+                        <span style={{ marginLeft: "0.35rem", fontSize: "0.78rem", color: "var(--status-success)", fontWeight: 600 }}>
                           — auto trained
                         </span>
                       )}
                       {!trainable && (
                         <span style={{ marginLeft: "0.35rem", fontSize: "0.78rem", color: "#888", fontWeight: 400 }}>
                           {selectedClass ? "— not on class list" : ""}
+                        </span>
+                      )}
+                      {disableBecauseMaxed && (
+                        <span style={{ marginLeft: "0.35rem", fontSize: "0.78rem", color: "#777", fontWeight: 500 }}>
+                          — max trained selected
                         </span>
                       )}
                       {checked && !trainable && selectedClass && (
@@ -2438,8 +2548,8 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                     {skillBody && (
                       <details open style={{ marginLeft: "1.25rem", marginTop: "0.15rem" }}>
                         <summary style={{ fontSize: "0.85rem" }}>Description</summary>
-                        <div style={{ fontSize: "0.8rem", margin: "0.25rem 0 0 0", color: "#444" }}>
-                          <RulesRichText text={skillBody} paragraphStyle={{ fontSize: "0.8rem", color: "#444" }} listItemStyle={{ fontSize: "0.8rem", color: "#444" }} />
+                        <div style={{ fontSize: "0.8rem", margin: "0.25rem 0 0 0", color: "var(--text-secondary)" }}>
+                          <RulesRichText text={skillBody} paragraphStyle={{ fontSize: "0.8rem", color: "var(--text-secondary)" }} listItemStyle={{ fontSize: "0.8rem", color: "var(--text-secondary)" }} />
                         </div>
                       </details>
                     )}
@@ -2453,7 +2563,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
         {activeTab === "feats" && (
           <div>
             <h3>Feat Selection</h3>
-            <p style={{ margin: "0.25rem 0 0.5rem 0", fontSize: "0.85rem", color: "#555" }}>
+            <p style={{ margin: "0.25rem 0 0.5rem 0", fontSize: "0.85rem", color: "var(--text-muted)" }}>
               <strong>
                 {build.featIds.length} / {expectedFeatCount}
               </strong>{" "}
@@ -2486,19 +2596,19 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                   maxWidth: "28rem",
                   marginTop: "0.2rem",
                   padding: "0.4rem 0.5rem",
-                  border: "1px solid #c4c5cc",
+                  border: "1px solid var(--panel-border)",
                   borderRadius: "6px",
                   boxSizing: "border-box"
                 }}
               />
             </label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.55rem" }}>
-              <label style={{ fontSize: "0.82rem", color: "#444" }}>
+              <label style={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}>
                 Tier
                 <select
                   value={featTierFilter}
                   onChange={(e) => setFeatTierFilter(e.target.value as "all" | "HEROIC" | "PARAGON" | "EPIC")}
-                  style={{ display: "block", marginTop: "0.2rem", minWidth: "8.5rem", padding: "0.35rem", border: "1px solid #c4c5cc", borderRadius: "6px" }}
+                  style={{ display: "block", marginTop: "0.2rem", minWidth: "8.5rem", padding: "0.35rem", border: "1px solid var(--panel-border)", borderRadius: "6px" }}
                 >
                   <option value="all">All tiers</option>
                   <option value="HEROIC">Heroic</option>
@@ -2506,12 +2616,12 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                   <option value="EPIC">Epic</option>
                 </select>
               </label>
-              <label style={{ fontSize: "0.82rem", color: "#444" }}>
+              <label style={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}>
                 Category
                 <select
                   value={featCategoryFilter}
                   onChange={(e) => setFeatCategoryFilter(e.target.value)}
-                  style={{ display: "block", marginTop: "0.2rem", minWidth: "10rem", padding: "0.35rem", border: "1px solid #c4c5cc", borderRadius: "6px" }}
+                  style={{ display: "block", marginTop: "0.2rem", minWidth: "10rem", padding: "0.35rem", border: "1px solid var(--panel-border)", borderRadius: "6px" }}
                 >
                   <option value="all">All categories</option>
                   {featCategoryOptions.map((cat) => (
@@ -2521,12 +2631,12 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                   ))}
                 </select>
               </label>
-              <label style={{ fontSize: "0.82rem", color: "#444" }}>
+              <label style={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}>
                 Source
                 <select
                   value={featSourceFilter}
                   onChange={(e) => setFeatSourceFilter(e.target.value)}
-                  style={{ display: "block", marginTop: "0.2rem", minWidth: "11rem", padding: "0.35rem", border: "1px solid #c4c5cc", borderRadius: "6px" }}
+                  style={{ display: "block", marginTop: "0.2rem", minWidth: "11rem", padding: "0.35rem", border: "1px solid var(--panel-border)", borderRadius: "6px" }}
                 >
                   <option value="all">All sources</option>
                   {featSourceOptions.map((src) => (
@@ -2536,12 +2646,12 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                   ))}
                 </select>
               </label>
-              <label style={{ fontSize: "0.82rem", color: "#444" }}>
+              <label style={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}>
                 Sort
                 <select
                   value={featSortMode}
                   onChange={(e) => setFeatSortMode(e.target.value as FeatSortMode)}
-                  style={{ display: "block", marginTop: "0.2rem", minWidth: "11rem", padding: "0.35rem", border: "1px solid #c4c5cc", borderRadius: "6px" }}
+                  style={{ display: "block", marginTop: "0.2rem", minWidth: "11rem", padding: "0.35rem", border: "1px solid var(--panel-border)", borderRadius: "6px" }}
                 >
                   <option value="tier-alpha">Tier, then name</option>
                   <option value="alpha">Name (A-Z)</option>
@@ -2550,7 +2660,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
               </label>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center", marginBottom: "0.45rem" }}>
-              <button type="button" onClick={() => updateBuild({ ...build, featIds: [] })} style={{ padding: "0.35rem 0.65rem", borderRadius: "6px", border: "1px solid #c4c5cc", background: "#fff", cursor: "pointer" }}>
+              <button type="button" onClick={() => updateBuild({ ...build, featIds: [] })} style={{ padding: "0.35rem 0.65rem", borderRadius: "6px", border: "1px solid var(--panel-border)", background: "var(--surface-0)", cursor: "pointer" }}>
                 Clear all feats
               </button>
               <button
@@ -2562,14 +2672,14 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                   setFeatSourceFilter("all");
                   setFeatSortMode("tier-alpha");
                 }}
-                style={{ padding: "0.35rem 0.65rem", borderRadius: "6px", border: "1px solid #c4c5cc", background: "#fff", cursor: "pointer" }}
+                style={{ padding: "0.35rem 0.65rem", borderRadius: "6px", border: "1px solid var(--panel-border)", background: "var(--surface-0)", cursor: "pointer" }}
               >
                 Reset feat filters
               </button>
             </div>
-            <div style={{ ...ui.blockInset, maxHeight: "280px", overflow: "auto", backgroundColor: "#fafafa", padding: "0.35rem" }}>
+            <div style={{ ...ui.blockInset, maxHeight: "280px", overflow: "auto", backgroundColor: "var(--surface-1)", padding: "0.35rem" }}>
               {filteredFeatRows.length === 0 ? (
-                <p style={{ margin: "0.5rem", color: "#666", fontSize: "0.9rem" }}>
+                <p style={{ margin: "0.5rem", color: "var(--text-muted)", fontSize: "0.9rem" }}>
                   {allLegalFeats.length === 0 && !showInvalidFeats
                     ? "No feats are legal for this build yet. Check prerequisites (ability scores, race, class, skills), or turn on “Show invalid feats” to browse others."
                     : "No feats match this search. Clear the filter or try different keywords."}
@@ -2582,6 +2692,12 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                     const atCap = !selected && build.featIds.length >= expectedFeatCount;
                     const featCategory = getFeatFacetCategory(opt.item);
                     const featTier = String(opt.item.tier || "").trim();
+                    const featRaw = opt.item.raw as Record<string, unknown>;
+                    const featSpecific = (featRaw.specific as Record<string, unknown> | undefined) || {};
+                    const shortDescription =
+                      (typeof opt.item.shortDescription === "string" && opt.item.shortDescription.trim()) ||
+                      (typeof featSpecific["Short Description"] === "string" && String(featSpecific["Short Description"]).trim()) ||
+                      "";
                     return (
                       <li key={opt.item.id} style={{ marginBottom: "0.2rem" }}>
                         <button
@@ -2600,8 +2716,8 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                             textAlign: "left",
                             padding: "0.45rem 0.55rem",
                             borderRadius: "6px",
-                            border: selected ? "1px solid #9b9ca8" : "1px solid transparent",
-                            background: invalid ? "#ececee" : selected ? "#d8d9df" : "#fff",
+                            border: selected ? "1px solid var(--panel-border-strong)" : "1px solid transparent",
+                            background: invalid ? "var(--surface-2)" : selected ? "var(--surface-2)" : "var(--surface-0)",
                             cursor: invalid || atCap ? "not-allowed" : "pointer",
                             fontSize: "0.88rem",
                             opacity: invalid ? 0.92 : 1
@@ -2610,24 +2726,29 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                           <span style={{ fontWeight: selected ? 600 : 500 }}>
                             {opt.item.name}
                             {invalid && (
-                              <span style={{ marginLeft: "0.35rem", fontSize: "0.72rem", fontWeight: 600, color: "#9a3412" }}>Invalid</span>
+                              <span style={{ marginLeft: "0.35rem", fontSize: "0.72rem", fontWeight: 600, color: "var(--status-warning)" }}>Invalid</span>
                             )}
                           </span>
                           <span style={{ display: "block", marginTop: "0.2rem" }}>
                             {featTier && (
-                              <span style={{ display: "inline-block", marginRight: "0.3rem", padding: "0.08rem 0.35rem", borderRadius: "999px", fontSize: "0.7rem", background: "#ebeef5", color: "#334155", fontWeight: 600 }}>
+                              <span style={{ display: "inline-block", marginRight: "0.3rem", padding: "0.08rem 0.35rem", borderRadius: "999px", fontSize: "0.7rem", background: "var(--surface-2)", color: "var(--text-secondary)", fontWeight: 600 }}>
                                 {featTier}
                               </span>
                             )}
-                            <span style={{ display: "inline-block", marginRight: "0.3rem", padding: "0.08rem 0.35rem", borderRadius: "999px", fontSize: "0.7rem", background: "#f0f4ff", color: "#1e3a8a", fontWeight: 600 }}>
+                            <span style={{ display: "inline-block", marginRight: "0.3rem", padding: "0.08rem 0.35rem", borderRadius: "999px", fontSize: "0.7rem", background: "var(--surface-2)", color: "var(--status-info)", fontWeight: 600 }}>
                               {featCategory}
                             </span>
                           </span>
                           {opt.item.source && (
-                            <span style={{ display: "block", fontSize: "0.75rem", color: "#666", fontWeight: 400 }}>{opt.item.source}</span>
+                            <span style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 400 }}>{opt.item.source}</span>
+                          )}
+                          {shortDescription && (
+                            <span style={{ display: "block", marginTop: "0.16rem", fontSize: "0.76rem", color: "var(--text-secondary)", fontWeight: 400, lineHeight: 1.35 }}>
+                              {shortDescription}
+                            </span>
                           )}
                           {invalid && opt.reasons.length > 0 && (
-                            <span style={{ display: "block", fontSize: "0.72rem", color: "#92400e", marginTop: "0.15rem", fontWeight: 400 }}>
+                            <span style={{ display: "block", fontSize: "0.72rem", color: "var(--status-warning)", marginTop: "0.15rem", fontWeight: 400 }}>
                               {opt.reasons.join("; ")}
                             </span>
                           )}
@@ -2638,26 +2759,10 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                 </ul>
               )}
             </div>
-            {selectedFeatLore && (
-              <div style={{ ...ui.blockInset, marginTop: "0.75rem", backgroundColor: "#fafafa" }}>
-                {selectedFeatLore.flavor && <p style={{ margin: 0, fontStyle: "italic", color: "#333" }}>{selectedFeatLore.flavor}</p>}
-                {selectedFeatLore.shortLine && (
-                  <p style={{ margin: selectedFeatLore.flavor ? "0.5rem 0 0 0" : 0 }}>{selectedFeatLore.shortLine}</p>
-                )}
-                {selectedFeatLore.body && (
-                  <details open style={{ marginTop: "0.5rem" }}>
-                    <summary>Full text</summary>
-                    <div style={{ margin: "0.4rem 0 0 0", fontSize: "0.9rem" }}>
-                      <RulesRichText text={selectedFeatLore.body} paragraphStyle={{ fontSize: "0.9rem" }} listItemStyle={{ fontSize: "0.9rem" }} />
-                    </div>
-                  </details>
-                )}
-              </div>
-            )}
-            <div style={{ ...ui.blockInset, marginTop: "0.75rem", backgroundColor: "#fafafa" }}>
-              <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "#374151", marginBottom: "0.3rem" }}>Selected Feats</div>
+            <div style={{ ...ui.blockInset, marginTop: "0.75rem", backgroundColor: "var(--surface-1)" }}>
+              <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--text-secondary)", marginBottom: "0.3rem" }}>Selected Feats</div>
               {selectedFeats.length === 0 ? (
-                <p style={{ margin: 0, fontSize: "0.84rem", color: "#6b7280" }}>No feats selected yet.</p>
+                <p style={{ margin: 0, fontSize: "0.84rem", color: "var(--text-muted)" }}>No feats selected yet.</p>
               ) : (
                 <div style={{ display: "grid", gap: "0.45rem" }}>
                   {selectedFeats.map((f) => {
@@ -2674,27 +2779,48 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                       <article
                         key={f.id}
                         style={{
-                          border: "1px solid #d7dbe5",
+                          border: "1px solid var(--panel-border)",
                           borderRadius: "8px",
-                          backgroundColor: "#fff",
+                          backgroundColor: "var(--surface-0)",
                           padding: "0.45rem 0.55rem"
                         }}
                       >
-                        <div style={{ fontWeight: 700, fontSize: "0.84rem", color: "#1f2937" }}>{f.name}</div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.4rem" }}>
+                          <div style={{ fontWeight: 700, fontSize: "0.84rem", color: "var(--text-primary)" }}>{f.name}</div>
+                          <button
+                            type="button"
+                            onClick={() => updateBuild({ ...build, featIds: build.featIds.filter((id) => id !== f.id) })}
+                            style={{
+                              fontSize: "0.72rem",
+                              lineHeight: 1.1,
+                              padding: "0.16rem 0.4rem",
+                              borderRadius: "999px",
+                              border: "1px solid #f3c6c6",
+                              backgroundColor: "var(--surface-0)",
+                              color: "var(--status-danger)",
+                              cursor: "pointer",
+                              fontWeight: 700
+                            }}
+                            aria-label={`Remove feat ${f.name}`}
+                            title="Remove feat"
+                          >
+                            Remove
+                          </button>
+                        </div>
                         <div style={{ marginTop: "0.18rem", display: "flex", flexWrap: "wrap", gap: "0.3rem 0.45rem", alignItems: "center" }}>
                           {f.source ? (
-                            <span style={{ fontSize: "0.74rem", color: "#4b5563", backgroundColor: "#f3f4f6", border: "1px solid #e5e7eb", borderRadius: "999px", padding: "0.06rem 0.38rem" }}>
+                            <span style={{ fontSize: "0.74rem", color: "var(--text-secondary)", backgroundColor: "var(--surface-1)", border: "1px solid var(--panel-border)", borderRadius: "999px", padding: "0.06rem 0.38rem" }}>
                               {f.source}
                             </span>
                           ) : null}
                           {tier ? (
-                            <span style={{ fontSize: "0.72rem", color: "#1e3a8a", backgroundColor: "#eef2ff", border: "1px solid #dbe4ff", borderRadius: "999px", padding: "0.06rem 0.38rem", fontWeight: 600 }}>
+                            <span style={{ fontSize: "0.72rem", color: "var(--status-info)", backgroundColor: "var(--surface-2)", border: "1px solid var(--panel-border)", borderRadius: "999px", padding: "0.06rem 0.38rem", fontWeight: 600 }}>
                               {tier}
                             </span>
                           ) : null}
                         </div>
                         {summary && (
-                          <div style={{ marginTop: "0.28rem", color: "#4b5563", fontSize: "0.79rem", lineHeight: 1.4 }}>
+                          <div style={{ marginTop: "0.28rem", color: "var(--text-secondary)", fontSize: "0.79rem", lineHeight: 1.4 }}>
                             {summary}
                           </div>
                         )}
@@ -2710,21 +2836,21 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
         {activeTab === "powers" && (
           <div>
             <h3>Power Selection</h3>
-            <p style={{ margin: "0.25rem 0 0.65rem 0", fontSize: "0.85rem", color: "#555", lineHeight: 1.45 }}>
+            <p style={{ margin: "0.25rem 0 0.65rem 0", fontSize: "0.85rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
               Each <strong>class</strong> slot is a separate choice. The list for a slot only includes <strong>class</strong> powers whose{" "}
               <strong>printed level</strong> is at most that slot&apos;s gain level (for example, the 3rd-level encounter slot only lists encounter
               attacks of printed level 3 or lower). Search filters the lists. Paragon path and epic destiny powers are shown below when you have
               selected them on the Paths tab; they are extra powers on top of your class schedule, not chosen into these class slots.
             </p>
             {legality.powerSlotRules && (
-              <p style={{ margin: "0 0 0.65rem 0", fontSize: "0.82rem", color: "#444" }}>
+              <p style={{ margin: "0 0 0.65rem 0", fontSize: "0.82rem", color: "var(--text-secondary)" }}>
                 <strong>Required for level {build.level}:</strong> {legality.powerSlotRules.atWill} at-will attack,{" "}
                 {legality.powerSlotRules.encounter} encounter attack, {legality.powerSlotRules.daily} daily attack,{" "}
                 {legality.powerSlotRules.utility} utility.
               </p>
             )}
             {upcomingPowerSlotMilestones.length > 0 && (
-              <p style={{ margin: "0 0 0.65rem 0", fontSize: "0.8rem", color: "#4b5563", lineHeight: 1.45 }}>
+              <p style={{ margin: "0 0 0.65rem 0", fontSize: "0.8rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
                 <strong>Next class slots (PHB schedule):</strong>{" "}
                 {upcomingPowerSlotMilestones.map((m) => `${m.label} at level ${m.atLevel}`).join("; ")}.
               </p>
@@ -2735,7 +2861,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
               themeGrantedPowers.length > 0 ||
               paragonPathGrantedPowers.length > 0 ||
               epicDestinyGrantedPowers.length > 0) && (
-              <section style={{ marginBottom: "1.1rem", padding: "0.65rem 0.75rem", backgroundColor: "#f4f6fb", borderRadius: "8px", border: "1px solid #d8dce8" }}>
+              <section style={{ marginBottom: "1.1rem", padding: "0.65rem 0.75rem", backgroundColor: "var(--surface-1)", borderRadius: "8px", border: "1px solid var(--panel-border)" }}>
                 {racePowerGroups.some((g) => g.powerIds.length > 0 || g.dilettantePick) && (
                   <div style={{ marginBottom: "0.65rem" }}>
                     <div>
@@ -2756,17 +2882,17 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                           }
                           return (
                             <div key={g.traitId} style={{ marginBottom: "0.35rem" }}>
-                              <span style={{ fontWeight: 600, fontSize: "0.82rem", color: "#333" }}>{g.traitName}</span>
+                              <span style={{ fontWeight: 600, fontSize: "0.82rem", color: "var(--text-primary)" }}>{g.traitName}</span>
                               {g.choiceOnly && g.dilettantePick ? (
-                                <span style={{ color: "#6b5a2a", fontSize: "0.78rem" }}>
+                                <span style={{ color: "var(--text-muted)", fontSize: "0.78rem" }}>
                                   {" "}
                                   — Dilettante (1st at-will from another class; search above filters this list):
                                 </span>
                               ) : g.choiceOnly ? (
-                                <span style={{ color: "#6b5a2a", fontSize: "0.78rem" }}> — pick one (same as Race tab):</span>
+                                <span style={{ color: "var(--text-muted)", fontSize: "0.78rem" }}> — pick one (same as Race tab):</span>
                               ) : null}
                               {g.dilettantePick && !classIdForDilettante ? (
-                                <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.78rem", color: "#92400e" }}>
+                                <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.78rem", color: "var(--status-warning)" }}>
                                   Choose a standard class or hybrid classes on the Class tab to load other classes&apos; at-will powers.
                                 </p>
                               ) : null}
@@ -2780,7 +2906,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                                       width: "100%",
                                       padding: "0.35rem",
                                       borderRadius: "6px",
-                                      border: "1px solid #c4c5cc",
+                                      border: "1px solid var(--panel-border)",
                                       boxSizing: "border-box",
                                       fontSize: "0.82rem"
                                     }}
@@ -2799,7 +2925,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                                 </label>
                               )}
                               {g.choiceOnly && g.dilettantePick && build.classId && selectOptions.length === 0 && powerSearch.trim() ? (
-                                <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.76rem", color: "#92400e" }}>
+                                <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.76rem", color: "var(--status-warning)" }}>
                                   No powers match this filter; clear search to see the full Dilettante list.
                                 </p>
                               ) : null}
@@ -2815,7 +2941,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                                       );
                                     })()
                                   ) : (
-                                    <span style={{ fontSize: "0.78rem", color: "#6b7280" }}>No racial power chosen yet.</span>
+                                    <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>No racial power chosen yet.</span>
                                   )
                                 ) : (
                                   g.powerIds.map((pid) => {
@@ -2832,7 +2958,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                 )}
                 {classAutoGrantedPowers.length > 0 && (
                   <div style={{ marginBottom: "0.65rem" }}>
-                    <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "#333", marginBottom: "0.25rem" }}>Class</div>
+                    <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "0.25rem" }}>Class</div>
                     <div>
                       {classAutoGrantedPowers.map((p) => renderPowerCardWithSelections(p, `class-${p.id}`))}
                     </div>
@@ -2840,10 +2966,10 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                 )}
                 {themeGrantedPowers.length > 0 && (
                   <div style={{ marginBottom: "0.65rem" }}>
-                    <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "#333", marginBottom: "0.25rem" }}>
+                    <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "0.25rem" }}>
                       Theme{selectedTheme ? ` — ${selectedTheme.name}` : ""}
                     </div>
-                    <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.78rem", color: "#555" }}>
+                    <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.78rem", color: "var(--text-muted)" }}>
                       Granted by your theme when you meet each power&apos;s level; not chosen into class slots above.
                     </p>
                     <div>{themeGrantedPowers.map((p) => renderPowerCardWithSelections(p, `theme-${p.id}`))}</div>
@@ -2851,10 +2977,10 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                 )}
                 {paragonPathGrantedPowers.length > 0 && (
                   <div style={{ marginBottom: "0.65rem" }}>
-                    <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "#333", marginBottom: "0.25rem" }}>
+                    <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "0.25rem" }}>
                       Paragon path{selectedParagonPath ? ` — ${selectedParagonPath.name}` : ""}
                     </div>
-                    <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.78rem", color: "#555" }}>
+                    <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.78rem", color: "var(--text-muted)" }}>
                       Granted when your level reaches each power&apos;s printed level (often 11 / 12 / 20). These are in addition to class slots above.
                     </p>
                     <div>
@@ -2864,10 +2990,10 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                 )}
                 {epicDestinyGrantedPowers.length > 0 && (
                   <div style={{ marginBottom: "0.65rem" }}>
-                    <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "#333", marginBottom: "0.25rem" }}>
+                    <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "0.25rem" }}>
                       Epic destiny{selectedEpicDestiny ? ` — ${selectedEpicDestiny.name}` : ""}
                     </div>
-                    <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.78rem", color: "#555" }}>
+                    <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.78rem", color: "var(--text-muted)" }}>
                       Epic powers from compendium data when your level meets the printed level (commonly 26 / 30).
                     </p>
                     <div>
@@ -2877,8 +3003,8 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                 )}
                 {featAssociatedPowers.length > 0 && (
                   <div>
-                    <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "#333", marginBottom: "0.25rem" }}>Feats you selected</div>
-                    <ul style={{ margin: 0, paddingLeft: "1.1rem", fontSize: "0.82rem", color: "#333" }}>
+                    <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "0.25rem" }}>Feats you selected</div>
+                    <ul style={{ margin: 0, paddingLeft: "1.1rem", fontSize: "0.82rem", color: "var(--text-primary)" }}>
                       {featAssociatedPowers.map(({ feat, powers }) => (
                         <li key={feat.id} style={{ marginBottom: "0.45rem" }}>
                           <span style={{ fontWeight: 600 }}>{feat.name}</span>
@@ -2894,12 +3020,12 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
             )}
             {isHybridBuild ? (
               !hybridClassSelectionComplete ? (
-                <p style={{ margin: 0, color: "#666", fontSize: "0.9rem" }}>
+                <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.9rem" }}>
                   Choose two hybrid classes on the Class tab to assign powers.
                 </p>
               ) : null
             ) : !selectedClass ? (
-              <p style={{ margin: 0, color: "#666", fontSize: "0.9rem" }}>Choose a class on the Class tab to assign powers.</p>
+              <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.9rem" }}>Choose a class on the Class tab to assign powers.</p>
             ) : null}
             {(isHybridBuild ? hybridClassSelectionComplete : !!selectedClass) && (
               <>
@@ -2915,7 +3041,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                       maxWidth: "28rem",
                       marginTop: "0.2rem",
                       padding: "0.4rem 0.5rem",
-                      border: "1px solid #c4c5cc",
+                      border: "1px solid var(--panel-border)",
                       borderRadius: "6px",
                       boxSizing: "border-box"
                     }}
@@ -2959,16 +3085,16 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                   return (
                     <section key={def.key} style={{ marginBottom: "1rem" }}>
                       {showBucketHeader && (
-                        <h4 style={{ margin: "0 0 0.5rem 0", fontSize: "0.95rem", color: "#333", borderBottom: "1px solid #d5d6dc", paddingBottom: "0.25rem" }}>
+                        <h4 style={{ margin: "0 0 0.5rem 0", fontSize: "0.95rem", color: "var(--text-primary)", borderBottom: "1px solid var(--panel-border)", paddingBottom: "0.25rem" }}>
                           {slotBucketSectionTitle(def.bucket)}
                         </h4>
                       )}
-                      <div style={{ ...ui.blockInset, backgroundColor: "#fafafa", padding: "0.65rem 0.75rem" }}>
-                        <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.35rem", color: "#333" }}>
+                      <div style={{ ...ui.blockInset, backgroundColor: "var(--surface-1)", padding: "0.65rem 0.75rem" }}>
+                        <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.35rem", color: "var(--text-primary)" }}>
                           {def.label}
                         </label>
                         {poolForSlot.length === 0 ? (
-                          <p style={{ margin: 0, color: "#666", fontSize: "0.86rem" }}>
+                          <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.86rem" }}>
                             No powers of this type at printed level {def.gainLevel} or below for your level yet.
                           </p>
                         ) : (
@@ -2980,7 +3106,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                               maxWidth: "28rem",
                               padding: "0.4rem",
                               borderRadius: "6px",
-                              border: "1px solid #c4c5cc",
+                              border: "1px solid var(--panel-border)",
                               boxSizing: "border-box"
                             }}
                           >
@@ -2997,13 +3123,13 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                           </select>
                         )}
                         {poolForSlot.length > 0 && filtered.length === 0 && (
-                          <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.78rem", color: "#92400e" }}>
+                          <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.78rem", color: "var(--status-warning)" }}>
                             No powers match this filter; clear search to see options for this slot.
                           </p>
                         )}
                         {selPow && (
                           <div style={{ marginTop: "0.5rem" }}>
-                            <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "#374151" }}>Selected power card</div>
+                            <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--text-secondary)" }}>Selected power card</div>
                             {renderPowerCardWithSelections(selPow, `slot-${def.key}-${selPow.id}`)}
                           </div>
                         )}
@@ -3019,7 +3145,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
         {activeTab === "paths" && (
           <div>
             <h3>Theme, paragon path, and epic destiny</h3>
-            <p style={{ margin: "0.25rem 0 0.75rem 0", color: "#555", fontSize: "0.88rem", lineHeight: 1.45 }}>
+            <p style={{ margin: "0.25rem 0 0.75rem 0", color: "var(--text-muted)", fontSize: "0.88rem", lineHeight: 1.45 }}>
               Themes are optional packages with prerequisites. Paragon paths require <strong>level 11+</strong>; epic destinies require{" "}
               <strong>level 21+</strong>. Dropping level clears a path or destiny that is no longer legal.
             </p>
@@ -3038,7 +3164,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                     maxWidth: "28rem",
                     marginTop: "0.2rem",
                     padding: "0.4rem 0.5rem",
-                    border: "1px solid #c4c5cc",
+                    border: "1px solid var(--panel-border)",
                     borderRadius: "6px",
                     boxSizing: "border-box"
                   }}
@@ -3048,19 +3174,19 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                 <button
                   type="button"
                   onClick={() => updateBuild({ ...build, themeId: undefined })}
-                  style={{ padding: "0.35rem 0.65rem", borderRadius: "6px", border: "1px solid #c4c5cc", background: "#fff", cursor: "pointer" }}
+                  style={{ padding: "0.35rem 0.65rem", borderRadius: "6px", border: "1px solid var(--panel-border)", background: "var(--surface-0)", cursor: "pointer" }}
                 >
                   Clear theme
                 </button>
                 {build.themeId && selectedTheme && (
-                  <span style={{ fontSize: "0.85rem", color: "#444" }}>
+                  <span style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>
                     Selected: <strong>{selectedTheme.name}</strong>
                   </span>
                 )}
               </div>
-              <div style={{ ...ui.blockInset, maxHeight: "220px", overflow: "auto", backgroundColor: "#fafafa", padding: "0.35rem" }}>
+              <div style={{ ...ui.blockInset, maxHeight: "220px", overflow: "auto", backgroundColor: "var(--surface-1)", padding: "0.35rem" }}>
                 {filteredThemes.length === 0 ? (
-                  <p style={{ margin: "0.5rem", color: "#666", fontSize: "0.9rem" }}>No themes match this search.</p>
+                  <p style={{ margin: "0.5rem", color: "var(--text-muted)", fontSize: "0.9rem" }}>No themes match this search.</p>
                 ) : (
                   <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
                     {filteredThemes.map((t) => {
@@ -3079,8 +3205,8 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                               textAlign: "left",
                               padding: "0.45rem 0.55rem",
                               borderRadius: "6px",
-                              border: selected ? "1px solid #9b9ca8" : "1px solid transparent",
-                              background: !legal ? "#ececee" : selected ? "#d8d9df" : "#fff",
+                              border: selected ? "1px solid var(--panel-border-strong)" : "1px solid transparent",
+                              background: !legal ? "var(--surface-2)" : selected ? "var(--surface-2)" : "var(--surface-0)",
                               cursor: !legal ? "not-allowed" : "pointer",
                               fontSize: "0.88rem",
                               opacity: !legal ? 0.92 : 1
@@ -3089,14 +3215,14 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                             <span style={{ fontWeight: selected ? 600 : 500 }}>
                               {t.name}
                               {!legal && (
-                                <span style={{ marginLeft: "0.35rem", fontSize: "0.72rem", fontWeight: 600, color: "#9a3412" }}>Invalid</span>
+                                <span style={{ marginLeft: "0.35rem", fontSize: "0.72rem", fontWeight: 600, color: "var(--status-warning)" }}>Invalid</span>
                               )}
                             </span>
                             {t.source && (
-                              <span style={{ display: "block", fontSize: "0.75rem", color: "#666", fontWeight: 400 }}>{t.source}</span>
+                              <span style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 400 }}>{t.source}</span>
                             )}
                             {!legal && reasons.length > 0 && (
-                              <span style={{ display: "block", fontSize: "0.72rem", color: "#92400e", marginTop: "0.15rem", fontWeight: 400 }}>
+                              <span style={{ display: "block", fontSize: "0.72rem", color: "var(--status-warning)", marginTop: "0.15rem", fontWeight: 400 }}>
                                 {reasons.join("; ")}
                               </span>
                             )}
@@ -3121,7 +3247,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
               {themeGrantedPowers.length > 0 && (
                 <div style={{ marginTop: "0.75rem" }}>
                   <h5 style={{ margin: "0 0 0.35rem 0", fontSize: "0.88rem" }}>Powers from this theme</h5>
-                  <p style={{ margin: "0 0 0.45rem 0", fontSize: "0.78rem", color: "#555" }}>
+                  <p style={{ margin: "0 0 0.45rem 0", fontSize: "0.78rem", color: "var(--text-muted)" }}>
                     These are granted when your level reaches each power&apos;s printed level (same list as on the Powers tab).
                   </p>
                   <div>{themeGrantedPowers.map((p) => renderPowerCardWithSelections(p, `paths-theme-${p.id}`))}</div>
@@ -3132,7 +3258,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
             <section style={{ marginBottom: "1.25rem" }}>
               <h4 style={{ margin: "0 0 0.35rem 0" }}>Paragon path</h4>
               {build.level < 11 && (
-                <p style={{ margin: "0 0 0.5rem 0", fontSize: "0.85rem", color: "#7c2d12" }}>Set level to 11 or higher to choose a paragon path.</p>
+                <p style={{ margin: "0 0 0.5rem 0", fontSize: "0.85rem", color: "var(--status-warning)" }}>Set level to 11 or higher to choose a paragon path.</p>
               )}
               <label style={{ display: "block", fontSize: "0.88rem", marginBottom: "0.4rem" }}>
                 Search paragon paths
@@ -3146,7 +3272,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                     maxWidth: "28rem",
                     marginTop: "0.2rem",
                     padding: "0.4rem 0.5rem",
-                    border: "1px solid #c4c5cc",
+                    border: "1px solid var(--panel-border)",
                     borderRadius: "6px",
                     boxSizing: "border-box"
                   }}
@@ -3156,19 +3282,19 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                 <button
                   type="button"
                   onClick={() => updateBuild({ ...build, paragonPathId: undefined })}
-                  style={{ padding: "0.35rem 0.65rem", borderRadius: "6px", border: "1px solid #c4c5cc", background: "#fff", cursor: "pointer" }}
+                  style={{ padding: "0.35rem 0.65rem", borderRadius: "6px", border: "1px solid var(--panel-border)", background: "var(--surface-0)", cursor: "pointer" }}
                 >
                   Clear paragon path
                 </button>
                 {build.paragonPathId && selectedParagonPath && (
-                  <span style={{ fontSize: "0.85rem", color: "#444" }}>
+                  <span style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>
                     Selected: <strong>{selectedParagonPath.name}</strong>
                   </span>
                 )}
               </div>
-              <div style={{ ...ui.blockInset, maxHeight: "240px", overflow: "auto", backgroundColor: "#fafafa", padding: "0.35rem" }}>
+              <div style={{ ...ui.blockInset, maxHeight: "240px", overflow: "auto", backgroundColor: "var(--surface-1)", padding: "0.35rem" }}>
                 {filteredParagonPaths.length === 0 ? (
-                  <p style={{ margin: "0.5rem", color: "#666", fontSize: "0.9rem" }}>No paragon paths match this search.</p>
+                  <p style={{ margin: "0.5rem", color: "var(--text-muted)", fontSize: "0.9rem" }}>No paragon paths match this search.</p>
                 ) : (
                   <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
                     {filteredParagonPaths.map((p) => {
@@ -3187,8 +3313,8 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                               textAlign: "left",
                               padding: "0.45rem 0.55rem",
                               borderRadius: "6px",
-                              border: selected ? "1px solid #9b9ca8" : "1px solid transparent",
-                              background: !legal ? "#ececee" : selected ? "#d8d9df" : "#fff",
+                              border: selected ? "1px solid var(--panel-border-strong)" : "1px solid transparent",
+                              background: !legal ? "var(--surface-2)" : selected ? "var(--surface-2)" : "var(--surface-0)",
                               cursor: !legal ? "not-allowed" : "pointer",
                               fontSize: "0.88rem",
                               opacity: !legal ? 0.92 : 1
@@ -3197,14 +3323,14 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                             <span style={{ fontWeight: selected ? 600 : 500 }}>
                               {p.name}
                               {!legal && (
-                                <span style={{ marginLeft: "0.35rem", fontSize: "0.72rem", fontWeight: 600, color: "#9a3412" }}>Invalid</span>
+                                <span style={{ marginLeft: "0.35rem", fontSize: "0.72rem", fontWeight: 600, color: "var(--status-warning)" }}>Invalid</span>
                               )}
                             </span>
                             {p.source && (
-                              <span style={{ display: "block", fontSize: "0.75rem", color: "#666", fontWeight: 400 }}>{p.source}</span>
+                              <span style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 400 }}>{p.source}</span>
                             )}
                             {!legal && reasons.length > 0 && (
-                              <span style={{ display: "block", fontSize: "0.72rem", color: "#92400e", marginTop: "0.15rem", fontWeight: 400 }}>
+                              <span style={{ display: "block", fontSize: "0.72rem", color: "var(--status-warning)", marginTop: "0.15rem", fontWeight: 400 }}>
                                 {reasons.join("; ")}
                               </span>
                             )}
@@ -3216,7 +3342,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                 )}
               </div>
               {selectedParagonPath?.prereqsRaw && (
-                <p style={{ margin: "0.5rem 0 0 0", fontSize: "0.82rem", color: "#555" }}>
+                <p style={{ margin: "0.5rem 0 0 0", fontSize: "0.82rem", color: "var(--text-muted)" }}>
                   <strong>Prerequisites:</strong> {selectedParagonPath.prereqsRaw}
                 </p>
               )}
@@ -3237,7 +3363,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
             <section>
               <h4 style={{ margin: "0 0 0.35rem 0" }}>Epic destiny</h4>
               {build.level < 21 && (
-                <p style={{ margin: "0 0 0.5rem 0", fontSize: "0.85rem", color: "#7c2d12" }}>Set level to 21 or higher to choose an epic destiny.</p>
+                <p style={{ margin: "0 0 0.5rem 0", fontSize: "0.85rem", color: "var(--status-warning)" }}>Set level to 21 or higher to choose an epic destiny.</p>
               )}
               <label style={{ display: "block", fontSize: "0.88rem", marginBottom: "0.4rem" }}>
                 Search epic destinies
@@ -3251,7 +3377,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                     maxWidth: "28rem",
                     marginTop: "0.2rem",
                     padding: "0.4rem 0.5rem",
-                    border: "1px solid #c4c5cc",
+                    border: "1px solid var(--panel-border)",
                     borderRadius: "6px",
                     boxSizing: "border-box"
                   }}
@@ -3261,19 +3387,19 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                 <button
                   type="button"
                   onClick={() => updateBuild({ ...build, epicDestinyId: undefined })}
-                  style={{ padding: "0.35rem 0.65rem", borderRadius: "6px", border: "1px solid #c4c5cc", background: "#fff", cursor: "pointer" }}
+                  style={{ padding: "0.35rem 0.65rem", borderRadius: "6px", border: "1px solid var(--panel-border)", background: "var(--surface-0)", cursor: "pointer" }}
                 >
                   Clear epic destiny
                 </button>
                 {build.epicDestinyId && selectedEpicDestiny && (
-                  <span style={{ fontSize: "0.85rem", color: "#444" }}>
+                  <span style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>
                     Selected: <strong>{selectedEpicDestiny.name}</strong>
                   </span>
                 )}
               </div>
-              <div style={{ ...ui.blockInset, maxHeight: "240px", overflow: "auto", backgroundColor: "#fafafa", padding: "0.35rem" }}>
+              <div style={{ ...ui.blockInset, maxHeight: "240px", overflow: "auto", backgroundColor: "var(--surface-1)", padding: "0.35rem" }}>
                 {filteredEpicDestinies.length === 0 ? (
-                  <p style={{ margin: "0.5rem", color: "#666", fontSize: "0.9rem" }}>No epic destinies match this search.</p>
+                  <p style={{ margin: "0.5rem", color: "var(--text-muted)", fontSize: "0.9rem" }}>No epic destinies match this search.</p>
                 ) : (
                   <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
                     {filteredEpicDestinies.map((d) => {
@@ -3292,8 +3418,8 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                               textAlign: "left",
                               padding: "0.45rem 0.55rem",
                               borderRadius: "6px",
-                              border: selected ? "1px solid #9b9ca8" : "1px solid transparent",
-                              background: !legal ? "#ececee" : selected ? "#d8d9df" : "#fff",
+                              border: selected ? "1px solid var(--panel-border-strong)" : "1px solid transparent",
+                              background: !legal ? "var(--surface-2)" : selected ? "var(--surface-2)" : "var(--surface-0)",
                               cursor: !legal ? "not-allowed" : "pointer",
                               fontSize: "0.88rem",
                               opacity: !legal ? 0.92 : 1
@@ -3302,14 +3428,14 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                             <span style={{ fontWeight: selected ? 600 : 500 }}>
                               {d.name}
                               {!legal && (
-                                <span style={{ marginLeft: "0.35rem", fontSize: "0.72rem", fontWeight: 600, color: "#9a3412" }}>Invalid</span>
+                                <span style={{ marginLeft: "0.35rem", fontSize: "0.72rem", fontWeight: 600, color: "var(--status-warning)" }}>Invalid</span>
                               )}
                             </span>
                             {d.source && (
-                              <span style={{ display: "block", fontSize: "0.75rem", color: "#666", fontWeight: 400 }}>{d.source}</span>
+                              <span style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 400 }}>{d.source}</span>
                             )}
                             {!legal && reasons.length > 0 && (
-                              <span style={{ display: "block", fontSize: "0.72rem", color: "#92400e", marginTop: "0.15rem", fontWeight: 400 }}>
+                              <span style={{ display: "block", fontSize: "0.72rem", color: "var(--status-warning)", marginTop: "0.15rem", fontWeight: 400 }}>
                                 {reasons.join("; ")}
                               </span>
                             )}
@@ -3321,7 +3447,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                 )}
               </div>
               {selectedEpicDestiny?.prereqsRaw && (
-                <p style={{ margin: "0.5rem 0 0 0", fontSize: "0.82rem", color: "#555" }}>
+                <p style={{ margin: "0.5rem 0 0 0", fontSize: "0.82rem", color: "var(--text-muted)" }}>
                   <strong>Prerequisites:</strong> {selectedEpicDestiny.prereqsRaw}
                 </p>
               )}
@@ -3344,7 +3470,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
         {activeTab === "equipment" && (
           <div>
             <h3>Equipment</h3>
-            <div style={{ ...ui.blockInset, marginTop: "0.35rem", display: "grid", gap: "0.75rem", backgroundColor: "#fafafa" }}>
+            <div style={{ ...ui.blockInset, marginTop: "0.35rem", display: "grid", gap: "0.75rem", backgroundColor: "var(--surface-1)" }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.65rem" }}>
                 <label>
                   Armor
@@ -3373,7 +3499,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                     marginTop: "0.2rem",
                     padding: "0.35rem 0.45rem",
                     borderRadius: "6px",
-                    border: "1px solid #c4c5cc",
+                    border: "1px solid var(--panel-border)",
                     boxSizing: "border-box"
                   }}
                 />
@@ -3383,7 +3509,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                 <select
                   value={build.mainWeaponId || ""}
                   onChange={(e) => updateBuild({ ...build, mainWeaponId: e.target.value || undefined })}
-                  style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem", borderRadius: "6px", border: "1px solid #c4c5cc", boxSizing: "border-box" }}
+                  style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem", borderRadius: "6px", border: "1px solid var(--panel-border)", boxSizing: "border-box" }}
                 >
                   <option value="">None</option>
                   {mainWeaponOptions.map((w: Weapon) => (
@@ -3406,7 +3532,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                     marginTop: "0.2rem",
                     padding: "0.35rem 0.45rem",
                     borderRadius: "6px",
-                    border: "1px solid #c4c5cc",
+                    border: "1px solid var(--panel-border)",
                     boxSizing: "border-box"
                   }}
                 />
@@ -3416,7 +3542,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                 <select
                   value={build.offHandWeaponId || ""}
                   onChange={(e) => updateBuild({ ...build, offHandWeaponId: e.target.value || undefined })}
-                  style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem", borderRadius: "6px", border: "1px solid #c4c5cc", boxSizing: "border-box" }}
+                  style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem", borderRadius: "6px", border: "1px solid var(--panel-border)", boxSizing: "border-box" }}
                 >
                   <option value="">None</option>
                   {offHandWeaponOptions.map((w: Weapon) => (
@@ -3439,7 +3565,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                     marginTop: "0.2rem",
                     padding: "0.35rem 0.45rem",
                     borderRadius: "6px",
-                    border: "1px solid #c4c5cc",
+                    border: "1px solid var(--panel-border)",
                     boxSizing: "border-box"
                   }}
                 />
@@ -3449,7 +3575,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                 <select
                   value={build.implementId || ""}
                   onChange={(e) => updateBuild({ ...build, implementId: e.target.value || undefined })}
-                  style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem", borderRadius: "6px", border: "1px solid #c4c5cc", boxSizing: "border-box" }}
+                  style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem", borderRadius: "6px", border: "1px solid var(--panel-border)", boxSizing: "border-box" }}
                 >
                   <option value="">None</option>
                   {implementOptions.map((imp: Implement) => (
@@ -3467,6 +3593,87 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
         {activeTab === "summary" && (
           <div style={{ marginTop: "1rem", display: "flex", gap: "0.5rem" }}>
             <button onClick={() => exportBuild(build)}>Export Character JSON</button>
+            <button
+              onClick={() => {
+                const requestedName = (build.name || "Unnamed Character").trim() || "Unnamed Character";
+                const existing = loadSavedCharacters().find(
+                  (entry) => entry.name.trim().toLowerCase() === requestedName.toLowerCase()
+                );
+                const shouldOverwrite = existing
+                  ? window.confirm(`A saved character named "${requestedName}" already exists. Overwrite it?`)
+                  : false;
+                if (existing && !shouldOverwrite) {
+                  return;
+                }
+                const result = saveBuildToSavedCharacters(build, { overwriteExistingByName: shouldOverwrite });
+                refreshSavedCharacters();
+                const actionLabel = result.overwritten ? "Overwrote" : "Saved";
+                alert(`${actionLabel} "${result.entry.name}" for Character Sheet.`);
+              }}
+            >
+              Save for Character Sheet
+            </button>
+            <label style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+              Load saved
+              <select
+                value={selectedSavedCharacterId}
+                onChange={(e) => setSelectedSavedCharacterId(e.target.value)}
+                style={{ minWidth: "18rem" }}
+              >
+                <option value="">Select character...</option>
+                {savedCharacters.map((entry) => (
+                  <option key={entry.id} value={entry.id}>
+                    {entry.name} ({new Date(entry.updatedAt).toLocaleString()})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              onClick={() => {
+                if (!selectedSavedCharacterId) return;
+                const selected = savedCharacters.find((entry) => entry.id === selectedSavedCharacterId);
+                if (!selected) {
+                  alert("Selected saved character could not be found.");
+                  refreshSavedCharacters();
+                  setSelectedSavedCharacterId("");
+                  return;
+                }
+                const shouldLoad = window.confirm(
+                  `Load "${selected.name}" into the builder? This replaces your current in-progress character.`
+                );
+                if (!shouldLoad) return;
+                updateBuild({ ...selected.build });
+                setSelectedSavedCharacterId(selected.id);
+                alert(`Loaded "${selected.name}".`);
+              }}
+              disabled={!selectedSavedCharacterId}
+            >
+              Load Selected
+            </button>
+            <button
+              onClick={() => {
+                if (!selectedSavedCharacterId) return;
+                const selected = savedCharacters.find((entry) => entry.id === selectedSavedCharacterId);
+                if (!selected) {
+                  refreshSavedCharacters();
+                  setSelectedSavedCharacterId("");
+                  return;
+                }
+                const shouldDelete = window.confirm(`Delete saved character "${selected.name}"? This cannot be undone.`);
+                if (!shouldDelete) return;
+                const deleted = deleteSavedCharacterById(selected.id);
+                refreshSavedCharacters();
+                setSelectedSavedCharacterId("");
+                if (deleted) {
+                  alert(`Deleted "${selected.name}".`);
+                } else {
+                  alert("Saved character was not found.");
+                }
+              }}
+              disabled={!selectedSavedCharacterId}
+            >
+              Delete Selected
+            </button>
             <button onClick={() => updateBuild(defaultBuild)}>Reset</button>
             <label>
               Import JSON
@@ -3485,15 +3692,25 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
       </div>
 
       <div style={ui.sidebarColumn}>
-        <h3 style={{ margin: "0 0 0.75rem 0", fontSize: "1.1rem", color: "#1a1a1e" }}>Live Character Sheet</h3>
-        <div style={{ ...ui.blockInset, backgroundColor: "#f7f8fb", borderColor: "#cfd3dc", display: "grid", gap: "0.75rem" }}>
+        <h3 style={{ margin: "0 0 0.75rem 0", fontSize: "1.1rem", color: "var(--text-primary)" }}>Live Character Sheet</h3>
+        <div style={{ ...ui.blockInset, backgroundColor: "var(--surface-1)", borderColor: "var(--panel-border)", display: "grid", gap: "0.75rem" }}>
           <div>
-            <p style={{ margin: "0 0 0.4rem 0", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.04em", color: "#4b5563", textTransform: "uppercase" }}>
+            <p style={{ margin: "0 0 0.4rem 0", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--text-secondary)", textTransform: "uppercase" }}>
               Character
             </p>
             <div style={{ display: "grid", gap: "0.25rem" }}>
-              <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Race:</strong> {selectedRace?.name || "None"}</p>
-              <p style={{ margin: 0, fontSize: "0.88rem" }}>
+              <p
+                style={{ margin: 0, fontSize: "0.88rem" }}
+                onMouseEnter={(event) => startGlossaryHover(event, "race")}
+                onMouseLeave={stopGlossaryHover}
+              >
+                <strong>Race:</strong> {selectedRace?.name || "None"}
+              </p>
+              <p
+                style={{ margin: 0, fontSize: "0.88rem" }}
+                onMouseEnter={(event) => startGlossaryHover(event, "class")}
+                onMouseLeave={stopGlossaryHover}
+              >
                 <strong>Class:</strong>{" "}
                 {isHybridBuild && (selectedHybridA || selectedHybridB)
                   ? [selectedHybridA?.name, selectedHybridB?.name].filter(Boolean).join(" + ") || "Hybrid (incomplete)"
@@ -3501,10 +3718,10 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
               </p>
               {isHybridBuild && hybridClassSelectionComplete && (
                 <>
-                  <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.82rem", color: "#444" }}>
+                  <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.82rem", color: "var(--text-secondary)" }}>
                     Base classes: {hybridBaseClassDefA?.name ?? "?"} · {hybridBaseClassDefB?.name ?? "?"}
                   </p>
-                  <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.82rem", color: "#444" }}>
+                  <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.82rem", color: "var(--text-secondary)" }}>
                     Hybrid talents:{" "}
                     {[
                       selectedHybridA?.hybridTalentClassFeatures?.find((o) => o.id === build.hybridTalentClassFeatureIdA)?.name,
@@ -3514,7 +3731,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                       .join(" · ") || "—"}
                   </p>
                   {(selectedHybridA?.hybridSelectionGroups?.length || selectedHybridB?.hybridSelectionGroups?.length) ? (
-                    <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.82rem", color: "#444" }}>
+                    <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.82rem", color: "var(--text-secondary)" }}>
                       Hybrid options:{" "}
                       {[
                         ...(selectedHybridA?.hybridSelectionGroups ?? []).map((g) => {
@@ -3537,10 +3754,16 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
               {build.classSelections?.buildOption && (
                 <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Class Build:</strong> {build.classSelections.buildOption}</p>
               )}
-              <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Level:</strong> {build.level}</p>
+              <p
+                style={{ margin: 0, fontSize: "0.88rem" }}
+                onMouseEnter={(event) => startGlossaryHover(event, "level")}
+                onMouseLeave={stopGlossaryHover}
+              >
+                <strong>Level:</strong> {build.level}
+              </p>
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Theme:</strong> {selectedTheme?.name || "None"}</p>
               {themeGrantedPowers.length > 0 && (
-                <details style={{ marginTop: "0.25rem", fontSize: "0.8rem", color: "#374151" }}>
+                <details style={{ marginTop: "0.25rem", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
                   <summary style={{ cursor: "pointer" }}>
                     Theme granted powers ({themeGrantedPowers.length}) — summary
                   </summary>
@@ -3557,7 +3780,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Paragon Path:</strong> {selectedParagonPath?.name || "None"}</p>
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Epic Destiny:</strong> {selectedEpicDestiny?.name || "None"}</p>
               {multiclassFeatIdList.length > 0 && (
-                <details style={{ marginTop: "0.35rem", fontSize: "0.8rem", color: "#374151" }}>
+                <details style={{ marginTop: "0.35rem", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
                   <summary style={{ cursor: "pointer" }}>
                     Multiclass-related feats ({multiclassFeatIdList.length})
                   </summary>
@@ -3572,68 +3795,43 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
             </div>
           </div>
 
-          <div style={{ borderTop: "1px solid #dde1ea", paddingTop: "0.65rem" }}>
-            <p style={{ margin: "0 0 0.4rem 0", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.04em", color: "#4b5563", textTransform: "uppercase" }}>
-              Equipment
-            </p>
-            <div style={{ display: "grid", gap: "0.25rem" }}>
-              <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Armor:</strong> {selectedArmor?.name || "None"}</p>
-              <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Shield:</strong> {selectedShield?.name || "None"}</p>
-              <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Main weapon:</strong> {selectedMainWeapon?.name || "None"}</p>
-              <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Off-hand:</strong> {selectedOffHandWeapon?.name || "None"}</p>
-              <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Implement:</strong> {selectedImplement?.name || "None"}</p>
-            </div>
-          </div>
-
-          <div style={{ borderTop: "1px solid #dde1ea", paddingTop: "0.65rem" }}>
-            <p style={{ margin: "0 0 0.4rem 0", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.04em", color: "#4b5563", textTransform: "uppercase" }}>
-              Skills
-            </p>
-            <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.76rem", color: "#6b7280" }}>
-              Includes untrained skills; trained rows add +5 and ignore armor check penalty.
-            </p>
-            <div style={{ display: "grid", gap: "0.2rem", fontSize: "0.82rem", maxHeight: "11rem", overflow: "auto" }}>
-              {skillSheetRows.map((row) => (
-                <div
-                  key={row.skillId}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: "0.5rem",
-                    fontVariantNumeric: "tabular-nums"
-                  }}
-                >
-                  <span style={{ color: "#374151" }}>
-                    {row.name}
-                    {row.trained ? " (T)" : ""}
-                  </span>
-                  <span style={{ fontWeight: 600 }}>
-                    {row.modifier >= 0 ? "+" : ""}
-                    {row.modifier}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ borderTop: "1px solid #dde1ea", paddingTop: "0.65rem" }}>
-            <p style={{ margin: "0 0 0.4rem 0", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.04em", color: "#4b5563", textTransform: "uppercase" }}>
+          <div style={{ borderTop: "1px solid var(--panel-border)", paddingTop: "0.65rem" }}>
+            <p style={{ margin: "0 0 0.4rem 0", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--text-secondary)", textTransform: "uppercase" }}>
               Combat Stats
             </p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.3rem 0.75rem" }}>
-              <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>HP:</strong> {derived.maxHp}</p>
+              <p
+                style={{ margin: 0, fontSize: "0.88rem" }}
+                onMouseEnter={(event) => startGlossaryHover(event, "hp")}
+                onMouseLeave={stopGlossaryHover}
+              >
+                <strong>HP:</strong> {derived.maxHp}
+              </p>
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Speed:</strong> {derived.speed}</p>
-              <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Healing Surges:</strong> {derived.healingSurgesPerDay}</p>
-              <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Surge Value:</strong> {derived.surgeValue}</p>
+              <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Initiative:</strong> {derived.initiative >= 0 ? `+${derived.initiative}` : derived.initiative}</p>
+              <p
+                style={{ margin: 0, fontSize: "0.88rem" }}
+                onMouseEnter={(event) => startGlossaryHover(event, "surges")}
+                onMouseLeave={stopGlossaryHover}
+              >
+                <strong>Healing Surges:</strong> {derived.healingSurgesPerDay}
+              </p>
+              <p
+                style={{ margin: 0, fontSize: "0.88rem" }}
+                onMouseEnter={(event) => startGlossaryHover(event, "surgeValue")}
+                onMouseLeave={stopGlossaryHover}
+              >
+                <strong>Surge Value:</strong> {derived.surgeValue}
+              </p>
             </div>
             {derived.armorCheckPenalty > 0 && (
-              <p style={{ margin: "0.45rem 0 0 0", fontSize: "0.82rem", color: "#92400e" }}>
+              <p style={{ margin: "0.45rem 0 0 0", fontSize: "0.82rem", color: "var(--status-warning)" }}>
                 Armor check penalty −{derived.armorCheckPenalty} on untrained Strength / Dexterity skills (see Skills).
               </p>
             )}
             {(mainWeaponSummary || offHandWeaponSummary || implementAttackSummary) && (
-              <div style={{ marginTop: "0.45rem", fontSize: "0.82rem", color: "#374151", lineHeight: 1.45 }}>
-                <p style={{ margin: "0.15rem 0", color: "#6b7280" }}>
+              <div style={{ marginTop: "0.45rem", fontSize: "0.82rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
+                <p style={{ margin: "0.15rem 0", color: "var(--text-muted)" }}>
                   Attack bonus uses half-level + relevant ability modifier + proficiency bonus (or nonproficient -2).
                 </p>
                 {mainWeaponSummary && selectedMainWeapon && (
@@ -3642,7 +3840,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                     {mainWeaponSummary.attackBonus >= 0 ? "+" : ""}
                     {mainWeaponSummary.attackBonus} vs AC ({mainWeaponSummary.abilityCode}); damage {mainWeaponSummary.damageNotation}
                     {!mainWeaponSummary.proficient && (
-                      <span style={{ color: "#92400e", marginLeft: "0.25rem" }}>(nonproficient −2 applied in bonus)</span>
+                      <span style={{ color: "var(--status-warning)", marginLeft: "0.25rem" }}>(nonproficient −2 applied in bonus)</span>
                     )}
                   </p>
                 )}
@@ -3652,7 +3850,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                     {offHandWeaponSummary.attackBonus >= 0 ? "+" : ""}
                     {offHandWeaponSummary.attackBonus} vs AC ({offHandWeaponSummary.abilityCode}); damage {offHandWeaponSummary.damageNotation}
                     {!offHandWeaponSummary.proficient && (
-                      <span style={{ color: "#92400e", marginLeft: "0.25rem" }}>(nonproficient −2 applied in bonus)</span>
+                      <span style={{ color: "var(--status-warning)", marginLeft: "0.25rem" }}>(nonproficient −2 applied in bonus)</span>
                     )}
                   </p>
                 )}
@@ -3662,7 +3860,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                     {implementAttackSummary.attackBonus >= 0 ? "+" : ""}
                     {implementAttackSummary.attackBonus} vs AC (best key ability)
                     {!implementAttackSummary.proficient && (
-                      <span style={{ color: "#92400e", marginLeft: "0.25rem" }}>(nonproficient −2 applied in bonus)</span>
+                      <span style={{ color: "var(--status-warning)", marginLeft: "0.25rem" }}>(nonproficient −2 applied in bonus)</span>
                     )}
                   </p>
                 )}
@@ -3670,8 +3868,8 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
             )}
           </div>
 
-          <div style={{ borderTop: "1px solid #dde1ea", paddingTop: "0.65rem" }}>
-            <p style={{ margin: "0 0 0.4rem 0", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.04em", color: "#4b5563", textTransform: "uppercase" }}>
+          <div style={{ borderTop: "1px solid var(--panel-border)", paddingTop: "0.65rem" }}>
+            <p style={{ margin: "0 0 0.4rem 0", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--text-secondary)", textTransform: "uppercase" }}>
               Defenses
             </p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.3rem 0.75rem" }}>
@@ -3680,9 +3878,9 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Reflex:</strong> {derived.defenses.reflex}</p>
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Will:</strong> {derived.defenses.will}</p>
             </div>
-            <details style={{ marginTop: "0.45rem", fontSize: "0.78rem", color: "#4b5563" }}>
+            <details style={{ marginTop: "0.45rem", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
               <summary style={{ cursor: "pointer", fontWeight: 600 }}>AC breakdown</summary>
-              <p style={{ margin: "0.25rem 0 0 0", color: "#6b7280" }}>
+              <p style={{ margin: "0.25rem 0 0 0", color: "var(--text-muted)" }}>
                 AC = 10 + armor + shield + best of DEX/INT when allowed by armor.
               </p>
               <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.15rem", fontVariantNumeric: "tabular-nums" }}>
@@ -3696,11 +3894,107 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
               </div>
             </details>
           </div>
+
+          <div style={{ borderTop: "1px solid var(--panel-border)", paddingTop: "0.65rem" }}>
+            <p style={{ margin: "0 0 0.4rem 0", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--text-secondary)", textTransform: "uppercase" }}>
+              Equipment
+            </p>
+            <div style={{ display: "grid", gap: "0.25rem" }}>
+              <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Armor:</strong> {selectedArmor?.name || "None"}</p>
+              <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Shield:</strong> {selectedShield?.name || "None"}</p>
+              <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Main weapon:</strong> {selectedMainWeapon?.name || "None"}</p>
+              <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Off-hand:</strong> {selectedOffHandWeapon?.name || "None"}</p>
+              <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Implement:</strong> {selectedImplement?.name || "None"}</p>
+            </div>
+          </div>
+
+          <div style={{ borderTop: "1px solid var(--panel-border)", paddingTop: "0.65rem" }}>
+            <p
+              style={{ margin: "0 0 0.4rem 0", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--text-secondary)", textTransform: "uppercase" }}
+              onMouseEnter={(event) => startGlossaryHover(event, "abilityScores")}
+              onMouseLeave={stopGlossaryHover}
+            >
+              Ability Scores
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.3rem 0.75rem", fontVariantNumeric: "tabular-nums" }}>
+              {abilities.map((ability) => {
+                const score = effectiveAbilityScores[ability];
+                const mod = abilityModifier(score);
+                return (
+                  <p key={ability} style={{ margin: 0, fontSize: "0.88rem" }}>
+                    <strong>{ability}:</strong> {score} ({formatAbilityMod(mod)})
+                  </p>
+                );
+              })}
+            </div>
+          </div>
+
+          <div style={{ borderTop: "1px solid var(--panel-border)", paddingTop: "0.65rem" }}>
+            <p
+              style={{ margin: "0 0 0.4rem 0", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--text-secondary)", textTransform: "uppercase" }}
+              onMouseEnter={(event) => startGlossaryHover(event, "skills")}
+              onMouseLeave={stopGlossaryHover}
+            >
+              Skills
+            </p>
+            <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.76rem", color: "var(--text-muted)" }}>
+              Includes untrained skills; trained rows add +5 and ignore armor check penalty.
+            </p>
+            <div style={{ display: "grid", gap: "0.2rem", fontSize: "0.82rem", maxHeight: "11rem", overflow: "auto" }}>
+              {skillSheetRows.map((row) => (
+                <div
+                  key={row.skillId}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: "0.5rem",
+                    fontVariantNumeric: "tabular-nums"
+                  }}
+                >
+                  <span style={{ color: "var(--text-secondary)" }}>
+                    {row.name}
+                    {row.trained ? " (T)" : ""}
+                  </span>
+                  <span style={{ fontWeight: 600 }}>
+                    {row.modifier >= 0 ? "+" : ""}
+                    {row.modifier}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {showGlossaryHoverInfo && glossaryHoverKey && glossaryHoverPanelPos && (
+            <div
+              style={{
+                position: "fixed",
+                top: glossaryHoverPanelPos.top,
+                left: glossaryHoverPanelPos.left,
+                width: "360px",
+                maxHeight: "48vh",
+                overflow: "auto",
+                border: "1px solid var(--panel-border)",
+                backgroundColor: "var(--surface-0)",
+                borderRadius: "0.35rem",
+                padding: "0.45rem 0.5rem",
+                color: "var(--text-primary)",
+                textTransform: "none",
+                letterSpacing: "normal",
+                fontWeight: 500,
+                fontSize: "0.78rem",
+                lineHeight: 1.35,
+                zIndex: 1000,
+                boxShadow: "0 8px 24px rgba(45, 34, 16, 0.2)"
+              }}
+            >
+              {glossaryContent(glossaryHoverKey)}
+            </div>
+          )}
         </div>
         <div style={ui.blockSheetSection}>
-        <h4 style={{ margin: "0 0 0.5rem 0", fontSize: "0.95rem", color: "#25252c" }}>Validation Notes</h4>
+        <h4 style={{ margin: "0 0 0.5rem 0", fontSize: "0.95rem", color: "var(--text-primary)" }}>Validation Notes</h4>
         {legality.warnings.length > 0 && (
-          <ul style={{ margin: "0 0 0.5rem 0", paddingLeft: "1.2rem", color: "#92400e", fontSize: "0.88rem" }}>
+          <ul style={{ margin: "0 0 0.5rem 0", paddingLeft: "1.2rem", color: "var(--status-warning)", fontSize: "0.88rem" }}>
             {legality.warnings.map((w) => (
               <li key={w}>{w}</li>
             ))}
@@ -3715,7 +4009,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                 <button
                   type="button"
                   onClick={() => setActiveTab(mapErrorToTab(r))}
-                  style={{ border: "none", background: "transparent", textDecoration: "underline", cursor: "pointer", padding: 0, color: "#374151" }}
+                  style={{ border: "none", background: "transparent", textDecoration: "underline", cursor: "pointer", padding: 0, color: "var(--text-secondary)" }}
                 >
                   {r}
                 </button>
@@ -3726,7 +4020,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
               <button
                 type="button"
                 onClick={() => setActiveTab(mapErrorToTab(e))}
-                style={{ border: "none", background: "transparent", textDecoration: "underline", cursor: "pointer", padding: 0, color: "#374151" }}
+                style={{ border: "none", background: "transparent", textDecoration: "underline", cursor: "pointer", padding: 0, color: "var(--text-secondary)" }}
               >
                 {e}
               </button>

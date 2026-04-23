@@ -1,0 +1,111 @@
+:root {
+  color-scheme: light;
+  --app-background: #e4e5e9;
+  --app-foreground: #111827;
+  --character-sheet-background: linear-gradient(180deg, #f6f0df 0%, #f3ebd6 100%);
+  --surface-0: #ffffff;
+  --surface-1: #f8fafc;
+  --surface-2: #f1f5f9;
+  --surface-3: #e5e7eb;
+  --panel-border: #cbd5e1;
+  --panel-border-strong: #94a3b8;
+  --text-primary: #111827;
+  --text-secondary: #374151;
+  --text-muted: #4b5563;
+  --text-subtle: #6b7280;
+  --status-danger: #b91c1c;
+  --status-success: #166534;
+  --status-warning: #92400e;
+  --status-info: #0369a1;
+  --character-sheet-foreground: #211d15;
+  --power-accent-atwill-bar: #15803d;
+  --power-accent-atwill-bg: #f0fdf4;
+  --power-accent-atwill-border: #bbf7d0;
+  --power-accent-encounter-bar: #dc2626;
+  --power-accent-encounter-bg: #fef2f2;
+  --power-accent-encounter-border: #fecaca;
+  --power-accent-daily-bar: #111827;
+  --power-accent-daily-bg: #f3f4f6;
+  --power-accent-daily-border: #cbd5e1;
+  --power-expended-opacity: 0.8;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--app-background, #e4e5e9);
+  color: var(--app-foreground, var(--text-primary));
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  border: 1px solid var(--button-border, #cbd5e1);
+  background: var(--button-background, #ffffff);
+  color: var(--button-foreground, #111827);
+  border-radius: 6px;
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+:root[data-theme="dark"] body {
+  --app-background: #111827;
+  --app-foreground: #e5e7eb;
+  --button-border: #475569;
+  --button-background: #1f2937;
+  --button-foreground: #e5e7eb;
+  --character-sheet-background: linear-gradient(180deg, #1a2233 0%, #141b29 100%);
+  --surface-0: #0f172a;
+  --surface-1: #111827;
+  --surface-2: #1f2937;
+  --surface-3: #334155;
+  --panel-border: #475569;
+  --panel-border-strong: #64748b;
+  --text-primary: #e5e7eb;
+  --text-secondary: #cbd5e1;
+  --text-muted: #cbd5e1;
+  --text-subtle: #94a3b8;
+  --status-danger: #f87171;
+  --status-success: #4ade80;
+  --status-warning: #fbbf24;
+  --status-info: #7dd3fc;
+  --character-sheet-foreground: #e5e7eb;
+  --power-accent-atwill-bar: #4ade80;
+  --power-accent-atwill-bg: #10251b;
+  --power-accent-atwill-border: #1f5138;
+  --power-accent-encounter-bar: #f87171;
+  --power-accent-encounter-bg: #2b1417;
+  --power-accent-encounter-border: #5a2328;
+  --power-accent-daily-bar: #cbd5e1;
+  --power-accent-daily-bg: #192130;
+  --power-accent-daily-border: #334155;
+  --power-expended-opacity: 0.92;
+}
+
+:root[data-theme="dark"] input,
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] textarea {
+  background-color: var(--surface-1);
+  color: var(--text-primary);
+  border-color: var(--panel-border);
+}
