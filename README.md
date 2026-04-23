@@ -2,9 +2,9 @@
 
 Web-first, guided D&D 4e character builder using data extracted from the legacy Character Builder.
 
-## What is implemented
+## What Is Implemented
 
-- ETL pipeline that normalizes `out_json/*.json` into `generated/rules_index.json`
+- ETL pipeline that normalizes source rules into `generated/rules_index.json`
 - ETL anomaly log at `generated/etl_anomalies.jsonl` for parser improvement loops
 - Rules modules for:
   - prerequisite validation
@@ -23,29 +23,51 @@ Web-first, guided D&D 4e character builder using data extracted from the legacy 
   - armor and shield selection
   - weapon + implement equipment and attack previews
   - live character sheet
-  - local persistence (localStorage)
+  - local persistence (`localStorage`)
   - JSON import/export
 - Test coverage for ETL artifact presence and rules core behavior
 
-## Setup
+## Prerequisites
+
+- Node.js 18+ (for Vite + React tooling)
+- Python 3.10+ (for ETL scripts)
+
+## Quick Start
 
 1. Install dependencies:
    - `npm install`
-2. Build normalized index:
-   - `python tools/etl/build_rules_index.py out_json generated`
-3. Run app:
+2. Build the rules index (required before running the app):
+   - from Character Builder XML: `npm run etl:rules -- combined.dnd40.merged.xml generated`
+3. (Optional) Build the monster index:
+   - `npm run etl:monsters -- <selected-monster-folder-or-xml-file> generated`
+   - example: `npm run etl:monsters -- MonsterFiles/01 generated`
+   - example: `npm run etl:monsters -- combined.monsters.xml generated`
+   - output:
+     - `generated/monsters/index.json` (lightweight list + summary fields)
+     - `generated/monsters/entries/*.json` (one structured parsed monster per file)
+4. Run the app:
    - `npm run dev`
-4. Run tests:
+5. Run tests:
    - `npm test`
 
-## Key folders
+## Scripts
 
-- `tools/etl/`: normalization and indexing pipeline
-- `src/rules/`: typed models, prerequisite evaluator, stat calculator, option resolver
-- `src/features/builder/`: builder state, persistence, UI flow
-- `tests/`: ETL and rules tests
+- `npm run dev` - start local dev server
+- `npm run build` - build production assets
+- `npm run preview` - preview production build locally
+- `npm test` - run Vitest test suite once
+- `npm run etl:rules -- <input-json-or-xml> generated` - build `generated/rules_index.json`
+- `npm run etl:monsters -- <input-folder-or-xml-file> generated` - parse monster XML and emit structured JSON artifacts
 
-## Acceptance checklist
+## Key Folders
+
+- `tools/etl/` - normalization and indexing pipeline
+- `src/rules/` - typed models, prerequisite evaluator, stat calculator, option resolver
+- `src/features/builder/` - builder state, persistence, UI flow
+- `tests/` - ETL and rules tests
+- `generated/` - generated rules and ETL artifacts
+
+## Acceptance Checklist
 
 - Build a new level-1 hybrid character and verify legal hybrid power slots are enforced.
 - Pick a race/subrace power option, then switch subrace and confirm stale power selections are removed.

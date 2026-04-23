@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "etl:rules": "python tools/etl/build_rules_index.py",
+    "etl:monsters": "python tools/etl/build_monster_index.py"
   },
   "dependencies": {
     "react": "^18.3.1",

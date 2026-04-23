@@ -7,6 +7,12 @@ from typing import Dict, IO, Any, List, Optional
 import xml.etree.ElementTree as ET
 
 
+def _local_name(tag: str) -> str:
+    if "}" in tag:
+        return tag.rsplit("}", 1)[-1]
+    return tag
+
+
 def _normalize_whitespace(text: Optional[str]) -> Optional[str]:
     if text is None:
         return None
@@ -142,7 +148,7 @@ def convert_xml_to_json_by_type(
         context = ET.iterparse(str(input_path), events=("end",))
 
         for event, elem in context:
-            if elem.tag != "RulesElement":
+            if _local_name(elem.tag) != "RulesElement":
                 continue
 
             elem_type = elem.attrib.get("type")

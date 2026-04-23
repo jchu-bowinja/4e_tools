@@ -7,6 +7,7 @@ export interface DerivedStats {
   healingSurgesPerDay: number;
   surgeValue: number;
   speed: number;
+  initiative: number;
   /** Total armor check penalty from body armor + shield (for STR/DEX skills when untrained). */
   armorCheckPenalty: number;
   defenses: {
@@ -45,6 +46,7 @@ export function computeDerivedStats(
 
   const dexMod = abilityMod(dex);
   const intMod = abilityMod(int);
+  const initiative = Math.floor(build.level / 2) + dexMod;
   const raceSpeed = race?.speed ?? 6;
   const spdPen = bodyArmorSpeedPenalty(armor);
   const speed = Math.max(0, raceSpeed - spdPen);
@@ -77,6 +79,7 @@ export function computeDerivedStats(
     healingSurgesPerDay,
     surgeValue,
     speed,
+    initiative,
     armorCheckPenalty,
     defenses,
     acBreakdown

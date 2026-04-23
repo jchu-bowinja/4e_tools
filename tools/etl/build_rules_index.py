@@ -869,6 +869,12 @@ def _rules_element_to_row(elem: ET.Element) -> Dict[str, Any]:
     return row
 
 
+def _local_name(tag: str) -> str:
+    if "}" in tag:
+        return tag.rsplit("}", 1)[-1]
+    return tag
+
+
 def load_raw_collections_from_xml(xml_path: Path) -> Dict[str, List[Dict[str, Any]]]:
     wanted = {
         "Race",
@@ -877,6 +883,8 @@ def load_raw_collections_from_xml(xml_path: Path) -> Dict[str, List[Dict[str, An
         "Power",
         "Skill",
         "Armor",
+        "Weapon",
+        "Superior Implement",
         "Ability Score",
         "Theme",
         "Paragon Path",
@@ -886,10 +894,11 @@ def load_raw_collections_from_xml(xml_path: Path) -> Dict[str, List[Dict[str, An
         "Class Feature",
         "Grants",
         "Skill Training",
+        "Hybrid Class",
     }
     out: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     for _, elem in ET.iterparse(str(xml_path), events=("end",)):
-        if elem.tag != "RulesElement":
+        if _local_name(elem.tag) != "RulesElement":
             continue
         t = elem.attrib.get("type")
         if t in wanted:

@@ -12,6 +12,7 @@ __pycache__/
 # D&D Character Builder / licensed extracts (do not commit)
 combined.dnd40.merged.xml
 combined.*.merged.xml
+*.monster
 out_json/
 
 # Normalized rules text derived from extracts
