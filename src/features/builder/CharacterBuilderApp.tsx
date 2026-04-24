@@ -1475,6 +1475,43 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             ))}
           </div>
         </div>
+        <div style={ui.blockSheetSection}>
+          <h4 style={{ margin: "0 0 0.5rem 0", fontSize: "0.95rem", color: "var(--text-primary)" }}>Validation Notes</h4>
+          {legality.warnings.length > 0 && (
+            <ul style={{ margin: "0 0 0.5rem 0", paddingLeft: "1.2rem", color: "var(--status-warning)", fontSize: "0.88rem" }}>
+              {legality.warnings.map((w) => (
+                <li key={w}>{w}</li>
+              ))}
+            </ul>
+          )}
+          <ul style={{ margin: 0, paddingLeft: "1.2rem" }}>
+            {featOptions
+              .filter((f) => !f.legal && build.featIds.includes(f.item.id))
+              .flatMap((f) => f.reasons.map((r) => `${f.item.name}: ${r}`))
+              .map((r) => (
+                <li key={r}>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab(mapErrorToTab(r))}
+                    style={{ border: "none", background: "transparent", textDecoration: "underline", cursor: "pointer", padding: 0, color: "var(--text-secondary)" }}
+                  >
+                    {r}
+                  </button>
+                </li>
+              ))}
+            {legality.errors.map((e) => (
+              <li key={e}>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab(mapErrorToTab(e))}
+                  style={{ border: "none", background: "transparent", textDecoration: "underline", cursor: "pointer", padding: 0, color: "var(--text-secondary)" }}
+                >
+                  {e}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
 
         <div style={ui.blockContent}>
         {activeTab === "race" && (
@@ -4169,43 +4206,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               {glossaryContent(glossaryHoverKey)}
             </div>
           )}
-        </div>
-        <div style={ui.blockSheetSection}>
-        <h4 style={{ margin: "0 0 0.5rem 0", fontSize: "0.95rem", color: "var(--text-primary)" }}>Validation Notes</h4>
-        {legality.warnings.length > 0 && (
-          <ul style={{ margin: "0 0 0.5rem 0", paddingLeft: "1.2rem", color: "var(--status-warning)", fontSize: "0.88rem" }}>
-            {legality.warnings.map((w) => (
-              <li key={w}>{w}</li>
-            ))}
-          </ul>
-        )}
-        <ul style={{ margin: 0, paddingLeft: "1.2rem" }}>
-          {featOptions
-            .filter((f) => !f.legal && build.featIds.includes(f.item.id))
-            .flatMap((f) => f.reasons.map((r) => `${f.item.name}: ${r}`))
-            .map((r) => (
-              <li key={r}>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab(mapErrorToTab(r))}
-                  style={{ border: "none", background: "transparent", textDecoration: "underline", cursor: "pointer", padding: 0, color: "var(--text-secondary)" }}
-                >
-                  {r}
-                </button>
-              </li>
-            ))}
-          {legality.errors.map((e) => (
-            <li key={e}>
-              <button
-                type="button"
-                onClick={() => setActiveTab(mapErrorToTab(e))}
-                style={{ border: "none", background: "transparent", textDecoration: "underline", cursor: "pointer", padding: 0, color: "var(--text-secondary)" }}
-              >
-                {e}
-              </button>
-            </li>
-          ))}
-        </ul>
         </div>
       </div>
     </div>

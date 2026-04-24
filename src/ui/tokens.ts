@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 
 /** Shared neutral chrome for app shell and builder (single source for page background). */
-export const NEUTRAL_PAGE_BG = "#e4e5e9";
+export const NEUTRAL_PAGE_BG = "#dde0e6";
 
 export const appLoadingShell: CSSProperties = {
   minHeight: "100vh",
@@ -16,10 +16,10 @@ export const appLoadingShell: CSSProperties = {
 
 export const appLoadingCard: CSSProperties = {
   backgroundColor: "#ffffff",
-  border: "1px solid #c8c9d0",
+  border: "1px solid #a8b4c7",
   borderRadius: "12px",
   padding: "1.5rem 2rem",
   boxShadow: "0 1px 4px rgba(15, 23, 42, 0.06)",
-  color: "#3a3a42",
+  color: "#1f2937",
   fontSize: "0.95rem"
 };
