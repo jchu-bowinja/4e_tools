@@ -12,6 +12,7 @@ import {
 import { ResourceEditorApp } from "./features/resourceEditor/ResourceEditorApp";
 import { CharacterSheetApp } from "./features/characterSheet/CharacterSheetApp";
 import { MonsterEditorApp } from "./features/monsterEditor/MonsterEditorApp";
+import { loadTooltipGlossary } from "./data/tooltipGlossary";
 
 type AppScreen = "builder" | "resourceEditor" | "characterSheet" | "monsters";
 type AppTheme = "light" | "dark";
@@ -79,11 +80,15 @@ export default function App(): JSX.Element {
   const [screen, setScreen] = useState<AppScreen>(() => screenFromHash(window.location.hash));
   const [editorOverlay, setEditorOverlay] = useState<ResourceEditorOverlay>(() => loadResourceEditorOverlay());
   const [theme, setTheme] = useState<AppTheme>(() => loadSavedTheme());
+  const [tooltipGlossary, setTooltipGlossary] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadRulesIndex()
       .then(setIndex)
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "Unknown error"));
+    loadTooltipGlossary()
+      .then(setTooltipGlossary)
+      .catch(() => setTooltipGlossary({}));
   }, []);
 
   useEffect(() => {
@@ -182,7 +187,7 @@ export default function App(): JSX.Element {
         </nav>
       </header>
       {screen === "builder" ? (
-        <CharacterBuilderApp index={effectiveIndex} />
+        <CharacterBuilderApp index={effectiveIndex} tooltipGlossary={tooltipGlossary} />
       ) : screen === "resourceEditor" ? (
         <ResourceEditorApp
           index={effectiveIndex}
@@ -191,11 +196,11 @@ export default function App(): JSX.Element {
           onResetOverlay={handleResetOverlay}
         />
       ) : screen === "characterSheet" ? (
-        <CharacterSheetApp index={effectiveIndex} />
+        <CharacterSheetApp index={effectiveIndex} tooltipGlossary={tooltipGlossary} />
       ) : screen === "monsters" ? (
         <MonsterEditorApp />
       ) : (
-        <CharacterBuilderApp index={effectiveIndex} />
+        <CharacterBuilderApp index={effectiveIndex} tooltipGlossary={tooltipGlossary} />
       )}
     </div>
   );

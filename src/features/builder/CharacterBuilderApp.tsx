@@ -61,6 +61,7 @@ import { pruneStalePowerSelections } from "../../rules/powerSelections";
 import { summarizeImplementAttack, summarizeMainWeaponAttack } from "../../rules/weaponAttack";
 import { RulesRichText } from "./RulesRichText";
 import { NEUTRAL_PAGE_BG } from "../../ui/tokens";
+import { resolveTooltipText } from "../../data/tooltipGlossary";
 import {
   ensureSelectedEntityInFiltered,
   ensureSelectedFeatsInList,
@@ -74,6 +75,7 @@ import {
 
 interface Props {
   index: RulesIndex;
+  tooltipGlossary: Record<string, string>;
 }
 
 /** Synthetic / pseudoclass rows from the CB extract — not offered as playable classes. */
@@ -117,7 +119,20 @@ function powerCardUsageAccent(usageRaw: string): { borderLeft: string; backgroun
   };
 }
 
-function renderPowerCard(power: Power, key?: string): JSX.Element {
+function splitPowerKeywords(rawKeywords: string): string[] {
+  return rawKeywords
+    .split(/[;,]/)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+}
+
+function renderPowerCard(
+  power: Power,
+  options?: {
+    key?: string;
+    keywordTooltip?: (keyword: string) => string | null;
+  }
+): JSX.Element {
   const raw = (power.raw || {}) as Record<string, unknown>;
   const specific = (power.raw?.specific as Record<string, unknown> | undefined) || {};
   const flavor = typeof raw.flavor === "string" ? raw.flavor : "";
@@ -128,6 +143,7 @@ function renderPowerCard(power: Power, key?: string): JSX.Element {
   const level = power.level ?? null;
   const display = String(specific["Display"] || power.display || "").trim();
   const keywords = String(specific["Keywords"] || power.keywords || "").trim();
+  const keywordTokens = splitPowerKeywords(keywords);
   const actionType = String(specific["Action Type"] || "").trim();
   const attackType = String(specific["Attack Type"] || "").trim();
   const target = String(specific["Target"] || "").trim();
@@ -140,7 +156,7 @@ function renderPowerCard(power: Power, key?: string): JSX.Element {
 
   return (
     <article
-      key={key || power.id}
+      key={options?.key || power.id}
       style={{
         border: accent.border,
         borderLeft: accent.borderLeft,
@@ -158,9 +174,30 @@ function renderPowerCard(power: Power, key?: string): JSX.Element {
         </div>
       </div>
       {display && <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "0.2rem" }}>{display}</div>}
-      {keywords && (
+      {keywordTokens.length > 0 && (
         <div style={{ fontSize: "0.77rem", color: "var(--text-muted)", marginTop: "0.2rem" }}>
-          <strong>Keywords:</strong> {keywords}
+          <strong>Keywords:</strong>{" "}
+          {keywordTokens.map((keyword, idx) => {
+            const tooltip = options?.keywordTooltip?.(keyword) ?? null;
+            return (
+              <span key={`${power.id}-kw-${keyword}`}>
+                <span
+                  title={tooltip ?? undefined}
+                  style={{
+                    display: "inline-block",
+                    padding: "0.04rem 0.3rem",
+                    borderRadius: "0.2rem",
+                    border: "1px solid var(--panel-border)",
+                    backgroundColor: "var(--surface-2)",
+                    color: "var(--text-primary)"
+                  }}
+                >
+                  {keyword}
+                </span>
+                {idx < keywordTokens.length - 1 ? <span> </span> : null}
+              </span>
+            );
+          })}
         </div>
       )}
       {(actionType || attackType || target || trigger || requirement) && (
@@ -523,7 +560,7 @@ function importBuildFromFile(file: File, onLoaded: (build: CharacterBuild) => vo
   reader.readAsText(file);
 }
 
-export function CharacterBuilderApp({ index }: Props): JSX.Element {
+export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Element {
   const [build, setBuild] = useState<CharacterBuild>(() => loadBuild() || defaultBuild);
   const [savedCharacters, setSavedCharacters] = useState(() => loadSavedCharacters());
   const [selectedSavedCharacterId, setSelectedSavedCharacterId] = useState("");
@@ -639,48 +676,25 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
   }, []);
 
   function glossaryContent(key: BuilderGlossaryKey): JSX.Element {
-    if (key === "race") {
-      return (
-        <>
-          <div><strong>Race</strong> sets baseline traits like speed, size, and racial features.</div>
-          {selectedRace && (
-            <div style={{ marginTop: "0.2rem" }}>
-              <div><strong>Selected:</strong> {selectedRace.name}</div>
-              <div><strong>Speed:</strong> {selectedRace.speed ?? "-"}</div>
-              <div><strong>Abilities:</strong> {selectedRace.abilitySummary ?? "-"}</div>
-              <div><strong>Languages:</strong> {selectedRace.languages ?? "-"}</div>
-            </div>
-          )}
-        </>
-      );
+    const termCandidates: Record<BuilderGlossaryKey, string[]> = {
+      race: [selectedRace?.name || "", "Race"],
+      class: [selectedClass?.name || "", "Class"],
+      level: ["Level"],
+      hp: ["Hit Points", "HP"],
+      surges: ["Healing Surges", "Healing Surge"],
+      surgeValue: ["Surge Value", "Healing Surge Value"],
+      skills: ["Skill", "Skills"],
+      abilityScores: ["Ability Score", "Ability Scores"]
+    };
+    const resolved = resolveTooltipText({
+      terms: termCandidates[key].filter(Boolean),
+      glossaryByName: tooltipGlossary,
+      index
+    });
+    if (resolved) {
+      return <div style={{ whiteSpace: "pre-wrap" }}>{resolved}</div>;
     }
-    if (key === "class") {
-      return (
-        <>
-          <div><strong>Class</strong> defines role, key abilities, and core combat resources.</div>
-          {selectedClass && (
-            <div style={{ marginTop: "0.2rem" }}>
-              <div><strong>Selected:</strong> {selectedClass.name}</div>
-              <div><strong>Role:</strong> {selectedClass.role ?? "-"}</div>
-              <div><strong>Power Source:</strong> {selectedClass.powerSource ?? "-"}</div>
-              <div><strong>Key Abilities:</strong> {selectedClass.keyAbilities ?? "-"}</div>
-            </div>
-          )}
-        </>
-      );
-    }
-    if (key === "level") return <div><strong>Level</strong> controls progression, available powers, and scaling math.</div>;
-    if (key === "hp") return <div><strong>HP</strong> is your maximum hit points before falling unconscious/dying.</div>;
-    if (key === "surges")
-      return <div><strong>Healing Surges</strong> are your daily healing resources; spending one restores your surge value.</div>;
-    if (key === "surgeValue") return <div><strong>Surge Value</strong> is HP restored per spent surge (usually one-quarter max HP).</div>;
-    if (key === "skills")
-      return <div><strong>Skills</strong> combine half-level, ability modifier, training bonuses, and situational modifiers.</div>;
-    return (
-      <div>
-        <strong>Ability Scores</strong> (STR/CON/DEX/INT/WIS/CHA) determine ability modifiers used by attacks, defenses, and skills.
-      </div>
-    );
+    return <div>No glossary entry found in `generated/glossary_terms.json` or `generated/rules_index.json`.</div>;
   }
 
   function startGlossaryHover(event: React.MouseEvent<HTMLElement>, key: BuilderGlossaryKey): void {
@@ -713,6 +727,10 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
     const ids = new Set<string>([...autoGrantedSkillIds, ...build.trainedSkillIds]);
     return computeSkillSheetRows(index, build.level, effectiveAbilityScores, ids, derived.armorCheckPenalty);
   }, [index, build.level, effectiveAbilityScores, autoGrantedSkillIds, build.trainedSkillIds, derived.armorCheckPenalty]);
+
+  function powerKeywordTooltip(keyword: string): string | null {
+    return resolveTooltipText({ terms: [keyword, "Keyword"], glossaryByName: tooltipGlossary, index });
+  }
 
   const classWeaponProfText = useMemo(() => {
     if (isHybridBuild && selectedHybridA && selectedHybridB) {
@@ -1151,7 +1169,7 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
   function renderPowerCardWithSelections(p: Power, cardKey: string): JSX.Element {
     return (
       <div key={cardKey}>
-        {renderPowerCard(p, `${cardKey}-card`)}
+        {renderPowerCard(p, { key: `${cardKey}-card`, keywordTooltip: powerKeywordTooltip })}
         <PowerConstructionSelects power={p} build={build} onChange={updateBuild} />
       </div>
     );
@@ -1605,7 +1623,10 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                                   (() => {
                                     const p = index.powers.find((x) => x.id === selectedPowId);
                                     return p ? (
-                                      renderPowerCard(p, `race-tab-${g.traitId}-${p.id}`)
+                                      renderPowerCard(p, {
+                                        key: `race-tab-${g.traitId}-${p.id}`,
+                                        keywordTooltip: powerKeywordTooltip
+                                      })
                                     ) : (
                                       <p style={{ margin: 0, fontSize: "0.82rem", color: "var(--status-warning)" }}>
                                         Stored power id is unknown in the index.
@@ -1616,7 +1637,12 @@ export function CharacterBuilderApp({ index }: Props): JSX.Element {
                                   <p style={{ margin: 0, fontSize: "0.82rem", color: "var(--text-muted)" }}>Pick a power in Race choices.</p>
                                 )
                               ) : (
-                                optionPowers.map((p) => renderPowerCard(p, `race-tab-${g.traitId}-${p.id}`))
+                                optionPowers.map((p) =>
+                                  renderPowerCard(p, {
+                                    key: `race-tab-${g.traitId}-${p.id}`,
+                                    keywordTooltip: powerKeywordTooltip
+                                  })
+                                )
                               )}
                             </div>
                           </div>

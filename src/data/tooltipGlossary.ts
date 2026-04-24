@@ -1,0 +1,144 @@
+import type { RulesIndex } from "../rules/models";
+
+interface GlossaryTermRow {
+  name?: string;
+  definition?: string | null;
+  html?: string | null;
+}
+
+function normalizeTerm(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function htmlToPlainText(html: string): string {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
+  return (doc.body.textContent || "").trim();
+}
+
+function pickGlossaryText(row: GlossaryTermRow): string | null {
+  if (typeof row.definition === "string" && row.definition.trim()) return row.definition.trim();
+  if (typeof row.html === "string" && row.html.trim()) {
+    const text = htmlToPlainText(row.html);
+    if (text) return text;
+  }
+  return null;
+}
+
+export async function loadTooltipGlossary(): Promise<Record<string, string>> {
+  const response = await fetch("/generated/glossary_terms.json");
+  if (!response.ok) return {};
+  const rows = (await response.json()) as GlossaryTermRow[];
+  const byName: Record<string, string> = {};
+  for (const row of rows) {
+    if (typeof row.name !== "string" || !row.name.trim()) continue;
+    const text = pickGlossaryText(row);
+    if (!text) continue;
+    const key = normalizeTerm(row.name);
+    // Keep the first row so canonical entries in the source win.
+    if (!byName[key]) byName[key] = text;
+  }
+  return byName;
+}
+
+function firstText(...values: Array<unknown>): string | null {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function extractRulesEntityText(entity: { shortDescription?: string | null; body?: string | null; raw?: Record<string, unknown> }): string | null {
+  const raw = entity.raw || {};
+  return firstText(
+    entity.shortDescription,
+    entity.body,
+    raw.body,
+    raw.flavor,
+    raw["Short Description"],
+    raw["Description"],
+    raw["Rules Text"],
+    raw["Text"]
+  );
+}
+
+function fromRulesIndex(index: RulesIndex, term: string): string | null {
+  const normalized = normalizeTerm(term);
+  const collections: Array<Array<{ name?: string } & Record<string, unknown>>> = [
+    index.abilityScores,
+    index.skills,
+    index.races,
+    index.classes,
+    index.feats,
+    index.powers,
+    index.racialTraits,
+    index.themes,
+    index.paragonPaths,
+    index.epicDestinies,
+    index.languages,
+    index.armors,
+    index.weapons || [],
+    index.implements || [],
+    index.hybridClasses || []
+  ];
+  for (const collection of collections) {
+    const match = collection.find((item) => normalizeTerm(String(item.name || "")) === normalized);
+    if (!match) continue;
+    const text = extractRulesEntityText(match as { shortDescription?: string | null; body?: string | null; raw?: Record<string, unknown> });
+    if (text) return text;
+  }
+  return null;
+}
+
+function candidateTerms(input: string): string[] {
+  const trimmed = input.trim();
+  if (!trimmed) return [];
+  const candidates = [trimmed];
+  const typoAliases: Record<string, string> = {
+    teleporation: "teleportation",
+    marial: "martial",
+    arcare: "arcane"
+  };
+  const normalized = normalizeTerm(trimmed);
+  const alias = typoAliases[normalized];
+  if (alias) candidates.push(alias);
+  if (trimmed.endsWith("s") && trimmed.length > 1) {
+    candidates.push(trimmed.slice(0, -1));
+  }
+  if (!trimmed.endsWith("s")) {
+    candidates.push(`${trimmed}s`);
+  }
+  // Split compound keywords like "Fire or Lightning", "Lightning and Thunder", "Implement/Weapon".
+  const compoundParts = trimmed
+    .split(/\s*(?:\/|,|;|\band\b|\bor\b)\s*/i)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  if (compoundParts.length > 1) {
+    candidates.push(...compoundParts);
+  }
+  return [...new Set(candidates)];
+}
+
+export function resolveTooltipText(params: {
+  terms: string[];
+  glossaryByName: Record<string, string>;
+  index: RulesIndex;
+}): string | null {
+  for (const term of params.terms) {
+    for (const candidate of candidateTerms(term)) {
+      const glossaryMatch = params.glossaryByName[normalizeTerm(candidate)];
+      if (glossaryMatch) return glossaryMatch;
+    }
+  }
+  for (const term of params.terms) {
+    for (const candidate of candidateTerms(term)) {
+      const indexMatch = fromRulesIndex(params.index, candidate);
+      if (indexMatch) return indexMatch;
+    }
+  }
+  return null;
+}
+
+export function normalizeTooltipTerm(value: string): string {
+  return normalizeTerm(value);
+}

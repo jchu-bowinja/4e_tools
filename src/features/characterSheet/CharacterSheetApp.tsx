@@ -7,6 +7,7 @@ import { createDefaultCharacterSheetState } from "./defaultState";
 import type { CharacterSheetState, EquipmentSlot, InventoryItem } from "./model";
 import { canEquipItem, computeSheetDerivedData, groupCombatPowers, sheetStateFromBuild } from "./selectors";
 import { loadCharacterSheetState, saveCharacterSheetState } from "./storage";
+import { resolveTooltipText } from "../../data/tooltipGlossary";
 
 type SheetTab = "overview" | "inventory";
 
@@ -121,23 +122,6 @@ const GLOSSARY_CONDITION_OPTIONS = [
   "Weakened"
 ] as const;
 
-const CONDITION_DESCRIPTIONS: Record<string, string> = {
-  blinded: "You grant combat advantage, cannot see, and take a -10 penalty to Perception checks.",
-  dazed: "You can take only one action on your turn, and you grant combat advantage.",
-  deafened: "You cannot hear and automatically fail checks that rely on hearing.",
-  dominated: "Another creature chooses your actions; you are dazed while dominated.",
-  helpless: "You are unconscious-like and grant combat advantage; enemies can coup de grace you.",
-  immobilized: "You cannot leave your space, though you can still teleport or be moved by forced movement.",
-  marked: "You are under a defender-style mark and may suffer penalties or punishment for ignoring the marker.",
-  petrified: "You are transformed into stone, unconscious, and unaware of your surroundings.",
-  prone: "You are lying down; melee attackers gain bonuses while you take penalties to attack with some actions.",
-  restrained: "You are immobilized, grant combat advantage, and take a penalty to attack rolls.",
-  slowed: "Your speed becomes 2 unless it is already lower.",
-  stunned: "You cannot take actions and grant combat advantage.",
-  surprised: "At encounter start, you grant combat advantage and cannot act during the surprise round.",
-  unconscious: "You are helpless, cannot take actions, and usually fall prone.",
-  weakened: "Your attacks deal half damage."
-};
 
 const CONDITION_COLORS: Record<string, { background: string; text: string }> = {
   bloodied: { background: "#b91c1c", text: "#ffffff" },
@@ -202,31 +186,6 @@ function conditionDisplayLabel(name: string): string {
   return `${emoji} ${name}`;
 }
 
-const POWER_KEYWORD_DESCRIPTIONS: Record<string, string> = {
-  acid: "Acid damage type. Effects with this keyword interact with acid resistance and vulnerability.",
-  arcane: "Arcane power source keyword. Arcane features and items can modify these powers.",
-  charm: "Charm effects influence targets mentally and may be blocked by charm immunity.",
-  cold: "Cold damage type. Effects with this keyword interact with cold resistance and vulnerability.",
-  conjuration: "Creates a magical construct or effect in a space, following conjuration rules.",
-  fear: "Fear effect keyword. Creatures immune to fear are unaffected by fear effects.",
-  fire: "Fire damage type. Effects with this keyword interact with fire resistance and vulnerability.",
-  force: "Force damage type, typically pure magical impact.",
-  healing: "Healing keyword. Improves HP or recovery; can be modified by healing bonuses/penalties.",
-  illusion: "Illusion effect keyword, creating false sensory effects.",
-  implement: "Uses an implement for attack/damage resolution where applicable.",
-  lightning: "Lightning damage type. Effects with this keyword interact with lightning resistance and vulnerability.",
-  necrotic: "Necrotic damage type. Effects with this keyword interact with necrotic resistance and vulnerability.",
-  poison: "Poison damage/effect keyword. Creatures immune to poison ignore poison effects.",
-  psychic: "Psychic damage/effect keyword, targeting the mind.",
-  radiant: "Radiant damage type. Effects with this keyword interact with radiant resistance and vulnerability.",
-  reliable: "If this power misses, it is not expended.",
-  sleep: "Sleep effect keyword. Creatures immune to sleep are unaffected.",
-  stance: "A stance remains active until you use another stance or the encounter ends.",
-  summon: "Summons a creature or entity that follows summon rules.",
-  teleportation: "Includes teleport movement or effects using teleportation rules.",
-  thunder: "Thunder damage type. Effects with this keyword interact with thunder resistance and vulnerability.",
-  weapon: "Uses a weapon for attack and damage resolution where applicable."
-};
 
 function splitPowerKeywords(rawKeywords: string): string[] {
   return rawKeywords
@@ -281,7 +240,7 @@ type GlossaryKey =
   | `ability:${AbilityCode}`
   | `skill:${string}`;
 
-export function CharacterSheetApp({ index }: { index: RulesIndex }): JSX.Element {
+export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesIndex; tooltipGlossary: Record<string, string> }): JSX.Element {
   const [sheet, setSheet] = useState<CharacterSheetState>(() => loadCharacterSheetState());
   const [tab, setTab] = useState<SheetTab>("overview");
   const [draggingPowerId, setDraggingPowerId] = useState<string | null>(null);
@@ -368,130 +327,47 @@ export function CharacterSheetApp({ index }: { index: RulesIndex }): JSX.Element
   }, [sheet.classId]);
 
   function glossaryContent(key: GlossaryKey): JSX.Element {
+    let terms: string[] = [];
     if (key.startsWith("ability:")) {
-      const code = key.split(":")[1] as AbilityCode;
+      const code = key.slice("ability:".length) as AbilityCode;
       const lore = abilityLoreByCode.get(code);
-      return (
-        <>
-          <div><strong>{code}</strong> is one of the six core ability scores.</div>
-          <div>
-            Current score: <strong>{sheet.abilityScores[code]}</strong>, modifier:{" "}
-            <strong>{derived.abilityMods[code] >= 0 ? `+${derived.abilityMods[code]}` : derived.abilityMods[code]}</strong>.
-          </div>
-          {lore?.body && (
-            <div style={{ marginTop: "0.25rem" }}>
-              <RulesRichText
-                text={lore.body}
-                paragraphStyle={{ margin: "0 0 0.2rem 0", fontSize: "0.76rem", color: "var(--text-primary)" }}
-                listItemStyle={{ fontSize: "0.76rem", color: "var(--text-primary)" }}
-              />
-            </div>
-          )}
-        </>
-      );
-    }
-    if (key.startsWith("skill:")) {
+      terms = [lore?.name || "", code, "Ability Score"];
+    } else if (key.startsWith("skill:")) {
       const skillId = key.slice("skill:".length);
       const skill = skillById.get(skillId);
-      return (
-        <>
-          <div><strong>{skill?.name ?? "Skill"}</strong> is a trained/untrained check modified by level and key ability.</div>
-          <div><strong>Key Ability:</strong> {skill?.keyAbility ?? "-"}</div>
-          {typeof skill?.raw?.body === "string" && skill.raw.body.trim() && (
-            <div style={{ marginTop: "0.25rem" }}>
-              <RulesRichText
-                text={skill.raw.body}
-                paragraphStyle={{ margin: "0 0 0.2rem 0", fontSize: "0.76rem", color: "var(--text-primary)" }}
-                listItemStyle={{ fontSize: "0.76rem", color: "var(--text-primary)" }}
-              />
-            </div>
-          )}
-        </>
-      );
+      terms = [skill?.name || "", "Skill"];
+    } else if (key.startsWith("condition:")) {
+      const condition = key.slice("condition:".length).trim();
+      terms = [condition, "Condition"];
+    } else if (key.startsWith("powerKeyword:")) {
+      const keyword = key.slice("powerKeyword:".length).trim();
+      terms = [keyword, "Keyword"];
+    } else {
+      const coreTerms: Record<Exclude<GlossaryKey, `condition:${string}` | `powerKeyword:${string}` | `ability:${AbilityCode}` | `skill:${string}`>, string[]> = {
+        level: ["Level"],
+        hp: ["Hit Points", "HP"],
+        tempHp: ["Temporary Hit Points", "Temp HP"],
+        surges: ["Healing Surges", "Healing Surge"],
+        surgeValue: ["Surge Value", "Healing Surge Value"],
+        bloodied: ["Bloodied"],
+        dying: ["Dying"],
+        dead: ["Dead"],
+        speed: ["Speed"],
+        initiative: ["Initiative"],
+        defenses: ["Defense", "Defenses"],
+        ac: ["Armor Class", "AC"],
+        fortitude: ["Fortitude"],
+        reflex: ["Reflex"],
+        will: ["Will"],
+        deathSaves: ["Death Saving Throw", "Death Save"],
+        skills: ["Skills", "Skill"],
+        abilityScores: ["Ability Scores", "Ability Score"]
+      };
+      terms = coreTerms[key];
     }
-    if (key === "level") {
-      return (
-        <>
-          <div><strong>Level</strong> represents your character&apos;s overall advancement (1-30).</div>
-          <div>It determines tier access (Heroic/Paragon/Epic), feat and power progression, and many scaling rules.</div>
-        </>
-      );
-    }
-    if (key === "tempHp") {
-      return (
-        <>
-          <div><strong>Temporary HP</strong> absorb damage before current HP and are lost first.</div>
-          <div>Temp HP do not stack by default; when gaining new temp HP, you typically keep the higher value.</div>
-        </>
-      );
-    }
-    if (key === "hp") return <div><strong>HP / Max HP</strong> tracks current hit points against your maximum ({derived.maxHp}).</div>;
-    if (key === "surges") {
-      return (
-        <>
-          <div><strong>Healing Surges</strong> are your daily healing resources.</div>
-          <div>Spending a surge restores your Surge Value ({derived.surgeValue} for this sheet), usually via powers or second wind.</div>
-        </>
-      );
-    }
-    if (key === "surgeValue") return <div><strong>Surge Value</strong> is HP restored when spending one healing surge ({derived.surgeValue}).</div>;
-    if (key === "bloodied") return <div><strong>Bloodied</strong> is half your max HP (rounded down): {derived.bloodied}.</div>;
-    if (key === "dying") return <div><strong>Dying</strong> means you are at 0 HP or fewer and are making death saving throws.</div>;
-    if (key === "dead") return <div><strong>Dead</strong> means you are beyond recovery by normal means.</div>;
-    if (key === "speed") return <div><strong>Speed</strong> is how many squares you can move with a move action.</div>;
-    if (key === "initiative") return <div><strong>Initiative</strong> determines turn order in combat.</div>;
-    if (key === "defenses")
-      return <div><strong>Defenses</strong> are AC, Fortitude, Reflex, and Will — your core defensive target numbers.</div>;
-    if (key === "ac") return <div><strong>AC</strong> defends against most weapon and physical attacks.</div>;
-    if (key === "fortitude") return <div><strong>Fortitude</strong> resists bodily/endurance-targeting effects.</div>;
-    if (key === "reflex") return <div><strong>Reflex</strong> resists agility and many area effects.</div>;
-    if (key === "will") return <div><strong>Will</strong> resists mental influence and fear/charm effects.</div>;
-    if (key === "deathSaves") {
-      return (
-        <>
-          <div><strong>Death Saves</strong> track failed death saving throws while dying.</div>
-          <div>At 3 failed saves, the character dies.</div>
-        </>
-      );
-    }
-    if (key === "skills") {
-      return (
-        <>
-          <div><strong>Skills</strong> use level scaling, key ability modifier, and training bonuses.</div>
-          <div>Trained skills usually gain +5; armor check penalties can apply to some untrained skills.</div>
-        </>
-      );
-    }
-    if (key.startsWith("condition:")) {
-      const raw = key.slice("condition:".length).trim();
-      const lookup = raw.toLowerCase();
-      const description = CONDITION_DESCRIPTIONS[lookup];
-      return (
-        <>
-          <div><strong>{raw || "Condition"}</strong></div>
-          <div>{description ?? "Custom condition tracked on this sheet. Add rule text as needed for your table."}</div>
-        </>
-      );
-    }
-    if (key.startsWith("powerKeyword:")) {
-      const raw = key.slice("powerKeyword:".length).trim();
-      const lookup = raw.toLowerCase();
-      const description = POWER_KEYWORD_DESCRIPTIONS[lookup];
-      return (
-        <>
-          <div><strong>{raw || "Keyword"}</strong></div>
-          <div>
-            {description ?? "Power keyword from the compendium. Check full power text and rules context for exact behavior."}
-          </div>
-        </>
-      );
-    }
-    return (
-      <>
-        <div><strong>Ability Scores</strong> (STR, CON, DEX, INT, WIS, CHA) drive modifiers for attacks, defenses, and skills.</div>
-        <div>The modifier is typically <code>(score - 10) / 2</code>, rounded down.</div>
-      </>
-    );
+    const resolved = resolveTooltipText({ terms: terms.filter(Boolean), glossaryByName: tooltipGlossary, index });
+    if (resolved) return <div style={{ whiteSpace: "pre-wrap" }}>{resolved}</div>;
+    return <div>No glossary entry found in `generated/glossary_terms.json` or `generated/rules_index.json`.</div>;
   }
 
   function startGlossaryHoverInfoTimer(event: ReactMouseEvent<HTMLElement>, key: GlossaryKey): void {
@@ -1387,21 +1263,42 @@ export function CharacterSheetApp({ index }: { index: RulesIndex }): JSX.Element
                             <strong>Keywords:</strong>{" "}
                             {keywordTokens.map((keyword, idx) => (
                               <span key={`${power.id}-keyword-${keyword}`}>
-                                <span
-                                  onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `powerKeyword:${keyword}`)}
-                                  onMouseLeave={stopGlossaryHoverInfoTimerAndHide}
-                                  style={{
-                                    display: "inline-block",
-                                    padding: "0.04rem 0.3rem",
-                                    borderRadius: "0.2rem",
-                                    border: "1px solid var(--panel-border)",
-                                    backgroundColor: "var(--surface-2)",
-                                    color: "var(--text-primary)"
-                                  }}
-                                >
-                                  {keyword}
-                                </span>
-                                {idx < keywordTokens.length - 1 ? <span>, </span> : null}
+                                {(() => {
+                                  const isParalysisKeyword = keyword.trim().toLowerCase() === "paralysis";
+                                  if (isParalysisKeyword) {
+                                    return (
+                                      <span
+                                        style={{
+                                          display: "inline-block",
+                                          padding: "0.04rem 0.3rem",
+                                          borderRadius: "0.2rem",
+                                          border: "1px solid var(--panel-border)",
+                                          backgroundColor: "var(--surface-2)",
+                                          color: "var(--text-primary)"
+                                        }}
+                                      >
+                                        {keyword}
+                                      </span>
+                                    );
+                                  }
+                                  return (
+                                    <span
+                                      onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `powerKeyword:${keyword}`)}
+                                      onMouseLeave={stopGlossaryHoverInfoTimerAndHide}
+                                      style={{
+                                        display: "inline-block",
+                                        padding: "0.04rem 0.3rem",
+                                        borderRadius: "0.2rem",
+                                        border: "1px solid var(--panel-border)",
+                                        backgroundColor: "var(--surface-2)",
+                                        color: "var(--text-primary)"
+                                      }}
+                                    >
+                                      {keyword}
+                                    </span>
+                                  );
+                                })()}
+                                {idx < keywordTokens.length - 1 ? <span> </span> : null}
                               </span>
                             ))}
                           </div>
