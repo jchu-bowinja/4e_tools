@@ -182,15 +182,18 @@ def _extract_core_final_values(root: ET.Element) -> Dict[str, Any]:
     if saving_throws_value is not None:
         values["savingThrows"] = _coerce_value(saving_throws_value)
 
+    movement: List[Dict[str, Any]] = []
+    seen_movement = set()
     land_speed_section = _find_first_section(root, "LandSpeed")
     if land_speed_section is not None:
         land_speed = _first_descendant_attr_ci(land_speed_section, "Speed", "FinalValue")
         if land_speed is None:
             land_speed = _attr_value_case_insensitive(land_speed_section, "FinalValue")
         if land_speed is not None:
-            values["landSpeed"] = _coerce_value(land_speed)
+            land_value = _coerce_value(land_speed)
+            movement.append({"type": "Land", "value": land_value})
+            seen_movement.add("land")
 
-    movement_modes: Dict[str, Any] = {}
     speeds_section = _find_first_section(root, "Speeds")
     if speeds_section is not None:
         for speed_node in list(speeds_section):
@@ -200,11 +203,149 @@ def _extract_core_final_values(root: ET.Element) -> Dict[str, Any]:
             speed_value = _first_descendant_attr_ci(speed_node, "Speed", "FinalValue")
             if not mode_name or speed_value is None:
                 continue
-            movement_modes[mode_name] = _coerce_value(speed_value)
-    if movement_modes:
-        values["movementModes"] = movement_modes
+            normalized_mode_name = _normalize_text(mode_name)
+            coerced_speed = _coerce_value(speed_value)
+            lowered_mode = normalized_mode_name.lower()
+            if lowered_mode in seen_movement:
+                continue
+            movement.append({"type": normalized_mode_name, "value": coerced_speed})
+            seen_movement.add(lowered_mode)
+    if movement:
+        values["movement"] = movement
 
     return values
+
+
+def _extract_reference_payload(node: ET.Element) -> Dict[str, Any]:
+    payload: Dict[str, Any] = {}
+    obj_id = _first_descendant_text(node, "ID") or _first_descendant_text(node, "id")
+    name = _first_descendant_text(node, "Name")
+    description = _first_descendant_text(node, "Description")
+    url = _first_descendant_text(node, "URL")
+    if obj_id:
+        payload["id"] = _coerce_value(obj_id)
+    if name:
+        payload["name"] = name
+    if description:
+        payload["description"] = description
+    if url:
+        payload["url"] = url
+    return payload
+
+
+def _extract_reference_name(node: ET.Element) -> str:
+    reference = _find_first_section(node, "ReferencedObject")
+    if reference is not None:
+        name = _first_descendant_text(reference, "Name")
+        if name:
+            return name
+    return _first_descendant_text(node, "Name") or ""
+
+
+def _extract_reference_names_from_section(root: ET.Element, section_name: str) -> List[str]:
+    section = _find_first_section(root, section_name)
+    if section is None:
+        return []
+    values: List[str] = []
+    seen = set()
+    for node in section.iter():
+        local = _local_name(node.tag)
+        if local not in {"ObjectReference", "CreatureSusceptibility", "SenseReference"}:
+            continue
+        name = _extract_reference_name(node)
+        normalized = _normalize_text(name)
+        if not normalized:
+            continue
+        lowered = normalized.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        values.append(normalized)
+    return values
+
+
+def _extract_senses(root: ET.Element) -> List[Dict[str, Any]]:
+    section = _find_first_section(root, "Senses")
+    if section is None:
+        return []
+    senses: List[Dict[str, Any]] = []
+    for node in section.iter():
+        if _local_name(node.tag) != "SenseReference":
+            continue
+        name = _extract_reference_name(node)
+        if not name:
+            continue
+        range_value = _direct_child_text(node, "Range")
+        if range_value is None:
+            range_value = _first_descendant_text(node, "DefaultRange")
+        entry: Dict[str, Any] = {"name": name}
+        if range_value is not None and str(range_value).strip():
+            entry["range"] = _coerce_value(range_value)
+        senses.append(entry)
+    return senses
+
+
+def _extract_susceptibilities(root: ET.Element, section_name: str) -> List[Dict[str, Any]]:
+    section = _find_first_section(root, section_name)
+    if section is None:
+        return []
+    rows: List[Dict[str, Any]] = []
+    for node in section.iter():
+        if _local_name(node.tag) != "CreatureSusceptibility":
+            continue
+        name = _extract_reference_name(node)
+        amount = _first_descendant_attr_ci(node, "Amount", "FinalValue")
+        details = _first_available_text(node, ["Details"])
+        row: Dict[str, Any] = {}
+        if name:
+            row["name"] = name
+        if amount is not None:
+            row["amount"] = _coerce_value(amount)
+        if details:
+            row["details"] = details
+        if row:
+            rows.append(row)
+    return rows
+
+
+def _extract_reference_section(root: ET.Element, section_name: str) -> Dict[str, Any]:
+    section = _find_first_section(root, section_name)
+    if section is None:
+        return {}
+    referenced = _find_first_section(section, "ReferencedObject")
+    if referenced is None:
+        return {}
+    return _extract_reference_payload(referenced)
+
+
+def _extract_regeneration_value(root: ET.Element) -> Optional[Any]:
+    section = _find_first_section(root, "Regeneration")
+    if section is None:
+        return None
+    final_value = _attr_value_case_insensitive(section, "FinalValue")
+    if final_value is None:
+        return None
+    return _coerce_value(final_value)
+
+
+def _extract_items(root: ET.Element) -> List[Dict[str, Any]]:
+    section = _find_first_section(root, "Items")
+    if section is None:
+        return []
+    items: List[Dict[str, Any]] = []
+    for node in section.iter():
+        if _local_name(node.tag) != "ItemAndQuantity":
+            continue
+        quantity_text = _first_descendant_text(node, "Quantity")
+        name = _extract_reference_name(node)
+        row: Dict[str, Any] = {}
+        if quantity_text is not None and str(quantity_text).strip():
+            row["quantity"] = _coerce_value(quantity_text)
+        if name:
+            row["name"] = name
+        if row:
+            items.append(row)
+    return items
 
 
 def _element_to_structured(node: ET.Element) -> Dict[str, Any]:
@@ -229,6 +370,47 @@ def _element_to_structured(node: ET.Element) -> Dict[str, Any]:
 
 
 def _extract_powers(root: ET.Element) -> List[Dict[str, Any]]:
+    def _normalize_for_comparison(value: Optional[str]) -> str:
+        normalized = _normalize_text(value)
+        if not normalized:
+            return ""
+        normalized = normalized.lower().replace("’", "'")
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+        return normalized
+
+    def _description_redundant_with_attacks(description: str, attacks: List[Dict[str, Any]]) -> bool:
+        normalized_description = _normalize_for_comparison(description)
+        if not normalized_description or not attacks:
+            return False
+        primary_attack = attacks[0] if attacks else {}
+        if not isinstance(primary_attack, dict):
+            return False
+        for outcome_key in ("hit", "miss", "effect"):
+            outcome = primary_attack.get(outcome_key)
+            if not isinstance(outcome, dict):
+                continue
+            candidate_values: List[str] = []
+            direct_description = outcome.get("description")
+            if isinstance(direct_description, str):
+                candidate_values.append(direct_description)
+            damage = outcome.get("damage")
+            if isinstance(damage, dict):
+                expressions = damage.get("expressions")
+                if isinstance(expressions, list):
+                    candidate_values.extend(str(expr) for expr in expressions if str(expr).strip())
+            for candidate in candidate_values:
+                normalized_candidate = _normalize_for_comparison(candidate)
+                if not normalized_candidate:
+                    continue
+                if (
+                    normalized_candidate == normalized_description
+                    or normalized_candidate.endswith(normalized_description)
+                    or normalized_candidate.find(normalized_description) != -1
+                    or normalized_description.find(normalized_candidate) != -1
+                ):
+                    return True
+        return False
+
     def _extract_reference_names(node: ET.Element) -> List[str]:
         names: List[str] = []
         for candidate in node.iter():
@@ -567,7 +749,11 @@ def _extract_powers(root: ET.Element) -> List[Dict[str, Any]]:
                 continue
             seen_expressions.add(lowered)
             deduped_damage_expressions.append(expression)
-        if name or usage or action or keywords or keyword_tokens or description or attacks:
+        normalized_description = description
+        if _description_redundant_with_attacks(description, attacks):
+            normalized_description = ""
+
+        if name or usage or action or keywords or keyword_tokens or normalized_description or attacks:
             powers.append(
                 {
                     "name": name,
@@ -584,7 +770,7 @@ def _extract_powers(root: ET.Element) -> List[Dict[str, Any]]:
                     "keywordNames": keyword_names,
                     "keywordTokens": keyword_tokens,
                     "range": range_text,
-                    "description": description,
+                    "description": normalized_description,
                     "damageExpressions": deduped_damage_expressions,
                     "attacks": attacks,
                 }
@@ -597,23 +783,62 @@ def _extract_unmapped_sections(root: ET.Element) -> Dict[str, Any]:
         "Name",
         "Level",
         "Role",
+        "GroupRole",
         "Size",
         "Origin",
         "Type",
         "Experience",
         "XP",
+        "IsLeader",
         "AbilityScores",
         "Defenses",
         "AttackBonuses",
         "Skills",
         "Powers",
+        "Initiative",
+        "SavingThrows",
+        "HitPoints",
+        "ActionPoints",
+        "Regeneration",
+        "Items",
+        "LandSpeed",
+        "Speeds",
+        "Alignment",
+        "Languages",
+        "Keywords",
+        "Immunities",
+        "Senses",
+        "Resistances",
+        "Weaknesses",
+        "SourceBook",
+        "SourceBooks",
     }
-    out: Dict[str, Any] = {}
+    out: Dict[str, Any] = {
+        "groupRole": _extract_reference_name(_find_first_section(root, "GroupRole")) if _find_first_section(root, "GroupRole") is not None else "",
+        "alignment": _extract_reference_section(root, "Alignment"),
+        "languages": _extract_reference_names_from_section(root, "Languages"),
+        "keywords": _extract_reference_names_from_section(root, "Keywords"),
+        "immunities": _extract_reference_names_from_section(root, "Immunities"),
+        "senses": _extract_senses(root),
+        "resistances": _extract_susceptibilities(root, "Resistances"),
+        "weaknesses": _extract_susceptibilities(root, "Weaknesses"),
+        "sourceBook": _extract_reference_section(root, "SourceBook"),
+        "sourceBooks": _extract_reference_names_from_section(root, "SourceBooks"),
+        "regeneration": _extract_regeneration_value(root),
+        "items": _extract_items(root),
+    }
+    out = {
+        k: v
+        for k, v in out.items()
+        if not (v == "" or v == [] or v == {})
+    }
     for child in list(root):
         tag = _local_name(child.tag)
         if tag in mapped:
             continue
-        out[tag] = _element_to_structured(child)
+        structured = _element_to_structured(child)
+        if structured:
+            out[tag] = structured
     return out
 
 

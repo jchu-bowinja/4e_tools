@@ -19,7 +19,7 @@ export interface MonsterStats {
   defenses: Record<string, number | string>;
   attackBonuses: Record<string, number | string>;
   skills: Record<string, number | string>;
-  otherNumbers: Record<string, number | string | boolean | Record<string, number | string | boolean>>;
+  otherNumbers: Record<string, unknown>;
 }
 
 export interface MonsterPower {

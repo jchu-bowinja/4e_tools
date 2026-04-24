@@ -166,6 +166,14 @@ function normalizeSemicolonWhitespace(value: string): string {
   return value.replace(/\s*;\s*/g, " ").replace(/\s+/g, " ").trim();
 }
 
+function normalizeTextForDupCompare(value: string): string {
+  return normalizeSemicolonWhitespace(value)
+    .toLowerCase()
+    .replace(/[’']/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function splitFailedEscapeAttemptSections(text: string): { mainText: string; failedEscapeTexts: string[] } {
   const raw = String(text || "").trim();
   if (!raw) return { mainText: "", failedEscapeTexts: [] };
@@ -196,6 +204,45 @@ function renderStatValue(
   startGlossaryHover: (event: ReactMouseEvent<HTMLElement>, key: MonsterGlossaryHoverKey) => void,
   stopGlossaryHover: () => void
 ): JSX.Element {
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return <span style={{ fontWeight: 600 }}>-</span>;
+    }
+    return (
+      <span style={{ display: "inline-grid", gap: "0.12rem", justifyItems: "end", textAlign: "right" }}>
+        {value.map((entry, index) => {
+          if (entry && typeof entry === "object" && !Array.isArray(entry)) {
+            const entryRecord = entry as Record<string, unknown>;
+            const movementType = String(entryRecord.type ?? "").trim();
+            const movementValue = entryRecord.value;
+            if (movementType) {
+              return (
+                <span key={`${movementType}-${index}`} style={{ whiteSpace: "nowrap" }}>
+                  <span
+                    onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${movementType}`)}
+                    onMouseLeave={stopGlossaryHover}
+                    style={{ cursor: "help", borderBottom: "1px dotted var(--text-muted)", marginRight: "0.3rem" }}
+                  >
+                    {movementType}
+                  </span>
+                  <strong style={{ color: "var(--text-primary)" }}>
+                    {formatValue(movementValue as string | number | boolean | undefined | null)}
+                  </strong>
+                </span>
+              );
+            }
+          }
+          return (
+            <span key={`array-entry-${index}`} style={{ whiteSpace: "nowrap" }}>
+              <strong style={{ color: "var(--text-primary)" }}>
+                {formatValue(entry as string | number | boolean | undefined | null)}
+              </strong>
+            </span>
+          );
+        })}
+      </span>
+    );
+  }
   if (value && typeof value === "object" && !Array.isArray(value)) {
     const entries = Object.entries(value as Record<string, unknown>);
     if (entries.length === 0) {
@@ -445,13 +492,21 @@ function buildMonsterPowerCardViewModel(power: MonsterPower): MonsterPowerCardVi
   const descriptionDuplicatesEffect =
     isRenderableCardValue(normalizedDescription) &&
     isRenderableCardValue(normalizedEffectDescription) &&
-    normalizedDescription.toLowerCase() === normalizedEffectDescription.toLowerCase();
+    normalizeTextForDupCompare(normalizedDescription) === normalizeTextForDupCompare(normalizedEffectDescription);
   const descriptionDuplicatesOutcomeLine =
     isRenderableCardValue(normalizedDescription) &&
     outcomeLines.some(
       (line) =>
         isRenderableCardValue(line.text) &&
-        normalizeSemicolonWhitespace(String(line.text).trim()).toLowerCase() === normalizedDescription.toLowerCase()
+        (() => {
+          const normalizedLineText = normalizeTextForDupCompare(String(line.text).trim());
+          const normalizedDescriptionText = normalizeTextForDupCompare(normalizedDescription);
+          return (
+            normalizedLineText === normalizedDescriptionText ||
+            normalizedLineText.includes(normalizedDescriptionText) ||
+            normalizedDescriptionText.includes(normalizedLineText)
+          );
+        })()
     );
   const descriptionText =
     isRenderableCardValue(normalizedDescription) &&
@@ -1248,7 +1303,7 @@ export function MonsterEditorApp({
                                 fontVariantNumeric: "tabular-nums",
                                 padding: "0.22rem 0.35rem",
                                 borderRadius: "0.25rem",
-                                backgroundColor: idx % 2 === 0 ? "var(--surface-1)" : "var(--surface-0)"
+                                backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)"
                               }}
                             >
                               <span
