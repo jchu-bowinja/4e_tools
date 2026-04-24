@@ -33,8 +33,57 @@ export interface MonsterPower {
   tier?: string | number;
   flavorText?: string;
   keywords: string;
+  keywordNames?: string[];
   range?: string;
   description: string;
+  damageExpressions?: string[];
+  attacks?: MonsterPowerAttack[];
+}
+
+export interface MonsterPowerDamage {
+  expressions?: string[];
+  averageDamage?: number | string;
+  damageConstant?: number | string;
+  diceQuantity?: number | string;
+  diceSides?: number | string;
+  damageType?: string;
+  modifier?: string;
+}
+
+export interface MonsterPowerOutcomeEntry {
+  kind?: string;
+  name?: string;
+  description?: string;
+  damage?: MonsterPowerDamage;
+  aftereffects?: MonsterPowerOutcomeEntry[];
+  sustains?: MonsterPowerOutcomeEntry[];
+  failedSavingThrows?: MonsterPowerOutcomeEntry[];
+  attacks?: MonsterPowerAttack[];
+}
+
+export interface MonsterPowerOutcome {
+  description?: string;
+  damage?: MonsterPowerDamage;
+  nestedAttackDescriptions?: string[];
+  aftereffects?: MonsterPowerOutcomeEntry[];
+  sustains?: MonsterPowerOutcomeEntry[];
+  failedSavingThrows?: MonsterPowerOutcomeEntry[];
+}
+
+export interface MonsterPowerAttackBonus {
+  defense?: string;
+  bonus?: number | string;
+}
+
+export interface MonsterPowerAttack {
+  kind?: string;
+  name?: string;
+  range?: string;
+  targets?: string;
+  attackBonuses?: MonsterPowerAttackBonus[];
+  hit?: MonsterPowerOutcome;
+  miss?: MonsterPowerOutcome;
+  effect?: MonsterPowerOutcome;
 }
 
 export interface MonsterEntryFile extends MonsterIndexEntry {

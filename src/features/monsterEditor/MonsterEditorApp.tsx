@@ -2,7 +2,17 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEven
 import type { RulesIndex } from "../../rules/models";
 import { resolveTooltipText } from "../../data/tooltipGlossary";
 import { RulesRichText } from "../builder/RulesRichText";
-import { loadMonsterEntry, loadMonsterIndex, type MonsterEntryFile, type MonsterIndexEntry } from "./storage";
+import {
+  loadMonsterEntry,
+  loadMonsterIndex,
+  type MonsterEntryFile,
+  type MonsterIndexEntry,
+  type MonsterPower,
+  type MonsterPowerAttack,
+  type MonsterPowerDamage,
+  type MonsterPowerOutcome,
+  type MonsterPowerOutcomeEntry
+} from "./storage";
 
 const sheetPanel = {
   border: "1px solid var(--panel-border)",
@@ -35,6 +45,157 @@ function splitPowerKeywords(rawKeywords: string): string[] {
     .split(/[;,]/)
     .map((part) => part.trim())
     .filter((part) => part.length > 0);
+}
+
+function renderDamageSummary(damage?: MonsterPowerDamage): string {
+  if (!damage) return "";
+  const parts: string[] = [];
+  if (Array.isArray(damage.expressions) && damage.expressions.length > 0) {
+    parts.push(`Expr: ${damage.expressions.join(", ")}`);
+  }
+  if (damage.averageDamage !== undefined) parts.push(`Avg: ${damage.averageDamage}`);
+  if (damage.damageType) parts.push(`Type: ${damage.damageType}`);
+  if (damage.diceQuantity !== undefined && damage.diceSides !== undefined) {
+    parts.push(`Dice: ${damage.diceQuantity}d${damage.diceSides}`);
+  }
+  if (damage.damageConstant !== undefined) parts.push(`Const: ${damage.damageConstant}`);
+  if (damage.modifier) parts.push(`Mod: ${damage.modifier}`);
+  return parts.join(" • ");
+}
+
+function renderOutcomeEntry(
+  entry: MonsterPowerOutcomeEntry,
+  idx: number,
+  title: string,
+  startGlossaryHover: (event: ReactMouseEvent<HTMLElement>, key: MonsterGlossaryHoverKey) => void,
+  stopGlossaryHover: () => void
+): JSX.Element {
+  const damageSummary = renderDamageSummary(entry.damage);
+  return (
+    <div key={`${title}-${idx}`} style={{ borderLeft: "2px solid var(--panel-border)", paddingLeft: "0.45rem", marginTop: "0.3rem" }}>
+      <div style={{ fontSize: "0.78rem", fontWeight: 600 }}>
+        {entry.name || entry.kind || title}
+      </div>
+      {entry.description ? (
+        <RulesRichText
+          text={entry.description}
+          paragraphStyle={{ fontSize: "0.79rem", color: "var(--text-primary)", margin: "0.1rem 0 0.2rem 0" }}
+          listItemStyle={{ fontSize: "0.79rem", color: "var(--text-primary)" }}
+        />
+      ) : null}
+      {damageSummary ? <div style={{ fontSize: "0.74rem", color: "var(--text-muted)" }}>{damageSummary}</div> : null}
+      {entry.aftereffects?.length ? (
+        <div style={{ marginTop: "0.2rem" }}>
+          <div style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)" }}>Aftereffects</div>
+          {entry.aftereffects.map((nested, nestedIdx) =>
+            renderOutcomeEntry(nested, nestedIdx, "Aftereffect", startGlossaryHover, stopGlossaryHover)
+          )}
+        </div>
+      ) : null}
+      {entry.sustains?.length ? (
+        <div style={{ marginTop: "0.2rem" }}>
+          <div style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)" }}>Sustains</div>
+          {entry.sustains.map((nested, nestedIdx) =>
+            renderOutcomeEntry(nested, nestedIdx, "Sustain", startGlossaryHover, stopGlossaryHover)
+          )}
+        </div>
+      ) : null}
+      {entry.failedSavingThrows?.length ? (
+        <div style={{ marginTop: "0.2rem" }}>
+          <div style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)" }}>
+            Failed Saving Throws
+          </div>
+          {entry.failedSavingThrows.map((nested, nestedIdx) =>
+            renderOutcomeEntry(nested, nestedIdx, "Failed Save", startGlossaryHover, stopGlossaryHover)
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function renderAttackOutcome(
+  label: "hit" | "miss" | "effect",
+  outcome: MonsterPowerOutcome,
+  startGlossaryHover: (event: ReactMouseEvent<HTMLElement>, key: MonsterGlossaryHoverKey) => void,
+  stopGlossaryHover: () => void
+): JSX.Element {
+  const damageSummary = renderDamageSummary(outcome.damage);
+  return (
+    <div style={{ marginTop: "0.28rem" }}>
+      <div style={{ fontSize: "0.74rem", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)" }}>{label}</div>
+      {outcome.description ? (
+        <RulesRichText
+          text={outcome.description}
+          paragraphStyle={{ fontSize: "0.79rem", color: "var(--text-primary)", margin: "0.06rem 0 0.16rem 0" }}
+          listItemStyle={{ fontSize: "0.79rem", color: "var(--text-primary)" }}
+        />
+      ) : null}
+      {damageSummary ? <div style={{ fontSize: "0.74rem", color: "var(--text-muted)" }}>{damageSummary}</div> : null}
+      {outcome.nestedAttackDescriptions?.length ? (
+        <div style={{ fontSize: "0.74rem", color: "var(--text-secondary)", marginTop: "0.15rem" }}>
+          {outcome.nestedAttackDescriptions.map((text, idx) => (
+            <div key={`${label}-nested-${idx}`}>{text}</div>
+          ))}
+        </div>
+      ) : null}
+      {outcome.aftereffects?.length ? (
+        <div style={{ marginTop: "0.18rem" }}>
+          <div style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)" }}>Aftereffects</div>
+          {outcome.aftereffects.map((entry, idx) =>
+            renderOutcomeEntry(entry, idx, "Aftereffect", startGlossaryHover, stopGlossaryHover)
+          )}
+        </div>
+      ) : null}
+      {outcome.sustains?.length ? (
+        <div style={{ marginTop: "0.18rem" }}>
+          <div style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)" }}>Sustains</div>
+          {outcome.sustains.map((entry, idx) => renderOutcomeEntry(entry, idx, "Sustain", startGlossaryHover, stopGlossaryHover))}
+        </div>
+      ) : null}
+      {outcome.failedSavingThrows?.length ? (
+        <div style={{ marginTop: "0.18rem" }}>
+          <div style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)" }}>
+            Failed Saving Throws
+          </div>
+          {outcome.failedSavingThrows.map((entry, idx) =>
+            renderOutcomeEntry(entry, idx, "Failed Save", startGlossaryHover, stopGlossaryHover)
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function renderPowerAttacks(
+  power: MonsterPower,
+  startGlossaryHover: (event: ReactMouseEvent<HTMLElement>, key: MonsterGlossaryHoverKey) => void,
+  stopGlossaryHover: () => void
+): JSX.Element | null {
+  if (!power.attacks?.length) return null;
+  return (
+    <div style={{ marginTop: "0.3rem", display: "grid", gap: "0.35rem" }}>
+      {power.attacks.map((attack: MonsterPowerAttack, attackIdx) => {
+        const bonusText = (attack.attackBonuses ?? [])
+          .map((bonus) => `${bonus.bonus ?? "?"} vs ${bonus.defense ?? "?"}`)
+          .join(", ");
+        return (
+          <div key={`${power.name}-attack-${attackIdx}`} style={{ border: "1px solid var(--panel-border)", borderRadius: "0.32rem", padding: "0.35rem", backgroundColor: "var(--surface-1)" }}>
+            <div style={{ fontSize: "0.8rem", fontWeight: 600 }}>
+              {attack.name || `Attack ${attackIdx + 1}`}
+              {attack.kind ? ` (${attack.kind})` : ""}
+            </div>
+            <div style={{ fontSize: "0.74rem", color: "var(--text-muted)", marginTop: "0.06rem" }}>
+              {[attack.range, attack.targets, bonusText].filter(Boolean).join(" • ") || "No range/target/bonus details"}
+            </div>
+            {attack.hit ? renderAttackOutcome("hit", attack.hit, startGlossaryHover, stopGlossaryHover) : null}
+            {attack.miss ? renderAttackOutcome("miss", attack.miss, startGlossaryHover, stopGlossaryHover) : null}
+            {attack.effect ? renderAttackOutcome("effect", attack.effect, startGlossaryHover, stopGlossaryHover) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function splitTooltipTerms(rawTerm: string): string[] {
@@ -503,7 +664,11 @@ export function MonsterEditorApp({
                     <div style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>No powers parsed.</div>
                   ) : (
                     activeMonster.powers.map((power, index) => {
-                      const keywordTokens = splitPowerKeywords(power.keywords || "");
+                      const keywordTokens = [
+                        ...splitPowerKeywords(power.keywords || ""),
+                        ...(power.keywordNames?.filter(Boolean) ?? [])
+                      ];
+                      const uniqueKeywordTokens = [...new Set(keywordTokens)];
                       return (
                         <div key={`${power.name}-${index}`} style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.45rem", backgroundColor: "var(--surface-0)" }}>
                           <div style={{ fontWeight: 600 }}>{power.name || `Power ${index + 1}`}</div>
@@ -512,10 +677,10 @@ export function MonsterEditorApp({
                             {power.type ? ` • ${power.type}` : ""}
                             {power.range ? ` • ${power.range}` : ""}
                           </div>
-                          {keywordTokens.length > 0 ? (
+                          {uniqueKeywordTokens.length > 0 ? (
                             <div style={{ fontSize: "0.77rem", color: "var(--text-muted)", marginBottom: "0.25rem" }}>
                               <strong>Keywords:</strong>{" "}
-                              {keywordTokens.map((keyword, idx) => (
+                              {uniqueKeywordTokens.map((keyword, idx) => (
                                 <span key={`${power.name}-${index}-kw-${keyword}`}>
                                   <span
                                     onMouseEnter={(event) => startGlossaryHover(event, `powerKeyword:${keyword}`)}
@@ -532,9 +697,34 @@ export function MonsterEditorApp({
                                   >
                                     {keyword}
                                   </span>
-                                  {idx < keywordTokens.length - 1 ? <span> </span> : null}
+                                  {idx < uniqueKeywordTokens.length - 1 ? <span> </span> : null}
                                 </span>
                               ))}
+                            </div>
+                          ) : null}
+                          {power.damageExpressions?.length ? (
+                            <div style={{ fontSize: "0.77rem", color: "var(--text-muted)", marginBottom: "0.25rem" }}>
+                              <strong>Damage Expressions:</strong> {power.damageExpressions.join(", ")}
+                            </div>
+                          ) : null}
+                          {power.trigger ? (
+                            <div style={{ fontSize: "0.77rem", color: "var(--text-muted)", marginBottom: "0.2rem" }}>
+                              <strong>Trigger:</strong> {power.trigger}
+                            </div>
+                          ) : null}
+                          {power.requirements ? (
+                            <div style={{ fontSize: "0.77rem", color: "var(--text-muted)", marginBottom: "0.2rem" }}>
+                              <strong>Requirements:</strong> {power.requirements}
+                            </div>
+                          ) : null}
+                          {power.usageDetails ? (
+                            <div style={{ fontSize: "0.77rem", color: "var(--text-muted)", marginBottom: "0.2rem" }}>
+                              <strong>Usage Details:</strong> {power.usageDetails}
+                            </div>
+                          ) : null}
+                          {power.flavorText?.trim() ? (
+                            <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", marginBottom: "0.2rem", fontStyle: "italic" }}>
+                              {power.flavorText}
                             </div>
                           ) : null}
                           <div style={{ fontSize: "0.82rem", color: "var(--text-primary)" }}>
@@ -548,6 +738,7 @@ export function MonsterEditorApp({
                               "No description."
                             )}
                           </div>
+                          {renderPowerAttacks(power, startGlossaryHover, stopGlossaryHover)}
                         </div>
                       );
                     })
@@ -576,31 +767,53 @@ export function MonsterEditorApp({
                 </div>
               </div>
 
-              <details style={{ marginTop: "0.75rem", border: "1px solid var(--panel-border)", borderRadius: "0.35rem", backgroundColor: "var(--surface-0)", padding: "0.5rem" }}>
-                <summary style={{ cursor: "pointer", fontWeight: 700, fontSize: "0.82rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                  Raw Monster JSON
-                </summary>
-                <pre
-                  style={{
-                    marginTop: "0.5rem",
-                    marginBottom: 0,
-                    padding: "0.5rem",
-                    borderRadius: "0.3rem",
-                    border: "1px solid var(--panel-border)",
-                    backgroundColor: "var(--surface-1)",
-                    color: "var(--text-primary)",
-                    fontSize: "0.74rem",
-                    lineHeight: 1.35,
-                    whiteSpace: "pre-wrap",
-                    overflowX: "auto"
-                  }}
-                >
-                  {JSON.stringify(activeMonster, null, 2)}
-                </pre>
-              </details>
             </>
           )}
         </div>
+      </div>
+
+      <div style={{ marginTop: "0.85rem", border: "1px solid var(--panel-border)", borderRadius: "0.35rem", backgroundColor: "var(--surface-0)", padding: "0.55rem" }}>
+        <details>
+          <summary style={{ cursor: "pointer", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--text-primary)" }}>
+            JSON
+          </summary>
+          <div style={{ marginTop: "0.5rem" }}>
+            <button
+              type="button"
+              onClick={() => {
+                const rawJson = JSON.stringify(activeMonster, null, 2);
+                if (!navigator.clipboard?.writeText) {
+                  alert("Clipboard API unavailable in this browser.");
+                  return;
+                }
+                void navigator.clipboard.writeText(rawJson);
+              }}
+            >
+              Copy Contents
+            </button>
+          </div>
+          <textarea
+            value={JSON.stringify(activeMonster, null, 2)}
+            readOnly
+            style={{
+              margin: "0.55rem 0 0 0",
+              padding: "0.55rem",
+              borderRadius: "0.32rem",
+              border: "1px solid var(--panel-border)",
+              backgroundColor: "var(--surface-1)",
+              color: "var(--text-primary)",
+              overflow: "auto",
+              height: "44rem",
+              minHeight: "12rem",
+              width: "100%",
+              boxSizing: "border-box",
+              resize: "vertical",
+              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+              fontSize: "0.76rem",
+              lineHeight: 1.35
+            }}
+          />
+        </details>
       </div>
 
       {showGlossaryHoverInfo && glossaryHoverKey && glossaryHoverPanelPos && (

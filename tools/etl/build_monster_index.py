@@ -48,6 +48,15 @@ def _first_descendant_text(node: ET.Element, tag_name: str) -> Optional[str]:
     return None
 
 
+def _first_descendant_attr(node: ET.Element, tag_name: str, attr_name: str) -> Optional[str]:
+    for child in node.iter():
+        if _local_name(child.tag) == tag_name and attr_name in child.attrib:
+            value = child.attrib[attr_name]
+            if value is not None and str(value).strip():
+                return str(value).strip()
+    return None
+
+
 def _find_first_section(node: ET.Element, tag_name: str) -> Optional[ET.Element]:
     for child in node.iter():
         if _local_name(child.tag) == tag_name:
@@ -112,6 +121,215 @@ def _element_to_structured(node: ET.Element) -> Dict[str, Any]:
 
 
 def _extract_powers(root: ET.Element) -> List[Dict[str, Any]]:
+    def _extract_reference_names(node: ET.Element) -> List[str]:
+        names: List[str] = []
+        for candidate in node.iter():
+            if _local_name(candidate.tag) != "Name":
+                continue
+            text = (candidate.text or "").strip()
+            if text:
+                names.append(text)
+        deduped: List[str] = []
+        seen = set()
+        for name in names:
+            if name in seen:
+                continue
+            deduped.append(name)
+            seen.add(name)
+        return deduped
+
+    def _extract_damage_data(node: ET.Element) -> Dict[str, Any]:
+        data: Dict[str, Any] = {}
+        expressions = []
+        for expr in node.iter():
+            if _local_name(expr.tag) != "Expression":
+                continue
+            text = (expr.text or "").strip()
+            if text:
+                expressions.append(text)
+        if expressions:
+            data["expressions"] = expressions
+
+        average_damage = _first_descendant_attr(node, "AverageDamage", "FinalValue")
+        if average_damage is not None:
+            data["averageDamage"] = _coerce_value(average_damage)
+
+        damage_constant = _first_descendant_attr(node, "DamageConstant", "FinalValue")
+        if damage_constant is not None:
+            data["damageConstant"] = _coerce_value(damage_constant)
+
+        dice_quantity = _first_descendant_text(node, "DiceQuantity")
+        if dice_quantity is not None:
+            data["diceQuantity"] = _coerce_value(dice_quantity)
+
+        dice_sides = _first_descendant_text(node, "DiceSides")
+        if dice_sides is not None:
+            data["diceSides"] = _coerce_value(dice_sides)
+
+        damage_type = _first_descendant_text(node, "Type")
+        if damage_type:
+            data["damageType"] = damage_type
+        damage_modifier = _first_descendant_text(node, "Modifier")
+        if damage_modifier:
+            data["modifier"] = damage_modifier
+        # Suppress boilerplate "no-op" damage blocks that are emitted in many
+        # outcomes (e.g. AverageDamage=1, DamageType=None, no expression).
+        if (
+            data.get("averageDamage") == 1
+            and data.get("damageType") == "None"
+            and not data.get("expressions")
+            and data.get("diceQuantity") == 0
+            and data.get("diceSides") == 0
+        ):
+            return {}
+        return data
+
+    def _extract_entry_list(section: ET.Element) -> List[Dict[str, Any]]:
+        def _extract_attack_entry(node: ET.Element) -> Dict[str, Any]:
+            entry: Dict[str, Any] = {"kind": _local_name(node.tag)}
+            name = _direct_child_text(node, "Name")
+            if name:
+                entry["name"] = name
+            description = _direct_child_text(node, "Description")
+            if description:
+                entry["description"] = description
+            damage = _find_first_section(node, "Damage")
+            if damage is not None:
+                damage_data = _extract_damage_data(damage)
+                if damage_data:
+                    entry["damage"] = damage_data
+
+            nested_entries = []
+            for nested_name in ("Aftereffects", "Sustains", "FailedSavingThrows"):
+                nested_section = _find_first_section(node, nested_name)
+                if nested_section is None:
+                    continue
+                nested_values = _extract_entry_list(nested_section)
+                if nested_values:
+                    key = {
+                        "Aftereffects": "aftereffects",
+                        "Sustains": "sustains",
+                        "FailedSavingThrows": "failedSavingThrows",
+                    }[nested_name]
+                    entry[key] = nested_values
+                    nested_entries.extend(nested_values)
+
+            attacks_section = _find_first_section(node, "Attacks")
+            if attacks_section is not None:
+                nested_attacks = _extract_attacks(node)
+                if nested_attacks:
+                    entry["attacks"] = nested_attacks
+
+            return entry
+
+        items: List[Dict[str, Any]] = []
+        for child in list(section):
+            tag = _local_name(child.tag)
+            if tag in {"MonsterAttackEntry", "MonsterAttack", "Attack"}:
+                parsed = _extract_attack_entry(child)
+                if parsed:
+                    items.append(parsed)
+                continue
+            structured = _element_to_structured(child)
+            if structured:
+                items.append({"kind": tag, **structured})
+        return items
+
+    def _extract_outcome_data(node: ET.Element) -> Dict[str, Any]:
+        outcome: Dict[str, Any] = {}
+        description = _direct_child_text(node, "Description")
+        if description:
+            outcome["description"] = description
+        damage = _find_first_section(node, "Damage")
+        if damage is not None:
+            damage_data = _extract_damage_data(damage)
+            if damage_data:
+                outcome["damage"] = damage_data
+        nested_attacks = []
+        for attack_node in node.iter():
+            if _local_name(attack_node.tag) not in {"Attack", "MonsterAttack"}:
+                continue
+            attack_text = _direct_child_text(attack_node, "Description")
+            if attack_text:
+                nested_attacks.append(attack_text)
+        if nested_attacks:
+            outcome["nestedAttackDescriptions"] = nested_attacks
+
+        aftereffects_section = _find_first_section(node, "Aftereffects")
+        if aftereffects_section is not None:
+            aftereffects = _extract_entry_list(aftereffects_section)
+            if aftereffects:
+                outcome["aftereffects"] = aftereffects
+
+        sustains_section = _find_first_section(node, "Sustains")
+        if sustains_section is not None:
+            sustains = _extract_entry_list(sustains_section)
+            if sustains:
+                outcome["sustains"] = sustains
+
+        failed_saving_throws_section = _find_first_section(node, "FailedSavingThrows")
+        if failed_saving_throws_section is not None:
+            failed_saving_throws = _extract_entry_list(failed_saving_throws_section)
+            if failed_saving_throws:
+                outcome["failedSavingThrows"] = failed_saving_throws
+        return outcome
+
+    def _extract_attack_bonuses(node: ET.Element) -> List[Dict[str, Any]]:
+        bonuses: List[Dict[str, Any]] = []
+        attack_bonuses = _find_first_section(node, "AttackBonuses")
+        if attack_bonuses is None:
+            return bonuses
+        for bonus_node in attack_bonuses.iter():
+            if _local_name(bonus_node.tag) != "MonsterPowerAttackNumber":
+                continue
+            defense = _first_descendant_text(bonus_node, "DefenseName") or _first_descendant_text(bonus_node, "Name") or ""
+            final_value = bonus_node.attrib.get("FinalValue")
+            entry: Dict[str, Any] = {}
+            if defense:
+                entry["defense"] = defense
+            if final_value is not None:
+                entry["bonus"] = _coerce_value(final_value)
+            if entry:
+                bonuses.append(entry)
+        return bonuses
+
+    def _extract_attacks(node: ET.Element) -> List[Dict[str, Any]]:
+        attacks: List[Dict[str, Any]] = []
+        attacks_section = _find_first_section(node, "Attacks")
+        if attacks_section is None:
+            return attacks
+        for attack_node in attacks_section.iter():
+            attack_kind = _local_name(attack_node.tag)
+            if attack_kind not in {"MonsterAttack", "MonsterAttackEntry"}:
+                continue
+            attack: Dict[str, Any] = {}
+            attack["kind"] = attack_kind
+            name = _direct_child_text(attack_node, "Name")
+            if name:
+                attack["name"] = name
+            range_text = _direct_child_text(attack_node, "Range")
+            if range_text:
+                attack["range"] = range_text
+            targets = _direct_child_text(attack_node, "Targets") or _direct_child_text(attack_node, "Target")
+            if targets:
+                attack["targets"] = targets
+            attack_bonuses = _extract_attack_bonuses(attack_node)
+            if attack_bonuses:
+                attack["attackBonuses"] = attack_bonuses
+            for outcome_name in ("Hit", "Miss", "Effect"):
+                outcome_section = _find_first_section(attack_node, outcome_name)
+                if outcome_section is None:
+                    continue
+                outcome = _extract_outcome_data(outcome_section)
+                if outcome:
+                    attack[outcome_name.lower()] = outcome
+            for outcome_name in ("hit", "miss", "effect"):
+                if outcome_name in attack and not attack[outcome_name]:
+                    del attack[outcome_name]
+            if attack:
+                attacks.append(attack)
+        return attacks
+
     powers: List[Dict[str, Any]] = []
     section = _find_first_section(root, "Powers")
     if section is None:
@@ -134,9 +352,21 @@ def _extract_powers(root: ET.Element) -> List[Dict[str, Any]]:
         tier_raw = _direct_child_text(node, "Tier")
         tier = _coerce_value(tier_raw) if tier_raw else ""
         keywords = _direct_child_text(node, "Keywords") or ""
+        keyword_names: List[str] = []
+        keyword_section = _find_first_section(node, "Keywords")
+        if keyword_section is not None:
+            keyword_names = _extract_reference_names(keyword_section)
         range_text = _first_descendant_text(node, "Range") or ""
         description = _first_descendant_text(node, "Description") or ""
-        if name or usage or action or keywords or description:
+        attacks = _extract_attacks(node)
+        damage_expressions: List[str] = []
+        for expression_node in node.iter():
+            if _local_name(expression_node.tag) != "Expression":
+                continue
+            expression_text = (expression_node.text or "").strip()
+            if expression_text:
+                damage_expressions.append(expression_text)
+        if name or usage or action or keywords or keyword_names or description or attacks:
             powers.append(
                 {
                     "name": name,
@@ -150,8 +380,11 @@ def _extract_powers(root: ET.Element) -> List[Dict[str, Any]]:
                     "tier": tier,
                     "flavorText": flavor_text,
                     "keywords": keywords,
+                    "keywordNames": keyword_names,
                     "range": range_text,
                     "description": description,
+                    "damageExpressions": damage_expressions,
+                    "attacks": attacks,
                 }
             )
     return powers
@@ -212,7 +445,13 @@ def _parse_monster_file(xml_text: str, fallback_name: str) -> Dict[str, Any]:
         "size": size_name,
         "origin": origin_name,
         "type": type_name,
-        "xp": _first_descendant_text(root, "Experience") or _first_descendant_text(root, "XP") or "",
+        "xp": (
+            _first_descendant_attr(root, "Experience", "FinalValue")
+            or _first_descendant_attr(root, "XP", "FinalValue")
+            or _first_descendant_text(root, "Experience")
+            or _first_descendant_text(root, "XP")
+            or ""
+        ),
         "stats": {
             "abilityScores": _extract_named_final_values(root, "AbilityScores"),
             "defenses": _extract_named_final_values(root, "Defenses"),
