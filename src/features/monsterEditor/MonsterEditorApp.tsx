@@ -284,6 +284,8 @@ export function MonsterEditorApp({
   const [levelQuery, setLevelQuery] = useState<string>("");
   const [roleQuery, setRoleQuery] = useState<string>("");
   const [leaderFilter, setLeaderFilter] = useState<"both" | "leader" | "notLeader">("both");
+  const [sortBy, setSortBy] = useState<"name" | "level">("name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [message, setMessage] = useState<string>("Load monsters from generated JSON to begin.");
   const [isBusy, setIsBusy] = useState<boolean>(false);
   const [showGlossaryHoverInfo, setShowGlossaryHoverInfo] = useState(false);
@@ -348,7 +350,7 @@ export function MonsterEditorApp({
     const rawLevelFilter = levelQuery.trim();
     const parsedLevelFilter = parseLevelFilter(rawLevelFilter);
 
-    return indexRows.filter((entry) => {
+    const rows = indexRows.filter((entry) => {
       if (nameNeedle && !entry.name.toLowerCase().includes(nameNeedle)) {
         return false;
       }
@@ -382,7 +384,28 @@ export function MonsterEditorApp({
       }
       return false;
     });
-  }, [indexRows, nameQuery, levelQuery, roleQuery, leaderFilter]);
+
+    return [...rows].sort((a, b) => {
+      if (sortBy === "level") {
+        const levelA = Number(a.level);
+        const levelB = Number(b.level);
+        const hasLevelA = Number.isFinite(levelA);
+        const hasLevelB = Number.isFinite(levelB);
+        if (hasLevelA && hasLevelB && levelA !== levelB) {
+          return sortDir === "asc" ? levelA - levelB : levelB - levelA;
+        }
+        if (hasLevelA !== hasLevelB) {
+          return hasLevelA ? -1 : 1;
+        }
+      }
+
+      const byName = a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+      if (byName !== 0) {
+        return sortDir === "asc" ? byName : -byName;
+      }
+      return a.id.localeCompare(b.id, undefined, { sensitivity: "base" });
+    });
+  }, [indexRows, nameQuery, levelQuery, roleQuery, leaderFilter, sortBy, sortDir]);
 
   const roleOptions = useMemo(() => {
     const unique = new Set<string>();
@@ -527,6 +550,22 @@ export function MonsterEditorApp({
           <option value="both">-</option>
           <option value="leader">Leader</option>
           <option value="notLeader">Not leader</option>
+        </select>
+        <select
+          value={sortBy}
+          onChange={(event) => setSortBy(event.target.value as "name" | "level")}
+          style={{ minWidth: 140, border: "1px solid var(--panel-border)", borderRadius: "0.28rem", padding: "0.22rem 0.3rem" }}
+        >
+          <option value="name">Sort: Name</option>
+          <option value="level">Sort: Level</option>
+        </select>
+        <select
+          value={sortDir}
+          onChange={(event) => setSortDir(event.target.value as "asc" | "desc")}
+          style={{ minWidth: 140, border: "1px solid var(--panel-border)", borderRadius: "0.28rem", padding: "0.22rem 0.3rem" }}
+        >
+          <option value="asc">Ascending</option>
+          <option value="desc">Descending</option>
         </select>
       </div>
 
