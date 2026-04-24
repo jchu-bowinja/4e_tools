@@ -1411,11 +1411,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                                     return (
                                       <span
                                         style={{
-                                          display: "inline-block",
-                                          padding: "0.04rem 0.3rem",
-                                          borderRadius: "0.2rem",
-                                          border: "1px solid var(--panel-border)",
-                                          backgroundColor: "var(--surface-2)",
                                           color: "var(--text-primary)"
                                         }}
                                       >
@@ -1428,12 +1423,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                                       onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `powerKeyword:${keyword}`)}
                                       onMouseLeave={stopGlossaryHoverInfoTimerAndHide}
                                       style={{
-                                        display: "inline-block",
-                                        padding: "0.04rem 0.3rem",
-                                        borderRadius: "0.2rem",
-                                        border: "1px solid var(--panel-border)",
-                                        backgroundColor: "var(--surface-2)",
-                                        color: "var(--text-primary)"
+                                        color: "var(--text-primary)",
+                                        cursor: "help",
+                                        textDecoration: "underline dotted",
+                                        textUnderlineOffset: "2px"
                                       }}
                                     >
                                       {keyword}

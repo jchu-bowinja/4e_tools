@@ -28,6 +28,70 @@ const titleStyle = {
   color: "var(--text-primary)"
 };
 
+const statPanelStyle = {
+  border: "1px solid var(--panel-border)",
+  borderRadius: "0.35rem",
+  padding: "0.5rem",
+  backgroundColor: "var(--surface-0)"
+};
+
+type MonsterPowerUsageBucket = "atWill" | "encounter" | "daily" | "other";
+
+function usageAccentColor(bucket: MonsterPowerUsageBucket): string {
+  if (bucket === "atWill") return "var(--power-accent-atwill-bar)";
+  if (bucket === "encounter") return "var(--power-accent-encounter-bar)";
+  if (bucket === "daily") return "var(--power-accent-daily-bar)";
+  return "var(--text-secondary)";
+}
+
+function usageAccentCardStyle(bucket: MonsterPowerUsageBucket): {
+  border: string;
+  borderLeft: string;
+  backgroundColor: string;
+} {
+  if (bucket === "atWill") {
+    return {
+      border: "1px solid var(--power-accent-atwill-border)",
+      borderLeft: "6px solid var(--power-accent-atwill-bar)",
+      backgroundColor: "var(--power-accent-atwill-bg)"
+    };
+  }
+  if (bucket === "encounter") {
+    return {
+      border: "1px solid var(--power-accent-encounter-border)",
+      borderLeft: "6px solid var(--power-accent-encounter-bar)",
+      backgroundColor: "var(--power-accent-encounter-bg)"
+    };
+  }
+  if (bucket === "daily") {
+    return {
+      border: "1px solid var(--power-accent-daily-border)",
+      borderLeft: "6px solid var(--power-accent-daily-bar)",
+      backgroundColor: "var(--power-accent-daily-bg)"
+    };
+  }
+  return {
+    border: "1px solid var(--panel-border)",
+    borderLeft: "6px solid var(--text-secondary)",
+    backgroundColor: "var(--surface-1)"
+  };
+}
+
+function classifyMonsterPowerUsageBucket(usage: string | undefined): MonsterPowerUsageBucket {
+  const normalized = String(usage || "").toLowerCase();
+  if (normalized.includes("at-will") || normalized.includes("at will")) return "atWill";
+  if (normalized.includes("encounter")) return "encounter";
+  if (normalized.includes("daily")) return "daily";
+  return "other";
+}
+
+function usageBucketLabel(bucket: MonsterPowerUsageBucket): string {
+  if (bucket === "atWill") return "At-Will";
+  if (bucket === "encounter") return "Encounter";
+  if (bucket === "daily") return "Daily";
+  return "Other";
+}
+
 function formatValue(value: string | number | boolean | undefined | null): string {
   if (value === undefined || value === null || value === "") return "-";
   return String(value);
@@ -39,6 +103,41 @@ function formatStatLabel(label: string): string {
     .replace(/[_-]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function isRenderableCardValue(value: string | undefined | null): boolean {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) return false;
+  return normalized.toLowerCase() !== "none";
+}
+
+function normalizeSemicolonWhitespace(value: string): string {
+  return value.replace(/\s*;\s*/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function splitFailedEscapeAttemptSections(text: string): { mainText: string; failedEscapeTexts: string[] } {
+  const raw = String(text || "").trim();
+  if (!raw) return { mainText: "", failedEscapeTexts: [] };
+  const marker = "Failed Escape Attempt:";
+  const markerRegex = /Failed Escape Attempt:/gi;
+  const matches = [...raw.matchAll(markerRegex)];
+  if (matches.length === 0) {
+    return { mainText: raw, failedEscapeTexts: [] };
+  }
+
+  const firstIndex = matches[0]?.index ?? 0;
+  const mainText = raw.slice(0, firstIndex).trim().replace(/[;,:\s]+$/g, "").trim();
+  const failedEscapeTexts: string[] = [];
+  for (let idx = 0; idx < matches.length; idx += 1) {
+    const start = matches[idx]?.index ?? 0;
+    const end = idx + 1 < matches.length ? matches[idx + 1]?.index ?? raw.length : raw.length;
+    const clause = raw.slice(start + marker.length, end).trim().replace(/[;,:\s]+$/g, "").trim();
+    if (!clause) continue;
+    if (!failedEscapeTexts.some((existing) => existing.toLowerCase() === clause.toLowerCase())) {
+      failedEscapeTexts.push(clause);
+    }
+  }
+  return { mainText, failedEscapeTexts };
 }
 
 function renderStatValue(
@@ -62,13 +161,13 @@ function renderStatValue(
             >
               {formatStatLabel(nestedKey)}
             </span>
-            <strong>{formatValue(nestedValue as string | number | boolean | undefined | null)}</strong>
+            <strong style={{ color: "var(--text-primary)" }}>{formatValue(nestedValue as string | number | boolean | undefined | null)}</strong>
           </span>
         ))}
       </span>
     );
   }
-  return <span style={{ fontWeight: 600 }}>{formatValue(value as string | number | boolean | undefined | null)}</span>;
+  return <span style={{ fontWeight: 700, color: "var(--text-primary)" }}>{formatValue(value as string | number | boolean | undefined | null)}</span>;
 }
 
 function sectionChildKeys(section: unknown): string[] {
@@ -76,6 +175,13 @@ function sectionChildKeys(section: unknown): string[] {
   const maybeChildren = (section as { children?: Record<string, unknown> }).children;
   if (!maybeChildren || typeof maybeChildren !== "object") return [];
   return Object.keys(maybeChildren);
+}
+
+function statsDisplayOrder(label: string): number {
+  const normalized = label.trim().toLowerCase();
+  if (normalized === "skills") return 1;
+  if (normalized === "defenses") return 2;
+  return 0;
 }
 
 function splitPowerKeywords(rawKeywords: string): string[] {
@@ -119,6 +225,199 @@ function renderDamageSummary(damage?: MonsterPowerDamage): string {
   if (damage.damageConstant !== undefined) parts.push(`Const: ${damage.damageConstant}`);
   if (damage.modifier) parts.push(`Mod: ${damage.modifier}`);
   return parts.join(" • ");
+}
+
+function renderPrimaryAttackBonus(attack?: MonsterPowerAttack): string {
+  if (!attack?.attackBonuses?.length) return "";
+  return attack.attackBonuses
+    .map((bonus) => `${bonus.bonus ?? "?"} vs ${(bonus.defense ?? "?").toString().toLowerCase()}`)
+    .join(" * ");
+}
+
+function renderDamageExpression(outcome?: MonsterPowerOutcome, fallbackExpressions?: string[]): string {
+  const fromOutcome = outcome?.damage?.expressions?.filter(Boolean) ?? [];
+  if (fromOutcome.length > 0) return fromOutcome.join(" + ");
+  const fallback = fallbackExpressions?.filter(Boolean) ?? [];
+  if (fallback.length > 0) return fallback.join(" + ");
+  return "";
+}
+
+function renderCompactOutcomeLines(
+  power: MonsterPower,
+  attack: MonsterPowerAttack | undefined
+): Array<{ label: string; text: string }> {
+  const lines: Array<{ label: string; text: string }> = [];
+  const outcomeEntryDescription = (entry: MonsterPowerOutcomeEntry): string => {
+    const direct = normalizeSemicolonWhitespace(String(entry.description || "").trim());
+    if (isRenderableCardValue(direct)) return direct;
+    const fromChildren = normalizeSemicolonWhitespace(
+      String((entry as { children?: { Description?: { text?: string } } }).children?.Description?.text || "").trim()
+    );
+    if (isRenderableCardValue(fromChildren)) return fromChildren;
+    return "";
+  };
+  const appendNestedOutcomeLines = (prefix: "HIT" | "MISS" | "EFFECT", outcome: MonsterPowerOutcome | undefined): void => {
+    if (!outcome) return;
+    const aftereffectLines =
+      outcome.aftereffects
+        ?.map((entry) => outcomeEntryDescription(entry))
+        .filter((text) => isRenderableCardValue(text)) ?? [];
+    for (const aftereffect of aftereffectLines) {
+      lines.push({ label: "AFTEREFFECT", text: aftereffect });
+    }
+    const sustainLines =
+      outcome.sustains
+        ?.map((entry) => outcomeEntryDescription(entry))
+        .filter((text) => isRenderableCardValue(text)) ?? [];
+    for (const sustain of sustainLines) {
+      lines.push({ label: "SUSTAIN", text: sustain });
+    }
+    const failedSaveLines =
+      outcome.failedSavingThrows
+        ?.map((entry) => outcomeEntryDescription(entry))
+        .filter((text) => isRenderableCardValue(text)) ?? [];
+    for (const failedSave of failedSaveLines) {
+      lines.push({ label: "FAILED SAVE", text: failedSave });
+    }
+    const nestedAttackLines =
+      outcome.nestedAttackDescriptions
+        ?.map((entry) => normalizeSemicolonWhitespace(String(entry || "").trim()))
+        .filter((text) => isRenderableCardValue(text)) ?? [];
+    for (const nestedAttack of nestedAttackLines) {
+      lines.push({ label: "NESTED ATTACK", text: nestedAttack });
+    }
+  };
+
+  if (isRenderableCardValue(power.trigger)) {
+    lines.push({ label: "TRIGGER", text: normalizeSemicolonWhitespace(String(power.trigger).trim()) });
+  }
+  if (isRenderableCardValue(power.requirements)) {
+    lines.push({ label: "REQUIREMENTS", text: normalizeSemicolonWhitespace(String(power.requirements).trim()) });
+  }
+  if (isRenderableCardValue(attack?.targets)) {
+    lines.push({ label: "TARGET", text: normalizeSemicolonWhitespace(String(attack?.targets).trim()) });
+  }
+  const hitExpr = renderDamageExpression(attack?.hit, power.damageExpressions);
+  const hitDescription = isRenderableCardValue(attack?.hit?.description)
+    ? normalizeSemicolonWhitespace(String(attack?.hit?.description).trim())
+    : "";
+  if (hitExpr) {
+    const combinedHit = isRenderableCardValue(hitDescription) ? `${hitExpr} ${hitDescription}`.trim() : hitExpr;
+    lines.push({ label: "HIT", text: combinedHit });
+  } else if (isRenderableCardValue(hitDescription)) {
+    lines.push({ label: "HIT", text: hitDescription });
+  }
+  if (isRenderableCardValue(attack?.miss?.description)) {
+    lines.push({ label: "MISS", text: normalizeSemicolonWhitespace(String(attack?.miss?.description).trim()) });
+  }
+  if (isRenderableCardValue(attack?.effect?.description)) {
+    lines.push({ label: "EFFECT", text: String(attack?.effect?.description).trim() });
+  }
+  appendNestedOutcomeLines("HIT", attack?.hit);
+  appendNestedOutcomeLines("MISS", attack?.miss);
+  appendNestedOutcomeLines("EFFECT", attack?.effect);
+  return lines;
+}
+
+function extractOngoingText(description: string | undefined): string {
+  if (!isRenderableCardValue(description)) return "";
+  const desc = String(description).trim();
+  const ongoingMatch = desc.match(/\bongoing\b[:\s-]*(.*)$/i);
+  if (!isRenderableCardValue(ongoingMatch?.[1])) return "";
+  return String(ongoingMatch?.[1]).trim();
+}
+
+type MonsterPowerCardViewModel = {
+  usagePrimaryParts: string[];
+  usageDetailsLines: string[];
+  attackLineParts: string[];
+  keywordTokens: string[];
+  outcomeLines: Array<{ label: string; text: string }>;
+  descriptionText: string;
+  ongoingText: string;
+};
+
+function dedupeLabeledLines(lines: Array<{ label: string; text: string }>): Array<{ label: string; text: string }> {
+  const seen = new Set<string>();
+  const deduped: Array<{ label: string; text: string }> = [];
+  for (const line of lines) {
+    const normalizedLabel = normalizeSemicolonWhitespace(String(line.label || "").trim()).toLowerCase();
+    const normalizedText = normalizeSemicolonWhitespace(String(line.text || "").trim()).toLowerCase();
+    if (!normalizedLabel || !normalizedText) continue;
+    const key = `${normalizedLabel}::${normalizedText}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push({ label: String(line.label).trim(), text: String(line.text).trim() });
+  }
+  return deduped;
+}
+
+function buildMonsterPowerCardViewModel(power: MonsterPower): MonsterPowerCardViewModel {
+  const primaryAttack = power.attacks?.[0];
+  const attackBonusLine = renderPrimaryAttackBonus(primaryAttack);
+  const compactOutcomeLines = dedupeLabeledLines(renderCompactOutcomeLines(power, primaryAttack));
+  const normalizedDescription = normalizeSemicolonWhitespace(String(power.description || "").trim());
+  const normalizedEffectDescription = normalizeSemicolonWhitespace(String(primaryAttack?.effect?.description || "").trim());
+
+  const shouldInlineDescriptionWithHit =
+    isRenderableCardValue(normalizedDescription) &&
+    /^(?:[a-z]+\s+)?damage\b/i.test(normalizedDescription) &&
+    compactOutcomeLines.some((line) => line.label === "HIT");
+
+  const outcomeLines = dedupeLabeledLines(
+    compactOutcomeLines.map((line) =>
+      line.label === "HIT" && shouldInlineDescriptionWithHit ? { ...line, text: `${line.text} ${normalizedDescription}`.trim() } : line
+    )
+  );
+
+  const descriptionDuplicatesEffect =
+    isRenderableCardValue(normalizedDescription) &&
+    isRenderableCardValue(normalizedEffectDescription) &&
+    normalizedDescription.toLowerCase() === normalizedEffectDescription.toLowerCase();
+  const descriptionDuplicatesOutcomeLine =
+    isRenderableCardValue(normalizedDescription) &&
+    outcomeLines.some(
+      (line) =>
+        isRenderableCardValue(line.text) &&
+        normalizeSemicolonWhitespace(String(line.text).trim()).toLowerCase() === normalizedDescription.toLowerCase()
+    );
+  const descriptionText =
+    isRenderableCardValue(normalizedDescription) &&
+    !shouldInlineDescriptionWithHit &&
+    !descriptionDuplicatesEffect &&
+    !descriptionDuplicatesOutcomeLine
+      ? String(power.description)
+      : "";
+
+  const usagePrimaryParts = [
+    normalizeSemicolonWhitespace(String(power.action || "").trim().toLowerCase()),
+    normalizeSemicolonWhitespace(String(power.usage || "").trim().toLowerCase())
+  ].filter((part) => isRenderableCardValue(part));
+
+  const usageDetails = normalizeSemicolonWhitespace(String(power.usageDetails || "").trim());
+  const usageDetailsLines = isRenderableCardValue(usageDetails) ? [usageDetails] : [];
+
+  const powerRange = String(power.range || "").trim();
+  const attackRange = String(primaryAttack?.range || "").trim();
+  const attackLineParts = [powerRange, powerRange.toLowerCase() === attackRange.toLowerCase() ? "" : attackRange, attackBonusLine]
+    .map((part) => String(part || "").trim())
+    .filter((part) => isRenderableCardValue(part));
+
+  const keywordTokens = [
+    ...splitPowerKeywords(power.keywords || ""),
+    ...(power.keywordNames?.filter(Boolean) ?? [])
+  ];
+  const uniqueKeywordTokens = [...new Set(keywordTokens.filter((keyword) => isRenderableCardValue(keyword)))];
+
+  return {
+    usagePrimaryParts,
+    usageDetailsLines,
+    attackLineParts,
+    keywordTokens: uniqueKeywordTokens,
+    outcomeLines,
+    descriptionText,
+    ongoingText: extractOngoingText(power.description)
+  };
 }
 
 function renderOutcomeEntry(
@@ -415,6 +714,20 @@ export function MonsterEditorApp({
     }
     return Array.from(unique).sort((a, b) => a.localeCompare(b));
   }, [indexRows]);
+
+  const groupedPowers = useMemo(() => {
+    const buckets: Record<MonsterPowerUsageBucket, MonsterPower[]> = {
+      atWill: [],
+      encounter: [],
+      daily: [],
+      other: []
+    };
+    if (!activeMonster) return buckets;
+    for (const power of activeMonster.powers) {
+      buckets[classifyMonsterPowerUsageBucket(power.usage)].push(power);
+    }
+    return buckets;
+  }, [activeMonster]);
 
   function monsterGlossaryContent(key: MonsterGlossaryHoverKey): JSX.Element {
     let terms: string[] = [];
@@ -808,18 +1121,42 @@ export function MonsterEditorApp({
               <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(280px, 1fr))", gap: "0.75rem", marginBottom: "0.75rem" }}>
                 {Object.entries(activeMonster.stats)
                   .filter(([label]) => label !== "attackBonuses")
+                  .sort(([labelA], [labelB]) => {
+                    const orderA = statsDisplayOrder(labelA);
+                    const orderB = statsDisplayOrder(labelB);
+                    if (orderA !== orderB) return orderA - orderB;
+                    return 0;
+                  })
                   .map(([label, block]) => (
-                  <div key={label} style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.5rem", backgroundColor: "var(--surface-0)" }}>
-                    <h3 style={titleStyle}>{label}</h3>
-                    <div style={{ marginTop: "0.45rem", fontSize: "0.82rem", color: "var(--text-secondary)" }}>
+                  <div key={label} style={statPanelStyle}>
+                    <h3 style={titleStyle}>{formatStatLabel(label)}</h3>
+                    <div style={{ marginTop: "0.45rem", fontSize: "0.82rem", color: "var(--text-secondary)", display: "grid", gap: "0.2rem" }}>
                       {Object.keys(block).length === 0
                         ? "No values"
-                        : Object.entries(block).map(([k, v]) => (
-                            <div key={k} style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid var(--panel-border)", padding: "0.15rem 0" }}>
+                        : Object.entries(block).map(([k, v], idx) => (
+                            <div
+                              key={k}
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns: "1fr auto",
+                                alignItems: "center",
+                                columnGap: "0.5rem",
+                                fontVariantNumeric: "tabular-nums",
+                                padding: "0.22rem 0.35rem",
+                                borderRadius: "0.25rem",
+                                backgroundColor: idx % 2 === 0 ? "var(--surface-1)" : "var(--surface-0)"
+                              }}
+                            >
                               <span
                                 onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${k}`)}
                                 onMouseLeave={stopGlossaryHover}
-                                style={{ cursor: "help", borderBottom: "1px dotted var(--text-muted)" }}
+                                style={{
+                                  cursor: "help",
+                                  borderBottom: "1px dotted var(--text-muted)",
+                                  color: "var(--text-primary)",
+                                  fontWeight: 600,
+                                  width: "fit-content"
+                                }}
                               >
                                 {formatStatLabel(k)}
                               </span>
@@ -833,90 +1170,191 @@ export function MonsterEditorApp({
 
               <div style={{ border: "1px solid var(--panel-border-strong)", borderRadius: "0.35rem", backgroundColor: "var(--surface-0)", padding: "0.5rem", marginBottom: "0.75rem" }}>
                 <h3 style={titleStyle}>Powers ({activeMonster.powers.length})</h3>
-                <div style={{ marginTop: "0.5rem", display: "grid", gap: "0.5rem" }}>
-                  {activeMonster.powers.length === 0 ? (
-                    <div style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>No powers parsed.</div>
-                  ) : (
-                    activeMonster.powers.map((power, index) => {
-                      const keywordTokens = [
-                        ...splitPowerKeywords(power.keywords || ""),
-                        ...(power.keywordNames?.filter(Boolean) ?? [])
-                      ];
-                      const uniqueKeywordTokens = [...new Set(keywordTokens)];
+                <div style={{ marginTop: "0.5rem", display: "grid", gap: "0.6rem" }}>
+                  {activeMonster.powers.length === 0 ? <div style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>No powers parsed.</div> : null}
+                  {(["atWill", "encounter", "daily", "other"] as const).map((bucket) => {
+                    const bucketPowers = groupedPowers[bucket];
+                    if (bucketPowers.length === 0) return null;
+                    return (
+                      <div key={bucket} style={{ display: "grid", gap: "0.4rem" }}>
+                        <div
+                          style={{
+                            fontWeight: 700,
+                            borderLeft: `5px solid ${usageAccentColor(bucket)}`,
+                            paddingLeft: "0.45rem",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.05em",
+                            color: "var(--text-primary)"
+                          }}
+                        >
+                          {usageBucketLabel(bucket)}
+                        </div>
+                        <div style={{ display: "grid", gap: "0.45rem", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", alignItems: "stretch" }}>
+                          {bucketPowers.map((power, index) => {
+                            const accent = usageAccentCardStyle(bucket);
+                            const cardModel = buildMonsterPowerCardViewModel(power);
                       return (
-                        <div key={`${power.name}-${index}`} style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.45rem", backgroundColor: "var(--surface-0)" }}>
-                          <div style={{ fontWeight: 600 }}>{power.name || `Power ${index + 1}`}</div>
-                          <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", margin: "0.1rem 0 0.3rem", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                            {formatValue(power.action)} • {formatValue(power.usage)}
-                            {power.type ? ` • ${power.type}` : ""}
-                            {power.range ? ` • ${power.range}` : ""}
+                            <div
+                              key={`${bucket}-${power.name}-${index}`}
+                              style={{
+                                border: accent.border,
+                                borderLeft: accent.borderLeft,
+                                borderRadius: "8px",
+                                padding: "0.55rem 0.65rem",
+                                backgroundColor: accent.backgroundColor,
+                                boxShadow: `inset 0 0 0 1px ${usageAccentColor(bucket)}33`,
+                                height: "100%",
+                                boxSizing: "border-box",
+                                display: "flex",
+                                flexDirection: "column"
+                              }}
+                            >
+                          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: "0.35rem" }}>
+                            <div style={{ fontWeight: 600 }}>{power.name || `Power ${index + 1}`}</div>
+                            {power.isBasic ? (
+                              <span
+                                style={{
+                                  fontSize: "0.72rem",
+                                  fontWeight: 700,
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.04em",
+                                  color: "var(--text-secondary)",
+                                  border: "1px solid var(--panel-border)",
+                                  borderRadius: "999px",
+                                  padding: "0.05rem 0.35rem",
+                                  backgroundColor: "var(--surface-1)"
+                                }}
+                              >
+                                Basic Attack
+                              </span>
+                            ) : null}
                           </div>
-                          {uniqueKeywordTokens.length > 0 ? (
+                          {cardModel.usagePrimaryParts.length > 0 ? (
+                            <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginTop: "0.12rem" }}>
+                              {cardModel.usagePrimaryParts.map((part, partIdx) => (
+                                <span key={`${power.name}-${index}-usage-${part}`}>
+                                  <span
+                                    onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${part}`)}
+                                    onMouseLeave={stopGlossaryHover}
+                                    style={{
+                                      fontWeight: 700,
+                                      color: "var(--text-primary)",
+                                      cursor: "help",
+                                      borderBottom: "1px dotted var(--text-muted)",
+                                      textTransform: "uppercase",
+                                      letterSpacing: "0.03em"
+                                    }}
+                                  >
+                                    {part}
+                                  </span>
+                                  {partIdx < cardModel.usagePrimaryParts.length - 1 ? (
+                                    <span style={{ color: "var(--text-muted)", margin: "0 0.1rem" }}>•</span>
+                                  ) : null}
+                                </span>
+                              ))}
+                              {cardModel.usageDetailsLines.length > 0 ? (
+                                <div style={{ marginTop: "0.1rem", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                                  {cardModel.usageDetailsLines.map((line, lineIdx) => (
+                                    <div key={`${power.name}-${index}-usage-details-${lineIdx}`}>{line}</div>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </div>
+                          ) : null}
+                          {cardModel.attackLineParts.length > 0 ? (
+                            <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginTop: "0.05rem", display: "flex", flexWrap: "wrap", gap: "0.22rem", alignItems: "center" }}>
+                              {cardModel.attackLineParts.map((part, partIdx) => (
+                                <span key={`${power.name}-${index}-attackline-${partIdx}`}>
+                                  <span
+                                    onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${part}`)}
+                                    onMouseLeave={stopGlossaryHover}
+                                    style={{
+                                      cursor: "help",
+                                      borderBottom: "1px dotted var(--text-muted)",
+                                      color: "var(--text-primary)"
+                                    }}
+                                  >
+                                    {part}
+                                  </span>
+                                  {partIdx < cardModel.attackLineParts.length - 1 ? <span style={{ color: "var(--text-muted)", margin: "0 0.1rem" }}>•</span> : null}
+                                </span>
+                              ))}
+                            </div>
+                          ) : null}
+                          {cardModel.keywordTokens.length > 0 ? (
                             <div style={{ fontSize: "0.77rem", color: "var(--text-muted)", marginBottom: "0.25rem" }}>
                               <strong>Keywords:</strong>{" "}
-                              {uniqueKeywordTokens.map((keyword, idx) => (
+                              {cardModel.keywordTokens.map((keyword, idx) => (
                                 <span key={`${power.name}-${index}-kw-${keyword}`}>
                                   <span
                                     onMouseEnter={(event) => startGlossaryHover(event, `powerKeyword:${keyword}`)}
                                     onMouseLeave={stopGlossaryHover}
                                     style={{
-                                      display: "inline-block",
-                                      padding: "0.04rem 0.3rem",
-                                      borderRadius: "0.2rem",
-                                      border: "1px solid var(--panel-border)",
-                                      backgroundColor: "var(--surface-2)",
                                       color: "var(--text-primary)",
-                                      cursor: "help"
+                                      cursor: "help",
+                                      borderBottom: "1px dotted var(--text-muted)"
                                     }}
                                   >
                                     {keyword}
                                   </span>
-                                  {idx < uniqueKeywordTokens.length - 1 ? <span> </span> : null}
+                                  {idx < cardModel.keywordTokens.length - 1 ? <span> </span> : null}
                                 </span>
                               ))}
                             </div>
                           ) : null}
-                          {power.damageExpressions?.length ? (
-                            <div style={{ fontSize: "0.77rem", color: "var(--text-muted)", marginBottom: "0.25rem" }}>
-                              <strong>Damage Expressions:</strong> {power.damageExpressions.join(", ")}
-                            </div>
-                          ) : null}
-                          {power.trigger ? (
-                            <div style={{ fontSize: "0.77rem", color: "var(--text-muted)", marginBottom: "0.2rem" }}>
-                              <strong>Trigger:</strong> {power.trigger}
-                            </div>
-                          ) : null}
-                          {power.requirements ? (
-                            <div style={{ fontSize: "0.77rem", color: "var(--text-muted)", marginBottom: "0.2rem" }}>
-                              <strong>Requirements:</strong> {power.requirements}
-                            </div>
-                          ) : null}
-                          {power.usageDetails ? (
-                            <div style={{ fontSize: "0.77rem", color: "var(--text-muted)", marginBottom: "0.2rem" }}>
-                              <strong>Usage Details:</strong> {power.usageDetails}
-                            </div>
-                          ) : null}
-                          {power.flavorText?.trim() ? (
+                          <div style={{ marginTop: "0.22rem", display: "grid", gap: "0.14rem" }}>
+                            {cardModel.outcomeLines.map((line) => (
+                              <div key={`${power.name}-${index}-${line.label}-${line.text}`} style={{ fontSize: "0.8rem", color: "var(--text-primary)" }}>
+                                {(() => {
+                                  const split = splitFailedEscapeAttemptSections(line.text);
+                                  return (
+                                    <>
+                                      {isRenderableCardValue(split.mainText) ? (
+                                        <div>
+                                          <strong>{line.label}:</strong> {split.mainText}
+                                        </div>
+                                      ) : (
+                                        <div>
+                                          <strong>{line.label}:</strong> {line.text}
+                                        </div>
+                                      )}
+                                      {split.failedEscapeTexts.map((failedText) => (
+                                        <div key={`${power.name}-${index}-${line.label}-failed-${failedText}`} style={{ marginTop: "0.04rem" }}>
+                                          <strong>Failed Escape Attempt:</strong> {failedText}
+                                        </div>
+                                      ))}
+                                    </>
+                                  );
+                                })()}
+                              </div>
+                            ))}
+                          </div>
+                          {isRenderableCardValue(power.flavorText) ? (
                             <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", marginBottom: "0.2rem", fontStyle: "italic" }}>
                               {power.flavorText}
                             </div>
                           ) : null}
                           <div style={{ fontSize: "0.82rem", color: "var(--text-primary)" }}>
-                            {power.description?.trim() ? (
+                            {isRenderableCardValue(cardModel.descriptionText) ? (
                               <RulesRichText
-                                text={power.description}
+                                text={cardModel.descriptionText}
                                 paragraphStyle={{ fontSize: "0.82rem", color: "var(--text-primary)", margin: "0 0 0.35rem 0" }}
                                 listItemStyle={{ fontSize: "0.82rem", color: "var(--text-primary)" }}
                               />
-                            ) : (
-                              "No description."
-                            )}
+                            ) : null}
                           </div>
-                          {renderPowerAttacks(power, startGlossaryHover, stopGlossaryHover)}
-                        </div>
+                          {isRenderableCardValue(cardModel.ongoingText) ? (
+                            <div style={{ marginTop: "0.05rem", fontSize: "0.8rem", color: "var(--text-primary)" }}>
+                              <strong>ONGOING:</strong> {cardModel.ongoingText}
+                            </div>
+                          ) : null}
+                            </div>
                       );
-                    })
-                  )}
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 

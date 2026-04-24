@@ -261,13 +261,10 @@ function renderPowerCard(
                   onMouseEnter={hasHoverHandlers ? (event) => options?.onKeywordMouseEnter?.(event, keyword) : undefined}
                   onMouseLeave={hasHoverHandlers ? options?.onKeywordMouseLeave : undefined}
                   style={{
-                    display: "inline-block",
-                    padding: "0.04rem 0.3rem",
-                    borderRadius: "0.2rem",
-                    border: "1px solid var(--panel-border)",
-                    backgroundColor: "var(--surface-2)",
                     color: "var(--text-primary)",
-                    cursor: hasHoverHandlers || Boolean(tooltip) ? "help" : "default"
+                    cursor: hasHoverHandlers || Boolean(tooltip) ? "help" : "default",
+                    textDecoration: hasHoverHandlers || Boolean(tooltip) ? "underline dotted" : "none",
+                    textUnderlineOffset: "2px"
                   }}
                 >
                   {keyword}

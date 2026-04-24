@@ -5028,5 +5028,115 @@
     "definition": "A daily power can normally be used once per day. After use, it is expended until the character takes an extended rest, unless a feature specifically allows it to be regained.",
     "publishedIn": "Player's Handbook, Rules Compendium.",
     "html": null
+  },
+  {
+    "id": "glossary_custom_standard_alias",
+    "name": "standard",
+    "category": "Rules",
+    "type": "Rules Combat",
+    "sourceBook": "PHB, RC",
+    "definition": "Standard Action: The main action on your turn, usually used to attack or use a major power. You normally take one standard action on your turn. You can trade down a standard action for a move action or a minor action.",
+    "publishedIn": "Player's Handbook, Rules Compendium.",
+    "html": null
+  },
+  {
+    "id": "glossary_custom_move_alias",
+    "name": "move",
+    "category": "Rules",
+    "type": "Rules Combat",
+    "sourceBook": "PHB, RC",
+    "definition": "Move Action: An action used for movement and movement-related tasks, such as moving your speed, shifting, or standing up. You normally take one move action on your turn. You can trade down a move action for a minor action.",
+    "publishedIn": "Player's Handbook, Rules Compendium.",
+    "html": null
+  },
+  {
+    "id": "glossary_custom_minor_alias",
+    "name": "minor",
+    "category": "Rules",
+    "type": "Rules Combat",
+    "sourceBook": "PHB, RC",
+    "definition": "Minor Action: A type of action that takes less time than a standard action. On your turn, you can normally take one minor action in addition to your move and standard actions. Minor actions include tasks such as drawing a weapon, opening a door, or sustaining certain powers. You can trade down actions (for example, a move action can be used as a minor action).",
+    "publishedIn": "Player's Handbook, Rules Compendium.",
+    "html": null
+  },
+  {
+    "id": "glossary_custom_immediate_alias",
+    "name": "immediate",
+    "category": "Rules",
+    "type": "Rules Combat",
+    "sourceBook": "PHB, RC",
+    "definition": "Immediate Action: A triggered action taken in response to an event, usually on another creature's turn. Immediate actions are either interrupts or reactions. You can take no more than one immediate action per round, and you cannot take an immediate action on your own turn.",
+    "publishedIn": "Player's Handbook, Rules Compendium.",
+    "html": null
+  },
+  {
+    "id": "glossary_custom_reach_alias",
+    "name": "reach",
+    "category": "Rules",
+    "type": "Rules Combat",
+    "sourceBook": "PHB, RC",
+    "definition": "Melee shorthand for Melee Attack reach and adjacency. Reach determines how far a melee attack can target from the attacker.",
+    "publishedIn": "Player's Handbook, Rules Compendium.",
+    "html": null
+  },
+  {
+    "id": "glossary_custom_personal_attack",
+    "name": "Personal",
+    "category": "Rules",
+    "type": "Rules Combat",
+    "sourceBook": "PHB, RC",
+    "definition": "Personal indicates a power that affects only the user (the creature using the power), rather than targeting other creatures.",
+    "publishedIn": "Player's Handbook, Rules Compendium.",
+    "html": null
+  },
+  {
+    "id": "glossary_custom_melee_alias",
+    "name": "melee",
+    "category": "Rules",
+    "type": "Rules Combat",
+    "sourceBook": "PHB, RC",
+    "definition": "Melee shorthand for Melee Attack.",
+    "publishedIn": "Player's Handbook, Rules Compendium.",
+    "html": null
+  },
+  {
+    "id": "glossary_custom_ranged_alias",
+    "name": "ranged",
+    "category": "Rules",
+    "type": "Rules Combat",
+    "sourceBook": "PHB, RC",
+    "definition": "Ranged shorthand for Ranged Attack.",
+    "publishedIn": "Player's Handbook, Rules Compendium.",
+    "html": null
+  },
+  {
+    "id": "glossary_custom_close_alias",
+    "name": "close",
+    "category": "Rules",
+    "type": "Rules Combat",
+    "sourceBook": "PHB, RC",
+    "definition": "Close shorthand for Close Attack.",
+    "publishedIn": "Player's Handbook, Rules Compendium.",
+    "html": null
+  },
+  {
+    "id": "glossary_custom_area_alias",
+    "name": "area",
+    "category": "Rules",
+    "type": "Rules Combat",
+    "sourceBook": "PHB, RC",
+    "definition": "Area shorthand for Area Attack.",
+    "publishedIn": "Player's Handbook, Rules Compendium.",
+    "html": null
+  },
+  {
+    "id": "glossary_custom_personal_alias",
+    "name": "personal",
+    "category": "Rules",
+    "type": "Rules Combat",
+    "sourceBook": "PHB, RC",
+    "definition": "Personal shorthand for Personal.",
+    "publishedIn": "Player's Handbook, Rules Compendium.",
+    "html": null
   }
 ]
