@@ -53,11 +53,37 @@ Web-first, guided D&D 4e character builder using data extracted from the legacy 
 ## Scripts
 
 - `npm run dev` - start local dev server
-- `npm run build` - build production assets
+- `npm run build` - build production assets and include `generated/` JSON data in `dist/generated/`
 - `npm run preview` - preview production build locally
 - `npm test` - run Vitest test suite once
 - `npm run etl:rules -- <input-json-or-xml> generated` - build `generated/rules_index.json`
 - `npm run etl:monsters -- <input-folder-or-xml-file> generated` - parse monster XML and emit structured JSON artifacts
+
+## Hosting (Share With Others)
+
+This app is a static Vite site. A deployable build is created in `dist/`.
+
+1. Ensure data artifacts exist:
+   - `npm run etl:rules -- combined.dnd40.merged.xml generated`
+   - optional monster data: `npm run etl:monsters -- <selected-monster-folder-or-xml-file> generated`
+2. Build:
+   - `npm run build`
+3. Publish the `dist/` folder with any static host.
+
+### Fastest Option: Netlify Drop (No Git Setup)
+
+1. Open [https://app.netlify.com/drop](https://app.netlify.com/drop)
+2. Drag the local `dist/` folder onto the page
+3. Netlify gives you a public URL immediately
+
+### Git-Based Option: Vercel
+
+1. Push this repo to GitHub
+2. Import the repo in Vercel
+3. Build command: `npm run build`
+4. Output directory: `dist`
+
+After deploy, share the generated URL with others.
 
 ## Key Folders
 

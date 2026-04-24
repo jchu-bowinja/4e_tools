@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node tools/copy-generated-to-dist.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "etl:rules": "python tools/etl/build_rules_index.py",
