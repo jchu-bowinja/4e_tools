@@ -131,6 +131,8 @@ function renderPowerCard(
   options?: {
     key?: string;
     keywordTooltip?: (keyword: string) => string | null;
+    onKeywordMouseEnter?: (event: React.MouseEvent<HTMLElement>, keyword: string) => void;
+    onKeywordMouseLeave?: () => void;
   }
 ): JSX.Element {
   const raw = (power.raw || {}) as Record<string, unknown>;
@@ -179,17 +181,21 @@ function renderPowerCard(
           <strong>Keywords:</strong>{" "}
           {keywordTokens.map((keyword, idx) => {
             const tooltip = options?.keywordTooltip?.(keyword) ?? null;
+            const hasHoverHandlers = Boolean(options?.onKeywordMouseEnter && options?.onKeywordMouseLeave);
             return (
               <span key={`${power.id}-kw-${keyword}`}>
                 <span
-                  title={tooltip ?? undefined}
+                  title={hasHoverHandlers ? undefined : tooltip ?? undefined}
+                  onMouseEnter={hasHoverHandlers ? (event) => options?.onKeywordMouseEnter?.(event, keyword) : undefined}
+                  onMouseLeave={hasHoverHandlers ? options?.onKeywordMouseLeave : undefined}
                   style={{
                     display: "inline-block",
                     padding: "0.04rem 0.3rem",
                     borderRadius: "0.2rem",
                     border: "1px solid var(--panel-border)",
                     backgroundColor: "var(--surface-2)",
-                    color: "var(--text-primary)"
+                    color: "var(--text-primary)",
+                    cursor: hasHoverHandlers || Boolean(tooltip) ? "help" : "default"
                   }}
                 >
                   {keyword}
@@ -435,7 +441,16 @@ const abilities: Array<keyof CharacterBuild["abilityScores"]> = ["STR", "CON", "
 const PHYSICAL_ABILITIES: Ability[] = ["STR", "CON", "DEX"];
 const MENTAL_ABILITIES: Ability[] = ["INT", "WIS", "CHA"];
 type BuilderTab = "race" | "class" | "abilities" | "skills" | "feats" | "powers" | "paths" | "equipment" | "summary";
-type BuilderGlossaryKey = "race" | "class" | "level" | "hp" | "surges" | "surgeValue" | "skills" | "abilityScores";
+type BuilderGlossaryKey =
+  | "race"
+  | "class"
+  | "level"
+  | "hp"
+  | "surges"
+  | "surgeValue"
+  | "skills"
+  | "abilityScores"
+  | `powerKeyword:${string}`;
 
 function abilityModifier(score: number): number {
   return Math.floor((score - 10) / 2);
@@ -676,7 +691,17 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   }, []);
 
   function glossaryContent(key: BuilderGlossaryKey): JSX.Element {
-    const termCandidates: Record<BuilderGlossaryKey, string[]> = {
+    if (key.startsWith("powerKeyword:")) {
+      const keyword = key.slice("powerKeyword:".length).trim();
+      const resolved = resolveTooltipText({
+        terms: [keyword, "Keyword"],
+        glossaryByName: tooltipGlossary,
+        index
+      });
+      if (resolved) return <div style={{ whiteSpace: "pre-wrap" }}>{resolved}</div>;
+      return <div>No glossary entry found in `generated/glossary_terms.json` or `generated/rules_index.json`.</div>;
+    }
+    const termCandidates: Record<Exclude<BuilderGlossaryKey, `powerKeyword:${string}`>, string[]> = {
       race: [selectedRace?.name || "", "Race"],
       class: [selectedClass?.name || "", "Class"],
       level: ["Level"],
@@ -1169,7 +1194,12 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   function renderPowerCardWithSelections(p: Power, cardKey: string): JSX.Element {
     return (
       <div key={cardKey}>
-        {renderPowerCard(p, { key: `${cardKey}-card`, keywordTooltip: powerKeywordTooltip })}
+        {renderPowerCard(p, {
+          key: `${cardKey}-card`,
+          keywordTooltip: powerKeywordTooltip,
+          onKeywordMouseEnter: (event, keyword) => startGlossaryHover(event, `powerKeyword:${keyword}`),
+          onKeywordMouseLeave: stopGlossaryHover
+        })}
         <PowerConstructionSelects power={p} build={build} onChange={updateBuild} />
       </div>
     );
@@ -1625,7 +1655,9 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                                     return p ? (
                                       renderPowerCard(p, {
                                         key: `race-tab-${g.traitId}-${p.id}`,
-                                        keywordTooltip: powerKeywordTooltip
+                                        keywordTooltip: powerKeywordTooltip,
+                                        onKeywordMouseEnter: (event, keyword) => startGlossaryHover(event, `powerKeyword:${keyword}`),
+                                        onKeywordMouseLeave: stopGlossaryHover
                                       })
                                     ) : (
                                       <p style={{ margin: 0, fontSize: "0.82rem", color: "var(--status-warning)" }}>
@@ -1640,7 +1672,9 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                                 optionPowers.map((p) =>
                                   renderPowerCard(p, {
                                     key: `race-tab-${g.traitId}-${p.id}`,
-                                    keywordTooltip: powerKeywordTooltip
+                                    keywordTooltip: powerKeywordTooltip,
+                                    onKeywordMouseEnter: (event, keyword) => startGlossaryHover(event, `powerKeyword:${keyword}`),
+                                    onKeywordMouseLeave: stopGlossaryHover
                                   })
                                 )
                               )}

@@ -165,11 +165,11 @@ export default function App(): JSX.Element {
           <button type="button" onClick={() => goToScreen("characterSheet")} disabled={screen === "characterSheet"}>
             Character Sheet
           </button>
-          <button type="button" onClick={() => goToScreen("resourceEditor")} disabled={screen === "resourceEditor"}>
-            Resource Editor
-          </button>
           <button type="button" onClick={() => goToScreen("monsters")} disabled={screen === "monsters"}>
             Monsters
+          </button>
+          <button type="button" onClick={() => goToScreen("resourceEditor")} disabled={screen === "resourceEditor"}>
+            Resource Editor
           </button>
           <button
             type="button"
@@ -198,7 +198,7 @@ export default function App(): JSX.Element {
       ) : screen === "characterSheet" ? (
         <CharacterSheetApp index={effectiveIndex} tooltipGlossary={tooltipGlossary} />
       ) : screen === "monsters" ? (
-        <MonsterEditorApp />
+        <MonsterEditorApp index={effectiveIndex} tooltipGlossary={tooltipGlossary} />
       ) : (
         <CharacterBuilderApp index={effectiveIndex} tooltipGlossary={tooltipGlossary} />
       )}
