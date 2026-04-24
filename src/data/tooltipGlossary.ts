@@ -1,13 +1,41 @@
 import type { RulesIndex } from "../rules/models";
 
-interface GlossaryTermRow {
+/** One glossary entry as stored in `generated/glossary_terms.json`. */
+export interface GlossaryTermRow {
+  id?: string;
   name?: string;
+  aliases?: string[] | null;
   definition?: string | null;
   html?: string | null;
+  category?: string | null;
+  type?: string | null;
+  sourceBook?: string | null;
+  publishedIn?: string | null;
+  [key: string]: unknown;
 }
 
 function normalizeTerm(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+export function isNumberedRangeAlias(value: string): boolean {
+  const normalized = normalizeTerm(value);
+  return /^(?:melee|ranged|reach)\s+\d+$/.test(normalized) || /^((?:close|area)\s+(?:blast|burst))\s+\d+(?:\s+within\s+\d+)?$/.test(normalized);
+}
+
+function sanitizeAliasList(aliases: string[] | null | undefined): string[] {
+  if (!Array.isArray(aliases)) return [];
+  return aliases
+    .filter((alias): alias is string => typeof alias === "string")
+    .map((alias) => alias.trim())
+    .filter((alias) => alias.length > 0 && !isNumberedRangeAlias(alias));
+}
+
+export function sanitizeGlossaryRows(rows: GlossaryTermRow[]): GlossaryTermRow[] {
+  return rows.map((row) => ({
+    ...row,
+    aliases: sanitizeAliasList(row.aliases)
+  }));
 }
 
 function htmlToPlainText(html: string): string {
@@ -25,20 +53,37 @@ function pickGlossaryText(row: GlossaryTermRow): string | null {
   return null;
 }
 
+/** Plain-text tooltip body for a row (definition preferred, else HTML converted to text). */
+export function displayTextForGlossaryRow(row: GlossaryTermRow): string {
+  return pickGlossaryText(row) ?? "";
+}
+
+/**
+ * Maps normalized lookup keys (name + aliases) to the tooltip plain text.
+ * The first row to claim a key wins (matches `loadTooltipGlossary` behavior).
+ */
+export function glossaryRowsToTooltipMap(rows: GlossaryTermRow[]): Record<string, string> {
+  const byName: Record<string, string> = {};
+  for (const row of sanitizeGlossaryRows(rows)) {
+    if (typeof row.name !== "string" || !row.name.trim()) continue;
+    const text = pickGlossaryText(row);
+    if (!text) continue;
+    const keys = [row.name, ...(Array.isArray(row.aliases) ? row.aliases : [])]
+      .filter((value): value is string => typeof value === "string" && value.trim())
+      .filter((value) => !isNumberedRangeAlias(value))
+      .map((value) => normalizeTerm(value));
+    for (const key of keys) {
+      if (!byName[key]) byName[key] = text;
+    }
+  }
+  return byName;
+}
+
 export async function loadTooltipGlossary(): Promise<Record<string, string>> {
   const response = await fetch("/generated/glossary_terms.json");
   if (!response.ok) return {};
   const rows = (await response.json()) as GlossaryTermRow[];
-  const byName: Record<string, string> = {};
-  for (const row of rows) {
-    if (typeof row.name !== "string" || !row.name.trim()) continue;
-    const text = pickGlossaryText(row);
-    if (!text) continue;
-    const key = normalizeTerm(row.name);
-    // Keep the first row so canonical entries in the source win.
-    if (!byName[key]) byName[key] = text;
-  }
-  return byName;
+  return glossaryRowsToTooltipMap(rows);
 }
 
 function firstText(...values: Array<unknown>): string | null {
@@ -115,6 +160,16 @@ function candidateTerms(input: string): string[] {
     .filter((part) => part.length > 0);
   if (compoundParts.length > 1) {
     candidates.push(...compoundParts);
+  }
+  // Normalize numbered range patterns to their glossary base terms.
+  // Examples: "Melee 1" -> "Melee", "Close burst 2" -> "Close burst".
+  const simpleRangeMatch = trimmed.match(/^(melee|ranged|reach)\s+\d+$/i);
+  if (simpleRangeMatch?.[1]) {
+    candidates.push(simpleRangeMatch[1]);
+  }
+  const closeAreaRangeMatch = trimmed.match(/^((?:close|area)\s+(?:blast|burst))\s+\d+(?:\s+within\s+\d+)?$/i);
+  if (closeAreaRangeMatch?.[1]) {
+    candidates.push(closeAreaRangeMatch[1]);
   }
   return [...new Set(candidates)];
 }

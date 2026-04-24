@@ -157,7 +157,10 @@
     "sourceBook": "PHB, RC",
     "definition": "A standard action requires more effort than any other type and is usually the main action of a creature's turn. Examples: Most attack powers, using one's second wind, administering first aid to an ally.",
     "publishedIn": "Player's Handbook, page(s) 267, Rules Compendium, page(s) 194.",
-    "html": "<h1 class=player>Standard Action</h1><p class=flavor>A standard action requires more effort than any other type and is usually the main action of a creature's turn. Examples: Most attack powers, using one's second wind, administering first aid to an ally.<br><br></p><table><tr><th>Action</th><th>Description</th><tr><td>Administer a potion<td>Help an unconscious creature consume a potion<tr><td>Aid another<td>Improve an ally's skill check or ability check<tr><td>Aid attack<td>Improve an ally's attack roll<tr><td>Aid defense<td>Improve an ally's defenses<tr><td>Basic attack<td>Make a basic attack<tr><td>Bull rush<td>Push a target 1 square and shift into the vacated space<tr><td>Charge<td>Move and then make a melee basic attack or a bull rush<tr><td>Coup de grace<td>Make a critical hit against a helpless enemy<tr><td>Equip or stow a shield<td>Use a shield or put it away<tr><td>Grab<td>Seize and hold an enemy<tr><td>Ready an action<td>Ready an action to perform when a specified trigger occurs<tr><td>Second wind<td>Spend a healing surge and gain a bonus to defenses (once per encounter)<tr><td>Total defense<td>Gain a +2 to all defenses until next turn</table><p class=publishedIn>Published in Player's Handbook, page(s) 267, Rules Compendium, page(s) 194.</p>"
+    "html": "<h1 class=player>Standard Action</h1><p class=flavor>A standard action requires more effort than any other type and is usually the main action of a creature's turn. Examples: Most attack powers, using one's second wind, administering first aid to an ally.<br><br></p><table><tr><th>Action</th><th>Description</th><tr><td>Administer a potion<td>Help an unconscious creature consume a potion<tr><td>Aid another<td>Improve an ally's skill check or ability check<tr><td>Aid attack<td>Improve an ally's attack roll<tr><td>Aid defense<td>Improve an ally's defenses<tr><td>Basic attack<td>Make a basic attack<tr><td>Bull rush<td>Push a target 1 square and shift into the vacated space<tr><td>Charge<td>Move and then make a melee basic attack or a bull rush<tr><td>Coup de grace<td>Make a critical hit against a helpless enemy<tr><td>Equip or stow a shield<td>Use a shield or put it away<tr><td>Grab<td>Seize and hold an enemy<tr><td>Ready an action<td>Ready an action to perform when a specified trigger occurs<tr><td>Second wind<td>Spend a healing surge and gain a bonus to defenses (once per encounter)<tr><td>Total defense<td>Gain a +2 to all defenses until next turn</table><p class=publishedIn>Published in Player's Handbook, page(s) 267, Rules Compendium, page(s) 194.</p>",
+    "aliases": [
+      "standard"
+    ]
   },
   {
     "id": "glossary116",
@@ -167,7 +170,10 @@
     "sourceBook": "PHB, RC",
     "definition": "Move actions involve movement from one place to another.",
     "publishedIn": "Player's Handbook, page(s) 267, Rules Compendium, page(s) 194.",
-    "html": "<h1 class=player>Move Action</h1><p class=flavor>Move actions involve movement from one place to another.<br><br></p><table><tr><th>Action</th><th>Description</th><tr><td>Crawl<td>While prone, move up to half speed<tr><td>Escape<td>Escape a grab and shift 1 square<tr><td>Run<td>Move up to speed + 2; grant combat advantage until next turn and take a -5 penalty to attack rolls<tr><td>Stand up<td>Stand up from prone<tr><td>Shift<td>Move 1 square without provoking opportunity attacks<tr><td>Squeeze<td>Reduce size by one category, move up to half speed, and grant combat advantage<tr><td>Walk<td>Move up to walking speed</table><p class=publishedIn>Published in Player's Handbook, page(s) 267, Rules Compendium, page(s) 194.</p>"
+    "html": "<h1 class=player>Move Action</h1><p class=flavor>Move actions involve movement from one place to another.<br><br></p><table><tr><th>Action</th><th>Description</th><tr><td>Crawl<td>While prone, move up to half speed<tr><td>Escape<td>Escape a grab and shift 1 square<tr><td>Run<td>Move up to speed + 2; grant combat advantage until next turn and take a -5 penalty to attack rolls<tr><td>Stand up<td>Stand up from prone<tr><td>Shift<td>Move 1 square without provoking opportunity attacks<tr><td>Squeeze<td>Reduce size by one category, move up to half speed, and grant combat advantage<tr><td>Walk<td>Move up to walking speed</table><p class=publishedIn>Published in Player's Handbook, page(s) 267, Rules Compendium, page(s) 194.</p>",
+    "aliases": [
+      "move"
+    ]
   },
   {
     "id": "glossary117",
@@ -177,7 +183,10 @@
     "sourceBook": "PHB, RC",
     "definition": "As the name implies, minor actions are simple and quick.",
     "publishedIn": "Player's Handbook, page(s) 267, Rules Compendium, page(s) 194.",
-    "html": "<h1 class=player>Minor Action</h1><p class=flavor>As the name implies, minor actions are simple and quick.<br><br></p><table><tr><th>Action</th><th>Description</th><tr><td>Draw or sheathe a weapon<td>Use or put away a weapon<tr><td>Drink a potion<td>Consume a potion<tr><td>Drop prone<td>Drop down to lie on the ground<tr><td>Load a crossbow<td>Load a bolt into a crossbow to fire it<tr><td>Open or close a door<td>Open or close a door or container that isn't locked or stuck<tr><td>Pick up an item<td>Pick up an object in one's space or in an unoccupied square within reach<tr><td>Retrieve or stow item<td>Retrieve or stow an item on self</table><p class=publishedIn>Published in Player's Handbook, page(s) 267, Rules Compendium, page(s) 194.</p>"
+    "html": "<h1 class=player>Minor Action</h1><p class=flavor>As the name implies, minor actions are simple and quick.<br><br></p><table><tr><th>Action</th><th>Description</th><tr><td>Draw or sheathe a weapon<td>Use or put away a weapon<tr><td>Drink a potion<td>Consume a potion<tr><td>Drop prone<td>Drop down to lie on the ground<tr><td>Load a crossbow<td>Load a bolt into a crossbow to fire it<tr><td>Open or close a door<td>Open or close a door or container that isn't locked or stuck<tr><td>Pick up an item<td>Pick up an object in one's space or in an unoccupied square within reach<tr><td>Retrieve or stow item<td>Retrieve or stow an item on self</table><p class=publishedIn>Published in Player's Handbook, page(s) 267, Rules Compendium, page(s) 194.</p>",
+    "aliases": [
+      "minor"
+    ]
   },
   {
     "id": "glossary118",
@@ -187,7 +196,10 @@
     "sourceBook": "PHB, RC",
     "definition": "Free actions take almost no time or effort. A creature can usually take as many free actions as it wants during any turn, including other creatures' turns. Examples: Speaking a few sentences, dropping a held item, letting go of a grabbed creature.\n    There is an exception to this rule: A creature can take a free action to use an attack power only once per turn. Creatures don't normally have attack powers that can be used as free actions, but some powers and other effects grant the ability to use an attack power (usually a basic attack) as a free action. For instance, a character might have two different abilities that let him or her make a melee basic attack as a free action when their respective triggers occur. If both abilities are triggered on the same turn, the character can make only one of the melee basic attacks during that turn. This limitation does not apply to free actions that a creature is forced to take by an enemy.\n    In certain circumstances, the DM might decide to limit the use of free actions further. For instance, if an adventurer has already used free actions during a particular turn to talk, drop things, and use a class feature, the DM might rule that the adventurer can use no more free actions during that turn.",
     "publishedIn": "Player's Handbook, page(s) 267, Rules Compendium, page(s) 194.",
-    "html": "<h1 class=player>Free Actions</h1><p class=flavor>Free actions take almost no time or effort. A creature can usually take as many free actions as it wants during any turn, including other creatures' turns. Examples: Speaking a few sentences, dropping a held item, letting go of a grabbed creature.<br>    There is an exception to this rule: A creature can take a free action to use an attack power only once per turn. Creatures don't normally have attack powers that can be used as free actions, but some powers and other effects grant the ability to use an attack power (usually a basic attack) as a free action. For instance, a character might have two different abilities that let him or her make a melee basic attack as a free action when their respective triggers occur. If both abilities are triggered on the same turn, the character can make only one of the melee basic attacks during that turn. This limitation does not apply to free actions that a creature is forced to take by an enemy.<br>    In certain circumstances, the DM might decide to limit the use of free actions further. For instance, if an adventurer has already used free actions during a particular turn to talk, drop things, and use a class feature, the DM might rule that the adventurer can use no more free actions during that turn.<br><br></p><table><tr><th>Action</th><th>Description</th><tr><td>Delay<td>Put off a turn until later in the initiative order<tr><td>Drop held items<td>Drop any items currently held<tr><td>End a grab<td>Let go of an enemy<tr><td>Spend an action point<td>Spend an action point to take an extra action (once per encounter, not in a surprise round)<tr><td>Talk<td>Speak a few sentences</table><p class=publishedIn>Published in Player's Handbook, page(s) 267, Rules Compendium, page(s) 194.</p>"
+    "html": "<h1 class=player>Free Actions</h1><p class=flavor>Free actions take almost no time or effort. A creature can usually take as many free actions as it wants during any turn, including other creatures' turns. Examples: Speaking a few sentences, dropping a held item, letting go of a grabbed creature.<br>    There is an exception to this rule: A creature can take a free action to use an attack power only once per turn. Creatures don't normally have attack powers that can be used as free actions, but some powers and other effects grant the ability to use an attack power (usually a basic attack) as a free action. For instance, a character might have two different abilities that let him or her make a melee basic attack as a free action when their respective triggers occur. If both abilities are triggered on the same turn, the character can make only one of the melee basic attacks during that turn. This limitation does not apply to free actions that a creature is forced to take by an enemy.<br>    In certain circumstances, the DM might decide to limit the use of free actions further. For instance, if an adventurer has already used free actions during a particular turn to talk, drop things, and use a class feature, the DM might rule that the adventurer can use no more free actions during that turn.<br><br></p><table><tr><th>Action</th><th>Description</th><tr><td>Delay<td>Put off a turn until later in the initiative order<tr><td>Drop held items<td>Drop any items currently held<tr><td>End a grab<td>Let go of an enemy<tr><td>Spend an action point<td>Spend an action point to take an extra action (once per encounter, not in a surprise round)<tr><td>Talk<td>Speak a few sentences</table><p class=publishedIn>Published in Player's Handbook, page(s) 267, Rules Compendium, page(s) 194.</p>",
+    "aliases": [
+      "free action"
+    ]
   },
   {
     "id": "glossary119",
@@ -217,47 +229,10 @@
     "sourceBook": "PHB, RC",
     "definition": "There are two kinds of immediate actions: interrupts and reactions. The following rules govern both kinds of immediate action.\n\nTrigger: Each immediate action—usually a power—defines its trigger. The one type of immediate action that every creature can take is a readied action (see “Ready an Action”.\n\nSomeone Else's Turn: A creature cannot take an immediate action on its own turn. The action interrupts some event on another creature's turn or responds to that event.\n\nOnce per Round: A creature can take only one immediate action per round, either an immediate interrupt or an immediate reaction. Therefore, if a creature takes an immediate action, it can't take another one until the start of its next turn.\n\nInterrupts: An immediate interrupt jumps in when its trigger occurs, taking place before the trigger finishes. If an interrupt invalidates a triggering action, the triggering action is lost.\n    Example: An enemy makes a melee attack against Keira the rogue, but Keira uses a power that lets her shift away as an immediate interrupt. If the enemy can no longer reach her, its attack action is lost. Similarly, Albanon the wizard might use shield in response to being hit and turn that hit into a miss, or Keira might use the immediate interrupt heroic escape to evade an enemy's attack before it can deal damage.\n\nReactions: An immediate reaction lets a creature act in response to a trigger. The triggering action or event occurs and is completely resolved before the reaction takes place.\n    An immediate reaction waits for its trigger to finish, not necessarily for the action that contains the trigger to finish.\n    Example: An elder dragon's claw attack power is a standard action that allows two attack rolls against the same target. The dragon faces Fargrim the fighter, who has an immediate reaction (veteran gambit) that is triggered by being hit with a melee attack. If the dragon uses claw and hits Fargrim with the first attack roll, he can use veteran gambit in response to that hit. In that case, the immediate reaction waits for that hit to be resolved, but does not wait for the entire power to be resolved.\n\nLikewise, an immediate reaction can interrupt movement. Here's how: If a creature triggers an immediate reaction while moving (by coming into range, for instance), the reaction can take place before the creature finishes moving, but after it has moved at least 1 square. In other words, an immediate reaction can be in response to a square of movement, rather than to an entire move action.\n\nIf an effect has a trigger but is neither an immediate action nor an opportunity action, assume that it behaves like an immediate reaction, waiting for its trigger to completely resolve. However, ignore this guideline when the effect has to interrupt its trigger to function. For instance, if a triggered power allows an adventurer to use a free action to reroll an attack roll, with the hope of turning a miss into a hit, the power must interrupt the trigger (“You miss with an attack”) to function; otherwise the attack would be resolved as a miss.",
     "publishedIn": "Player's Handbook, page(s) 268, Rules Compendium, page(s) 195.",
-    "html": "<h1 class=player>Immediate Action</h1><p class=flavor>There are two kinds of immediate actions: interrupts and reactions. The following rules govern both kinds of immediate action.<br><br>Trigger: Each immediate action—usually a power—defines its trigger. The one type of immediate action that every creature can take is a readied action (see “Ready an Action”.<br><br>Someone Else's Turn: A creature cannot take an immediate action on its own turn. The action interrupts some event on another creature's turn or responds to that event.<br><br>Once per Round: A creature can take only one immediate action per round, either an immediate interrupt or an immediate reaction. Therefore, if a creature takes an immediate action, it can't take another one until the start of its next turn.<br><br>Interrupts: An immediate interrupt jumps in when its trigger occurs, taking place before the trigger finishes. If an interrupt invalidates a triggering action, the triggering action is lost.<br>    Example: An enemy makes a melee attack against Keira the rogue, but Keira uses a power that lets her shift away as an immediate interrupt. If the enemy can no longer reach her, its attack action is lost. Similarly, Albanon the wizard might use shield in response to being hit and turn that hit into a miss, or Keira might use the immediate interrupt heroic escape to evade an enemy's attack before it can deal damage.<br><br>Reactions: An immediate reaction lets a creature act in response to a trigger. The triggering action or event occurs and is completely resolved before the reaction takes place.<br>    An immediate reaction waits for its trigger to finish, not necessarily for the action that contains the trigger to finish.<br>    Example: An elder dragon's claw attack power is a standard action that allows two attack rolls against the same target. The dragon faces Fargrim the fighter, who has an immediate reaction (veteran gambit) that is triggered by being hit with a melee attack. If the dragon uses claw and hits Fargrim with the first attack roll, he can use veteran gambit in response to that hit. In that case, the immediate reaction waits for that hit to be resolved, but does not wait for the entire power to be resolved.<br><br>Likewise, an immediate reaction can interrupt movement. Here's how: If a creature triggers an immediate reaction while moving (by coming into range, for instance), the reaction can take place before the creature finishes moving, but after it has moved at least 1 square. In other words, an immediate reaction can be in response to a square of movement, rather than to an entire move action.<br><br>If an effect has a trigger but is neither an immediate action nor an opportunity action, assume that it behaves like an immediate reaction, waiting for its trigger to completely resolve. However, ignore this guideline when the effect has to interrupt its trigger to function. For instance, if a triggered power allows an adventurer to use a free action to reroll an attack roll, with the hope of turning a miss into a hit, the power must interrupt the trigger (“You miss with an attack”) to function; otherwise the attack would be resolved as a miss.</p><p class=publishedIn>Published in Player's Handbook, page(s) 268, Rules Compendium, page(s) 195.</p>"
-  },
-  {
-    "id": "glossary121",
-    "name": "Melee Attack",
-    "category": "Rules",
-    "type": "Rules Combat",
-    "sourceBook": "PHB",
-    "definition": "Targeted: Melee attacks target individuals. A melee attack against multiple enemies consists of separate attacks, each with its own attack roll and damage roll. Melee attacks don't create areas of effect.\n\nRange: A melee attack's range usually equals your melee reach. (Sometimes a power specifies that it affects only adjacent targets, though, so even if you're using a reach weapon, you can't attack more distant targets with that power.)\n\nReach: Most characters have a reach of 1 square. Certain powers, feats, and weapons can increase your reach.",
-    "publishedIn": "Player's Handbook, page(s) 270.",
-    "html": "<h1 class=player>Melee Attack</h1><p class=flavor>Targeted: Melee attacks target individuals. A melee attack against multiple enemies consists of separate attacks, each with its own attack roll and damage roll. Melee attacks don't create areas of effect.<br><br>Range: A melee attack's range usually equals your melee reach. (Sometimes a power specifies that it affects only adjacent targets, though, so even if you're using a reach weapon, you can't attack more distant targets with that power.)<br><br>Reach: Most characters have a reach of 1 square. Certain powers, feats, and weapons can increase your reach.</p><p class=publishedIn>Published in Player's Handbook, page(s) 270.</p>"
-  },
-  {
-    "id": "glossary122",
-    "name": "Ranged Attack",
-    "category": "Rules",
-    "type": "Rules Combat",
-    "sourceBook": "PHB",
-    "definition": "Targeted: Ranged attacks target individuals. A ranged attack against multiple enemies consists of separate attacks, each with its own attack roll and damage roll. Ranged attacks don't create areas of effect.\nIf you're using a projectile weapon to make a ranged attack against multiple targets, you need one piece of ammunition for each target, and if you're using thrown weapons, you need one for each target. \n\nRange: Some powers set a specific range (“Ranged 10”) or allow you to attack any target you can see (“Ranged sight”). If you're using a weapon, the attack's range is the range of your weapon, as shown on the Ranged Weapons table in Chapter 7.\n\nLong Range: If you use a ranged weapon and your target is farther away than the weapon's normal range but within its long range, you take a -2 penalty to your attack roll. You can't hit a target beyond the weapon's long range. A ranged power that doesn't use a weapon has a normal range but no long range.\n\nProvoke Opportunity Attacks: If you use a ranged power while adjacent to an enemy, that enemy can make an opportunity attack against you.",
-    "publishedIn": "Player's Handbook, page(s) 270.",
-    "html": "<h1 class=player>Ranged Attack</h1><p class=flavor>Targeted: Ranged attacks target individuals. A ranged attack against multiple enemies consists of separate attacks, each with its own attack roll and damage roll. Ranged attacks don't create areas of effect.<br>If you're using a projectile weapon to make a ranged attack against multiple targets, you need one piece of ammunition for each target, and if you're using thrown weapons, you need one for each target. <br><br>Range: Some powers set a specific range (“Ranged 10”) or allow you to attack any target you can see (“Ranged sight”). If you're using a weapon, the attack's range is the range of your weapon, as shown on the Ranged Weapons table in Chapter 7.<br><br>Long Range: If you use a ranged weapon and your target is farther away than the weapon's normal range but within its long range, you take a -2 penalty to your attack roll. You can't hit a target beyond the weapon's long range. A ranged power that doesn't use a weapon has a normal range but no long range.<br><br>Provoke Opportunity Attacks: If you use a ranged power while adjacent to an enemy, that enemy can make an opportunity attack against you.</p><p class=publishedIn>Published in Player's Handbook, page(s) 270.</p>"
-  },
-  {
-    "id": "glossary123",
-    "name": "Close Attack",
-    "category": "Rules",
-    "type": "Rules Combat",
-    "sourceBook": "PHB",
-    "definition": "Area of Effect: A close attack creates an area of effect, usually a blast or a burst. A close attack affects certain targets within its area of effect, which has a certain size. A close attack's area of effect and targets are specified in its power description.\n\nOrigin Square: A close attack's area of effect defines the attack's origin square, which is the attack's starting point. A close burst uses your space as its origin square. A close blast uses a square within your space as its origin square. For a target to be affected by a close attack, there must be line of effect from the origin square to the target.\n\nMultiple Attack Rolls but One Damage Roll: When you make a close attack, you make a separate attack roll against each target in the area of effect, but you make a single damage roll that affects all the targets. A Large or larger creature hit by a close attack is affected only once by the attack, even if multiple squares of the creature's space are in the area of effect.\n\nIf you're using a projectile weapon to make a close attack, you need one piece of ammunition for each target, and if you're using thrown weapons, you need one for each target.",
-    "publishedIn": "Player's Handbook, page(s) 271.",
-    "html": "<h1 class=player>Close Attack</h1><p class=flavor>Area of Effect: A close attack creates an area of effect, usually a blast or a burst. A close attack affects certain targets within its area of effect, which has a certain size. A close attack's area of effect and targets are specified in its power description.<br><br>Origin Square: A close attack's area of effect defines the attack's origin square, which is the attack's starting point. A close burst uses your space as its origin square. A close blast uses a square within your space as its origin square. For a target to be affected by a close attack, there must be line of effect from the origin square to the target.<br><br>Multiple Attack Rolls but One Damage Roll: When you make a close attack, you make a separate attack roll against each target in the area of effect, but you make a single damage roll that affects all the targets. A Large or larger creature hit by a close attack is affected only once by the attack, even if multiple squares of the creature's space are in the area of effect.<br><br>If you're using a projectile weapon to make a close attack, you need one piece of ammunition for each target, and if you're using thrown weapons, you need one for each target.</p><p class=publishedIn>Published in Player's Handbook, page(s) 271.</p>"
-  },
-  {
-    "id": "glossary124",
-    "name": "Area Attack",
-    "category": "Rules",
-    "type": "Rules Combat",
-    "sourceBook": "PHB",
-    "definition": "Area of Effect: An area attack creates an area of effect, usually a burst or a wall, within range. An area attack affects certain targets within its area of effect, which has a certain size. An area attack's area of effect, range, and targets are specified in its power description.\n\nOrigin Square: You choose a square within an area attack's range as the attack's origin square, which is where you center or start the area of effect. You need line of effect from a square in your space to the origin square. For a target to be affected by an area attack, there needs to be line of effect from the origin square to the target. You don't have to be able to see the origin square or the target, and concealment between the origin square and the target doesn't apply.\n\nMultiple Attack Rolls but One Damage Roll: When you make an area attack, you make a separate attack roll against each target in the area of effect, but you make a single damage roll that affects all the targets. A Large or larger creature hit by an area attack is affected only once by the attack, even if multiple squares of the creature's space are in the area of effect.\nIf you're using a projectile weapon to make an area attack, you need one piece of ammunition for each target, and if you're using thrown weapons, you need one for each target.\n\nProvoke Opportunity Attacks: If you use an area power while adjacent to an enemy, that enemy can make an opportunity attack against you.",
-    "publishedIn": "Player's Handbook, page(s) 271.",
-    "html": "<h1 class=player>Area Attack</h1><p class=flavor>Area of Effect: An area attack creates an area of effect, usually a burst or a wall, within range. An area attack affects certain targets within its area of effect, which has a certain size. An area attack's area of effect, range, and targets are specified in its power description.<br><br>Origin Square: You choose a square within an area attack's range as the attack's origin square, which is where you center or start the area of effect. You need line of effect from a square in your space to the origin square. For a target to be affected by an area attack, there needs to be line of effect from the origin square to the target. You don't have to be able to see the origin square or the target, and concealment between the origin square and the target doesn't apply.<br><br>Multiple Attack Rolls but One Damage Roll: When you make an area attack, you make a separate attack roll against each target in the area of effect, but you make a single damage roll that affects all the targets. A Large or larger creature hit by an area attack is affected only once by the attack, even if multiple squares of the creature's space are in the area of effect.<br>If you're using a projectile weapon to make an area attack, you need one piece of ammunition for each target, and if you're using thrown weapons, you need one for each target.<br><br>Provoke Opportunity Attacks: If you use an area power while adjacent to an enemy, that enemy can make an opportunity attack against you.</p><p class=publishedIn>Published in Player's Handbook, page(s) 271.</p>"
+    "html": "<h1 class=player>Immediate Action</h1><p class=flavor>There are two kinds of immediate actions: interrupts and reactions. The following rules govern both kinds of immediate action.<br><br>Trigger: Each immediate action—usually a power—defines its trigger. The one type of immediate action that every creature can take is a readied action (see “Ready an Action”.<br><br>Someone Else's Turn: A creature cannot take an immediate action on its own turn. The action interrupts some event on another creature's turn or responds to that event.<br><br>Once per Round: A creature can take only one immediate action per round, either an immediate interrupt or an immediate reaction. Therefore, if a creature takes an immediate action, it can't take another one until the start of its next turn.<br><br>Interrupts: An immediate interrupt jumps in when its trigger occurs, taking place before the trigger finishes. If an interrupt invalidates a triggering action, the triggering action is lost.<br>    Example: An enemy makes a melee attack against Keira the rogue, but Keira uses a power that lets her shift away as an immediate interrupt. If the enemy can no longer reach her, its attack action is lost. Similarly, Albanon the wizard might use shield in response to being hit and turn that hit into a miss, or Keira might use the immediate interrupt heroic escape to evade an enemy's attack before it can deal damage.<br><br>Reactions: An immediate reaction lets a creature act in response to a trigger. The triggering action or event occurs and is completely resolved before the reaction takes place.<br>    An immediate reaction waits for its trigger to finish, not necessarily for the action that contains the trigger to finish.<br>    Example: An elder dragon's claw attack power is a standard action that allows two attack rolls against the same target. The dragon faces Fargrim the fighter, who has an immediate reaction (veteran gambit) that is triggered by being hit with a melee attack. If the dragon uses claw and hits Fargrim with the first attack roll, he can use veteran gambit in response to that hit. In that case, the immediate reaction waits for that hit to be resolved, but does not wait for the entire power to be resolved.<br><br>Likewise, an immediate reaction can interrupt movement. Here's how: If a creature triggers an immediate reaction while moving (by coming into range, for instance), the reaction can take place before the creature finishes moving, but after it has moved at least 1 square. In other words, an immediate reaction can be in response to a square of movement, rather than to an entire move action.<br><br>If an effect has a trigger but is neither an immediate action nor an opportunity action, assume that it behaves like an immediate reaction, waiting for its trigger to completely resolve. However, ignore this guideline when the effect has to interrupt its trigger to function. For instance, if a triggered power allows an adventurer to use a free action to reroll an attack roll, with the hope of turning a miss into a hit, the power must interrupt the trigger (“You miss with an attack”) to function; otherwise the attack would be resolved as a miss.</p><p class=publishedIn>Published in Player's Handbook, page(s) 268, Rules Compendium, page(s) 195.</p>",
+    "aliases": [
+      "immediate"
+    ]
   },
   {
     "id": "glossary125",
@@ -870,16 +845,6 @@
     "html": "<h1 class=player>dwarf</h1><p class=flavor>Dwarves are creatures of the earth, as steadfast and hardy as stone. Industrious and inventive, dwarves live in the mountains of the world. They build remarkable fortress-cities among the peaks, under which they delve into the earth for riches and raw materials.</p><p class=publishedIn>Published in Monster Manual.</p>"
   },
   {
-    "id": "glossary185",
-    "name": "Healing",
-    "category": "Powers",
-    "type": "Effect Type",
-    "sourceBook": "PHB3",
-    "definition": "Powers that restore hit points.",
-    "publishedIn": "Player's Handbook 3, page(s) 217.",
-    "html": "<h1 class=player>Healing</h1><p class=flavor>Powers that restore hit points.</p><p class=publishedIn>Published in Player's Handbook 3, page(s) 217.</p>"
-  },
-  {
     "id": "glossary186",
     "name": "Beast Form",
     "category": "Powers",
@@ -930,46 +895,6 @@
     "html": "<h1 class=player>Versatile</h1><p class=flavor>Versatile weapons are one-handed, but creatures can use them two-handed. An attacker that does so gains a +1 bonus to the weapon's damage rolls.<br>    A Small creature, such as a halfling, must use a versatile weapon two-handed and doesn't gain the bonus to damage rolls.</p><p class=publishedIn>Published in Player's Handbook, page(s) 217, Mordenkainen's Magnificent Emporium, page(s) 20, Rules Compendium, page(s) 270.</p>"
   },
   {
-    "id": "glossary196",
-    "name": "Cold",
-    "category": "Powers",
-    "type": "Damage Type",
-    "sourceBook": "PHB, PHB3",
-    "definition": "Ice crystals, arctic air, or frigid liquid.",
-    "publishedIn": "Player's Handbook, page(s) 55, Player's Handbook 3, page(s) 220.",
-    "html": "<h1 class=player>Cold</h1><p class=flavor>Ice crystals, arctic air, or frigid liquid.</p><p class=publishedIn>Published in Player's Handbook, page(s) 55, Player's Handbook 3, page(s) 220.</p>"
-  },
-  {
-    "id": "glossary197",
-    "name": "Fire",
-    "category": "Powers",
-    "type": "Damage Type",
-    "sourceBook": "PHB, PHB3",
-    "definition": "Explosive bursts, fiery rays, or simple ignition.",
-    "publishedIn": "Player's Handbook, page(s) 55, Player's Handbook 3, page(s) 220.",
-    "html": "<h1 class=player>Fire</h1><p class=flavor>Explosive bursts, fiery rays, or simple ignition.</p><p class=publishedIn>Published in Player's Handbook, page(s) 55, Player's Handbook 3, page(s) 220.</p>"
-  },
-  {
-    "id": "glossary198",
-    "name": "Lightning",
-    "category": "Powers",
-    "type": "Damage Type",
-    "sourceBook": "PHB, PHB3",
-    "definition": "Electrical energy.",
-    "publishedIn": "Player's Handbook, page(s) 55, Player's Handbook 3, page(s) 222.",
-    "html": "<h1 class=player>Lightning</h1><p class=flavor>Electrical energy.</p><p class=publishedIn>Published in Player's Handbook, page(s) 55, Player's Handbook 3, page(s) 222.</p>"
-  },
-  {
-    "id": "glossary199",
-    "name": "Thunder",
-    "category": "Powers",
-    "type": "Damage Type",
-    "sourceBook": "PHB, PHB3",
-    "definition": "Shock waves and deafening sounds.",
-    "publishedIn": "Player's Handbook, page(s) 55, Player's Handbook 3, page(s) 223.",
-    "html": "<h1 class=player>Thunder</h1><p class=flavor>Shock waves and deafening sounds.</p><p class=publishedIn>Published in Player's Handbook, page(s) 55, Player's Handbook 3, page(s) 223.</p>"
-  },
-  {
     "id": "glossary2",
     "name": "Brute",
     "category": "Monsters",
@@ -978,16 +903,6 @@
     "definition": "✦     Specializes in high-damage melee attacks\n✦     High hit points\n✦     Often simpler to run than other monsters\n✦     Good at protecting artillery or controllers\n\nTip: Use multiple brutes to form a front line.",
     "publishedIn": "Monster Manual, Rules Compendium, page(s) 286.",
     "html": "<h1 class=player>Brute</h1><p class=flavor>✦     Specializes in high-damage melee attacks<br>✦     High hit points<br>✦     Often simpler to run than other monsters<br>✦     Good at protecting artillery or controllers<br><br>Tip: Use multiple brutes to form a front line.</p><p class=publishedIn>Published in Monster Manual, Rules Compendium, page(s) 286.</p>"
-  },
-  {
-    "id": "glossary200",
-    "name": "Shadow",
-    "category": "Powers",
-    "type": "Power Source",
-    "sourceBook": "Dra379",
-    "definition": "Shadow powers open a well of energy to the Shadowfell, the realm of darkness, illusion, death, and the undead.",
-    "publishedIn": "Dragon Magazine 379, page(s) 16.",
-    "html": "<h1 class=player>Shadow</h1><p class=flavor>Shadow powers open a well of energy to the Shadowfell, the realm of darkness, illusion, death, and the undead.</p><p class=publishedIn>Published in Dragon Magazine 379, page(s) 16.</p>"
   },
   {
     "id": "glossary201",
@@ -1278,16 +1193,6 @@
     "definition": "An air creature is strongly connected to the element of air.",
     "publishedIn": "Monster Manual 2, page(s) 216, Monster Manual, Rules Compendium, page(s) 308, Monster Vault: Threats to the Nentir Vale, page(s) 122.",
     "html": "<h1 class=player>air</h1><p class=flavor>An air creature is strongly connected to the element of air.</p><p class=publishedIn>Published in Monster Manual 2, page(s) 216, Monster Manual, Rules Compendium, page(s) 308, Monster Vault: Threats to the Nentir Vale, page(s) 122.</p>"
-  },
-  {
-    "id": "glossary296",
-    "name": "Beast",
-    "category": "Powers",
-    "type": "Accessories",
-    "sourceBook": "PHB2, MP, RC",
-    "definition": "An effect type. A beast power can be used only in conjunction with a beast companion.",
-    "publishedIn": "Player's Handbook 2, page(s) 219, Martial Power, page(s) 42, Rules Compendium, page(s) 308.",
-    "html": "<h1 class=player>Beast</h1><p class=flavor>An effect type. A beast power can be used only in conjunction with a beast companion.<br></p><p class=publishedIn>Published in Player's Handbook 2, page(s) 219, Martial Power, page(s) 42, Rules Compendium, page(s) 308.</p>"
   },
   {
     "id": "glossary30",
@@ -1728,16 +1633,6 @@
     "definition": "The monster can alter its appearance through illusion. The entry specifies the type and size of the form it can take. The monster's statistics remain unchanged. A successful Insight check (opposed by the monster's Bluff check) allows an observer to notice that the monster is disguised by an illusion.\nChanging appearance requires a minor action unless otherwise specified.",
     "publishedIn": "Monster Manual, page(s) 281.",
     "html": "<h1 class=player>Deceptive Veil</h1><p class=flavor>The monster can alter its appearance through illusion. The entry specifies the type and size of the form it can take. The monster's statistics remain unchanged. A successful Insight check (opposed by the monster's Bluff check) allows an observer to notice that the monster is disguised by an illusion.<br>Changing appearance requires a minor action unless otherwise specified.</p><p class=publishedIn>Published in Monster Manual, page(s) 281.</p>"
-  },
-  {
-    "id": "glossary349",
-    "name": "Disease",
-    "category": "Rules",
-    "type": "Rules Other",
-    "sourceBook": "DMG",
-    "definition": "Infection: When you are exposed to a disease, you risk becoming infected. If you are infected, you suffer the initial effect of the disease and begin to move on the disease track.\n\nMonster Attacks: Make a saving throw at the end of the encounter. If the saving throw fails, you are infected.\n\nOther Exposure: For other kinds of exposure (environmental or food), the disease makes an attack roll. If the disease's attack hits, you are infected. \n\nProlonged Exposure: If a character spends a long time exposed to disease, the disease makes one attack roll per day of exposure.\n\nDisease Track: Every disease has at least three states, arrayed on a a row of effects called the disease's track: cured (the target is no longer affected), the disease's initial effect, and the disease's final state.\n\nInitial Effect: When you become infected, you suffer the disease's initial effect.\n\nMoving on the Disease Track: As the disease progresses, you might get worse, moving on the track toward the final state, or you might improve until you are cured. Some effects continue until you are cured, persisting regardless of where you are on the disease's track, until you improve to the cured state. Other effects end when you move to a better or worse state on the track.\n\nDisease Progression: Once you're infected, make an Endurance check after each extended rest to see if you improve, worsen, or maintain your current condition. A disease specifies two target Endurance DCs: a lower DC to maintain and a higher DC to improve.\n Maintain: If the check result beats the lower DC but doesn't beat the higher one, your condition remains the same.\n Improve: If the check result beats the higher DC, your condition improves—move one step to the left on the disease track.\n Worsen: If the check result doesn't beat either DC, your condition worsens—move one step to the right on the disease track.\n Cure: When you reach the left edge of the track, you are cured and stop making Endurance checks.\n Final State: When you reach the right edge of the track, the final state of the disease takes effect. Once the disease is in its final state, you no longer make Endurance checks to improve. Often, the only way to recover from the final state is through the Cure Disease ritual.\n\nHeal Skill: An ally can use a Heal check in place of your Endurance check to help you recover from a disease, as described in the Player's Handbook.",
-    "publishedIn": "Dungeon Master's Guide, page(s) 49.",
-    "html": "<h1 class=player>Disease</h1><p class=flavor>Infection: When you are exposed to a disease, you risk becoming infected. If you are infected, you suffer the initial effect of the disease and begin to move on the disease track.<br><br>Monster Attacks: Make a saving throw at the end of the encounter. If the saving throw fails, you are infected.<br><br>Other Exposure: For other kinds of exposure (environmental or food), the disease makes an attack roll. If the disease's attack hits, you are infected. <br><br>Prolonged Exposure: If a character spends a long time exposed to disease, the disease makes one attack roll per day of exposure.<br><br>Disease Track: Every disease has at least three states, arrayed on a a row of effects called the disease's track: cured (the target is no longer affected), the disease's initial effect, and the disease's final state.<br><br>Initial Effect: When you become infected, you suffer the disease's initial effect.<br><br>Moving on the Disease Track: As the disease progresses, you might get worse, moving on the track toward the final state, or you might improve until you are cured. Some effects continue until you are cured, persisting regardless of where you are on the disease's track, until you improve to the cured state. Other effects end when you move to a better or worse state on the track.<br><br>Disease Progression: Once you're infected, make an Endurance check after each extended rest to see if you improve, worsen, or maintain your current condition. A disease specifies two target Endurance DCs: a lower DC to maintain and a higher DC to improve.<br> Maintain: If the check result beats the lower DC but doesn't beat the higher one, your condition remains the same.<br> Improve: If the check result beats the higher DC, your condition improves—move one step to the left on the disease track.<br> Worsen: If the check result doesn't beat either DC, your condition worsens—move one step to the right on the disease track.<br> Cure: When you reach the left edge of the track, you are cured and stop making Endurance checks.<br> Final State: When you reach the right edge of the track, the final state of the disease takes effect. Once the disease is in its final state, you no longer make Endurance checks to improve. Often, the only way to recover from the final state is through the Cure Disease ritual.<br><br>Heal Skill: An ally can use a Heal check in place of your Endurance check to help you recover from a disease, as described in the Player's Handbook. </p><p class=publishedIn>Published in Dungeon Master's Guide, page(s) 49.</p>"
   },
   {
     "id": "glossary350",
@@ -2280,6 +2175,21 @@
     "html": "<h1 class=player>healing</h1><p class=flavor>An effect type. A healing power restores hit points, usually either by restoring hit points immediately or by granting regeneration.</p><p class=publishedIn>Published in Monster Manual 2, page(s) 217, Monster Manual, page(s) 281, Rules Compendium, page(s) 312, Monster Vault: Threats to the Nentir Vale, page(s) 123.</p>"
   },
   {
+    "id": "glossary_custom_healing_effect_phb3",
+    "name": "Healing (PHB3 effect type)",
+    "category": "Powers",
+    "type": "Effect Type",
+    "sourceBook": "PHB3",
+    "definition": "Powers that restore hit points.",
+    "publishedIn": "Player's Handbook 3, page(s) 217.",
+    "html": null,
+    "aliases": [
+      "Healing (PHB3)",
+      "Healing PHB3",
+      "Healing effect (PHB3)"
+    ]
+  },
+  {
     "id": "glossary408",
     "name": "Hidden",
     "category": "Rules",
@@ -2328,16 +2238,6 @@
     "definition": "A damage type. See also damage type.",
     "publishedIn": "Monster Manual 2, page(s) 218, Monster Manual, page(s) 282, Rules Compendium, page(s) 314, Monster Vault: Threats to the Nentir Vale, page(s) 124.",
     "html": "<h1 class=player>necrotic</h1><p class=flavor>A damage type. See also damage type.</p><p class=publishedIn>Published in Monster Manual 2, page(s) 218, Monster Manual, page(s) 282, Rules Compendium, page(s) 314, Monster Vault: Threats to the Nentir Vale, page(s) 124.</p>"
-  },
-  {
-    "id": "glossary415",
-    "name": "Poison",
-    "category": "Monsters",
-    "type": "Keyword",
-    "sourceBook": "MM2, MM, RC, MV:TttNV",
-    "definition": "A damage and effect type. A poison power delivers a nondamaging poisonous effect, deals poison damage, or both. See also damage type.",
-    "publishedIn": "Monster Manual 2, page(s) 218, Monster Manual, page(s) 282, Rules Compendium, page(s) 314, Monster Vault: Threats to the Nentir Vale, page(s) 124.",
-    "html": "<h1 class=player>poison</h1><p class=flavor>A damage and effect type. A poison power delivers a nondamaging poisonous effect, deals poison damage, or both. See also damage type.</p><p class=publishedIn>Published in Monster Manual 2, page(s) 218, Monster Manual, page(s) 282, Rules Compendium, page(s) 314, Monster Vault: Threats to the Nentir Vale, page(s) 124.</p>"
   },
   {
     "id": "glossary416",
@@ -2608,16 +2508,6 @@
     "definition": "A creature that has low-light vision can see normally in areas of bright light and dim light, but areas of darkness are totally obscured to it. The creature ignores concealment that is a result of dim light.",
     "publishedIn": "Monster Manual 2, page(s) 218, Monster Manual, page(s) 282, Player's Handbook 3, page(s) 222, Rules Compendium, page(s) 313, Monster Vault: Threats to the Nentir Vale, page(s) 124.",
     "html": "<h1 class=player>low-light vision</h1><p class=flavor>A creature that has low-light vision can see normally in areas of bright light and dim light, but areas of darkness are totally obscured to it. The creature ignores concealment that is a result of dim light.</p><p class=publishedIn>Published in Monster Manual 2, page(s) 218, Monster Manual, page(s) 282, Player's Handbook 3, page(s) 222, Rules Compendium, page(s) 313, Monster Vault: Threats to the Nentir Vale, page(s) 124.</p>"
-  },
-  {
-    "id": "glossary484",
-    "name": "Disease",
-    "category": "Powers",
-    "type": "Damage Type",
-    "sourceBook": "MM, MM2, RC, MV:TttNV",
-    "definition": "Some powers expose a creature to a disease. If a creature is exposed to a disease one or more times during an encounter, it makes one saving throw at the end of the encounter to determine if it contracts that disease. If the saving throw fails, the creature is infected.",
-    "publishedIn": "Monster Manual, page(s) 281, Monster Manual 2, page(s) 217, Rules Compendium, page(s) 310, Monster Vault: Threats to the Nentir Vale, page(s) 122.",
-    "html": "<h1 class=player>Disease</h1><p class=flavor>Some powers expose a creature to a disease. If a creature is exposed to a disease one or more times during an encounter, it makes one saving throw at the end of the encounter to determine if it contracts that disease. If the saving throw fails, the creature is infected.</p><p class=publishedIn>Published in Monster Manual, page(s) 281, Monster Manual 2, page(s) 217, Rules Compendium, page(s) 310, Monster Vault: Threats to the Nentir Vale, page(s) 122.</p>"
   },
   {
     "id": "glossary485",
@@ -3240,16 +3130,6 @@
     "html": "<h1 class=player>Double Weapons</h1><p class=flavor>Double weapons share the following traits.<br>    • You must wield a double weapon in two hands to use it.<br>    • A Small character cannot wield a double weapon unless the weapon has the small property.<br>    • Wielding a double weapon is like wielding a weapon in each hand. In the table, the first line of the double weapon's entry describes the end of the weapon wielded in your main hand. The indented line describes the weapon's other end, wielded in your off-hand. The two ends of a double weapon can have different proficiency bonuses, damage, properties, and weapon groups. The weight and price entries represent the total for the weapon, rather than only one side.<br>    • When adding an enchantment that requires a particular weapon type, at least one end of the weapon must match the requirement. For example, an urgrosh could gain the vorpal enchantment, even though only one end meets the requirement of “heavy blade or axe.”<br>    • An enchanted double weapon gains all benefits of the enchantment on each end (even if one end would not normally qualify for the enchantment). This does not increase the frequency of use of any power possessed by the item; if you wield a double weapon with a daily power you can still only activate that power once per day.</p><p class=publishedIn>Published in Adventurer's Vault, page(s) 10.</p>"
   },
   {
-    "id": "glossary586",
-    "name": "Blind",
-    "category": "Monsters",
-    "type": "Sense",
-    "sourceBook": "Madness at Gardmore Abbey",
-    "definition": "A blind creature relies on special senses, such as blindsight or tremorsense, to see within a specified range, beyond which the creature can't see. The creature is immune to gaze attacks and cannot be blinded.",
-    "publishedIn": "Madness at Gardmore Abbey.",
-    "html": "<h1 class=player>blind</h1><p class=flavor>A blind creature relies on special senses, such as blindsight or tremorsense, to see within a specified range, beyond which the creature can't see. The creature is immune to gaze attacks and cannot be blinded.</p><p class=publishedIn>Published in Madness at Gardmore Abbey.</p>"
-  },
-  {
     "id": "glossary587",
     "name": "Mounted",
     "category": "Weapons",
@@ -3468,16 +3348,6 @@
     "definition": "The nethermancer's methods were devised when renegade wizards fled to the Shadowfell long ago and delved into the plane's secrets and the malign influence found there. These original nethermancers identified shadow magic as the impetus for the Shadowfell's creation. The strength of shadow magic derives from the dark stuff that the primordials rejected when they first gave form to substance. Nethermancers focus their efforts on extricating shadow from various environments, then blending it with arcane forces to create magical effects. Among other manifestations, such spells excite or dull the senses, spin creatures from raw shadow, and punch holes through reality to allow swift passage.",
     "publishedIn": "Heroes of Shadow.",
     "html": "<h1 class=player>Nethermancy</h1><p class=flavor>The nethermancer's methods were devised when renegade wizards fled to the Shadowfell long ago and delved into the plane's secrets and the malign influence found there. These original nethermancers identified shadow magic as the impetus for the Shadowfell's creation. The strength of shadow magic derives from the dark stuff that the primordials rejected when they first gave form to substance. Nethermancers focus their efforts on extricating shadow from various environments, then blending it with arcane forces to create magical effects. Among other manifestations, such spells excite or dull the senses, spin creatures from raw shadow, and punch holes through reality to allow swift passage.<br></p><p class=publishedIn>Published in Heroes of Shadow.</p>"
-  },
-  {
-    "id": "glossary609",
-    "name": "Poison",
-    "category": "Powers",
-    "type": "Damage Type",
-    "sourceBook": "PHB",
-    "definition": "Toxins that reduce a creature's hit points.",
-    "publishedIn": "Player's Handbook.",
-    "html": "<h1 class=player>Poison</h1><p class=flavor>Toxins that reduce a creature's hit points.</p><p class=publishedIn>Published in Player's Handbook.</p>"
   },
   {
     "id": "glossary61",
@@ -3960,16 +3830,6 @@
     "html": "<h1 class=player>Armor</h1><p class=flavor>Armor provides a barrier between an adventurer and attacks—or, put more bluntly, between the adventurer and death. Every class provides access to one or more armor proficiencies, and it's in an adventurer's best interest to wear the finest armor possible.<br><br>Armor Bonus: While wearing a suit of armor, an adventurer gains an armor bonus to Armor Class, determined by the type of armor. For instance, a suit of chainmail grants a +6 armor bonus to AC.<br><br>Armor Proficiency<br>An adventurer's class specifies the kinds of armor that he or she has proficiency with, and an adventurer can take feats to learn the proper use of other kinds of armor. If an adventurer wears armor that he or she does not have proficiency with, the armor makes the adventurer clumsy and uncoordinated: That character takes a -2 penalty to attack rolls and to Reflex.<br>    Armor proficiency is irrelevant to a monster. If it's wearing armor, that fact is noted in its stat block, and it is able to use the armor effectively.<br><br>Donning Armor<br>Putting on a suit of armor takes at least 5 minutes, so it's an activity that can be undertaken only outside combat. Armor can be donned while taking a short rest.<br><br>Reading an Armor Description<br>Each type of armor is defined by a few basic characteristics that indicate how it functions in the game. These characteristics are typically specified in a table that contains the following entries.<br><br>Armor Bonus: The armor bonus to AC that a creature gains while wearing the armor.<br><br>Check: The penalty to Strength-, Dexterity-, and Constitution-based skill checks that a creature takes while wearing the armor. This penalty is called an armor check penalty. It does not apply to ability checks (such as a Strength check to break down a door or a Dexterity check to determine initiative in combat).<br><br>Speed: The penalty to speed that a creature takes while wearing the armor.<br><br>Price: The armor's cost in gold pieces.<br><br>Weight: The armor's weight.</p><p class=publishedIn>Published in Rules Compendium, page(s) 265.</p>"
   },
   {
-    "id": "glossary66",
-    "name": "Force",
-    "category": "Powers",
-    "type": "Damage Type",
-    "sourceBook": "PHB, PHB3",
-    "definition": "Invisible energy formed into incredibly hard yet nonsolid shapes.",
-    "publishedIn": "Player's Handbook, page(s) 55, Player's Handbook 3, page(s) 220.",
-    "html": "<h1 class=player>Force</h1><p class=flavor>Invisible energy formed into incredibly hard yet nonsolid shapes.</p><p class=publishedIn>Published in Player's Handbook, page(s) 55, Player's Handbook 3, page(s) 220.</p>"
-  },
-  {
     "id": "glossary660",
     "name": "Armor Types",
     "category": "Rules",
@@ -4270,16 +4130,6 @@
     "html": "<h1 class=player>Martial</h1><p class=flavor>Martial powers are not magic in the traditional sense, although some martial powers stand well beyond the capabilities of ordinary mortals. Martial characters use their own strength and willpower to vanquish their enemies. Training and dedication replace arcane formulas and prayers to grant fighters, rangers, rogues, and warlords, among others, their power.</p><p class=publishedIn>Published in Player's Handbook, page(s) 55.</p>"
   },
   {
-    "id": "glossary73",
-    "name": "Necrotic",
-    "category": "Powers",
-    "type": "Damage Type",
-    "sourceBook": "PHB, PHB3",
-    "definition": "Purple-black energy that deadens flesh and wounds the soul.",
-    "publishedIn": "Player's Handbook, page(s) 55, Player's Handbook 3, page(s) 222.",
-    "html": "<h1 class=player>Necrotic</h1><p class=flavor>Purple-black energy that deadens flesh and wounds the soul.</p><p class=publishedIn>Published in Player's Handbook, page(s) 55, Player's Handbook 3, page(s) 222.</p>"
-  },
-  {
     "id": "glossary76",
     "name": "Polymorph",
     "category": "Powers",
@@ -4300,16 +4150,6 @@
     "html": "<h1 class=player>Primal</h1><p class=flavor>Powers that draw on the spirits of nature that pervade the world.</p><p class=publishedIn>Published in Player's Handbook 2, page(s) 5.</p>"
   },
   {
-    "id": "glossary79",
-    "name": "Psychic",
-    "category": "Powers",
-    "type": "Damage Type",
-    "sourceBook": "PHB, PHB3",
-    "definition": "Effects that target the mind.",
-    "publishedIn": "Player's Handbook, page(s) 55, Player's Handbook 3, page(s) 222.",
-    "html": "<h1 class=player>Psychic</h1><p class=flavor>Effects that target the mind.</p><p class=publishedIn>Published in Player's Handbook, page(s) 55, Player's Handbook 3, page(s) 222.</p>"
-  },
-  {
     "id": "glossary8",
     "name": "Swarm",
     "category": "Monsters",
@@ -4320,16 +4160,6 @@
     "html": "<h1 class=player>swarm</h1><p class=flavor>A swarm is composed of multiple creatures but functions as a single creature. A swarm can occupy the same space as another creature, and an enemy can enter a swarm's space, which is difficult terrain. A swarm cannot be pulled, pushed, or slid by melee or ranged attacks. <br>    A swarm can squeeze through any opening large enough for even one of its constituent creatures. For example, a swarm of bats can squeeze through an opening large enough for one of the bats to squeeze through.</p><p class=publishedIn>Published in Monster Manual 2, page(s) 218, Monster Manual, page(s) 283, Rules Compendium, page(s) 316, Monster Vault: Threats to the Nentir Vale, page(s) 125.</p>"
   },
   {
-    "id": "glossary80",
-    "name": "Radiant",
-    "category": "Powers",
-    "type": "Damage Type",
-    "sourceBook": "PHB, PHB3",
-    "definition": "Searing white light or shimmering colors.",
-    "publishedIn": "Player's Handbook, page(s) 55, Player's Handbook 3, page(s) 222.",
-    "html": "<h1 class=player>Radiant</h1><p class=flavor>Searing white light or shimmering colors.</p><p class=publishedIn>Published in Player's Handbook, page(s) 55, Player's Handbook 3, page(s) 222.</p>"
-  },
-  {
     "id": "glossary81",
     "name": "Reliable",
     "category": "Powers",
@@ -4338,16 +4168,6 @@
     "definition": "An effect type. If a reliable power misses every target, the power is not expended.",
     "publishedIn": "Player's Handbook 3, page(s) 217, Monster Manual 2, page(s) 218, Player's Handbook, page(s) 55, Player's Handbook 2, page(s) 220, Rules Compendium, page(s) 315.",
     "html": "<h1 class=player>Reliable</h1><p class=flavor>An effect type. If a reliable power misses every target, the power is not expended.</p><p class=publishedIn>Published in Player's Handbook 3, page(s) 217, Monster Manual 2, page(s) 218, Player's Handbook, page(s) 55, Player's Handbook 2, page(s) 220, Rules Compendium, page(s) 315.</p>"
-  },
-  {
-    "id": "glossary82",
-    "name": "Shadow",
-    "category": "Monsters",
-    "type": "Keyword",
-    "sourceBook": "Revenge of the Giants",
-    "definition": "Shadow powers open a well of energy to the Shadowfell, the realm of darkness, illusion, death, and the undead.",
-    "publishedIn": "Revenge of the Giants.",
-    "html": "<h1 class=player>Shadow</h1><p class=flavor>Shadow powers open a well of energy to the Shadowfell, the realm of darkness, illusion, death, and the undead.</p><p class=publishedIn>Published in Revenge of the Giants.</p>"
   },
   {
     "id": "glossary83",
@@ -4843,21 +4663,37 @@
     "id": "glossary_custom_area",
     "name": "Area",
     "category": "Rules",
-    "type": "Attack Type",
-    "sourceBook": "MM, PHB, RC",
-    "definition": "An area attack affects a defined region rather than a single target.",
-    "publishedIn": "Monster Manual, Player's Handbook, Rules Compendium.",
-    "html": null
+    "type": "Rules Combat",
+    "sourceBook": "PHB, RC",
+    "definition": "An area power creates an area of effect that can appear in a distant square.\n\nOrigin square: An area power's origin square is a single square that can be some distance away from the user, unless otherwise noted. The user must have line of effect to the origin square.\n\nKey terms: origin square, line of effect, line of sight, area of effect.\n\nArea of effect: The area, size, and range are all specified in the power using common presentations (area burst within, area wall within).\n\nTargets: An area power targets specific individuals within the area of effect (for example, each creature in the burst, each enemy in the burst, or each creature in the wall).\n\nMultiple targets: If an area power has multiple targets and includes attack rolls or damage rolls, the attack rolls are made separately against each target, but a single damage roll is made against all targets.\n\nLine of effect: A target must be within line of effect of the origin square. The target does not need line of effect to the user.\n\nLine of sight: Unless otherwise noted, the user does not have to see the origin square or the target, and concealment between the origin square and a target does not apply.\n\nProvokes opportunity attacks: Using an area power provokes opportunity attacks.\n\nAmmunition: If a creature uses a projectile weapon to use an attack power against multiple targets, the creature needs one piece of ammunition for each target. If the creature uses thrown weapons, it needs one for each target. (The DM might ignore this rule for simplicity.)\n\nArea subterms and aliases:\n\nArea burst [number] within [number] squares: The user chooses the origin square within the second number of squares, then creates a burst of the size in the first number, centered on that origin square.\n\nArea wall [number] within [number] squares: The user chooses the origin square within the second number of squares, then creates a wall in a number of squares (including the origin square) specified by the first number. Every square of the wall must be within range of the user, but only the origin square has to be within line of effect of the user. The user decides where the wall's squares are placed.",
+    "publishedIn": "Rules Compendium, Chapter 3 (Attack and Utility Types: Area Powers), Player's Handbook.",
+    "html": null,
+    "aliases": [
+      "area",
+      "area attack",
+      "area burst",
+      "area wall",
+      "area burst 2 within 10",
+      "area wall 8 within 10"
+    ]
   },
   {
     "id": "glossary_custom_close",
     "name": "Close",
     "category": "Rules",
-    "type": "Attack Type",
-    "sourceBook": "MM, PHB, RC",
-    "definition": "A close attack (such as a close burst or close blast) originates from the attacker.",
-    "publishedIn": "Monster Manual, Player's Handbook, Rules Compendium.",
-    "html": null
+    "type": "Rules Combat",
+    "sourceBook": "PHB, RC",
+    "definition": "A close power creates an area of effect that emanates from the power's user (unless otherwise noted by an exceptional power).\n\nOrigin square: A close power's area of effect, whether a blast or a burst, uses the space of the power's user as its origin square, unless otherwise noted. For a Medium creature, the origin square is 1 square; a larger creature's origin square spans multiple squares.\n\nKey terms: origin square, range, line of effect, line of sight, area of effect.\n\nArea of effect: A close power's area has a size specified in the power. Common presentations are close blast and close burst.\n\nRange: A close power's range rarely matters; when it is relevant, the size number can also function as the range in certain situations (for example, a sustained effect that must end within a number of squares).\n\nTargets: A close power targets specific individuals within the area of effect (for example, each creature in the burst, each enemy in the blast, or one ally in the burst).\n\nMultiple targets: If a close power has multiple targets and includes attack rolls or damage rolls, the attack rolls are made separately against each target, but a single damage roll is made against all targets.\n\nLine of effect: A target must be within line of effect of the power's origin square.\n\nLine of sight: Unless otherwise noted, the user does not have to see the target, and concealment between the origin square and a target does not apply.\n\nClose subterms and aliases:\n\nClose blast [number]: The power creates a blast of the specified size adjacent to the origin square; the user decides where to place the blast.\n\nClose burst [number]: The power creates a burst of the specified size centered on the origin square. The larger the creator, the larger the origin square, and the larger the burst.\n\nClose: Shorthand for close attack/utility presentation when the line uses only the word \"Close\" without the blast or burst subterm.",
+    "publishedIn": "Rules Compendium, Chapter 3 (Attack and Utility Types: Close Powers), Player's Handbook.",
+    "html": null,
+    "aliases": [
+      "close",
+      "close attack",
+      "close blast",
+      "close burst",
+      "close blast 5",
+      "close burst 3"
+    ]
   },
   {
     "id": "glossary_custom_recharge",
@@ -4893,31 +4729,29 @@
     "id": "glossary_custom_melee",
     "name": "Melee",
     "category": "Rules",
-    "type": "Attack Type",
-    "sourceBook": "MM, PHB, RC",
-    "definition": "A melee attack targets creatures within the attacker's reach.",
-    "publishedIn": "Monster Manual, Player's Handbook, Rules Compendium.",
-    "html": null
+    "type": "Rules Combat",
+    "sourceBook": "PHB, RC",
+    "definition": "A melee power is an attack or utility power that affects nearby targets, most often through a weapon attack or touch.\n\nOrigin square: A melee power's origin square is the space of the power's user, unless otherwise noted.\n\nTargets: A melee power targets individuals specified by the power (for example, one creature, one enemy, or one or two creatures).\n\nMultiple targets: If a melee power has multiple targets and includes attack rolls or damage rolls, those rolls are made separately against each target.\n\nLine of effect: There must be line of effect between the power's origin square and the target.\n\nLine of sight: Unless otherwise noted, the user does not have to be able to see the target, though concealment can still apply.\n\nRange is specified in the power entry.\n\nMelee subterms and aliases:\n\nMelee [number]: The target must be within the specified number of squares of the origin square.\n\nMelee 1: Adjacent target only.\n\nMelee 0: Target must share the attacker's space.\n\nMelee weapon: Target must be within the reach of the melee weapon used with the power. Unless otherwise noted, reach is 1. If a creature has reach greater than 1, use the creature's reach for the power's range; if that creature also uses a reach weapon (reach greater than 1), add 1 to the creature's reach.\n\nMelee touch: Target must be within the reach of the power's user.\n\nReach: Reach determines how far a melee attack can target from the attacker.",
+    "publishedIn": "Rules Compendium, Chapter 3 (Attack and Utility Types: Melee Powers; Melee Attacks), Player's Handbook.",
+    "html": null,
+    "aliases": [
+      "melee",
+      "Melee 1"
+    ]
   },
   {
     "id": "glossary_custom_ranged",
     "name": "Ranged",
     "category": "Rules",
-    "type": "Attack Type",
-    "sourceBook": "MM, PHB, RC",
-    "definition": "A ranged attack targets creatures at distance within the power's range.",
-    "publishedIn": "Monster Manual, Player's Handbook, Rules Compendium.",
-    "html": null
-  },
-  {
-    "id": "glossary_custom_free_action",
-    "name": "Free Action",
-    "category": "Rules",
-    "type": "Action Economy",
+    "type": "Rules Combat",
     "sourceBook": "PHB, RC",
-    "definition": "A free action usually does not consume a standard, move, or minor action.",
-    "publishedIn": "Player's Handbook, Rules Compendium.",
-    "html": null
+    "definition": "A ranged power is an attack or utility power that affects distant targets.\n\nOrigin square: A ranged power's origin square is the space of the power's user, unless otherwise noted.\n\nTargets: A ranged power targets individuals specified by the power (for example, one creature, one enemy, or one or two creatures).\n\nMultiple targets: If a ranged power has multiple targets and includes attack rolls or damage rolls, those rolls are made separately against each target.\n\nLine of effect: A target must be within line of effect of the power's origin square.\n\nLine of sight: Unless otherwise noted, the user does not have to be able to see the target, though concealment can apply.\n\nProvokes opportunity attacks: Using a ranged power provokes opportunity attacks.\n\nRanged subterms and aliases:\n\nRanged [number]: The target must be within the specified number of squares of the power's origin square.\n\nRanged weapon: Uses the weapon's listed normal range and long range. Attacks beyond normal range and within long range take a -2 penalty to attack rolls. Targets beyond long range cannot be attacked.\n\nRanged sight: The target must be a creature the power's user can see.\n\nRanged attack details (shared by ranged attack powers)\n\nTargeted: Ranged attacks target individuals. A ranged attack against multiple enemies consists of separate attacks, each with its own attack roll and damage roll. Ranged attacks don't create areas of effect.\n\nAmmunition: If you use a projectile weapon to make a ranged attack against multiple targets, you need one piece of ammunition for each target, and if you use thrown weapons, you need one for each target. The DM might ignore this rule and allow limitless ammunition.\n\nRange (attacks): Some powers set a specific range (for example, \"Ranged 10\") or allow you to attack any target you can see (Ranged sight). If you are using a weapon, the attack's range is the range of that weapon, as given on the weapon's statistics.",
+    "publishedIn": "Rules Compendium, Chapter 3 (Attack and Utility Types: Ranged Powers; Ranged Attacks), Player's Handbook.",
+    "html": null,
+    "aliases": [
+      "ranged",
+      "Ranged 10"
+    ]
   },
   {
     "id": "glossary_custom_immediate_interrupt",
@@ -4966,16 +4800,6 @@
     "type": "Size",
     "sourceBook": "MM, RC",
     "definition": "Tiny is the smallest standard creature size category. Typical space is 1/2 square by 1/2 square, and typical reach is 0 (cannot normally make melee attacks beyond its own square unless a power says otherwise).",
-    "publishedIn": "Monster Manual, Rules Compendium.",
-    "html": null
-  },
-  {
-    "id": "glossary_custom_small",
-    "name": "Small",
-    "category": "Monsters",
-    "type": "Size",
-    "sourceBook": "MM, RC",
-    "definition": "Small creatures typically occupy a space of 1 square by 1 square and have reach 1. Small and Medium creatures use the same default combat space on the grid.",
     "publishedIn": "Monster Manual, Rules Compendium.",
     "html": null
   },
@@ -5030,56 +4854,6 @@
     "html": null
   },
   {
-    "id": "glossary_custom_standard_alias",
-    "name": "standard",
-    "category": "Rules",
-    "type": "Rules Combat",
-    "sourceBook": "PHB, RC",
-    "definition": "Standard Action: The main action on your turn, usually used to attack or use a major power. You normally take one standard action on your turn. You can trade down a standard action for a move action or a minor action.",
-    "publishedIn": "Player's Handbook, Rules Compendium.",
-    "html": null
-  },
-  {
-    "id": "glossary_custom_move_alias",
-    "name": "move",
-    "category": "Rules",
-    "type": "Rules Combat",
-    "sourceBook": "PHB, RC",
-    "definition": "Move Action: An action used for movement and movement-related tasks, such as moving your speed, shifting, or standing up. You normally take one move action on your turn. You can trade down a move action for a minor action.",
-    "publishedIn": "Player's Handbook, Rules Compendium.",
-    "html": null
-  },
-  {
-    "id": "glossary_custom_minor_alias",
-    "name": "minor",
-    "category": "Rules",
-    "type": "Rules Combat",
-    "sourceBook": "PHB, RC",
-    "definition": "Minor Action: A type of action that takes less time than a standard action. On your turn, you can normally take one minor action in addition to your move and standard actions. Minor actions include tasks such as drawing a weapon, opening a door, or sustaining certain powers. You can trade down actions (for example, a move action can be used as a minor action).",
-    "publishedIn": "Player's Handbook, Rules Compendium.",
-    "html": null
-  },
-  {
-    "id": "glossary_custom_immediate_alias",
-    "name": "immediate",
-    "category": "Rules",
-    "type": "Rules Combat",
-    "sourceBook": "PHB, RC",
-    "definition": "Immediate Action: A triggered action taken in response to an event, usually on another creature's turn. Immediate actions are either interrupts or reactions. You can take no more than one immediate action per round, and you cannot take an immediate action on your own turn.",
-    "publishedIn": "Player's Handbook, Rules Compendium.",
-    "html": null
-  },
-  {
-    "id": "glossary_custom_reach_alias",
-    "name": "reach",
-    "category": "Rules",
-    "type": "Rules Combat",
-    "sourceBook": "PHB, RC",
-    "definition": "Melee shorthand for Melee Attack reach and adjacency. Reach determines how far a melee attack can target from the attacker.",
-    "publishedIn": "Player's Handbook, Rules Compendium.",
-    "html": null
-  },
-  {
     "id": "glossary_custom_personal_attack",
     "name": "Personal",
     "category": "Rules",
@@ -5087,56 +4861,29 @@
     "sourceBook": "PHB, RC",
     "definition": "Personal indicates a power that affects only the user (the creature using the power), rather than targeting other creatures.",
     "publishedIn": "Player's Handbook, Rules Compendium.",
+    "html": null,
+    "aliases": [
+      "personal"
+    ]
+  },
+  {
+    "id": "glossary_custom_role_alias",
+    "name": "role",
+    "category": "Monsters",
+    "type": "Role",
+    "sourceBook": "MM, RC",
+    "definition": "A monster's role describes its primary tactical function in combat.\n\nA role indicates how a monster attacks, where it performs best on the battlefield, and what kinds of allies it works with most effectively. Role is used together with level and rank when building encounters.\n\nRole and rank are separate concepts. Rank (such as standard, minion, elite, and solo) determines a monster's relative durability and encounter value, while role determines combat behavior.\n\nRole subterms and aliases:\n\nRole artillery: Specializes in high-accuracy ranged and area attacks. Often has good defenses against ranged or area attacks. Low hit points. Best paired with brutes or soldiers.\n\nRole brute: Specializes in high-damage melee attacks. High hit points. Often simpler to run than other monsters. Good at protecting artillery or controllers.\n\nRole controller: Specializes in forced movement and other forms of manipulation. Often more complex to run than other monsters. Benefits from brutes or soldiers for protection.\n\nRole lurker: Usually alternates high-damage attacks with an ability to escape counterattacks. Low hit points. Tricky to oppose effectively. Benefits from brutes or soldiers that draw adventurers' attention.\n\nRole skirmisher: Specializes in mobility and clever positioning during battle. Prefers to attack on the move or with combat advantage. Benefits from brutes or soldiers that draw adventurers' attention.\n\nRole soldier: Specializes in melee attacks and close-range control effects. Punishes foes for attacking its allies. High defenses. Good at protecting artillery or controllers.\n\nRole leader: A subrole that can be combined with other roles (a soldier leader or a solo controller leader, for instance). Grants its allies bonuses to attack rolls, damage rolls, defenses, or other statistics. Sometimes allows its allies to heal.",
+    "publishedIn": "Monster Manual, page(s) 286-287, Rules Compendium, page(s) 287.",
     "html": null
   },
   {
-    "id": "glossary_custom_melee_alias",
-    "name": "melee",
-    "category": "Rules",
-    "type": "Rules Combat",
-    "sourceBook": "PHB, RC",
-    "definition": "Melee shorthand for Melee Attack.",
-    "publishedIn": "Player's Handbook, Rules Compendium.",
-    "html": null
-  },
-  {
-    "id": "glossary_custom_ranged_alias",
-    "name": "ranged",
-    "category": "Rules",
-    "type": "Rules Combat",
-    "sourceBook": "PHB, RC",
-    "definition": "Ranged shorthand for Ranged Attack.",
-    "publishedIn": "Player's Handbook, Rules Compendium.",
-    "html": null
-  },
-  {
-    "id": "glossary_custom_close_alias",
-    "name": "close",
-    "category": "Rules",
-    "type": "Rules Combat",
-    "sourceBook": "PHB, RC",
-    "definition": "Close shorthand for Close Attack.",
-    "publishedIn": "Player's Handbook, Rules Compendium.",
-    "html": null
-  },
-  {
-    "id": "glossary_custom_area_alias",
-    "name": "area",
-    "category": "Rules",
-    "type": "Rules Combat",
-    "sourceBook": "PHB, RC",
-    "definition": "Area shorthand for Area Attack.",
-    "publishedIn": "Player's Handbook, Rules Compendium.",
-    "html": null
-  },
-  {
-    "id": "glossary_custom_personal_alias",
-    "name": "personal",
-    "category": "Rules",
-    "type": "Rules Combat",
-    "sourceBook": "PHB, RC",
-    "definition": "Personal shorthand for Personal.",
-    "publishedIn": "Player's Handbook, Rules Compendium.",
+    "id": "glossary_custom_origin_alias",
+    "name": "origin",
+    "category": "Monsters",
+    "type": "Origin",
+    "sourceBook": "MM, MM2, RC, PHB3, MV:TttNV",
+    "definition": "A monster's origin describes the fundamental plane or cosmological source from which the creature comes.\n\nOrigin is a core monster descriptor used with role, type, and keywords to communicate a creature's nature and place in the world.\n\nOrigin subterms and aliases:\n\nOrigin aberrant: Aberrant creatures are native to or shaped by the Far Realm.\n\nOrigin elemental: Elemental creatures are native to the Elemental Chaos.\n\nOrigin fey: Fey creatures are native to the Feywild.\n\nOrigin immortal: Immortal creatures are native to the Astral Sea. Unless they are killed, they live forever.\n\nOrigin natural: Natural creatures are native to the natural world.\n\nOrigin shadow: Shadow creatures are native to the Shadowfell.",
+    "publishedIn": "Monster Manual, page(s) 281, Monster Manual 2, page(s) 217, Rules Compendium, page(s) 311, Player's Handbook 3, page(s) 220, Monster Vault: Threats to the Nentir Vale, page(s) 123.",
     "html": null
   }
 ]
