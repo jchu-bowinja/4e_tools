@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import type { RulesIndex } from "../../rules/models";
 import { resolveTooltipText } from "../../data/tooltipGlossary";
+import { positionFixedTooltip } from "../../ui/glossaryTooltipPosition";
 import { RulesRichText } from "../builder/RulesRichText";
 import {
   loadMonsterEntry,
@@ -202,7 +203,7 @@ function splitFailedEscapeAttemptSections(text: string): { mainText: string; fai
 function renderStatValue(
   value: unknown,
   startGlossaryHover: (event: ReactMouseEvent<HTMLElement>, key: MonsterGlossaryHoverKey) => void,
-  stopGlossaryHover: () => void
+  leaveGlossaryHover: () => void
 ): JSX.Element {
   if (Array.isArray(value)) {
     if (value.length === 0) {
@@ -220,7 +221,7 @@ function renderStatValue(
                 <span key={`${movementType}-${index}`} style={{ whiteSpace: "nowrap" }}>
                   <span
                     onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${movementType}`)}
-                    onMouseLeave={stopGlossaryHover}
+                    onMouseLeave={leaveGlossaryHover}
                     style={{ cursor: "help", borderBottom: "1px dotted var(--text-muted)", marginRight: "0.3rem" }}
                   >
                     {movementType}
@@ -254,7 +255,7 @@ function renderStatValue(
           <span key={nestedKey} style={{ whiteSpace: "nowrap" }}>
             <span
               onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${nestedKey}`)}
-              onMouseLeave={stopGlossaryHover}
+              onMouseLeave={leaveGlossaryHover}
               style={{ cursor: "help", borderBottom: "1px dotted var(--text-muted)", marginRight: "0.3rem" }}
             >
               {formatStatLabel(nestedKey)}
@@ -610,7 +611,7 @@ function renderOutcomeEntry(
   idx: number,
   title: string,
   startGlossaryHover: (event: ReactMouseEvent<HTMLElement>, key: MonsterGlossaryHoverKey) => void,
-  stopGlossaryHover: () => void
+  leaveGlossaryHover: () => void
 ): JSX.Element {
   const damageSummary = renderDamageSummary(entry.damage);
   return (
@@ -630,7 +631,7 @@ function renderOutcomeEntry(
         <div style={{ marginTop: "0.2rem" }}>
           <div style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)" }}>Aftereffects</div>
           {entry.aftereffects.map((nested, nestedIdx) =>
-            renderOutcomeEntry(nested, nestedIdx, "Aftereffect", startGlossaryHover, stopGlossaryHover)
+            renderOutcomeEntry(nested, nestedIdx, "Aftereffect", startGlossaryHover, leaveGlossaryHover)
           )}
         </div>
       ) : null}
@@ -638,7 +639,7 @@ function renderOutcomeEntry(
         <div style={{ marginTop: "0.2rem" }}>
           <div style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)" }}>Sustains</div>
           {entry.sustains.map((nested, nestedIdx) =>
-            renderOutcomeEntry(nested, nestedIdx, "Sustain", startGlossaryHover, stopGlossaryHover)
+            renderOutcomeEntry(nested, nestedIdx, "Sustain", startGlossaryHover, leaveGlossaryHover)
           )}
         </div>
       ) : null}
@@ -648,7 +649,7 @@ function renderOutcomeEntry(
             Failed Saving Throws
           </div>
           {entry.failedSavingThrows.map((nested, nestedIdx) =>
-            renderOutcomeEntry(nested, nestedIdx, "Failed Save", startGlossaryHover, stopGlossaryHover)
+            renderOutcomeEntry(nested, nestedIdx, "Failed Save", startGlossaryHover, leaveGlossaryHover)
           )}
         </div>
       ) : null}
@@ -660,7 +661,7 @@ function renderAttackOutcome(
   label: "hit" | "miss" | "effect",
   outcome: MonsterPowerOutcome,
   startGlossaryHover: (event: ReactMouseEvent<HTMLElement>, key: MonsterGlossaryHoverKey) => void,
-  stopGlossaryHover: () => void
+  leaveGlossaryHover: () => void
 ): JSX.Element {
   const damageSummary = renderDamageSummary(outcome.damage);
   return (
@@ -685,14 +686,14 @@ function renderAttackOutcome(
         <div style={{ marginTop: "0.18rem" }}>
           <div style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)" }}>Aftereffects</div>
           {outcome.aftereffects.map((entry, idx) =>
-            renderOutcomeEntry(entry, idx, "Aftereffect", startGlossaryHover, stopGlossaryHover)
+            renderOutcomeEntry(entry, idx, "Aftereffect", startGlossaryHover, leaveGlossaryHover)
           )}
         </div>
       ) : null}
       {outcome.sustains?.length ? (
         <div style={{ marginTop: "0.18rem" }}>
           <div style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)" }}>Sustains</div>
-          {outcome.sustains.map((entry, idx) => renderOutcomeEntry(entry, idx, "Sustain", startGlossaryHover, stopGlossaryHover))}
+          {outcome.sustains.map((entry, idx) => renderOutcomeEntry(entry, idx, "Sustain", startGlossaryHover, leaveGlossaryHover))}
         </div>
       ) : null}
       {outcome.failedSavingThrows?.length ? (
@@ -701,7 +702,7 @@ function renderAttackOutcome(
             Failed Saving Throws
           </div>
           {outcome.failedSavingThrows.map((entry, idx) =>
-            renderOutcomeEntry(entry, idx, "Failed Save", startGlossaryHover, stopGlossaryHover)
+            renderOutcomeEntry(entry, idx, "Failed Save", startGlossaryHover, leaveGlossaryHover)
           )}
         </div>
       ) : null}
@@ -712,7 +713,7 @@ function renderAttackOutcome(
 function renderPowerAttacks(
   power: MonsterPower,
   startGlossaryHover: (event: ReactMouseEvent<HTMLElement>, key: MonsterGlossaryHoverKey) => void,
-  stopGlossaryHover: () => void
+  leaveGlossaryHover: () => void
 ): JSX.Element | null {
   if (!power.attacks?.length) return null;
   return (
@@ -730,9 +731,9 @@ function renderPowerAttacks(
             <div style={{ fontSize: "0.74rem", color: "var(--text-muted)", marginTop: "0.06rem" }}>
               {[attack.range, attack.targets, bonusText].filter(Boolean).join(" • ") || "No range/target/bonus details"}
             </div>
-            {attack.hit ? renderAttackOutcome("hit", attack.hit, startGlossaryHover, stopGlossaryHover) : null}
-            {attack.miss ? renderAttackOutcome("miss", attack.miss, startGlossaryHover, stopGlossaryHover) : null}
-            {attack.effect ? renderAttackOutcome("effect", attack.effect, startGlossaryHover, stopGlossaryHover) : null}
+            {attack.hit ? renderAttackOutcome("hit", attack.hit, startGlossaryHover, leaveGlossaryHover) : null}
+            {attack.miss ? renderAttackOutcome("miss", attack.miss, startGlossaryHover, leaveGlossaryHover) : null}
+            {attack.effect ? renderAttackOutcome("effect", attack.effect, startGlossaryHover, leaveGlossaryHover) : null}
           </div>
         );
       })}
@@ -776,6 +777,8 @@ export function MonsterEditorApp({
   const [glossaryHoverKey, setGlossaryHoverKey] = useState<MonsterGlossaryHoverKey | null>(null);
   const [glossaryHoverPanelPos, setGlossaryHoverPanelPos] = useState<{ top: number; left: number } | null>(null);
   const glossaryHoverTimerRef = useRef<number | null>(null);
+  const glossaryHoverCloseTimerRef = useRef<number | null>(null);
+  const GLOSSARY_HOVER_CLOSE_DELAY_MS = 400;
 
   useEffect(() => {
     void (async () => {
@@ -815,6 +818,9 @@ export function MonsterEditorApp({
       if (glossaryHoverTimerRef.current != null) {
         window.clearTimeout(glossaryHoverTimerRef.current);
       }
+      if (glossaryHoverCloseTimerRef.current != null) {
+        window.clearTimeout(glossaryHoverCloseTimerRef.current);
+      }
     };
   }, []);
 
@@ -822,6 +828,10 @@ export function MonsterEditorApp({
     if (glossaryHoverTimerRef.current != null) {
       window.clearTimeout(glossaryHoverTimerRef.current);
       glossaryHoverTimerRef.current = null;
+    }
+    if (glossaryHoverCloseTimerRef.current != null) {
+      window.clearTimeout(glossaryHoverCloseTimerRef.current);
+      glossaryHoverCloseTimerRef.current = null;
     }
     setShowGlossaryHoverInfo(false);
     setGlossaryHoverKey(null);
@@ -948,11 +958,28 @@ export function MonsterEditorApp({
     return <div>No glossary entry found in `generated/glossary_terms.json` or `generated/rules_index.json`.</div>;
   }
 
+  function cancelGlossaryHoverCloseTimer(): void {
+    if (glossaryHoverCloseTimerRef.current != null) {
+      window.clearTimeout(glossaryHoverCloseTimerRef.current);
+      glossaryHoverCloseTimerRef.current = null;
+    }
+  }
+
+  function hideGlossaryHoverNow(): void {
+    cancelGlossaryHoverCloseTimer();
+    if (glossaryHoverTimerRef.current != null) {
+      window.clearTimeout(glossaryHoverTimerRef.current);
+      glossaryHoverTimerRef.current = null;
+    }
+    setShowGlossaryHoverInfo(false);
+    setGlossaryHoverKey(null);
+    setGlossaryHoverPanelPos(null);
+  }
+
   function startGlossaryHover(event: ReactMouseEvent<HTMLElement>, key: MonsterGlossaryHoverKey): void {
+    cancelGlossaryHoverCloseTimer();
     const rect = event.currentTarget.getBoundingClientRect();
-    const panelWidth = 340;
-    const left = Math.max(12, Math.min(rect.left, window.innerWidth - panelWidth - 12));
-    const top = Math.min(rect.bottom + 8, window.innerHeight - 180);
+    const { top, left } = positionFixedTooltip(rect, { panelWidth: 340, maxHeightVh: 50 });
     setGlossaryHoverPanelPos({ top, left });
     setGlossaryHoverKey(key);
     if (glossaryHoverTimerRef.current != null) {
@@ -964,14 +991,11 @@ export function MonsterEditorApp({
     }, 1000);
   }
 
-  function stopGlossaryHover(): void {
-    if (glossaryHoverTimerRef.current != null) {
-      window.clearTimeout(glossaryHoverTimerRef.current);
-      glossaryHoverTimerRef.current = null;
-    }
-    setShowGlossaryHoverInfo(false);
-    setGlossaryHoverKey(null);
-    setGlossaryHoverPanelPos(null);
+  function leaveGlossaryHover(): void {
+    cancelGlossaryHoverCloseTimer();
+    glossaryHoverCloseTimerRef.current = window.setTimeout(() => {
+      hideGlossaryHoverNow();
+    }, GLOSSARY_HOVER_CLOSE_DELAY_MS);
   }
 
   return (
@@ -1128,7 +1152,7 @@ export function MonsterEditorApp({
                 <div style={{ color: "var(--text-secondary)", fontSize: "0.85rem" }}>
                   <span
                     onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Level")}
-                    onMouseLeave={stopGlossaryHover}
+                    onMouseLeave={leaveGlossaryHover}
                     style={{ cursor: "help", borderBottom: "1px dotted var(--text-muted)" }}
                   >
                     Level
@@ -1138,7 +1162,7 @@ export function MonsterEditorApp({
                     onMouseEnter={(event) =>
                       startGlossaryHover(event, `glossaryTerm:${activeMonster.role || "Role"}`)
                     }
-                    onMouseLeave={stopGlossaryHover}
+                    onMouseLeave={leaveGlossaryHover}
                     style={{ cursor: "help", borderBottom: "1px dotted var(--text-muted)" }}
                   >
                     {activeMonster.role || ""}
@@ -1149,7 +1173,7 @@ export function MonsterEditorApp({
                     onMouseEnter={(event) =>
                       startGlossaryHover(event, `glossaryTerm:${activeMonster.size || "Size"}`)
                     }
-                    onMouseLeave={stopGlossaryHover}
+                    onMouseLeave={leaveGlossaryHover}
                     style={{ cursor: "help", borderBottom: "1px dotted var(--text-muted)" }}
                   >
                     {activeMonster.size || "Unknown size"}
@@ -1159,7 +1183,7 @@ export function MonsterEditorApp({
                     onMouseEnter={(event) =>
                       startGlossaryHover(event, `glossaryTerm:${activeMonster.origin || "Origin"}`)
                     }
-                    onMouseLeave={stopGlossaryHover}
+                    onMouseLeave={leaveGlossaryHover}
                     style={{ cursor: "help", borderBottom: "1px dotted var(--text-muted)" }}
                   >
                     {activeMonster.origin || "Unknown origin"}
@@ -1169,7 +1193,7 @@ export function MonsterEditorApp({
                     onMouseEnter={(event) =>
                       startGlossaryHover(event, `glossaryTerm:${activeMonster.type || "Type"}`)
                     }
-                    onMouseLeave={stopGlossaryHover}
+                    onMouseLeave={leaveGlossaryHover}
                     style={{ cursor: "help", borderBottom: "1px dotted var(--text-muted)" }}
                   >
                     {activeMonster.type || "Unknown type"}
@@ -1177,7 +1201,7 @@ export function MonsterEditorApp({
                   •{" "}
                   <span
                     onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Experience")}
-                    onMouseLeave={stopGlossaryHover}
+                    onMouseLeave={leaveGlossaryHover}
                     style={{ cursor: "help", borderBottom: "1px dotted var(--text-muted)" }}
                   >
                     XP
@@ -1221,7 +1245,7 @@ export function MonsterEditorApp({
                 <div style={{ border: "1px solid var(--panel-border)", borderRadius: 6, padding: "0.6rem", background: "var(--surface-1)" }}>
                   <div
                     onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Role")}
-                    onMouseLeave={stopGlossaryHover}
+                    onMouseLeave={leaveGlossaryHover}
                     style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 700, cursor: "help", width: "fit-content", borderBottom: "1px dotted var(--text-muted)" }}
                   >
                     Role
@@ -1230,14 +1254,14 @@ export function MonsterEditorApp({
                     onMouseEnter={(event) =>
                       startGlossaryHover(event, `glossaryTerm:${activeMonster.role || "Role"}`)
                     }
-                    onMouseLeave={stopGlossaryHover}
+                    onMouseLeave={leaveGlossaryHover}
                     style={{ fontWeight: 600, cursor: "help", width: "fit-content", borderBottom: "1px dotted var(--text-muted)", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
                   >
                     {formatValue(activeMonster.role)}
                     {activeMonster.isLeader ? (
                       <span
                         onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Leader")}
-                        onMouseLeave={stopGlossaryHover}
+                        onMouseLeave={leaveGlossaryHover}
                         style={{
                           fontSize: "0.68rem",
                           fontWeight: 700,
@@ -1259,14 +1283,14 @@ export function MonsterEditorApp({
                 <div style={{ border: "1px solid var(--panel-border)", borderRadius: 6, padding: "0.6rem", background: "var(--surface-1)" }}>
                   <div
                     onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Level")}
-                    onMouseLeave={stopGlossaryHover}
+                    onMouseLeave={leaveGlossaryHover}
                     style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 700, cursor: "help", width: "fit-content", borderBottom: "1px dotted var(--text-muted)" }}
                   >
                     Level / XP
                   </div>
                   <div
                     onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Level")}
-                    onMouseLeave={stopGlossaryHover}
+                    onMouseLeave={leaveGlossaryHover}
                     style={{ fontWeight: 600, cursor: "help", width: "fit-content", borderBottom: "1px dotted var(--text-muted)" }}
                   >
                     {formatValue(activeMonster.level)} / {formatValue(activeMonster.xp)}
@@ -1275,7 +1299,7 @@ export function MonsterEditorApp({
                 <div style={{ border: "1px solid var(--panel-border)", borderRadius: 6, padding: "0.6rem", background: "var(--surface-1)" }}>
                   <div
                     onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Size")}
-                    onMouseLeave={stopGlossaryHover}
+                    onMouseLeave={leaveGlossaryHover}
                     style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 700, cursor: "help", width: "fit-content", borderBottom: "1px dotted var(--text-muted)" }}
                   >
                     Size
@@ -1284,7 +1308,7 @@ export function MonsterEditorApp({
                     onMouseEnter={(event) =>
                       startGlossaryHover(event, `glossaryTerm:${activeMonster.size || "Size"}`)
                     }
-                    onMouseLeave={stopGlossaryHover}
+                    onMouseLeave={leaveGlossaryHover}
                     style={{ fontWeight: 600, cursor: "help", width: "fit-content", borderBottom: "1px dotted var(--text-muted)" }}
                   >
                     {formatValue(activeMonster.size)}
@@ -1293,7 +1317,7 @@ export function MonsterEditorApp({
                 <div style={{ border: "1px solid var(--panel-border)", borderRadius: 6, padding: "0.6rem", background: "var(--surface-1)" }}>
                   <div
                     onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Origin")}
-                    onMouseLeave={stopGlossaryHover}
+                    onMouseLeave={leaveGlossaryHover}
                     style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 700, cursor: "help", width: "fit-content", borderBottom: "1px dotted var(--text-muted)" }}
                   >
                     Origin
@@ -1302,7 +1326,7 @@ export function MonsterEditorApp({
                     onMouseEnter={(event) =>
                       startGlossaryHover(event, `glossaryTerm:${activeMonster.origin || "Origin"}`)
                     }
-                    onMouseLeave={stopGlossaryHover}
+                    onMouseLeave={leaveGlossaryHover}
                     style={{ fontWeight: 600, cursor: "help", width: "fit-content", borderBottom: "1px dotted var(--text-muted)" }}
                   >
                     {formatValue(activeMonster.origin)}
@@ -1311,7 +1335,7 @@ export function MonsterEditorApp({
                 <div style={{ border: "1px solid var(--panel-border)", borderRadius: 6, padding: "0.6rem", background: "var(--surface-1)" }}>
                   <div
                     onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Type")}
-                    onMouseLeave={stopGlossaryHover}
+                    onMouseLeave={leaveGlossaryHover}
                     style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 700, cursor: "help", width: "fit-content", borderBottom: "1px dotted var(--text-muted)" }}
                   >
                     Type
@@ -1320,7 +1344,7 @@ export function MonsterEditorApp({
                     onMouseEnter={(event) =>
                       startGlossaryHover(event, `glossaryTerm:${activeMonster.type || "Type"}`)
                     }
-                    onMouseLeave={stopGlossaryHover}
+                    onMouseLeave={leaveGlossaryHover}
                     style={{ fontWeight: 600, cursor: "help", width: "fit-content", borderBottom: "1px dotted var(--text-muted)" }}
                   >
                     {formatValue(activeMonster.type)}
@@ -1329,14 +1353,14 @@ export function MonsterEditorApp({
                 <div style={{ border: "1px solid var(--panel-border)", borderRadius: 6, padding: "0.6rem", background: "var(--surface-1)" }}>
                   <div
                     onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Phasing")}
-                    onMouseLeave={stopGlossaryHover}
+                    onMouseLeave={leaveGlossaryHover}
                     style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 700, cursor: "help", width: "fit-content", borderBottom: "1px dotted var(--text-muted)" }}
                   >
                     Phasing
                   </div>
                   <div
                     onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Phasing")}
-                    onMouseLeave={stopGlossaryHover}
+                    onMouseLeave={leaveGlossaryHover}
                     style={{ fontWeight: 600, cursor: "help", width: "fit-content", borderBottom: "1px dotted var(--text-muted)" }}
                   >
                     {formatValue(activeMonster.phasing as string | number | boolean | undefined | null)}
@@ -1375,7 +1399,7 @@ export function MonsterEditorApp({
                             >
                               <span
                                 onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${k}`)}
-                                onMouseLeave={stopGlossaryHover}
+                                onMouseLeave={leaveGlossaryHover}
                                 style={{
                                   cursor: "help",
                                   borderBottom: "1px dotted var(--text-muted)",
@@ -1386,7 +1410,7 @@ export function MonsterEditorApp({
                               >
                                 {formatStatLabel(k)}
                               </span>
-                              {renderStatValue(v, startGlossaryHover, stopGlossaryHover)}
+                              {renderStatValue(v, startGlossaryHover, leaveGlossaryHover)}
                             </div>
                           ))}
                     </div>
@@ -1592,7 +1616,7 @@ export function MonsterEditorApp({
                                 <span key={`${power.name}-${index}-usage-${part}`}>
                                   <span
                                     onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${part}`)}
-                                    onMouseLeave={stopGlossaryHover}
+                                    onMouseLeave={leaveGlossaryHover}
                                     style={{
                                       fontWeight: 700,
                                       color: "var(--text-primary)",
@@ -1624,7 +1648,7 @@ export function MonsterEditorApp({
                                 <span key={`${power.name}-${index}-attackline-${partIdx}`}>
                                   <span
                                     onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${part}`)}
-                                    onMouseLeave={stopGlossaryHover}
+                                    onMouseLeave={leaveGlossaryHover}
                                     style={{
                                       cursor: "help",
                                       borderBottom: "1px dotted var(--text-muted)",
@@ -1645,7 +1669,7 @@ export function MonsterEditorApp({
                                 <span key={`${power.name}-${index}-kw-${keyword}`}>
                                   <span
                                     onMouseEnter={(event) => startGlossaryHover(event, `powerKeyword:${keyword}`)}
-                                    onMouseLeave={stopGlossaryHover}
+                                    onMouseLeave={leaveGlossaryHover}
                                     style={{
                                       color: "var(--text-primary)",
                                       cursor: "help",
@@ -1706,7 +1730,7 @@ export function MonsterEditorApp({
                                         <span key={`${power.name}-${index}-secondary-${secondaryIndex}-attackline-${partIdx}`}>
                                           <span
                                             onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${part}`)}
-                                            onMouseLeave={stopGlossaryHover}
+                                            onMouseLeave={leaveGlossaryHover}
                                             style={{
                                               cursor: "help",
                                               borderBottom: "1px dotted var(--text-muted)",
@@ -1833,6 +1857,8 @@ export function MonsterEditorApp({
 
       {showGlossaryHoverInfo && glossaryHoverKey && glossaryHoverPanelPos && (
         <div
+          onMouseEnter={cancelGlossaryHoverCloseTimer}
+          onMouseLeave={leaveGlossaryHover}
           style={{
             position: "fixed",
             top: glossaryHoverPanelPos.top,

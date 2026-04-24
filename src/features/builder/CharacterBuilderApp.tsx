@@ -61,6 +61,7 @@ import { pruneStalePowerSelections } from "../../rules/powerSelections";
 import { summarizeImplementAttack, summarizeMainWeaponAttack } from "../../rules/weaponAttack";
 import { RulesRichText } from "./RulesRichText";
 import { NEUTRAL_PAGE_BG } from "../../ui/tokens";
+import { positionFixedTooltip } from "../../ui/glossaryTooltipPosition";
 import { resolveTooltipText } from "../../data/tooltipGlossary";
 import {
   ensureSelectedEntityInFiltered,
@@ -667,6 +668,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   const [glossaryHoverKey, setGlossaryHoverKey] = useState<BuilderGlossaryKey | null>(null);
   const [glossaryHoverPanelPos, setGlossaryHoverPanelPos] = useState<{ top: number; left: number } | null>(null);
   const glossaryHoverTimerRef = useRef<number | null>(null);
+  const glossaryHoverCloseTimerRef = useRef<number | null>(null);
+  const GLOSSARY_HOVER_CLOSE_DELAY_MS = 400;
   const rulesById = useMemo(() => buildRulesIdLookup(index), [index]);
 
   const selectedRace = index.races.find((r) => r.id === build.raceId);
@@ -761,6 +764,9 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       if (glossaryHoverTimerRef.current != null) {
         window.clearTimeout(glossaryHoverTimerRef.current);
       }
+      if (glossaryHoverCloseTimerRef.current != null) {
+        window.clearTimeout(glossaryHoverCloseTimerRef.current);
+      }
     };
   }, []);
 
@@ -796,11 +802,28 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     return <div>No glossary entry found in `generated/glossary_terms.json` or `generated/rules_index.json`.</div>;
   }
 
+  function cancelGlossaryHoverCloseTimer(): void {
+    if (glossaryHoverCloseTimerRef.current != null) {
+      window.clearTimeout(glossaryHoverCloseTimerRef.current);
+      glossaryHoverCloseTimerRef.current = null;
+    }
+  }
+
+  function hideGlossaryHoverNow(): void {
+    cancelGlossaryHoverCloseTimer();
+    if (glossaryHoverTimerRef.current != null) {
+      window.clearTimeout(glossaryHoverTimerRef.current);
+      glossaryHoverTimerRef.current = null;
+    }
+    setShowGlossaryHoverInfo(false);
+    setGlossaryHoverKey(null);
+    setGlossaryHoverPanelPos(null);
+  }
+
   function startGlossaryHover(event: React.MouseEvent<HTMLElement>, key: BuilderGlossaryKey): void {
+    cancelGlossaryHoverCloseTimer();
     const rect = event.currentTarget.getBoundingClientRect();
-    const panelWidth = 360;
-    const left = Math.max(12, Math.min(rect.left, window.innerWidth - panelWidth - 12));
-    const top = Math.min(rect.bottom + 8, window.innerHeight - 180);
+    const { top, left } = positionFixedTooltip(rect, { panelWidth: 360, maxHeightVh: 48 });
     setGlossaryHoverPanelPos({ top, left });
     setGlossaryHoverKey(key);
     if (glossaryHoverTimerRef.current != null) {
@@ -812,14 +835,11 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     }, 1000);
   }
 
-  function stopGlossaryHover(): void {
-    if (glossaryHoverTimerRef.current != null) {
-      window.clearTimeout(glossaryHoverTimerRef.current);
-      glossaryHoverTimerRef.current = null;
-    }
-    setShowGlossaryHoverInfo(false);
-    setGlossaryHoverKey(null);
-    setGlossaryHoverPanelPos(null);
+  function leaveGlossaryHover(): void {
+    cancelGlossaryHoverCloseTimer();
+    glossaryHoverCloseTimerRef.current = window.setTimeout(() => {
+      hideGlossaryHoverNow();
+    }, GLOSSARY_HOVER_CLOSE_DELAY_MS);
   }
 
   const skillSheetRows = useMemo(() => {
@@ -1272,7 +1292,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
           key: `${cardKey}-card`,
           keywordTooltip: powerKeywordTooltip,
           onKeywordMouseEnter: (event, keyword) => startGlossaryHover(event, `powerKeyword:${keyword}`),
-          onKeywordMouseLeave: stopGlossaryHover
+          onKeywordMouseLeave: leaveGlossaryHover
         })}
         <PowerConstructionSelects power={p} build={build} onChange={updateBuild} />
       </div>
@@ -1768,7 +1788,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                                         key: `race-tab-${g.traitId}-${p.id}`,
                                         keywordTooltip: powerKeywordTooltip,
                                         onKeywordMouseEnter: (event, keyword) => startGlossaryHover(event, `powerKeyword:${keyword}`),
-                                        onKeywordMouseLeave: stopGlossaryHover
+                                        onKeywordMouseLeave: leaveGlossaryHover
                                       })
                                     ) : (
                                       <p style={{ margin: 0, fontSize: "0.82rem", color: "var(--status-warning)" }}>
@@ -1785,7 +1805,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                                     key: `race-tab-${g.traitId}-${p.id}`,
                                     keywordTooltip: powerKeywordTooltip,
                                     onKeywordMouseEnter: (event, keyword) => startGlossaryHover(event, `powerKeyword:${keyword}`),
-                                    onKeywordMouseLeave: stopGlossaryHover
+                                    onKeywordMouseLeave: leaveGlossaryHover
                                   })
                                 )
                               )}
@@ -3915,14 +3935,14 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               <p
                 style={{ margin: 0, fontSize: "0.88rem" }}
                 onMouseEnter={(event) => startGlossaryHover(event, "race")}
-                onMouseLeave={stopGlossaryHover}
+                onMouseLeave={leaveGlossaryHover}
               >
                 <strong>Race:</strong> {selectedRace?.name || "None"}
               </p>
               <p
                 style={{ margin: 0, fontSize: "0.88rem" }}
                 onMouseEnter={(event) => startGlossaryHover(event, "class")}
-                onMouseLeave={stopGlossaryHover}
+                onMouseLeave={leaveGlossaryHover}
               >
                 <strong>Class:</strong>{" "}
                 {isHybridBuild && (selectedHybridA || selectedHybridB)
@@ -3970,7 +3990,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               <p
                 style={{ margin: 0, fontSize: "0.88rem" }}
                 onMouseEnter={(event) => startGlossaryHover(event, "level")}
-                onMouseLeave={stopGlossaryHover}
+                onMouseLeave={leaveGlossaryHover}
               >
                 <strong>Level:</strong> {build.level}
               </p>
@@ -4016,7 +4036,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               <p
                 style={{ margin: 0, fontSize: "0.88rem" }}
                 onMouseEnter={(event) => startGlossaryHover(event, "hp")}
-                onMouseLeave={stopGlossaryHover}
+                onMouseLeave={leaveGlossaryHover}
               >
                 <strong>HP:</strong> {derived.maxHp}
               </p>
@@ -4025,14 +4045,14 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               <p
                 style={{ margin: 0, fontSize: "0.88rem" }}
                 onMouseEnter={(event) => startGlossaryHover(event, "surges")}
-                onMouseLeave={stopGlossaryHover}
+                onMouseLeave={leaveGlossaryHover}
               >
                 <strong>Healing Surges:</strong> {derived.healingSurgesPerDay}
               </p>
               <p
                 style={{ margin: 0, fontSize: "0.88rem" }}
                 onMouseEnter={(event) => startGlossaryHover(event, "surgeValue")}
-                onMouseLeave={stopGlossaryHover}
+                onMouseLeave={leaveGlossaryHover}
               >
                 <strong>Surge Value:</strong> {derived.surgeValue}
               </p>
@@ -4125,7 +4145,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             <p
               style={{ margin: "0 0 0.4rem 0", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--text-secondary)", textTransform: "uppercase" }}
               onMouseEnter={(event) => startGlossaryHover(event, "abilityScores")}
-              onMouseLeave={stopGlossaryHover}
+              onMouseLeave={leaveGlossaryHover}
             >
               Ability Scores
             </p>
@@ -4146,7 +4166,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             <p
               style={{ margin: "0 0 0.4rem 0", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--text-secondary)", textTransform: "uppercase" }}
               onMouseEnter={(event) => startGlossaryHover(event, "skills")}
-              onMouseLeave={stopGlossaryHover}
+              onMouseLeave={leaveGlossaryHover}
             >
               Skills
             </p>
@@ -4179,6 +4199,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
 
           {showGlossaryHoverInfo && glossaryHoverKey && glossaryHoverPanelPos && (
             <div
+              onMouseEnter={cancelGlossaryHoverCloseTimer}
+              onMouseLeave={leaveGlossaryHover}
               style={{
                 position: "fixed",
                 top: glossaryHoverPanelPos.top,

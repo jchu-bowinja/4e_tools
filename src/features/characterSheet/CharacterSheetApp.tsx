@@ -8,6 +8,7 @@ import type { CharacterSheetState, EquipmentSlot, InventoryItem } from "./model"
 import { canEquipItem, computeSheetDerivedData, groupCombatPowers, sheetStateFromBuild } from "./selectors";
 import { loadCharacterSheetState, saveCharacterSheetState } from "./storage";
 import { normalizeTooltipTerm, resolveTooltipText } from "../../data/tooltipGlossary";
+import { positionFixedTooltip } from "../../ui/glossaryTooltipPosition";
 
 type SheetTab = "overview" | "inventory";
 
@@ -337,6 +338,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   const raceHoverTimerRef = useRef<number | null>(null);
   const classHoverTimerRef = useRef<number | null>(null);
   const glossaryHoverTimerRef = useRef<number | null>(null);
+  const glossaryHoverCloseTimerRef = useRef<number | null>(null);
+  const GLOSSARY_HOVER_CLOSE_DELAY_MS = 400;
   const glossaryTermLookupCacheRef = useRef<Map<string, boolean>>(new Map());
 
   const derived = useMemo(() => computeSheetDerivedData(sheet, index), [sheet, index]);
@@ -392,6 +395,9 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
       }
       if (glossaryHoverTimerRef.current != null) {
         window.clearTimeout(glossaryHoverTimerRef.current);
+      }
+      if (glossaryHoverCloseTimerRef.current != null) {
+        window.clearTimeout(glossaryHoverCloseTimerRef.current);
       }
     };
   }, []);
@@ -461,11 +467,28 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     return <div>No glossary entry found in `generated/glossary_terms.json` or `generated/rules_index.json`.</div>;
   }
 
+  function cancelGlossaryHoverCloseTimer(): void {
+    if (glossaryHoverCloseTimerRef.current != null) {
+      window.clearTimeout(glossaryHoverCloseTimerRef.current);
+      glossaryHoverCloseTimerRef.current = null;
+    }
+  }
+
+  function hideGlossaryHoverInfoNow(): void {
+    cancelGlossaryHoverCloseTimer();
+    if (glossaryHoverTimerRef.current != null) {
+      window.clearTimeout(glossaryHoverTimerRef.current);
+      glossaryHoverTimerRef.current = null;
+    }
+    setShowGlossaryHoverInfo(false);
+    setGlossaryHoverKey(null);
+    setGlossaryHoverPanelPos(null);
+  }
+
   function startGlossaryHoverInfoTimer(event: ReactMouseEvent<HTMLElement>, key: GlossaryKey): void {
+    cancelGlossaryHoverCloseTimer();
     const rect = event.currentTarget.getBoundingClientRect();
-    const panelWidth = 340;
-    const left = Math.max(12, Math.min(rect.left, window.innerWidth - panelWidth - 12));
-    const top = Math.min(rect.bottom + 8, window.innerHeight - 180);
+    const { top, left } = positionFixedTooltip(rect, { panelWidth: 340, maxHeightVh: 50 });
     setGlossaryHoverPanelPos({ top, left });
     setGlossaryHoverKey(key);
     if (glossaryHoverTimerRef.current != null) {
@@ -477,14 +500,11 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     }, 1000);
   }
 
-  function stopGlossaryHoverInfoTimerAndHide(): void {
-    if (glossaryHoverTimerRef.current != null) {
-      window.clearTimeout(glossaryHoverTimerRef.current);
-      glossaryHoverTimerRef.current = null;
-    }
-    setShowGlossaryHoverInfo(false);
-    setGlossaryHoverKey(null);
-    setGlossaryHoverPanelPos(null);
+  function leaveGlossaryHoverInfo(): void {
+    cancelGlossaryHoverCloseTimer();
+    glossaryHoverCloseTimerRef.current = window.setTimeout(() => {
+      hideGlossaryHoverInfoNow();
+    }, GLOSSARY_HOVER_CLOSE_DELAY_MS);
   }
 
   function hasGlossaryHoverForTerm(term: string): boolean {
@@ -517,7 +537,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             <span
               key={`${keyPrefix}-${idx}`}
               onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `powerKeyword:${term}`)}
-              onMouseLeave={stopGlossaryHoverInfoTimerAndHide}
+              onMouseLeave={leaveGlossaryHoverInfo}
               style={{
                 cursor: "help",
                 textDecoration: "underline dotted",
@@ -682,7 +702,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           <label
             style={{ ...labelStyle, padding: "0.28rem 0.35rem", border: "1px solid var(--panel-border)", borderRadius: "0.3rem", backgroundColor: "var(--surface-1)" }}
             onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "hp")}
-            onMouseLeave={stopGlossaryHoverInfoTimerAndHide}
+            onMouseLeave={leaveGlossaryHoverInfo}
           >
             Hit Points
             <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
@@ -710,7 +730,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           <label
             style={{ ...labelStyle, padding: "0.28rem 0.35rem", border: "1px solid var(--panel-border)", borderRadius: "0.3rem", backgroundColor: "var(--surface-1)" }}
             onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "surges")}
-            onMouseLeave={stopGlossaryHoverInfoTimerAndHide}
+            onMouseLeave={leaveGlossaryHoverInfo}
           >
             Healing Surges
             <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
@@ -739,7 +759,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           <label
             style={{ ...labelStyle, padding: "0.28rem 0.35rem", border: "1px solid var(--panel-border)", borderRadius: "0.3rem", backgroundColor: "var(--surface-1)" }}
             onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "speed")}
-            onMouseLeave={stopGlossaryHoverInfoTimerAndHide}
+            onMouseLeave={leaveGlossaryHoverInfo}
           >
             Speed
             <div style={{ fontWeight: 700, color: "var(--text-primary)", fontSize: "0.88rem", textTransform: "none", letterSpacing: "normal", textAlign: "left" }}>
@@ -749,7 +769,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           <label
             style={{ ...labelStyle, padding: "0.28rem 0.35rem", border: "1px solid var(--panel-border)", borderRadius: "0.3rem", backgroundColor: "var(--surface-0)" }}
             onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "tempHp")}
-            onMouseLeave={stopGlossaryHoverInfoTimerAndHide}
+            onMouseLeave={leaveGlossaryHoverInfo}
           >
             Temp HP
             <input
@@ -771,7 +791,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           <label
             style={{ ...labelStyle, padding: "0.28rem 0.35rem", border: "1px solid var(--panel-border)", borderRadius: "0.3rem", backgroundColor: "var(--surface-0)" }}
             onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "deathSaves")}
-            onMouseLeave={stopGlossaryHoverInfoTimerAndHide}
+            onMouseLeave={leaveGlossaryHoverInfo}
           >
             Death Saves
             <DeathSaveCheckboxes
@@ -790,7 +810,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           <label
             style={{ ...labelStyle, padding: "0.28rem 0.35rem", border: "1px solid var(--panel-border)", borderRadius: "0.3rem", backgroundColor: "var(--surface-0)" }}
             onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "initiative")}
-            onMouseLeave={stopGlossaryHoverInfoTimerAndHide}
+            onMouseLeave={leaveGlossaryHoverInfo}
           >
             Initiative
             <div style={{ fontWeight: 700, color: "var(--text-primary)", fontSize: "0.88rem", textTransform: "none", letterSpacing: "normal", textAlign: "left" }}>
@@ -866,7 +886,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         {isBloodied && (
           <div
             onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "bloodied")}
-            onMouseLeave={stopGlossaryHoverInfoTimerAndHide}
+            onMouseLeave={leaveGlossaryHoverInfo}
             style={conditionBadgeStyle("bloodied")}
           >
             {conditionDisplayLabel("Bloodied")}
@@ -875,7 +895,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         {isDying && (
           <div
             onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "dying")}
-            onMouseLeave={stopGlossaryHoverInfoTimerAndHide}
+            onMouseLeave={leaveGlossaryHoverInfo}
             style={conditionBadgeStyle("dying")}
           >
             {conditionDisplayLabel("Dying")}
@@ -884,7 +904,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         {isDead && (
           <div
             onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "dead")}
-            onMouseLeave={stopGlossaryHoverInfoTimerAndHide}
+            onMouseLeave={leaveGlossaryHoverInfo}
             style={conditionBadgeStyle("dead")}
           >
             {conditionDisplayLabel("Dead")}
@@ -910,7 +930,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   letterSpacing: "0.04em"
                 }}
               >
-                <span onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `condition:${condition}`)} onMouseLeave={stopGlossaryHoverInfoTimerAndHide}>
+                <span onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `condition:${condition}`)} onMouseLeave={leaveGlossaryHoverInfo}>
                   {conditionDisplayLabel(condition)}
                 </span>
                 <button
@@ -951,7 +971,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             <div key={item.key} style={{ display: "contents" }}>
               <span
                 onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, item.key)}
-                onMouseLeave={stopGlossaryHoverInfoTimerAndHide}
+                onMouseLeave={leaveGlossaryHoverInfo}
                 style={{
                   padding: "0.16rem 0.35rem",
                   borderRadius: "0.25rem",
@@ -962,7 +982,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               </span>
               <strong
                 onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, item.key)}
-                onMouseLeave={stopGlossaryHoverInfoTimerAndHide}
+                onMouseLeave={leaveGlossaryHoverInfo}
                 style={{
                   padding: "0.16rem 0.35rem",
                   borderRadius: "0.25rem",
@@ -995,9 +1015,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   function startRaceHoverInfoTimer(event: ReactMouseEvent<HTMLDivElement>): void {
     if (!derived.race) return;
     const rect = event.currentTarget.getBoundingClientRect();
-    const panelWidth = 360;
-    const left = Math.max(12, Math.min(rect.left, window.innerWidth - panelWidth - 12));
-    const top = Math.min(rect.bottom + 8, window.innerHeight - 180);
+    const { top, left } = positionFixedTooltip(rect, { panelWidth: 360, maxHeightVh: 52 });
     setRaceHoverPanelPos({ top, left });
     if (raceHoverTimerRef.current != null) {
       window.clearTimeout(raceHoverTimerRef.current);
@@ -1020,9 +1038,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   function startClassHoverInfoTimer(event: ReactMouseEvent<HTMLDivElement>): void {
     if (!derived.cls) return;
     const rect = event.currentTarget.getBoundingClientRect();
-    const panelWidth = 380;
-    const left = Math.max(12, Math.min(rect.left, window.innerWidth - panelWidth - 12));
-    const top = Math.min(rect.bottom + 8, window.innerHeight - 180);
+    const { top, left } = positionFixedTooltip(rect, { panelWidth: 380, maxHeightVh: 52 });
     setClassHoverPanelPos({ top, left });
     if (classHoverTimerRef.current != null) {
       window.clearTimeout(classHoverTimerRef.current);
@@ -1142,7 +1158,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                     Level
                     <div
                       onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "level")}
-                      onMouseLeave={stopGlossaryHoverInfoTimerAndHide}
+                      onMouseLeave={leaveGlossaryHoverInfo}
                       style={{ border: "1px solid var(--panel-border)", backgroundColor: "var(--surface-0)", borderRadius: "0.32rem", padding: "0.24rem 0.45rem", lineHeight: 1.2, textAlign: "left", fontWeight: 800, color: "var(--text-primary)" }}
                     >
                       {sheet.level}
@@ -1153,7 +1169,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               <div
                 style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.5rem", backgroundColor: "var(--surface-0)" }}
                 onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "abilityScores")}
-                onMouseLeave={stopGlossaryHoverInfoTimerAndHide}
+                onMouseLeave={leaveGlossaryHoverInfo}
               >
                 <h3 style={sectionTitleStyle}>Ability Scores</h3>
                 <div style={{ marginTop: "0.25rem", display: "grid", gap: "0.2rem", gridTemplateColumns: "minmax(0, 1fr)" }}>
@@ -1161,7 +1177,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                     <div
                       key={ab}
                       onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `ability:${ab}`)}
-                      onMouseLeave={stopGlossaryHoverInfoTimerAndHide}
+                      onMouseLeave={leaveGlossaryHoverInfo}
                       style={{
                         display: "grid",
                         gridTemplateColumns: "1fr auto",
@@ -1247,7 +1263,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 <h3
                   style={sectionTitleStyle}
                   onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "skills")}
-                  onMouseLeave={stopGlossaryHoverInfoTimerAndHide}
+                  onMouseLeave={leaveGlossaryHoverInfo}
                 >
                   Skills
                 </h3>
@@ -1256,7 +1272,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                     <div
                       key={row.skillId}
                       onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `skill:${row.skillId}`)}
-                      onMouseLeave={stopGlossaryHoverInfoTimerAndHide}
+                      onMouseLeave={leaveGlossaryHoverInfo}
                       style={{
                         display: "grid",
                         gridTemplateColumns: "1fr auto",
@@ -1301,7 +1317,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             <div key={bucket} style={{ ...panelStyle, gridColumn: "1 / -1" }}>
               <div
                 onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `powerUsage:${bucket}`)}
-                onMouseLeave={stopGlossaryHoverInfoTimerAndHide}
+                onMouseLeave={leaveGlossaryHoverInfo}
                 style={{
                   fontWeight: 700,
                   marginBottom: "0.35rem",
@@ -1375,7 +1391,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                           <strong style={{ textDecoration: expended ? "line-through" : "none" }}>{power.name}</strong>
                           <span
                             onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `powerUsage:${bucket}`)}
-                            onMouseLeave={stopGlossaryHoverInfoTimerAndHide}
+                            onMouseLeave={leaveGlossaryHoverInfo}
                             style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}
                           >
                             Lv {power.level ?? 0} • {power.usage || "-"}
@@ -1421,7 +1437,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                                   return (
                                     <span
                                       onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `powerKeyword:${keyword}`)}
-                                      onMouseLeave={stopGlossaryHoverInfoTimerAndHide}
+                                      onMouseLeave={leaveGlossaryHoverInfo}
                                       style={{
                                         color: "var(--text-primary)",
                                         cursor: "help",
@@ -1446,7 +1462,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                                 {hasGlossaryHoverForTerm(actionType) ? (
                                   <span
                                     onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `powerKeyword:${actionType}`)}
-                                    onMouseLeave={stopGlossaryHoverInfoTimerAndHide}
+                                    onMouseLeave={leaveGlossaryHoverInfo}
                                     style={{ cursor: "help", textDecoration: "underline dotted", textUnderlineOffset: "2px" }}
                                   >
                                     {actionType}
@@ -1592,6 +1608,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           )}
           {showGlossaryHoverInfo && glossaryHoverKey && glossaryHoverPanelPos && (
             <div
+              onMouseEnter={cancelGlossaryHoverCloseTimer}
+              onMouseLeave={leaveGlossaryHoverInfo}
               style={{
                 position: "fixed",
                 top: glossaryHoverPanelPos.top,
