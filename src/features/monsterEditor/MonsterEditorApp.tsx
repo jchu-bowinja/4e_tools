@@ -35,16 +35,82 @@ const statPanelStyle = {
   backgroundColor: "var(--surface-0)"
 };
 
-type MonsterPowerUsageBucket = "atWill" | "encounter" | "daily" | "other";
+type MonsterPowerActionBucket = "standard" | "minor" | "triggered" | "other";
+type MonsterPowerColorBucket = "atWill" | "encounter" | "daily" | "other";
 
-function usageAccentColor(bucket: MonsterPowerUsageBucket): string {
+function usageAccentColor(bucket: MonsterPowerActionBucket): string {
+  if (bucket === "standard") return "var(--power-accent-atwill-bar)";
+  if (bucket === "minor") return "var(--power-accent-encounter-bar)";
+  if (bucket === "triggered") return "var(--power-accent-daily-bar)";
+  return "var(--text-secondary)";
+}
+
+function usageAccentCardStyle(bucket: MonsterPowerActionBucket): {
+  border: string;
+  borderLeft: string;
+  backgroundColor: string;
+} {
+  if (bucket === "standard") {
+    return {
+      border: "1px solid var(--power-accent-atwill-border)",
+      borderLeft: "6px solid var(--power-accent-atwill-bar)",
+      backgroundColor: "var(--power-accent-atwill-bg)"
+    };
+  }
+  if (bucket === "minor") {
+    return {
+      border: "1px solid var(--power-accent-encounter-border)",
+      borderLeft: "6px solid var(--power-accent-encounter-bar)",
+      backgroundColor: "var(--power-accent-encounter-bg)"
+    };
+  }
+  if (bucket === "triggered") {
+    return {
+      border: "1px solid var(--power-accent-daily-border)",
+      borderLeft: "6px solid var(--power-accent-daily-bar)",
+      backgroundColor: "var(--power-accent-daily-bg)"
+    };
+  }
+  return {
+    border: "1px solid var(--panel-border)",
+    borderLeft: "6px solid var(--text-secondary)",
+    backgroundColor: "var(--surface-1)"
+  };
+}
+
+function classifyMonsterPowerUsageBucket(action: string | undefined, trigger: string | undefined): MonsterPowerActionBucket {
+  const normalizedAction = String(action || "").toLowerCase();
+  const normalizedTrigger = String(trigger || "").toLowerCase();
+  const hasTrigger = Boolean(normalizedTrigger.trim()) && normalizedTrigger.trim() !== "none";
+  if (hasTrigger || /immediate|interrupt|reaction|opportunity/.test(normalizedAction)) return "triggered";
+  if (normalizedAction.includes("standard")) return "standard";
+  if (normalizedAction.includes("minor")) return "minor";
+  return "other";
+}
+
+function usageBucketLabel(bucket: MonsterPowerActionBucket): string {
+  if (bucket === "standard") return "Standard Action";
+  if (bucket === "minor") return "Minor Action";
+  if (bucket === "triggered") return "Triggered Actions";
+  return "Other";
+}
+
+function classifyMonsterPowerColorBucket(usage: string | undefined): MonsterPowerColorBucket {
+  const normalized = String(usage || "").toLowerCase();
+  if (normalized.includes("at-will") || normalized.includes("at will")) return "atWill";
+  if (normalized.includes("encounter")) return "encounter";
+  if (normalized.includes("daily")) return "daily";
+  return "other";
+}
+
+function usageColorAccentColor(bucket: MonsterPowerColorBucket): string {
   if (bucket === "atWill") return "var(--power-accent-atwill-bar)";
   if (bucket === "encounter") return "var(--power-accent-encounter-bar)";
   if (bucket === "daily") return "var(--power-accent-daily-bar)";
   return "var(--text-secondary)";
 }
 
-function usageAccentCardStyle(bucket: MonsterPowerUsageBucket): {
+function usageColorAccentCardStyle(bucket: MonsterPowerColorBucket): {
   border: string;
   borderLeft: string;
   backgroundColor: string;
@@ -75,21 +141,6 @@ function usageAccentCardStyle(bucket: MonsterPowerUsageBucket): {
     borderLeft: "6px solid var(--text-secondary)",
     backgroundColor: "var(--surface-1)"
   };
-}
-
-function classifyMonsterPowerUsageBucket(usage: string | undefined): MonsterPowerUsageBucket {
-  const normalized = String(usage || "").toLowerCase();
-  if (normalized.includes("at-will") || normalized.includes("at will")) return "atWill";
-  if (normalized.includes("encounter")) return "encounter";
-  if (normalized.includes("daily")) return "daily";
-  return "other";
-}
-
-function usageBucketLabel(bucket: MonsterPowerUsageBucket): string {
-  if (bucket === "atWill") return "At-Will";
-  if (bucket === "encounter") return "Encounter";
-  if (bucket === "daily") return "Daily";
-  return "Other";
 }
 
 function formatValue(value: string | number | boolean | undefined | null): string {
@@ -716,15 +767,15 @@ export function MonsterEditorApp({
   }, [indexRows]);
 
   const groupedPowers = useMemo(() => {
-    const buckets: Record<MonsterPowerUsageBucket, MonsterPower[]> = {
-      atWill: [],
-      encounter: [],
-      daily: [],
+    const buckets: Record<MonsterPowerActionBucket, MonsterPower[]> = {
+      standard: [],
+      minor: [],
+      triggered: [],
       other: []
     };
     if (!activeMonster) return buckets;
     for (const power of activeMonster.powers) {
-      buckets[classifyMonsterPowerUsageBucket(power.usage)].push(power);
+      buckets[classifyMonsterPowerUsageBucket(power.action, power.trigger)].push(power);
     }
     return buckets;
   }, [activeMonster]);
@@ -1172,7 +1223,7 @@ export function MonsterEditorApp({
                 <h3 style={titleStyle}>Powers ({activeMonster.powers.length})</h3>
                 <div style={{ marginTop: "0.5rem", display: "grid", gap: "0.6rem" }}>
                   {activeMonster.powers.length === 0 ? <div style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>No powers parsed.</div> : null}
-                  {(["atWill", "encounter", "daily", "other"] as const).map((bucket) => {
+                  {(["standard", "minor", "triggered", "other"] as const).map((bucket) => {
                     const bucketPowers = groupedPowers[bucket];
                     if (bucketPowers.length === 0) return null;
                     return (
@@ -1180,8 +1231,6 @@ export function MonsterEditorApp({
                         <div
                           style={{
                             fontWeight: 700,
-                            borderLeft: `5px solid ${usageAccentColor(bucket)}`,
-                            paddingLeft: "0.45rem",
                             textTransform: "uppercase",
                             letterSpacing: "0.05em",
                             color: "var(--text-primary)"
@@ -1189,9 +1238,10 @@ export function MonsterEditorApp({
                         >
                           {usageBucketLabel(bucket)}
                         </div>
-                        <div style={{ display: "grid", gap: "0.45rem", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", alignItems: "stretch" }}>
+                        <div style={{ display: "grid", gap: "0.45rem", gridTemplateColumns: "minmax(0, 1fr)", alignItems: "stretch" }}>
                           {bucketPowers.map((power, index) => {
-                            const accent = usageAccentCardStyle(bucket);
+                            const colorBucket = classifyMonsterPowerColorBucket(power.usage);
+                            const accent = usageColorAccentCardStyle(colorBucket);
                             const cardModel = buildMonsterPowerCardViewModel(power);
                       return (
                             <div
@@ -1202,7 +1252,7 @@ export function MonsterEditorApp({
                                 borderRadius: "8px",
                                 padding: "0.55rem 0.65rem",
                                 backgroundColor: accent.backgroundColor,
-                                boxShadow: `inset 0 0 0 1px ${usageAccentColor(bucket)}33`,
+                                boxShadow: `inset 0 0 0 1px ${usageColorAccentColor(colorBucket)}33`,
                                 height: "100%",
                                 boxSizing: "border-box",
                                 display: "flex",
