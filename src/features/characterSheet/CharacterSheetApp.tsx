@@ -7,7 +7,7 @@ import { createDefaultCharacterSheetState } from "./defaultState";
 import type { CharacterSheetState, EquipmentSlot, InventoryItem } from "./model";
 import { canEquipItem, computeSheetDerivedData, groupCombatPowers, sheetStateFromBuild } from "./selectors";
 import { loadCharacterSheetState, saveCharacterSheetState } from "./storage";
-import { resolveTooltipText } from "../../data/tooltipGlossary";
+import { normalizeTooltipTerm, resolveTooltipText } from "../../data/tooltipGlossary";
 
 type SheetTab = "overview" | "inventory";
 
@@ -237,6 +237,9 @@ type GlossaryKey =
   | "abilityScores"
   | `condition:${string}`
   | `powerKeyword:${string}`
+  | `powerUsage:atWill`
+  | `powerUsage:encounter`
+  | `powerUsage:daily`
   | `ability:${AbilityCode}`
   | `skill:${string}`;
 
@@ -262,6 +265,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   const raceHoverTimerRef = useRef<number | null>(null);
   const classHoverTimerRef = useRef<number | null>(null);
   const glossaryHoverTimerRef = useRef<number | null>(null);
+  const glossaryTermLookupCacheRef = useRef<Map<string, boolean>>(new Map());
 
   const derived = useMemo(() => computeSheetDerivedData(sheet, index), [sheet, index]);
   const groupedPowers = useMemo(() => groupCombatPowers(sheet, index), [sheet, index]);
@@ -319,6 +323,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   }, []);
 
   useEffect(() => {
+    glossaryTermLookupCacheRef.current.clear();
+  }, [tooltipGlossary, index]);
+
+  useEffect(() => {
     setShowRaceHoverInfo(false);
   }, [sheet.raceId]);
 
@@ -342,6 +350,15 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     } else if (key.startsWith("powerKeyword:")) {
       const keyword = key.slice("powerKeyword:".length).trim();
       terms = [keyword, "Keyword"];
+    } else if (key.startsWith("powerUsage:")) {
+      const usage = key.slice("powerUsage:".length).trim();
+      if (usage === "atWill") {
+        terms = ["At-Will", "At-Will Power", "At Will"];
+      } else if (usage === "encounter") {
+        terms = ["Encounter", "Encounter Power"];
+      } else if (usage === "daily") {
+        terms = ["Daily", "Daily Power"];
+      }
     } else {
       const coreTerms: Record<Exclude<GlossaryKey, `condition:${string}` | `powerKeyword:${string}` | `ability:${AbilityCode}` | `skill:${string}`>, string[]> = {
         level: ["Level"],
@@ -394,6 +411,51 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     setShowGlossaryHoverInfo(false);
     setGlossaryHoverKey(null);
     setGlossaryHoverPanelPos(null);
+  }
+
+  function hasGlossaryHoverForTerm(term: string): boolean {
+    const normalized = normalizeTooltipTerm(term);
+    if (!normalized) return false;
+    const cache = glossaryTermLookupCacheRef.current;
+    const cached = cache.get(normalized);
+    if (cached != null) return cached;
+    const found = Boolean(
+      resolveTooltipText({
+        terms: [term],
+        glossaryByName: tooltipGlossary,
+        index
+      })
+    );
+    cache.set(normalized, found);
+    return found;
+  }
+
+  function renderPowerTextWithGlossaryHovers(value: string, keyPrefix: string): JSX.Element {
+    const parts = value.split(/(\s+|[,;:/()])/g);
+    return (
+      <>
+        {parts.map((part, idx) => {
+          const term = part.trim();
+          if (!term || !/[A-Za-z]/.test(term) || !hasGlossaryHoverForTerm(term)) {
+            return <span key={`${keyPrefix}-${idx}`}>{part}</span>;
+          }
+          return (
+            <span
+              key={`${keyPrefix}-${idx}`}
+              onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `powerKeyword:${term}`)}
+              onMouseLeave={stopGlossaryHoverInfoTimerAndHide}
+              style={{
+                cursor: "help",
+                textDecoration: "underline dotted",
+                textUnderlineOffset: "2px"
+              }}
+            >
+              {part}
+            </span>
+          );
+        })}
+      </>
+    );
   }
 
   function updateSheet(mutator: (prev: CharacterSheetState) => CharacterSheetState): void {
@@ -1164,6 +1226,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           {(["atWill", "encounter", "daily"] as const).map((bucket) => (
             <div key={bucket} style={{ ...panelStyle, gridColumn: "1 / -1" }}>
               <div
+                onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `powerUsage:${bucket}`)}
+                onMouseLeave={stopGlossaryHoverInfoTimerAndHide}
                 style={{
                   fontWeight: 700,
                   marginBottom: "0.35rem",
@@ -1235,7 +1299,11 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                       >
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem" }}>
                           <strong style={{ textDecoration: expended ? "line-through" : "none" }}>{power.name}</strong>
-                          <span style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>
+                          <span
+                            onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `powerUsage:${bucket}`)}
+                            onMouseLeave={stopGlossaryHoverInfoTimerAndHide}
+                            style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}
+                          >
                             Lv {power.level ?? 0} • {power.usage || "-"}
                           </span>
                         </div>
@@ -1305,19 +1373,34 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                         ) : null}
                         {(actionType || attackType || target || trigger || requirement) && (
                           <div style={{ marginTop: "0.3rem", fontSize: "0.8rem", color: "var(--text-primary)", lineHeight: 1.45 }}>
-                            {actionType ? <div><strong>Action:</strong> {actionType}</div> : null}
-                            {attackType ? <div><strong>Range/Area:</strong> {attackType}</div> : null}
-                            {target ? <div><strong>Target:</strong> {target}</div> : null}
-                            {trigger ? <div><strong>Trigger:</strong> {trigger}</div> : null}
-                            {requirement ? <div><strong>Requirement:</strong> {requirement}</div> : null}
+                            {actionType ? (
+                              <div>
+                                <strong>Action:</strong>{" "}
+                                {hasGlossaryHoverForTerm(actionType) ? (
+                                  <span
+                                    onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `powerKeyword:${actionType}`)}
+                                    onMouseLeave={stopGlossaryHoverInfoTimerAndHide}
+                                    style={{ cursor: "help", textDecoration: "underline dotted", textUnderlineOffset: "2px" }}
+                                  >
+                                    {actionType}
+                                  </span>
+                                ) : (
+                                  renderPowerTextWithGlossaryHovers(actionType, `${power.id}-action`)
+                                )}
+                              </div>
+                            ) : null}
+                            {attackType ? <div><strong>Range/Area:</strong> {renderPowerTextWithGlossaryHovers(attackType, `${power.id}-attack-type`)}</div> : null}
+                            {target ? <div><strong>Target:</strong> {renderPowerTextWithGlossaryHovers(target, `${power.id}-target`)}</div> : null}
+                            {trigger ? <div><strong>Trigger:</strong> {renderPowerTextWithGlossaryHovers(trigger, `${power.id}-trigger`)}</div> : null}
+                            {requirement ? <div><strong>Requirement:</strong> {renderPowerTextWithGlossaryHovers(requirement, `${power.id}-requirement`)}</div> : null}
                           </div>
                         )}
                         {(hit || miss || effect || special) && (
                           <div style={{ marginTop: "0.3rem", fontSize: "0.8rem", color: "var(--text-primary)", lineHeight: 1.45 }}>
-                            {hit ? <div><strong>Hit:</strong> {hit}</div> : null}
-                            {miss ? <div><strong>Miss:</strong> {miss}</div> : null}
-                            {effect ? <div><strong>Effect:</strong> {effect}</div> : null}
-                            {special ? <div><strong>Special:</strong> {special}</div> : null}
+                            {hit ? <div><strong>Hit:</strong> {renderPowerTextWithGlossaryHovers(hit, `${power.id}-hit`)}</div> : null}
+                            {miss ? <div><strong>Miss:</strong> {renderPowerTextWithGlossaryHovers(miss, `${power.id}-miss`)}</div> : null}
+                            {effect ? <div><strong>Effect:</strong> {renderPowerTextWithGlossaryHovers(effect, `${power.id}-effect`)}</div> : null}
+                            {special ? <div><strong>Special:</strong> {renderPowerTextWithGlossaryHovers(special, `${power.id}-special`)}</div> : null}
                           </div>
                         )}
                         {body ? (
