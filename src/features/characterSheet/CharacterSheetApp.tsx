@@ -194,6 +194,78 @@ function splitPowerKeywords(rawKeywords: string): string[] {
     .filter((part) => part.length > 0);
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function buildRulesIdLookup(index: RulesIndex): Map<string, unknown> {
+  const lookup = new Map<string, unknown>();
+  for (const value of Object.values(index) as unknown[]) {
+    if (!Array.isArray(value)) continue;
+    for (const entry of value) {
+      if (!isPlainObject(entry)) continue;
+      const idValue = entry.id;
+      if (typeof idValue !== "string" || !idValue.trim()) continue;
+      if (!lookup.has(idValue)) {
+        lookup.set(idValue, entry);
+      }
+    }
+  }
+  return lookup;
+}
+
+function isResolvableIdKey(key: string): boolean {
+  const trimmed = key.trim();
+  if (!trimmed) return false;
+  if (trimmed.toLowerCase() === "id") return false;
+  return /ids?$/i.test(trimmed);
+}
+
+function expandJsonIds(
+  value: unknown,
+  rulesById: Map<string, unknown>,
+  ancestry: Set<string> = new Set()
+): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => expandJsonIds(entry, rulesById, ancestry));
+  }
+  if (!isPlainObject(value)) {
+    return value;
+  }
+  const next: Record<string, unknown> = {};
+  for (const [key, rawChild] of Object.entries(value)) {
+    if (key === "raw") {
+      continue;
+    }
+    if (isResolvableIdKey(key)) {
+      if (typeof rawChild === "string") {
+        const matched = rulesById.get(rawChild);
+        if (matched && !ancestry.has(rawChild)) {
+          const nextAncestry = new Set(ancestry);
+          nextAncestry.add(rawChild);
+          next[key] = expandJsonIds(matched, rulesById, nextAncestry);
+        } else {
+          next[key] = rawChild;
+        }
+        continue;
+      }
+      if (Array.isArray(rawChild)) {
+        next[key] = rawChild.map((entry) => {
+          if (typeof entry !== "string") return expandJsonIds(entry, rulesById, ancestry);
+          const matched = rulesById.get(entry);
+          if (!matched || ancestry.has(entry)) return entry;
+          const nextAncestry = new Set(ancestry);
+          nextAncestry.add(entry);
+          return expandJsonIds(matched, rulesById, nextAncestry);
+        });
+        continue;
+      }
+    }
+    next[key] = expandJsonIds(rawChild, rulesById, ancestry);
+  }
+  return next;
+}
+
 function DeathSaveCheckboxes(props: { value: number; onChange: (next: number) => void }): JSX.Element {
   const value = clamp(props.value, 0, 3);
   return (
@@ -269,6 +341,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
 
   const derived = useMemo(() => computeSheetDerivedData(sheet, index), [sheet, index]);
   const groupedPowers = useMemo(() => groupCombatPowers(sheet, index), [sheet, index]);
+  const rulesById = useMemo(() => buildRulesIdLookup(index), [index]);
+  const expandedSheetJson = useMemo(() => JSON.stringify(expandJsonIds(sheet, rulesById), null, 2), [sheet, rulesById]);
   const abilityLoreByCode = useMemo(() => {
     const map = new Map<AbilityCode, { name: string; body?: string | null }>();
     for (const entry of index.abilityScores) {
@@ -1705,6 +1779,49 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           </div>
         </div>
       )}
+
+      <div style={{ marginTop: "0.75rem", border: "1px solid var(--panel-border)", borderRadius: "0.35rem", backgroundColor: "var(--surface-0)", padding: "0.5rem" }}>
+        <details>
+          <summary style={{ cursor: "pointer", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--text-primary)" }}>
+            JSON
+          </summary>
+          <div style={{ marginTop: "0.45rem", display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={() => {
+                if (!navigator.clipboard?.writeText) {
+                  alert("Clipboard API unavailable in this browser.");
+                  return;
+                }
+                void navigator.clipboard.writeText(expandedSheetJson);
+              }}
+            >
+              Copy Contents
+            </button>
+          </div>
+          <textarea
+            value={expandedSheetJson}
+            readOnly
+            style={{
+              margin: "0.5rem 0 0 0",
+              padding: "0.5rem",
+              borderRadius: "0.3rem",
+              border: "1px solid var(--panel-border)",
+              backgroundColor: "var(--surface-1)",
+              color: "var(--text-primary)",
+              overflow: "auto",
+              height: "44rem",
+              minHeight: "12rem",
+              width: "100%",
+              boxSizing: "border-box",
+              resize: "vertical",
+              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+              fontSize: "0.76rem",
+              lineHeight: 1.35
+            }}
+          />
+        </details>
+      </div>
 
     </div>
   );
