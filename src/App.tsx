@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { loadRulesIndex } from "./data/loadRules";
 import { RulesIndex } from "./rules/models";
 import { CharacterBuilderApp } from "./features/builder/CharacterBuilderApp";
@@ -12,9 +12,11 @@ import {
 import { ResourceEditorApp } from "./features/resourceEditor/ResourceEditorApp";
 import { CharacterSheetApp } from "./features/characterSheet/CharacterSheetApp";
 import { MonsterEditorApp } from "./features/monsterEditor/MonsterEditorApp";
-import { loadTooltipGlossary } from "./data/tooltipGlossary";
+import { GlossaryEditorApp } from "./features/glossaryEditor/GlossaryEditorApp";
+import { glossaryRowsToTooltipMap, type GlossaryTermRow } from "./data/tooltipGlossary";
+import { loadInitialGlossaryRows, reloadGlossaryRowsFromBundle } from "./data/loadGlossaryRows";
 
-type AppScreen = "builder" | "resourceEditor" | "characterSheet" | "monsters";
+type AppScreen = "builder" | "resourceEditor" | "characterSheet" | "monsters" | "glossary";
 type AppTheme = "light" | "dark";
 
 const THEME_STORAGE_KEY = "dnd4e.app.theme";
@@ -23,7 +25,8 @@ const SCREEN_HASH: Record<AppScreen, string> = {
   builder: "#/builder",
   resourceEditor: "#/resource-editor",
   characterSheet: "#/character-sheet",
-  monsters: "#/monsters"
+  monsters: "#/monsters",
+  glossary: "#/glossary"
 };
 
 function screenFromHash(hash: string): AppScreen {
@@ -31,6 +34,7 @@ function screenFromHash(hash: string): AppScreen {
   if (normalized === "#/resource-editor") return "resourceEditor";
   if (normalized === "#/character-sheet") return "characterSheet";
   if (normalized === "#/monsters") return "monsters";
+  if (normalized === "#/glossary") return "glossary";
   return "builder";
 }
 
@@ -80,15 +84,23 @@ export default function App(): JSX.Element {
   const [screen, setScreen] = useState<AppScreen>(() => screenFromHash(window.location.hash));
   const [editorOverlay, setEditorOverlay] = useState<ResourceEditorOverlay>(() => loadResourceEditorOverlay());
   const [theme, setTheme] = useState<AppTheme>(() => loadSavedTheme());
-  const [tooltipGlossary, setTooltipGlossary] = useState<Record<string, string>>({});
+  const [glossaryRows, setGlossaryRows] = useState<GlossaryTermRow[] | null>(null);
+
+  const tooltipGlossary = useMemo(
+    () => (glossaryRows == null ? {} : glossaryRowsToTooltipMap(glossaryRows)),
+    [glossaryRows]
+  );
 
   useEffect(() => {
     loadRulesIndex()
       .then(setIndex)
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "Unknown error"));
-    loadTooltipGlossary()
-      .then(setTooltipGlossary)
-      .catch(() => setTooltipGlossary({}));
+  }, []);
+
+  useEffect(() => {
+    loadInitialGlossaryRows()
+      .then(setGlossaryRows)
+      .catch(() => setGlossaryRows([]));
   }, []);
 
   useEffect(() => {
@@ -145,6 +157,11 @@ export default function App(): JSX.Element {
 
   const effectiveIndex = mergeRulesOverlay(index, editorOverlay);
 
+  async function handleGlossaryResetToBundled(): Promise<void> {
+    const next = await reloadGlossaryRowsFromBundle();
+    setGlossaryRows(next);
+  }
+
   return (
     <div style={{ minHeight: "100vh", backgroundColor: colors.appBackground, color: colors.text }}>
       <header
@@ -167,6 +184,9 @@ export default function App(): JSX.Element {
           </button>
           <button type="button" onClick={() => goToScreen("monsters")} disabled={screen === "monsters"}>
             Monsters
+          </button>
+          <button type="button" onClick={() => goToScreen("glossary")} disabled={screen === "glossary"}>
+            Glossary
           </button>
           <button type="button" onClick={() => goToScreen("resourceEditor")} disabled={screen === "resourceEditor"}>
             Resource Editor
@@ -199,6 +219,10 @@ export default function App(): JSX.Element {
         <CharacterSheetApp index={effectiveIndex} tooltipGlossary={tooltipGlossary} />
       ) : screen === "monsters" ? (
         <MonsterEditorApp index={effectiveIndex} tooltipGlossary={tooltipGlossary} />
+      ) : screen === "glossary" && glossaryRows != null ? (
+        <GlossaryEditorApp rows={glossaryRows} onRowsChange={setGlossaryRows} onResetToBundled={handleGlossaryResetToBundled} />
+      ) : screen === "glossary" ? (
+        <div style={{ padding: "1.25rem", color: "var(--text-muted, inherit)" }}>Loading glossary…</div>
       ) : (
         <CharacterBuilderApp index={effectiveIndex} tooltipGlossary={tooltipGlossary} />
       )}
