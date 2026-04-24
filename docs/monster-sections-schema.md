@@ -47,10 +47,6 @@ This document describes normalized fields currently emitted under `sections` by 
     - `[{"name":"Radiant","amount":5}]`
     - `[{"name":"against","amount":10,"details":"close and area attacks"}]`
 
-- `sourceBook: { id?: string | number; name?: string; description?: string; url?: string }`
-  - Example:
-    - `{ "id": 11, "name": "Draconomicon 1", "url": "http://www.wizards.com/default.asp?x=products/dndacc/217887200" }`
-
 - `sourceBooks: string[]`
   - Example values:
     - `["Draconomicon 1", "Underdark"]`
@@ -60,10 +56,25 @@ This document describes normalized fields currently emitted under `sections` by 
 - `regeneration: number`
   - Example values: `0`, `10`
 
-- `items: Array<{ quantity?: string | number; name?: string }>`
+- `items: Array<{ quantity?: string | number; name?: string; id?: string | number; description?: string }>`
   - Example values:
     - `[{"quantity":1,"name":"bone dagger"}]`
-    - `[{"quantity":1,"name":"Hide Armor"},{"quantity":1,"name":"Greataxe"}]`
+    - `[{"quantity":1,"name":"Hide Armor","id":"A3","description":"Thicker and heavier than leather..."},{"quantity":1,"name":"Greataxe","id":"W21"}]`
+
+- `phasing: boolean`
+  - Example values: `false`
+
+- `compendiumUrl: string`
+  - Example values:
+    - `"http://www.wizards.com/dndinsider/compendium/monster.aspx?id=1449"`
+
+- `tactics: string`
+  - Example values:
+    - `"For all its hideousness, a wretch dragon is highly intelligent..."`
+
+- `description: string`
+  - Example values:
+    - `"THE GOD OF HONOR, JUSTICE AND NOBILITY, Bahamut is known as..."`
 
 ## Related Normalized Stat Fields
 
@@ -81,4 +92,4 @@ These are normalized under `stats.otherNumbers` (not under `sections`):
 
 - Unknown or unmapped XML sections still appear under `sections` in a raw structured fallback shape (`attrs` / `text` / `children`), so data is not lost.
 - Some entries still reflect source XML quality issues (for example, split weakness clauses such as `"his"` or `"against"` as a name). These are candidates for a later cleanup pass.
-- Raw `Initiative`, `SavingThrows`, `HitPoints`, `ActionPoints`, `LandSpeed`, `Speeds`, `Regeneration`, and `Items` are intentionally excluded from `sections` once normalized.
+- Raw XML wrapper blocks are intentionally excluded once normalized (for example `Initiative`, `SavingThrows`, `HitPoints`, `ActionPoints`, `LandSpeed`, `Speeds`, `Regeneration`, `Items`, `Phasing`, `CompendiumUrl`, `ID`, `FullPortrait`, `Tactics`, `Description`).

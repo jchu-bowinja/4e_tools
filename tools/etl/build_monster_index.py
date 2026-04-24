@@ -318,6 +318,26 @@ def _extract_reference_section(root: ET.Element, section_name: str) -> Dict[str,
     return _extract_reference_payload(referenced)
 
 
+def _extract_source_books(root: ET.Element) -> List[str]:
+    names: List[str] = []
+    seen = set()
+    primary = _extract_reference_section(root, "SourceBook")
+    primary_name = _normalize_text(str(primary.get("name", ""))) if isinstance(primary, dict) else ""
+    if primary_name:
+        seen.add(primary_name.lower())
+        names.append(primary_name)
+    for name in _extract_reference_names_from_section(root, "SourceBooks"):
+        normalized = _normalize_text(name)
+        if not normalized:
+            continue
+        lowered = normalized.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        names.append(normalized)
+    return names
+
+
 def _extract_regeneration_value(root: ET.Element) -> Optional[Any]:
     section = _find_first_section(root, "Regeneration")
     if section is None:
@@ -337,15 +357,43 @@ def _extract_items(root: ET.Element) -> List[Dict[str, Any]]:
         if _local_name(node.tag) != "ItemAndQuantity":
             continue
         quantity_text = _first_descendant_text(node, "Quantity")
+        referenced = _find_first_section(node, "ReferencedObject")
+        reference_payload = _extract_reference_payload(referenced) if referenced is not None else {}
         name = _extract_reference_name(node)
         row: Dict[str, Any] = {}
         if quantity_text is not None and str(quantity_text).strip():
             row["quantity"] = _coerce_value(quantity_text)
         if name:
             row["name"] = name
+        if "id" in reference_payload:
+            row["id"] = reference_payload["id"]
+        if "description" in reference_payload:
+            row["description"] = reference_payload["description"]
         if row:
             items.append(row)
     return items
+
+
+def _extract_section_text(root: ET.Element, section_name: str) -> str:
+    section = _find_first_section(root, section_name)
+    if section is None:
+        return ""
+    return _normalized_optional_text(section.text)
+
+
+def _extract_phasing(root: ET.Element) -> Optional[bool]:
+    value = _extract_section_text(root, "Phasing")
+    if not value:
+        return None
+    coerced = _coerce_value(value)
+    if isinstance(coerced, bool):
+        return coerced
+    lowered = value.lower()
+    if lowered in {"true", "yes", "1"}:
+        return True
+    if lowered in {"false", "no", "0"}:
+        return False
+    return None
 
 
 def _element_to_structured(node: ET.Element) -> Dict[str, Any]:
@@ -812,26 +860,14 @@ def _extract_unmapped_sections(root: ET.Element) -> Dict[str, Any]:
         "Weaknesses",
         "SourceBook",
         "SourceBooks",
+        "Phasing",
+        "CompendiumUrl",
+        "ID",
+        "FullPortrait",
+        "Tactics",
+        "Description",
     }
-    out: Dict[str, Any] = {
-        "groupRole": _extract_reference_name(_find_first_section(root, "GroupRole")) if _find_first_section(root, "GroupRole") is not None else "",
-        "alignment": _extract_reference_section(root, "Alignment"),
-        "languages": _extract_reference_names_from_section(root, "Languages"),
-        "keywords": _extract_reference_names_from_section(root, "Keywords"),
-        "immunities": _extract_reference_names_from_section(root, "Immunities"),
-        "senses": _extract_senses(root),
-        "resistances": _extract_susceptibilities(root, "Resistances"),
-        "weaknesses": _extract_susceptibilities(root, "Weaknesses"),
-        "sourceBook": _extract_reference_section(root, "SourceBook"),
-        "sourceBooks": _extract_reference_names_from_section(root, "SourceBooks"),
-        "regeneration": _extract_regeneration_value(root),
-        "items": _extract_items(root),
-    }
-    out = {
-        k: v
-        for k, v in out.items()
-        if not (v == "" or v == [] or v == {})
-    }
+    out: Dict[str, Any] = {}
     for child in list(root):
         tag = _local_name(child.tag)
         if tag in mapped:
@@ -840,6 +876,26 @@ def _extract_unmapped_sections(root: ET.Element) -> Dict[str, Any]:
         if structured:
             out[tag] = structured
     return out
+
+
+def _extract_normalized_monster_fields(root: ET.Element) -> Dict[str, Any]:
+    values: Dict[str, Any] = {
+        "groupRole": _extract_reference_name(_find_first_section(root, "GroupRole")) if _find_first_section(root, "GroupRole") is not None else "",
+        "alignment": _extract_reference_section(root, "Alignment"),
+        "languages": _extract_reference_names_from_section(root, "Languages"),
+        "keywords": _extract_reference_names_from_section(root, "Keywords"),
+        "immunities": _extract_reference_names_from_section(root, "Immunities"),
+        "senses": _extract_senses(root),
+        "resistances": _extract_susceptibilities(root, "Resistances"),
+        "weaknesses": _extract_susceptibilities(root, "Weaknesses"),
+        "sourceBooks": _extract_source_books(root),
+        "regeneration": _extract_regeneration_value(root),
+        "items": _extract_items(root),
+        "phasing": _extract_phasing(root),
+        "compendiumUrl": _extract_section_text(root, "CompendiumUrl"),
+        "description": _extract_section_text(root, "Description"),
+    }
+    return {k: v for k, v in values.items() if not (v == "" or v == [] or v == {})}
 
 
 def _parse_monster_file(xml_text: str, fallback_name: str) -> Dict[str, Any]:
@@ -886,6 +942,8 @@ def _parse_monster_file(xml_text: str, fallback_name: str) -> Dict[str, Any]:
             or _first_descendant_text(root, "XP")
             or ""
         ),
+        "tactics": _extract_section_text(root, "Tactics"),
+        **_extract_normalized_monster_fields(root),
         "stats": {
             "abilityScores": _extract_named_final_values(root, "AbilityScores"),
             "defenses": _extract_named_final_values(root, "Defenses"),
@@ -994,6 +1052,21 @@ def build_monster_index(monster_root: Path, output_root: Path) -> None:
                 "origin": "",
                 "type": "",
                 "xp": "",
+                "tactics": "",
+                "groupRole": "",
+                "alignment": {},
+                "languages": [],
+                "keywords": [],
+                "immunities": [],
+                "senses": [],
+                "resistances": [],
+                "weaknesses": [],
+                "sourceBooks": [],
+                "regeneration": "",
+                "items": [],
+                "phasing": False,
+                "compendiumUrl": "",
+                "description": "",
                 "stats": {"abilityScores": {}, "defenses": {}, "attackBonuses": {}, "skills": {}, "otherNumbers": {}},
                 "powers": [],
                 "sections": {},

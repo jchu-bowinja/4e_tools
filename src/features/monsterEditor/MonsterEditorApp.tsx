@@ -275,6 +275,32 @@ function sectionChildKeys(section: unknown): string[] {
   return Object.keys(maybeChildren);
 }
 
+function sectionObject(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return value as Record<string, unknown>;
+}
+
+function sectionArrayOfObjects(value: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => sectionObject(entry))
+    .filter((entry) => Object.keys(entry).length > 0);
+}
+
+function weaknessLine(value: Record<string, unknown>): string {
+  const rawAmount = value.amount;
+  const amount = typeof rawAmount === "number" ? rawAmount : Number(rawAmount);
+  const amountPart = Number.isFinite(amount) && amount !== 0 ? `${amount} ` : "";
+  const namePart = String(value.name ?? "").trim();
+  const detailsPart = String(value.details ?? "").trim();
+  return `${amountPart}${namePart}${detailsPart ? ` ${detailsPart}` : ""}`.trim();
+}
+
+function renderTagList(values: string[] | undefined): string {
+  if (!Array.isArray(values) || values.length === 0) return "-";
+  return values.join(", ");
+}
+
 function statsDisplayOrder(label: string): number {
   const normalized = label.trim().toLowerCase();
   if (normalized === "skills") return 1;
@@ -1158,6 +1184,11 @@ export function MonsterEditorApp({
                   </span>{" "}
                   {formatValue(activeMonster.xp)}
                 </div>
+                {isRenderableCardValue(activeMonster.groupRole) ? (
+                  <div style={{ color: "var(--text-secondary)", fontSize: "0.8rem", marginTop: "0.12rem" }}>
+                    Group Role: {String(activeMonster.groupRole)}
+                  </div>
+                ) : null}
               </div>
 
               {activeMonster.parseError && (
@@ -1200,9 +1231,29 @@ export function MonsterEditorApp({
                       startGlossaryHover(event, `glossaryTerm:${activeMonster.role || "Role"}`)
                     }
                     onMouseLeave={stopGlossaryHover}
-                    style={{ fontWeight: 600, cursor: "help", width: "fit-content", borderBottom: "1px dotted var(--text-muted)" }}
+                    style={{ fontWeight: 600, cursor: "help", width: "fit-content", borderBottom: "1px dotted var(--text-muted)", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
                   >
                     {formatValue(activeMonster.role)}
+                    {activeMonster.isLeader ? (
+                      <span
+                        onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Leader")}
+                        onMouseLeave={stopGlossaryHover}
+                        style={{
+                          fontSize: "0.68rem",
+                          fontWeight: 700,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.04em",
+                          color: "var(--text-secondary)",
+                          border: "1px solid var(--panel-border)",
+                          borderRadius: "999px",
+                          padding: "0.03rem 0.3rem",
+                          backgroundColor: "var(--surface-1)",
+                          cursor: "help"
+                        }}
+                      >
+                        Leader
+                      </span>
+                    ) : null}
                   </div>
                 </div>
                 <div style={{ border: "1px solid var(--panel-border)", borderRadius: 6, padding: "0.6rem", background: "var(--surface-1)" }}>
@@ -1275,6 +1326,22 @@ export function MonsterEditorApp({
                     {formatValue(activeMonster.type)}
                   </div>
                 </div>
+                <div style={{ border: "1px solid var(--panel-border)", borderRadius: 6, padding: "0.6rem", background: "var(--surface-1)" }}>
+                  <div
+                    onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Phasing")}
+                    onMouseLeave={stopGlossaryHover}
+                    style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 700, cursor: "help", width: "fit-content", borderBottom: "1px dotted var(--text-muted)" }}
+                  >
+                    Phasing
+                  </div>
+                  <div
+                    onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Phasing")}
+                    onMouseLeave={stopGlossaryHover}
+                    style={{ fontWeight: 600, cursor: "help", width: "fit-content", borderBottom: "1px dotted var(--text-muted)" }}
+                  >
+                    {formatValue(activeMonster.phasing as string | number | boolean | undefined | null)}
+                  </div>
+                </div>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(280px, 1fr))", gap: "0.75rem", marginBottom: "0.75rem" }}>
@@ -1326,6 +1393,138 @@ export function MonsterEditorApp({
                   </div>
                 ))}
               </div>
+
+              {isRenderableCardValue(activeMonster.tactics) ? (
+                <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", backgroundColor: "var(--surface-0)", padding: "0.5rem", marginBottom: "0.75rem" }}>
+                  <h3 style={titleStyle}>Tactics</h3>
+                  <RulesRichText
+                    text={String(activeMonster.tactics)}
+                    paragraphStyle={{ fontSize: "0.82rem", color: "var(--text-primary)", margin: "0.35rem 0 0 0" }}
+                    listItemStyle={{ fontSize: "0.82rem", color: "var(--text-primary)" }}
+                  />
+                </div>
+              ) : null}
+
+              {(activeMonster.alignment?.name || isRenderableCardValue(activeMonster.description)) ? (
+                <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", backgroundColor: "var(--surface-0)", padding: "0.5rem", marginBottom: "0.75rem" }}>
+                  <h3 style={titleStyle}>Traits</h3>
+                  <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.3rem" }}>
+                    {activeMonster.alignment?.name ? (
+                      <div style={{ fontSize: "0.82rem", color: "var(--text-primary)" }}>
+                        <strong>Alignment:</strong> {activeMonster.alignment.name}
+                      </div>
+                    ) : null}
+                    {Array.isArray(activeMonster.senses) && activeMonster.senses.length > 0 ? (
+                      <div style={{ fontSize: "0.82rem", color: "var(--text-primary)" }}>
+                        <strong>Senses:</strong>{" "}
+                        {activeMonster.senses
+                          .map((sense) => {
+                            const name = String(sense.name ?? "").trim();
+                            const range = sense.range;
+                            if (!name) return "";
+                            return range !== undefined && range !== null && range !== "" ? `${name} ${range}` : name;
+                          })
+                          .filter(Boolean)
+                          .join(", ")}
+                      </div>
+                    ) : null}
+                    <div style={{ fontSize: "0.82rem", color: "var(--text-primary)" }}>
+                      <strong>Languages:</strong> {renderTagList(activeMonster.languages)}
+                    </div>
+                    <div style={{ fontSize: "0.82rem", color: "var(--text-primary)" }}>
+                      <strong>Keywords:</strong> {renderTagList(activeMonster.keywords)}
+                    </div>
+                    <div style={{ fontSize: "0.82rem", color: "var(--text-primary)" }}>
+                      <strong>Immunities:</strong> {renderTagList(activeMonster.immunities)}
+                    </div>
+                    {Array.isArray(activeMonster.resistances) && activeMonster.resistances.length > 0 ? (
+                      <div style={{ fontSize: "0.82rem", color: "var(--text-primary)" }}>
+                        <strong>Resistances:</strong>{" "}
+                        {activeMonster.resistances
+                          .map((resistance) => weaknessLine(resistance as Record<string, unknown>))
+                          .filter(Boolean)
+                          .join(", ")}
+                      </div>
+                    ) : null}
+                    {Array.isArray(activeMonster.sourceBooks) && activeMonster.sourceBooks.length > 0 ? (
+                      <div style={{ fontSize: "0.82rem", color: "var(--text-primary)" }}>
+                        <strong>Sources:</strong> {activeMonster.sourceBooks.join(", ")}
+                      </div>
+                    ) : null}
+                    {activeMonster.regeneration !== undefined && activeMonster.regeneration !== null && activeMonster.regeneration !== "" ? (
+                      <div style={{ fontSize: "0.82rem", color: "var(--text-primary)" }}>
+                        <strong>Regeneration:</strong> {String(activeMonster.regeneration)}
+                      </div>
+                    ) : null}
+                    {isRenderableCardValue(activeMonster.compendiumUrl) ? (
+                      <div style={{ fontSize: "0.82rem", color: "var(--text-primary)", overflowWrap: "anywhere" }}>
+                        <strong>Compendium URL:</strong> {String(activeMonster.compendiumUrl)}
+                      </div>
+                    ) : null}
+                    {isRenderableCardValue(activeMonster.description) ? (
+                      <RulesRichText
+                        text={String(activeMonster.description)}
+                        paragraphStyle={{ fontSize: "0.82rem", color: "var(--text-primary)", margin: "0.2rem 0 0 0" }}
+                        listItemStyle={{ fontSize: "0.82rem", color: "var(--text-primary)" }}
+                      />
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+
+              {(() => {
+                const weaknesses = sectionArrayOfObjects(activeMonster.weaknesses);
+                if (weaknesses.length === 0) return null;
+                return (
+                  <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", backgroundColor: "var(--surface-0)", padding: "0.5rem", marginBottom: "0.75rem" }}>
+                    <h3 style={titleStyle}>Weaknesses</h3>
+                    <div style={{ marginTop: "0.4rem", display: "grid", gap: "0.24rem" }}>
+                      {weaknesses.map((entry, idx) => (
+                        <div key={`weakness-${idx}`} style={{ fontSize: "0.82rem", color: "var(--text-primary)" }}>
+                          {weaknessLine(entry)}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {(() => {
+                const items = sectionArrayOfObjects(activeMonster.items);
+                if (items.length === 0) return null;
+                return (
+                  <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", backgroundColor: "var(--surface-0)", padding: "0.5rem", marginBottom: "0.75rem" }}>
+                    <h3 style={titleStyle}>Items</h3>
+                    <div style={{ marginTop: "0.4rem", display: "grid", gap: "0.35rem" }}>
+                      {items.map((item, idx) => {
+                        const quantity = item.quantity;
+                        const name = String(item.name ?? "").trim();
+                        const id = String(item.id ?? "").trim();
+                        const description = String(item.description ?? "").trim();
+                        return (
+                          <div key={`item-${idx}`} style={{ border: "1px solid var(--panel-border)", borderRadius: "0.3rem", padding: "0.4rem", backgroundColor: "var(--surface-1)" }}>
+                            <div style={{ fontSize: "0.82rem", color: "var(--text-primary)" }}>
+                              <strong>{name || "Item"}</strong>
+                              {quantity !== undefined && quantity !== null && quantity !== "" ? ` x${quantity}` : ""}
+                              {id ? <span style={{ color: "var(--text-muted)" }}> ({id})</span> : null}
+                            </div>
+                            {isRenderableCardValue(description) ? (
+                              <details style={{ marginTop: "0.22rem" }}>
+                                <summary style={{ cursor: "pointer", color: "var(--text-secondary)", fontSize: "0.76rem" }}>Description</summary>
+                                <RulesRichText
+                                  text={description}
+                                  paragraphStyle={{ fontSize: "0.8rem", color: "var(--text-primary)", margin: "0.24rem 0 0 0" }}
+                                  listItemStyle={{ fontSize: "0.8rem", color: "var(--text-primary)" }}
+                                />
+                              </details>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div style={{ border: "1px solid var(--panel-border-strong)", borderRadius: "0.35rem", backgroundColor: "var(--surface-0)", padding: "0.5rem", marginBottom: "0.75rem" }}>
                 <h3 style={titleStyle}>Powers ({activeMonster.powers.length})</h3>
@@ -1580,27 +1779,6 @@ export function MonsterEditorApp({
                       </div>
                     );
                   })}
-                </div>
-              </div>
-
-              <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", backgroundColor: "var(--surface-0)", padding: "0.5rem" }}>
-                <h3 style={titleStyle}>Additional Sections</h3>
-                <div style={{ marginTop: "0.5rem", display: "grid", gridTemplateColumns: "repeat(2, minmax(220px, 1fr))", gap: "0.5rem" }}>
-                  {Object.entries(activeMonster.sections ?? {}).length === 0 ? (
-                    <div style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>No additional sections.</div>
-                  ) : (
-                    Object.entries(activeMonster.sections ?? {}).map(([sectionName, sectionData]) => {
-                      const childKeys = sectionChildKeys(sectionData);
-                      return (
-                        <div key={sectionName} style={{ border: "1px solid var(--panel-border)", borderRadius: "0.32rem", padding: "0.45rem", backgroundColor: "var(--surface-1)" }}>
-                          <div style={{ fontWeight: 600, fontSize: "0.82rem" }}>{sectionName}</div>
-                          <div style={{ marginTop: "0.25rem", fontSize: "0.76rem", color: "var(--text-muted)" }}>
-                            {childKeys.length === 0 ? "No child tags" : childKeys.join(", ")}
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
                 </div>
               </div>
 
