@@ -278,7 +278,7 @@ function renderDamageSummary(damage?: MonsterPowerDamage): string {
   return parts.join(" • ");
 }
 
-function renderPrimaryAttackBonus(attack?: MonsterPowerAttack): string {
+function renderAttackBonusLine(attack?: MonsterPowerAttack): string {
   if (!attack?.attackBonuses?.length) return "";
   return attack.attackBonuses
     .map((bonus) => `${bonus.bonus ?? "?"} vs ${(bonus.defense ?? "?").toString().toLowerCase()}`)
@@ -293,11 +293,11 @@ function renderDamageExpression(outcome?: MonsterPowerOutcome, fallbackExpressio
   return "";
 }
 
-function renderCompactOutcomeLines(
-  power: MonsterPower,
-  attack: MonsterPowerAttack | undefined
-): Array<{ label: string; text: string }> {
-  const lines: Array<{ label: string; text: string }> = [];
+function appendNestedOutcomeLines(
+  lines: Array<{ label: string; text: string }>,
+  outcome: MonsterPowerOutcome | undefined
+): void {
+  if (!outcome) return;
   const outcomeEntryDescription = (entry: MonsterPowerOutcomeEntry): string => {
     const direct = normalizeSemicolonWhitespace(String(entry.description || "").trim());
     if (isRenderableCardValue(direct)) return direct;
@@ -307,48 +307,42 @@ function renderCompactOutcomeLines(
     if (isRenderableCardValue(fromChildren)) return fromChildren;
     return "";
   };
-  const appendNestedOutcomeLines = (prefix: "HIT" | "MISS" | "EFFECT", outcome: MonsterPowerOutcome | undefined): void => {
-    if (!outcome) return;
-    const aftereffectLines =
-      outcome.aftereffects
-        ?.map((entry) => outcomeEntryDescription(entry))
-        .filter((text) => isRenderableCardValue(text)) ?? [];
-    for (const aftereffect of aftereffectLines) {
-      lines.push({ label: "AFTEREFFECT", text: aftereffect });
-    }
-    const sustainLines =
-      outcome.sustains
-        ?.map((entry) => outcomeEntryDescription(entry))
-        .filter((text) => isRenderableCardValue(text)) ?? [];
-    for (const sustain of sustainLines) {
-      lines.push({ label: "SUSTAIN", text: sustain });
-    }
-    const failedSaveLines =
-      outcome.failedSavingThrows
-        ?.map((entry) => outcomeEntryDescription(entry))
-        .filter((text) => isRenderableCardValue(text)) ?? [];
-    for (const failedSave of failedSaveLines) {
-      lines.push({ label: "FAILED SAVE", text: failedSave });
-    }
-    const nestedAttackLines =
-      outcome.nestedAttackDescriptions
-        ?.map((entry) => normalizeSemicolonWhitespace(String(entry || "").trim()))
-        .filter((text) => isRenderableCardValue(text)) ?? [];
-    for (const nestedAttack of nestedAttackLines) {
-      lines.push({ label: "NESTED ATTACK", text: nestedAttack });
-    }
-  };
+  const aftereffectLines =
+    outcome.aftereffects
+      ?.map((entry) => outcomeEntryDescription(entry))
+      .filter((text) => isRenderableCardValue(text)) ?? [];
+  for (const aftereffect of aftereffectLines) {
+    lines.push({ label: "AFTEREFFECT", text: aftereffect });
+  }
+  const sustainLines =
+    outcome.sustains
+      ?.map((entry) => outcomeEntryDescription(entry))
+      .filter((text) => isRenderableCardValue(text)) ?? [];
+  for (const sustain of sustainLines) {
+    lines.push({ label: "SUSTAIN", text: sustain });
+  }
+  const failedSaveLines =
+    outcome.failedSavingThrows
+      ?.map((entry) => outcomeEntryDescription(entry))
+      .filter((text) => isRenderableCardValue(text)) ?? [];
+  for (const failedSave of failedSaveLines) {
+    lines.push({ label: "FAILED SAVE", text: failedSave });
+  }
+  const nestedAttackLines =
+    outcome.nestedAttackDescriptions
+      ?.map((entry) => normalizeSemicolonWhitespace(String(entry || "").trim()))
+      .filter((text) => isRenderableCardValue(text)) ?? [];
+  for (const nestedAttack of nestedAttackLines) {
+    lines.push({ label: "NESTED ATTACK", text: nestedAttack });
+  }
+}
 
-  if (isRenderableCardValue(power.trigger)) {
-    lines.push({ label: "TRIGGER", text: normalizeSemicolonWhitespace(String(power.trigger).trim()) });
-  }
-  if (isRenderableCardValue(power.requirements)) {
-    lines.push({ label: "REQUIREMENTS", text: normalizeSemicolonWhitespace(String(power.requirements).trim()) });
-  }
+function renderCompactAttackOutcomeLines(attack: MonsterPowerAttack | undefined): Array<{ label: string; text: string }> {
+  const lines: Array<{ label: string; text: string }> = [];
   if (isRenderableCardValue(attack?.targets)) {
     lines.push({ label: "TARGET", text: normalizeSemicolonWhitespace(String(attack?.targets).trim()) });
   }
-  const hitExpr = renderDamageExpression(attack?.hit, power.damageExpressions);
+  const hitExpr = renderDamageExpression(attack?.hit);
   const hitDescription = isRenderableCardValue(attack?.hit?.description)
     ? normalizeSemicolonWhitespace(String(attack?.hit?.description).trim())
     : "";
@@ -364,9 +358,24 @@ function renderCompactOutcomeLines(
   if (isRenderableCardValue(attack?.effect?.description)) {
     lines.push({ label: "EFFECT", text: String(attack?.effect?.description).trim() });
   }
-  appendNestedOutcomeLines("HIT", attack?.hit);
-  appendNestedOutcomeLines("MISS", attack?.miss);
-  appendNestedOutcomeLines("EFFECT", attack?.effect);
+  appendNestedOutcomeLines(lines, attack?.hit);
+  appendNestedOutcomeLines(lines, attack?.miss);
+  appendNestedOutcomeLines(lines, attack?.effect);
+  return lines;
+}
+
+function renderCompactOutcomeLines(
+  power: MonsterPower,
+  attack: MonsterPowerAttack | undefined
+): Array<{ label: string; text: string }> {
+  const lines: Array<{ label: string; text: string }> = [];
+  if (isRenderableCardValue(power.trigger)) {
+    lines.push({ label: "TRIGGER", text: normalizeSemicolonWhitespace(String(power.trigger).trim()) });
+  }
+  if (isRenderableCardValue(power.requirements)) {
+    lines.push({ label: "REQUIREMENTS", text: normalizeSemicolonWhitespace(String(power.requirements).trim()) });
+  }
+  lines.push(...renderCompactAttackOutcomeLines(attack));
   return lines;
 }
 
@@ -384,6 +393,11 @@ type MonsterPowerCardViewModel = {
   attackLineParts: string[];
   keywordTokens: string[];
   outcomeLines: Array<{ label: string; text: string }>;
+  secondaryAttacks: Array<{
+    name: string;
+    attackLineParts: string[];
+    outcomeLines: Array<{ label: string; text: string }>;
+  }>;
   descriptionText: string;
   ongoingText: string;
 };
@@ -405,17 +419,24 @@ function dedupeLabeledLines(lines: Array<{ label: string; text: string }>): Arra
 
 function buildMonsterPowerCardViewModel(power: MonsterPower): MonsterPowerCardViewModel {
   const primaryAttack = power.attacks?.[0];
-  const attackBonusLine = renderPrimaryAttackBonus(primaryAttack);
+  const attackBonusLine = renderAttackBonusLine(primaryAttack);
   const compactOutcomeLines = dedupeLabeledLines(renderCompactOutcomeLines(power, primaryAttack));
   const normalizedDescription = normalizeSemicolonWhitespace(String(power.description || "").trim());
   const normalizedEffectDescription = normalizeSemicolonWhitespace(String(primaryAttack?.effect?.description || "").trim());
+  const normalizedHitDescription = normalizeSemicolonWhitespace(String(primaryAttack?.hit?.description || "").trim());
+  const hitAlreadyContainsDescription =
+    isRenderableCardValue(normalizedDescription) &&
+    isRenderableCardValue(normalizedHitDescription) &&
+    (normalizedHitDescription.toLowerCase().includes(normalizedDescription.toLowerCase()) ||
+      normalizedDescription.toLowerCase().includes(normalizedHitDescription.toLowerCase()));
 
   const shouldInlineDescriptionWithHit =
     isRenderableCardValue(normalizedDescription) &&
     /^(?:[a-z]+\s+)?damage\b/i.test(normalizedDescription) &&
-    compactOutcomeLines.some((line) => line.label === "HIT");
+    compactOutcomeLines.some((line) => line.label === "HIT") &&
+    !hitAlreadyContainsDescription;
 
-  const outcomeLines = dedupeLabeledLines(
+  let outcomeLines = dedupeLabeledLines(
     compactOutcomeLines.map((line) =>
       line.label === "HIT" && shouldInlineDescriptionWithHit ? { ...line, text: `${line.text} ${normalizedDescription}`.trim() } : line
     )
@@ -454,7 +475,38 @@ function buildMonsterPowerCardViewModel(power: MonsterPower): MonsterPowerCardVi
     .map((part) => String(part || "").trim())
     .filter((part) => isRenderableCardValue(part));
 
+  const secondaryAttacks = (power.attacks ?? [])
+    .slice(1)
+    .map((attack, idx) => {
+      const secondaryRange = String(attack.range || "").trim();
+      const secondaryBonusLine = renderAttackBonusLine(attack);
+      const secondaryAttackLineParts = [secondaryRange, secondaryBonusLine]
+        .map((part) => String(part || "").trim())
+        .filter((part) => isRenderableCardValue(part));
+      return {
+        name: String(attack.name || `Secondary Attack ${idx + 1}`),
+        attackLineParts: secondaryAttackLineParts,
+        outcomeLines: dedupeLabeledLines(renderCompactAttackOutcomeLines(attack))
+      };
+    })
+    .filter((attack) => attack.attackLineParts.length > 0 || attack.outcomeLines.length > 0);
+
+  if (secondaryAttacks.length > 0) {
+    const secondaryOutcomeTexts = new Set(
+      secondaryAttacks
+        .flatMap((attack) => attack.outcomeLines.map((line) => normalizeSemicolonWhitespace(String(line.text || "").trim()).toLowerCase()))
+        .filter((text) => isRenderableCardValue(text))
+    );
+    outcomeLines = outcomeLines.filter((line) => {
+      if (line.label !== "NESTED ATTACK") return true;
+      const normalizedText = normalizeSemicolonWhitespace(String(line.text || "").trim()).toLowerCase();
+      if (!isRenderableCardValue(normalizedText)) return true;
+      return !secondaryOutcomeTexts.has(normalizedText);
+    });
+  }
+
   const keywordTokens = [
+    ...(power.keywordTokens?.filter(Boolean) ?? []),
     ...splitPowerKeywords(power.keywords || ""),
     ...(power.keywordNames?.filter(Boolean) ?? [])
   ];
@@ -466,6 +518,7 @@ function buildMonsterPowerCardViewModel(power: MonsterPower): MonsterPowerCardVi
     attackLineParts,
     keywordTokens: uniqueKeywordTokens,
     outcomeLines,
+    secondaryAttacks,
     descriptionText,
     ongoingText: extractOngoingText(power.description)
   };
@@ -1379,6 +1432,73 @@ export function MonsterEditorApp({
                               </div>
                             ))}
                           </div>
+                          {cardModel.secondaryAttacks.length > 0 ? (
+                            <div
+                              style={{
+                                marginTop: "0.28rem",
+                                marginLeft: "0.55rem",
+                                paddingLeft: "0.55rem",
+                                borderLeft: "2px solid var(--panel-border)"
+                              }}
+                            >
+                              {cardModel.secondaryAttacks.map((secondaryAttack, secondaryIndex) => (
+                                <div key={`${power.name}-${index}-secondary-${secondaryIndex}`} style={{ marginTop: secondaryIndex === 0 ? 0 : "0.3rem" }}>
+                                  <div style={{ fontSize: "0.74rem", fontWeight: 700, textTransform: "uppercase", color: "var(--text-secondary)" }}>
+                                    {secondaryAttack.name}
+                                  </div>
+                                  {secondaryAttack.attackLineParts.length > 0 ? (
+                                    <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginTop: "0.05rem", display: "flex", flexWrap: "wrap", gap: "0.22rem", alignItems: "center" }}>
+                                      {secondaryAttack.attackLineParts.map((part, partIdx) => (
+                                        <span key={`${power.name}-${index}-secondary-${secondaryIndex}-attackline-${partIdx}`}>
+                                          <span
+                                            onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${part}`)}
+                                            onMouseLeave={stopGlossaryHover}
+                                            style={{
+                                              cursor: "help",
+                                              borderBottom: "1px dotted var(--text-muted)",
+                                              color: "var(--text-primary)"
+                                            }}
+                                          >
+                                            {part}
+                                          </span>
+                                          {partIdx < secondaryAttack.attackLineParts.length - 1 ? (
+                                            <span style={{ color: "var(--text-muted)", margin: "0 0.1rem" }}>•</span>
+                                          ) : null}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  ) : null}
+                                  <div style={{ marginTop: "0.15rem", display: "grid", gap: "0.14rem" }}>
+                                    {secondaryAttack.outcomeLines.map((line) => (
+                                      <div key={`${power.name}-${index}-secondary-${secondaryIndex}-${line.label}-${line.text}`} style={{ fontSize: "0.8rem", color: "var(--text-primary)" }}>
+                                        {(() => {
+                                          const split = splitFailedEscapeAttemptSections(line.text);
+                                          return (
+                                            <>
+                                              {isRenderableCardValue(split.mainText) ? (
+                                                <div>
+                                                  <strong>{line.label}:</strong> {split.mainText}
+                                                </div>
+                                              ) : (
+                                                <div>
+                                                  <strong>{line.label}:</strong> {line.text}
+                                                </div>
+                                              )}
+                                              {split.failedEscapeTexts.map((failedText) => (
+                                                <div key={`${power.name}-${index}-secondary-${secondaryIndex}-${line.label}-failed-${failedText}`} style={{ marginTop: "0.04rem" }}>
+                                                  <strong>Failed Escape Attempt:</strong> {failedText}
+                                                </div>
+                                              ))}
+                                            </>
+                                          );
+                                        })()}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
                           {isRenderableCardValue(power.flavorText) ? (
                             <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", marginBottom: "0.2rem", fontStyle: "italic" }}>
                               {power.flavorText}

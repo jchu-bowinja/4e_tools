@@ -35,6 +35,7 @@ export interface MonsterPower {
   flavorText?: string;
   keywords: string;
   keywordNames?: string[];
+  keywordTokens?: string[];
   range?: string;
   description: string;
   damageExpressions?: string[];

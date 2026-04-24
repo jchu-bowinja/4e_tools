@@ -32,6 +32,21 @@ def _coerce_value(value: str) -> Any:
     return text
 
 
+def _normalize_text(value: Optional[str]) -> str:
+    raw = "" if value is None else str(value)
+    normalized = re.sub(r"\s+", " ", raw).strip()
+    if not normalized:
+        return ""
+    return re.sub(r"\s*;\s*", "; ", normalized)
+
+
+def _normalized_optional_text(value: Optional[str]) -> str:
+    normalized = _normalize_text(value)
+    if normalized.lower() in {"none", "n/a", "null", "nil"}:
+        return ""
+    return normalized
+
+
 def _direct_child_text(node: ET.Element, tag_name: str) -> Optional[str]:
     for child in list(node):
         if _local_name(child.tag) == tag_name and child.text:
@@ -46,6 +61,34 @@ def _first_descendant_text(node: ET.Element, tag_name: str) -> Optional[str]:
         if _local_name(child.tag) == tag_name and child.text and child.text.strip():
             return child.text.strip()
     return None
+
+
+def _all_descendant_texts(node: ET.Element, tag_name: str) -> List[str]:
+    values: List[str] = []
+    seen = set()
+    for child in node.iter():
+        if _local_name(child.tag) != tag_name:
+            continue
+        text = _normalized_optional_text(child.text)
+        if not text:
+            continue
+        lowered = text.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        values.append(text)
+    return values
+
+
+def _first_available_text(node: ET.Element, tag_names: List[str]) -> str:
+    for tag_name in tag_names:
+        direct = _direct_child_text(node, tag_name)
+        if direct and _normalized_optional_text(direct):
+            return _normalized_optional_text(direct)
+        descendant = _first_descendant_text(node, tag_name)
+        if descendant and _normalized_optional_text(descendant):
+            return _normalized_optional_text(descendant)
+    return ""
 
 
 def _first_descendant_attr(node: ET.Element, tag_name: str, attr_name: str) -> Optional[str]:
@@ -237,25 +280,78 @@ def _extract_powers(root: ET.Element) -> List[Dict[str, Any]]:
         damage_modifier = _first_descendant_text(node, "Modifier")
         if damage_modifier:
             data["modifier"] = damage_modifier
-        # Suppress boilerplate "no-op" damage blocks that are emitted in many
-        # outcomes (e.g. AverageDamage=1, DamageType=None, no expression).
-        if (
-            data.get("averageDamage") == 1
-            and data.get("damageType") == "None"
-            and not data.get("expressions")
-            and data.get("diceQuantity") == 0
-            and data.get("diceSides") == 0
-        ):
+        # Suppress boilerplate "no-op" damage blocks emitted in many outcomes.
+        if _is_noop_damage(data):
             return {}
         return data
+
+    def _is_noop_damage(damage: Dict[str, Any]) -> bool:
+        if not damage:
+            return True
+        expressions = [str(expr).strip() for expr in (damage.get("expressions") or []) if str(expr).strip()]
+        if expressions:
+            return False
+        damage_type = str(damage.get("damageType") or "").strip().lower()
+        average = damage.get("averageDamage")
+        quantity = damage.get("diceQuantity")
+        sides = damage.get("diceSides")
+        constant = damage.get("damageConstant")
+        modifier = str(damage.get("modifier") or "").strip().lower()
+        if (
+            quantity in {None, 0}
+            and sides in {None, 0, 8}
+            and (constant is None or float(constant) <= 12.5)
+            and (not damage_type or damage_type in {"none", "normal"})
+            and modifier in {"", "medium"}
+        ):
+            return True
+        return False
+
+    def _is_placeholder_attack_entry(entry: Dict[str, Any]) -> bool:
+        if not entry:
+            return True
+        kind = str(entry.get("kind") or "")
+        name = str(entry.get("name") or "").strip().lower()
+        description = str(entry.get("description") or "").strip()
+        if "damage" in entry and not isinstance(entry["damage"], dict):
+            return False
+        has_damage = isinstance(entry.get("damage"), dict) and bool(entry.get("damage"))
+        has_outcomes = bool(entry.get("hit") or entry.get("miss") or entry.get("effect"))
+        has_nested = bool(entry.get("aftereffects") or entry.get("sustains") or entry.get("failedSavingThrows") or entry.get("attacks"))
+        if has_damage or has_outcomes or has_nested or description:
+            return False
+        return kind in {"MonsterAttackEntry", "Attack", "MonsterAttack"} and name in {"aftereffect", "effect", "hit", "miss", ""}
+
+    def _extract_nested_entries(node: ET.Element, section_name: str) -> List[Dict[str, Any]]:
+        section = _find_first_section(node, section_name)
+        if section is None:
+            return []
+        return _dedupe_entries(_extract_entry_list(section))
+
+    def _entry_dedupe_key(entry: Dict[str, Any]) -> str:
+        normalized = json.dumps(entry, sort_keys=True, ensure_ascii=False)
+        return normalized.lower()
+
+    def _dedupe_entries(entries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        out: List[Dict[str, Any]] = []
+        seen = set()
+        for entry in entries:
+            if _is_placeholder_attack_entry(entry):
+                continue
+            key = _entry_dedupe_key(entry)
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(entry)
+        return out
 
     def _extract_entry_list(section: ET.Element) -> List[Dict[str, Any]]:
         def _extract_attack_entry(node: ET.Element) -> Dict[str, Any]:
             entry: Dict[str, Any] = {"kind": _local_name(node.tag)}
-            name = _direct_child_text(node, "Name")
+            name = _first_available_text(node, ["Name", "Display"])
             if name:
                 entry["name"] = name
-            description = _direct_child_text(node, "Description")
+            description = _first_available_text(node, ["Description"])
             if description:
                 entry["description"] = description
             damage = _find_first_section(node, "Damage")
@@ -264,12 +360,8 @@ def _extract_powers(root: ET.Element) -> List[Dict[str, Any]]:
                 if damage_data:
                     entry["damage"] = damage_data
 
-            nested_entries = []
             for nested_name in ("Aftereffects", "Sustains", "FailedSavingThrows"):
-                nested_section = _find_first_section(node, nested_name)
-                if nested_section is None:
-                    continue
-                nested_values = _extract_entry_list(nested_section)
+                nested_values = _extract_nested_entries(node, nested_name)
                 if nested_values:
                     key = {
                         "Aftereffects": "aftereffects",
@@ -277,7 +369,6 @@ def _extract_powers(root: ET.Element) -> List[Dict[str, Any]]:
                         "FailedSavingThrows": "failedSavingThrows",
                     }[nested_name]
                     entry[key] = nested_values
-                    nested_entries.extend(nested_values)
 
             attacks_section = _find_first_section(node, "Attacks")
             if attacks_section is not None:
@@ -298,11 +389,11 @@ def _extract_powers(root: ET.Element) -> List[Dict[str, Any]]:
             structured = _element_to_structured(child)
             if structured:
                 items.append({"kind": tag, **structured})
-        return items
+        return _dedupe_entries(items)
 
     def _extract_outcome_data(node: ET.Element) -> Dict[str, Any]:
         outcome: Dict[str, Any] = {}
-        description = _direct_child_text(node, "Description")
+        description = _first_available_text(node, ["Description"])
         if description:
             outcome["description"] = description
         damage = _find_first_section(node, "Damage")
@@ -314,29 +405,29 @@ def _extract_powers(root: ET.Element) -> List[Dict[str, Any]]:
         for attack_node in node.iter():
             if _local_name(attack_node.tag) not in {"Attack", "MonsterAttack"}:
                 continue
-            attack_text = _direct_child_text(attack_node, "Description")
+            attack_text = _first_available_text(attack_node, ["Description"])
             if attack_text:
                 nested_attacks.append(attack_text)
         if nested_attacks:
-            outcome["nestedAttackDescriptions"] = nested_attacks
+            deduped: List[str] = []
+            seen = set()
+            for entry in nested_attacks:
+                lowered = entry.lower()
+                if lowered in seen:
+                    continue
+                seen.add(lowered)
+                deduped.append(entry)
+            outcome["nestedAttackDescriptions"] = deduped
 
-        aftereffects_section = _find_first_section(node, "Aftereffects")
-        if aftereffects_section is not None:
-            aftereffects = _extract_entry_list(aftereffects_section)
-            if aftereffects:
-                outcome["aftereffects"] = aftereffects
-
-        sustains_section = _find_first_section(node, "Sustains")
-        if sustains_section is not None:
-            sustains = _extract_entry_list(sustains_section)
-            if sustains:
-                outcome["sustains"] = sustains
-
-        failed_saving_throws_section = _find_first_section(node, "FailedSavingThrows")
-        if failed_saving_throws_section is not None:
-            failed_saving_throws = _extract_entry_list(failed_saving_throws_section)
-            if failed_saving_throws:
-                outcome["failedSavingThrows"] = failed_saving_throws
+        aftereffects = _extract_nested_entries(node, "Aftereffects")
+        if aftereffects:
+            outcome["aftereffects"] = aftereffects
+        sustains = _extract_nested_entries(node, "Sustains")
+        if sustains:
+            outcome["sustains"] = sustains
+        failed_saving_throws = _extract_nested_entries(node, "FailedSavingThrows")
+        if failed_saving_throws:
+            outcome["failedSavingThrows"] = failed_saving_throws
         return outcome
 
     def _extract_attack_bonuses(node: ET.Element) -> List[Dict[str, Any]]:
@@ -369,13 +460,13 @@ def _extract_powers(root: ET.Element) -> List[Dict[str, Any]]:
                 continue
             attack: Dict[str, Any] = {}
             attack["kind"] = attack_kind
-            name = _direct_child_text(attack_node, "Name")
+            name = _first_available_text(attack_node, ["Name", "Display"])
             if name:
                 attack["name"] = name
-            range_text = _direct_child_text(attack_node, "Range")
+            range_text = _first_available_text(attack_node, ["Range"])
             if range_text:
                 attack["range"] = range_text
-            targets = _direct_child_text(attack_node, "Targets") or _direct_child_text(attack_node, "Target")
+            targets = _first_available_text(attack_node, ["Targets", "Target"])
             if targets:
                 attack["targets"] = targets
             attack_bonuses = _extract_attack_bonuses(attack_node)
@@ -392,8 +483,33 @@ def _extract_powers(root: ET.Element) -> List[Dict[str, Any]]:
                 if outcome_name in attack and not attack[outcome_name]:
                     del attack[outcome_name]
             if attack:
+                if (
+                    attack_kind == "MonsterAttackEntry"
+                    and not attack.get("name")
+                    and not attack.get("range")
+                    and not attack.get("targets")
+                    and not attack.get("attackBonuses")
+                    and not attack.get("hit")
+                    and not attack.get("miss")
+                    and not attack.get("effect")
+                ):
+                    continue
                 attacks.append(attack)
-        return attacks
+        attacks = _dedupe_entries(attacks)
+        cleaned_attacks: List[Dict[str, Any]] = []
+        for attack in attacks:
+            if (
+                str(attack.get("kind") or "") == "MonsterAttackEntry"
+                and str(attack.get("name") or "").strip().lower() in {"aftereffect", "effect", "hit", "miss"}
+                and not attack.get("description")
+                and not attack.get("hit")
+                and not attack.get("miss")
+                and not attack.get("effect")
+                and not attack.get("attacks")
+            ):
+                continue
+            cleaned_attacks.append(attack)
+        return cleaned_attacks
 
     powers: List[Dict[str, Any]] = []
     section = _find_first_section(root, "Powers")
@@ -404,34 +520,54 @@ def _extract_powers(root: ET.Element) -> List[Dict[str, Any]]:
         local = _local_name(node.tag)
         if local not in {"MonsterPower", "Power"}:
             continue
-        name = _direct_child_text(node, "Name") or _direct_child_text(node, "Display") or ""
-        usage = _direct_child_text(node, "Usage") or _direct_child_text(node, "PowerUsage") or ""
-        usage_details = _direct_child_text(node, "UsageDetails") or ""
-        action = _direct_child_text(node, "Action") or ""
-        trigger = _direct_child_text(node, "Trigger") or ""
-        requirements = _direct_child_text(node, "Requirements") or ""
-        power_type = _direct_child_text(node, "Type") or ""
-        flavor_text = _direct_child_text(node, "FlavorText") or ""
+        name = _first_available_text(node, ["Name", "Display"])
+        usage = _first_available_text(node, ["Usage", "PowerUsage"])
+        usage_details = _first_available_text(node, ["UsageDetails"])
+        action = _first_available_text(node, ["Action"])
+        trigger = _first_available_text(node, ["Trigger"])
+        requirements = _first_available_text(node, ["Requirements"])
+        power_type = _first_available_text(node, ["Type"])
+        flavor_text = _first_available_text(node, ["FlavorText"])
         is_basic_raw = _direct_child_text(node, "IsBasic")
         is_basic = _coerce_value(is_basic_raw) if is_basic_raw else False
         tier_raw = _direct_child_text(node, "Tier")
         tier = _coerce_value(tier_raw) if tier_raw else ""
-        keywords = _direct_child_text(node, "Keywords") or ""
+        keywords = _first_available_text(node, ["Keywords"])
         keyword_names: List[str] = []
         keyword_section = _find_first_section(node, "Keywords")
         if keyword_section is not None:
             keyword_names = _extract_reference_names(keyword_section)
-        range_text = _first_descendant_text(node, "Range") or ""
-        description = _first_descendant_text(node, "Description") or ""
+        keyword_tokens = [
+            _normalize_text(token)
+            for token in re.split(r"[;,]", keywords)
+            if _normalize_text(token)
+        ]
+        for keyword_name in keyword_names:
+            normalized_keyword_name = _normalize_text(keyword_name)
+            if normalized_keyword_name and normalized_keyword_name.lower() not in {
+                token.lower() for token in keyword_tokens
+            }:
+                keyword_tokens.append(normalized_keyword_name)
+        range_text = _first_available_text(node, ["Range"])
+        description_candidates = _all_descendant_texts(node, "Description")
+        description = description_candidates[0] if description_candidates else ""
         attacks = _extract_attacks(node)
         damage_expressions: List[str] = []
         for expression_node in node.iter():
             if _local_name(expression_node.tag) != "Expression":
                 continue
-            expression_text = (expression_node.text or "").strip()
+            expression_text = _normalize_text(expression_node.text)
             if expression_text:
                 damage_expressions.append(expression_text)
-        if name or usage or action or keywords or keyword_names or description or attacks:
+        deduped_damage_expressions: List[str] = []
+        seen_expressions = set()
+        for expression in damage_expressions:
+            lowered = expression.lower()
+            if lowered in seen_expressions:
+                continue
+            seen_expressions.add(lowered)
+            deduped_damage_expressions.append(expression)
+        if name or usage or action or keywords or keyword_tokens or description or attacks:
             powers.append(
                 {
                     "name": name,
@@ -446,9 +582,10 @@ def _extract_powers(root: ET.Element) -> List[Dict[str, Any]]:
                     "flavorText": flavor_text,
                     "keywords": keywords,
                     "keywordNames": keyword_names,
+                    "keywordTokens": keyword_tokens,
                     "range": range_text,
                     "description": description,
-                    "damageExpressions": damage_expressions,
+                    "damageExpressions": deduped_damage_expressions,
                     "attacks": attacks,
                 }
             )
