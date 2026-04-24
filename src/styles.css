@@ -28,6 +28,8 @@
   --power-accent-daily-bg: #f3f4f6;
   --power-accent-daily-border: #94a3b8;
   --power-expended-opacity: 0.8;
+  --table-stripe-even: var(--surface-1);
+  --table-stripe-odd: var(--surface-0);
 }
 
 :root[data-theme="dark"] {
@@ -122,6 +124,8 @@ a:focus-visible {
   --power-accent-daily-bg: #192130;
   --power-accent-daily-border: #334155;
   --power-expended-opacity: 0.92;
+  --table-stripe-even: #202d43;
+  --table-stripe-odd: #0f172a;
 }
 
 :root[data-theme="dark"] input,

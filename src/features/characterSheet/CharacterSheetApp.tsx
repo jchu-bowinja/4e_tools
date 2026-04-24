@@ -955,7 +955,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 style={{
                   padding: "0.16rem 0.35rem",
                   borderRadius: "0.25rem",
-                  backgroundColor: idx % 2 === 0 ? "var(--surface-1)" : "var(--surface-0)"
+                  backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)"
                 }}
               >
                 {item.label}
@@ -967,7 +967,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   padding: "0.16rem 0.35rem",
                   borderRadius: "0.25rem",
                   textAlign: "right",
-                  backgroundColor: idx % 2 === 0 ? "var(--surface-1)" : "var(--surface-0)"
+                  backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)"
                 }}
               >
                 {item.value}
@@ -1178,7 +1178,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                           letterSpacing: "0.04em",
                           padding: "0.22rem 0.35rem",
                           borderRadius: "0.25rem",
-                          backgroundColor: idx % 2 === 0 ? "var(--surface-1)" : "var(--surface-0)"
+                          backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)"
                         }}
                       >
                         {ab}
@@ -1189,7 +1189,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                           fontSize: "0.82rem",
                           padding: "0.22rem 0.35rem",
                           borderRadius: "0.25rem",
-                          backgroundColor: idx % 2 === 0 ? "var(--surface-1)" : "var(--surface-0)"
+                          backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)"
                         }}
                       >
                         <strong>{sheet.abilityScores[ab]}</strong>
@@ -1217,7 +1217,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                           lineHeight: 1.2,
                           padding: "0.24rem 0.35rem",
                           borderRadius: "0.25rem",
-                          backgroundColor: idx % 2 === 0 ? "var(--surface-1)" : "var(--surface-0)",
+                          backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)",
                           color: "var(--text-primary)"
                         }}
                       >
@@ -1272,7 +1272,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                           color: "var(--text-primary)",
                           padding: "0.2rem 0.35rem",
                           borderRadius: "0.25rem",
-                          backgroundColor: idx % 2 === 0 ? "var(--surface-1)" : "var(--surface-0)"
+                          backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)"
                         }}
                       >
                         {row.name}
@@ -1283,7 +1283,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                           textAlign: "right",
                           padding: "0.2rem 0.35rem",
                           borderRadius: "0.25rem",
-                          backgroundColor: idx % 2 === 0 ? "var(--surface-1)" : "var(--surface-0)"
+                          backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)"
                         }}
                       >
                         {row.modifier >= 0 ? `+${row.modifier}` : row.modifier}
