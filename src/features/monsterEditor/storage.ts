@@ -5,6 +5,7 @@ export interface MonsterIndexEntry {
   name: string;
   level: string | number;
   role: string;
+  isLeader?: boolean;
   parseError: string;
 }
 
@@ -18,7 +19,7 @@ export interface MonsterStats {
   defenses: Record<string, number | string>;
   attackBonuses: Record<string, number | string>;
   skills: Record<string, number | string>;
-  otherNumbers: Record<string, number | string>;
+  otherNumbers: Record<string, number | string | boolean | Record<string, number | string | boolean>>;
 }
 
 export interface MonsterPower {

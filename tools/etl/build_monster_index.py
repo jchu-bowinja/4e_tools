@@ -57,6 +57,29 @@ def _first_descendant_attr(node: ET.Element, tag_name: str, attr_name: str) -> O
     return None
 
 
+def _attr_value_case_insensitive(node: ET.Element, attr_name: str) -> Optional[str]:
+    target = attr_name.lower()
+    for key, value in node.attrib.items():
+        if key.lower() != target:
+            continue
+        if value is None:
+            return None
+        text = str(value).strip()
+        if text:
+            return text
+    return None
+
+
+def _first_descendant_attr_ci(node: ET.Element, tag_name: str, attr_name: str) -> Optional[str]:
+    for child in node.iter():
+        if _local_name(child.tag) != tag_name:
+            continue
+        value = _attr_value_case_insensitive(child, attr_name)
+        if value is not None:
+            return value
+    return None
+
+
 def _find_first_section(node: ET.Element, tag_name: str) -> Optional[ET.Element]:
     for child in node.iter():
         if _local_name(child.tag) == tag_name:
@@ -70,12 +93,13 @@ def _extract_named_final_values(root: ET.Element, section_name: str) -> Dict[str
         return {}
     result: Dict[str, Any] = {}
     for node in section.iter():
-        if "FinalValue" not in node.attrib:
+        final_value = _attr_value_case_insensitive(node, "FinalValue")
+        if final_value is None:
             continue
         name = _direct_child_text(node, "Name")
         if not name:
             continue
-        result[name] = _coerce_value(node.attrib["FinalValue"])
+        result[name] = _coerce_value(final_value)
     return result
 
 
@@ -97,6 +121,47 @@ def _extract_named_value_texts(root: ET.Element, section_name: str) -> Dict[str,
         if text_parts:
             result[name] = " | ".join(text_parts)
     return result
+
+
+def _extract_core_final_values(root: ET.Element) -> Dict[str, Any]:
+    values: Dict[str, Any] = {}
+
+    for tag in ("Initiative", "HitPoints", "ActionPoints"):
+        node = _find_first_section(root, tag)
+        if node is None:
+            continue
+        final_value = _attr_value_case_insensitive(node, "FinalValue")
+        if final_value is None:
+            continue
+        values[tag[0].lower() + tag[1:]] = _coerce_value(final_value)
+
+    saving_throws_value = _first_descendant_attr_ci(root, "MonsterSavingThrow", "FinalValue")
+    if saving_throws_value is not None:
+        values["savingThrows"] = _coerce_value(saving_throws_value)
+
+    land_speed_section = _find_first_section(root, "LandSpeed")
+    if land_speed_section is not None:
+        land_speed = _first_descendant_attr_ci(land_speed_section, "Speed", "FinalValue")
+        if land_speed is None:
+            land_speed = _attr_value_case_insensitive(land_speed_section, "FinalValue")
+        if land_speed is not None:
+            values["landSpeed"] = _coerce_value(land_speed)
+
+    movement_modes: Dict[str, Any] = {}
+    speeds_section = _find_first_section(root, "Speeds")
+    if speeds_section is not None:
+        for speed_node in list(speeds_section):
+            if _local_name(speed_node.tag) != "CreatureSpeed":
+                continue
+            mode_name = _first_descendant_text(speed_node, "Name") or ""
+            speed_value = _first_descendant_attr_ci(speed_node, "Speed", "FinalValue")
+            if not mode_name or speed_value is None:
+                continue
+            movement_modes[mode_name] = _coerce_value(speed_value)
+    if movement_modes:
+        values["movementModes"] = movement_modes
+
+    return values
 
 
 def _element_to_structured(node: ET.Element) -> Dict[str, Any]:
@@ -438,10 +503,17 @@ def _parse_monster_file(xml_text: str, fallback_name: str) -> Dict[str, Any]:
     if type_object is not None:
         type_name = _first_descendant_text(type_object, "Name") or ""
 
+    is_leader_raw = _direct_child_text(root, "IsLeader") or ""
+    is_leader = False
+    if is_leader_raw:
+        coerced = _coerce_value(is_leader_raw)
+        is_leader = bool(coerced) if isinstance(coerced, bool) else str(is_leader_raw).strip().lower() == "true"
+
     return {
         "name": _direct_child_text(root, "Name") or fallback_name,
         "level": _direct_child_text(root, "Level") or "",
         "role": role_name,
+        "isLeader": is_leader,
         "size": size_name,
         "origin": origin_name,
         "type": type_name,
@@ -457,7 +529,10 @@ def _parse_monster_file(xml_text: str, fallback_name: str) -> Dict[str, Any]:
             "defenses": _extract_named_final_values(root, "Defenses"),
             "attackBonuses": _extract_named_final_values(root, "AttackBonuses"),
             "skills": _extract_named_final_values(root, "Skills"),
-            "otherNumbers": _extract_named_value_texts(root, "Characteristics"),
+            "otherNumbers": {
+                **_extract_named_value_texts(root, "Characteristics"),
+                **_extract_core_final_values(root),
+            },
         },
         "powers": _extract_powers(root),
         "sections": _extract_unmapped_sections(root),
@@ -552,6 +627,7 @@ def build_monster_index(monster_root: Path, output_root: Path) -> None:
                 "name": fallback_name,
                 "level": "",
                 "role": "",
+                "isLeader": False,
                 "size": "",
                 "origin": "",
                 "type": "",
@@ -581,6 +657,7 @@ def build_monster_index(monster_root: Path, output_root: Path) -> None:
                 "name": parsed_payload.get("name", fallback_name),
                 "level": parsed_payload.get("level", ""),
                 "role": parsed_payload.get("role", ""),
+                "isLeader": bool(parsed_payload.get("isLeader", False)),
                 "parseError": parse_error,
             }
         )

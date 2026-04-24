@@ -33,6 +33,44 @@ function formatValue(value: string | number | boolean | undefined | null): strin
   return String(value);
 }
 
+function formatStatLabel(label: string): string {
+  return label
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function renderStatValue(
+  value: unknown,
+  startGlossaryHover: (event: ReactMouseEvent<HTMLElement>, key: MonsterGlossaryHoverKey) => void,
+  stopGlossaryHover: () => void
+): JSX.Element {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length === 0) {
+      return <span style={{ fontWeight: 600 }}>-</span>;
+    }
+    return (
+      <span style={{ display: "inline-grid", gap: "0.12rem", justifyItems: "end", textAlign: "right" }}>
+        {entries.map(([nestedKey, nestedValue]) => (
+          <span key={nestedKey} style={{ whiteSpace: "nowrap" }}>
+            <span
+              onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${nestedKey}`)}
+              onMouseLeave={stopGlossaryHover}
+              style={{ cursor: "help", borderBottom: "1px dotted var(--text-muted)", marginRight: "0.3rem" }}
+            >
+              {formatStatLabel(nestedKey)}
+            </span>
+            <strong>{formatValue(nestedValue as string | number | boolean | undefined | null)}</strong>
+          </span>
+        ))}
+      </span>
+    );
+  }
+  return <span style={{ fontWeight: 600 }}>{formatValue(value as string | number | boolean | undefined | null)}</span>;
+}
+
 function sectionChildKeys(section: unknown): string[] {
   if (!section || typeof section !== "object") return [];
   const maybeChildren = (section as { children?: Record<string, unknown> }).children;
@@ -45,6 +83,26 @@ function splitPowerKeywords(rawKeywords: string): string[] {
     .split(/[;,]/)
     .map((part) => part.trim())
     .filter((part) => part.length > 0);
+}
+
+function parseLevelFilter(rawFilter: string): { exact?: number; range?: { min: number; max: number } } {
+  const trimmed = rawFilter.trim();
+  if (!trimmed) return {};
+
+  if (/^-?\d+$/.test(trimmed)) {
+    return { exact: Number(trimmed) };
+  }
+
+  const rangeMatch = trimmed.match(/^(-?\d+)\s*-\s*(-?\d+)$/);
+  if (rangeMatch) {
+    const start = Number(rangeMatch[1]);
+    const end = Number(rangeMatch[2]);
+    if (Number.isFinite(start) && Number.isFinite(end)) {
+      return { range: { min: Math.min(start, end), max: Math.max(start, end) } };
+    }
+  }
+
+  return {};
 }
 
 function renderDamageSummary(damage?: MonsterPowerDamage): string {
@@ -222,7 +280,10 @@ export function MonsterEditorApp({
   const [indexRows, setIndexRows] = useState<MonsterIndexEntry[]>([]);
   const [activeMonster, setActiveMonster] = useState<MonsterEntryFile | null>(null);
   const [selectedId, setSelectedId] = useState<string>("");
-  const [query, setQuery] = useState<string>("");
+  const [nameQuery, setNameQuery] = useState<string>("");
+  const [levelQuery, setLevelQuery] = useState<string>("");
+  const [roleQuery, setRoleQuery] = useState<string>("");
+  const [leaderFilter, setLeaderFilter] = useState<"both" | "leader" | "notLeader">("both");
   const [message, setMessage] = useState<string>("Load monsters from generated JSON to begin.");
   const [isBusy, setIsBusy] = useState<boolean>(false);
   const [showGlossaryHoverInfo, setShowGlossaryHoverInfo] = useState(false);
@@ -282,17 +343,55 @@ export function MonsterEditorApp({
   }, [selectedId]);
 
   const filteredRows = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return indexRows;
+    const nameNeedle = nameQuery.trim().toLowerCase();
+    const roleNeedle = roleQuery.trim().toLowerCase();
+    const rawLevelFilter = levelQuery.trim();
+    const parsedLevelFilter = parseLevelFilter(rawLevelFilter);
+
     return indexRows.filter((entry) => {
-      return (
-        entry.name.toLowerCase().includes(needle) ||
-        String(entry.level).toLowerCase().includes(needle) ||
-        entry.role.toLowerCase().includes(needle) ||
-        entry.relativePath.toLowerCase().includes(needle)
-      );
+      if (nameNeedle && !entry.name.toLowerCase().includes(nameNeedle)) {
+        return false;
+      }
+
+      if (roleNeedle && !entry.role.toLowerCase().includes(roleNeedle)) {
+        return false;
+      }
+
+      const isLeader = entry.isLeader === true;
+      if (leaderFilter === "leader" && !isLeader) {
+        return false;
+      }
+      if (leaderFilter === "notLeader" && isLeader) {
+        return false;
+      }
+
+      if (!rawLevelFilter) {
+        return true;
+      }
+
+      const levelAsNumber = Number(entry.level);
+      if (!Number.isFinite(levelAsNumber)) {
+        return false;
+      }
+
+      if (parsedLevelFilter.exact !== undefined) {
+        return levelAsNumber === parsedLevelFilter.exact;
+      }
+      if (parsedLevelFilter.range) {
+        return levelAsNumber >= parsedLevelFilter.range.min && levelAsNumber <= parsedLevelFilter.range.max;
+      }
+      return false;
     });
-  }, [indexRows, query]);
+  }, [indexRows, nameQuery, levelQuery, roleQuery, leaderFilter]);
+
+  const roleOptions = useMemo(() => {
+    const unique = new Set<string>();
+    for (const row of indexRows) {
+      const role = (row.role ?? "").trim();
+      if (role) unique.add(role);
+    }
+    return Array.from(unique).sort((a, b) => a.localeCompare(b));
+  }, [indexRows]);
 
   function monsterGlossaryContent(key: MonsterGlossaryHoverKey): JSX.Element {
     let terms: string[] = [];
@@ -397,11 +496,38 @@ export function MonsterEditorApp({
           Reload Generated Index
         </button>
         <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search name, level, role, or path"
-          style={{ minWidth: 300, border: "1px solid var(--panel-border)", borderRadius: "0.28rem", padding: "0.22rem 0.3rem" }}
+          value={nameQuery}
+          onChange={(event) => setNameQuery(event.target.value)}
+          placeholder="Name"
+          style={{ minWidth: 220, border: "1px solid var(--panel-border)", borderRadius: "0.28rem", padding: "0.22rem 0.3rem" }}
         />
+        <input
+          value={levelQuery}
+          onChange={(event) => setLevelQuery(event.target.value)}
+          placeholder="Level (e.g. 7 or 5-8)"
+          style={{ minWidth: 200, border: "1px solid var(--panel-border)", borderRadius: "0.28rem", padding: "0.22rem 0.3rem" }}
+        />
+        <select
+          value={roleQuery}
+          onChange={(event) => setRoleQuery(event.target.value)}
+          style={{ minWidth: 180, border: "1px solid var(--panel-border)", borderRadius: "0.28rem", padding: "0.22rem 0.3rem" }}
+        >
+          <option value="">All roles</option>
+          {roleOptions.map((role) => (
+            <option key={role} value={role}>
+              {role}
+            </option>
+          ))}
+        </select>
+        <select
+          value={leaderFilter}
+          onChange={(event) => setLeaderFilter(event.target.value as "both" | "leader" | "notLeader")}
+          style={{ minWidth: 150, border: "1px solid var(--panel-border)", borderRadius: "0.28rem", padding: "0.22rem 0.3rem" }}
+        >
+          <option value="both">-</option>
+          <option value="leader">Leader</option>
+          <option value="notLeader">Not leader</option>
+        </select>
       </div>
 
       <div style={{ marginBottom: "0.75rem", color: message.toLowerCase().includes("could not") ? "var(--status-danger)" : "var(--text-muted)" }}>
@@ -409,11 +535,20 @@ export function MonsterEditorApp({
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: "1rem", minHeight: "65vh" }}>
-        <div style={{ ...sheetPanel, overflow: "hidden" }}>
+        <div
+          style={{
+            ...sheetPanel,
+            overflow: "hidden",
+            display: "grid",
+            gridTemplateRows: "auto 1fr",
+            minHeight: 0,
+            maxHeight: "97.5vh"
+          }}
+        >
           <div style={{ padding: "0.5rem 0.75rem", borderBottom: "1px solid var(--panel-border)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", fontSize: "0.78rem" }}>
             Monsters ({filteredRows.length})
           </div>
-          <div style={{ maxHeight: "65vh", overflow: "auto" }}>
+          <div style={{ minHeight: 0, overflow: "auto" }}>
             {filteredRows.map((entry) => {
               const selectedRow = selectedId === entry.id;
               return (
@@ -432,8 +567,7 @@ export function MonsterEditorApp({
                     cursor: "pointer"
                   }}
                 >
-                  <div style={{ fontWeight: 600 }}>{entry.name || entry.fileName.replace(/\.monster$/i, "")}</div>
-                  <div style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>{entry.relativePath}</div>
+                  <div style={{ fontWeight: 600 }}>{entry.name || entry.id}</div>
                   {entry.level && (
                     <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
                       Level {entry.level}
@@ -513,7 +647,6 @@ export function MonsterEditorApp({
                   </span>{" "}
                   {formatValue(activeMonster.xp)}
                 </div>
-                <div style={{ color: "var(--text-secondary)", fontSize: "0.8rem" }}>{activeMonster.relativePath}</div>
               </div>
 
               {activeMonster.parseError && (
@@ -634,7 +767,9 @@ export function MonsterEditorApp({
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(280px, 1fr))", gap: "0.75rem", marginBottom: "0.75rem" }}>
-                {Object.entries(activeMonster.stats).map(([label, block]) => (
+                {Object.entries(activeMonster.stats)
+                  .filter(([label]) => label !== "attackBonuses")
+                  .map(([label, block]) => (
                   <div key={label} style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.5rem", backgroundColor: "var(--surface-0)" }}>
                     <h3 style={titleStyle}>{label}</h3>
                     <div style={{ marginTop: "0.45rem", fontSize: "0.82rem", color: "var(--text-secondary)" }}>
@@ -647,9 +782,9 @@ export function MonsterEditorApp({
                                 onMouseLeave={stopGlossaryHover}
                                 style={{ cursor: "help", borderBottom: "1px dotted var(--text-muted)" }}
                               >
-                                {k}
+                                {formatStatLabel(k)}
                               </span>
-                              <span style={{ fontWeight: 600 }}>{formatValue(v)}</span>
+                              {renderStatValue(v, startGlossaryHover, stopGlossaryHover)}
                             </div>
                           ))}
                     </div>
