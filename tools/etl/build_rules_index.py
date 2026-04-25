@@ -1344,7 +1344,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
     }
 
     (output_dir / "rules_index.json").write_text(
-        json.dumps(index, ensure_ascii=False), encoding="utf-8"
+        json.dumps(index, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
 
     with anomalies_path.open("w", encoding="utf-8") as f:
