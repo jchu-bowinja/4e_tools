@@ -147,7 +147,7 @@ const identityValueInteractive: CSSProperties = {
 };
 
 const identityValueRowWithPill: CSSProperties = {
-  ...identityValueInteractive,
+  ...identityValueStyle,
   display: "inline-flex",
   alignItems: "center",
   gap: "0.35rem"
@@ -1638,14 +1638,16 @@ export function MonsterEditorApp({
                   >
                     Role
                   </div>
-                  <div
-                    onMouseEnter={(event) =>
-                      startGlossaryHover(event, `glossaryTerm:${activeMonster.role || "Role"}`)
-                    }
-                    onMouseLeave={leaveGlossaryHover}
-                    style={identityValueRowWithPill}
-                  >
-                    {formatValue(activeMonster.role)}
+                  <div style={identityValueRowWithPill}>
+                    <span
+                      onMouseEnter={(event) =>
+                        startGlossaryHover(event, `glossaryTerm:${activeMonster.role || "Role"}`)
+                      }
+                      onMouseLeave={leaveGlossaryHover}
+                      style={identityValueInteractive}
+                    >
+                      {formatValue(activeMonster.role)}
+                    </span>
                     {activeMonster.isLeader ? (
                       <span
                         onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Leader")}
