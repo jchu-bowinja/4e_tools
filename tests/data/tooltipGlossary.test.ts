@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { loadTooltipGlossary, resolveTooltipText, sanitizeGlossaryRows } from "../../src/data/tooltipGlossary";
+import { displayTextForGlossaryRow, loadTooltipGlossary, resolveTooltipText, sanitizeGlossaryRows } from "../../src/data/tooltipGlossary";
 import type { RulesIndex } from "../../src/rules/models";
 
 function emptyIndex(): RulesIndex {
@@ -49,6 +49,29 @@ describe("resolveTooltipText range normalization", () => {
       reach: "Reach glossary"
     };
     expect(resolveTooltipText({ terms: ["Reach 3"], glossaryByName, index: emptyIndex() })).toBe("Reach glossary");
+  });
+
+  it("resolves skill phrase variants to rules_index skill entries", () => {
+    const index = emptyIndex();
+    index.skills = [
+      {
+        id: "skill-acrobatics",
+        name: "Acrobatics",
+        keyAbility: "Dex",
+        body: "Balance and tumbling skill text.",
+        raw: {}
+      }
+    ];
+    const glossaryByName = {};
+    expect(resolveTooltipText({ terms: ["Acrobatics (Dex)"], glossaryByName, index })).toBe(
+      "Balance and tumbling skill text."
+    );
+    expect(resolveTooltipText({ terms: ["Acrobatics check"], glossaryByName, index })).toBe(
+      "Balance and tumbling skill text."
+    );
+    expect(resolveTooltipText({ terms: ["Acrobatics skill check"], glossaryByName, index })).toBe(
+      "Balance and tumbling skill text."
+    );
   });
 });
 
@@ -137,5 +160,21 @@ describe("sanitizeGlossaryRows", () => {
       }
     ]);
     expect(rows[0]?.aliases).toEqual(["melee", "melee weapon"]);
+  });
+});
+
+describe("displayTextForGlossaryRow", () => {
+  it("preserves readable structure for glossary HTML tables", () => {
+    const text = displayTextForGlossaryRow({
+      name: "Skills",
+      definition: null,
+      html:
+        "<h1 class=player>Skills</h1><table><tr><th>Skill</th><th>Key Ability</th></tr><tr><td>Acrobatics</td><td>Dexterity</td></tr><tr><td>Arcana</td><td>Intelligence</td></tr></table><p class=publishedIn>Published in Rules Compendium, page(s) 125.</p>"
+    });
+    expect(text).toContain("Skills");
+    expect(text).toContain("Skill | Key Ability");
+    expect(text).toContain("Acrobatics | Dexterity");
+    expect(text).toContain("Arcana | Intelligence");
+    expect(text).toContain("Published in Rules Compendium, page(s) 125.");
   });
 });

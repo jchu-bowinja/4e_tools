@@ -510,7 +510,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     } else if (key.startsWith("skill:")) {
       const skillId = key.slice("skill:".length);
       const skill = skillById.get(skillId);
-      terms = [skill?.name || "", "Skill"];
+      terms = [skill?.name || ""];
     } else if (key.startsWith("condition:")) {
       const condition = key.slice("condition:".length).trim();
       terms = [condition, "Condition"];

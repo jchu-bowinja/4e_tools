@@ -955,7 +955,7 @@ function renderPowerAttacks(
   );
 }
 
-function splitTooltipTerms(rawTerm: string): string[] {
+export function splitTooltipTerms(rawTerm: string): string[] {
   const term = rawTerm.trim();
   if (!term) return [];
   const attackVsMatch = term.match(/^(.+?)\s+vs\.?\s+(.+)$/i);

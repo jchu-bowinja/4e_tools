@@ -39,8 +39,41 @@ export function sanitizeGlossaryRows(rows: GlossaryTermRow[]): GlossaryTermRow[]
 }
 
 function htmlToPlainText(html: string): string {
+  if (typeof DOMParser === "undefined") {
+    return html
+      .replace(/<\/(th|td)>/gi, " | ")
+      .replace(/<\/tr>/gi, "\n")
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<[^>]+>/g, "")
+      .replace(/[ \t]+\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .replace(/[ \t]{2,}/g, " ")
+      .replace(/\s+\|\s+\n/g, "\n")
+      .trim();
+  }
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, "text/html");
+  const rows = Array.from(doc.querySelectorAll("tr"));
+  if (rows.length > 0) {
+    const tableText = rows
+      .map((row) =>
+        Array.from(row.querySelectorAll("th,td"))
+          .map((cell) => cell.textContent?.trim() ?? "")
+          .filter((cell) => cell.length > 0)
+          .join(" | ")
+      )
+      .filter((line) => line.length > 0)
+      .join("\n");
+    const headingText = Array.from(doc.querySelectorAll("h1,h2,h3"))
+      .map((heading) => heading.textContent?.trim() ?? "")
+      .filter((line) => line.length > 0)
+      .join("\n");
+    const publishedText = Array.from(doc.querySelectorAll("p.publishedIn"))
+      .map((line) => line.textContent?.trim() ?? "")
+      .filter((line) => line.length > 0)
+      .join("\n");
+    return [headingText, tableText, publishedText].filter((part) => part.length > 0).join("\n\n").trim();
+  }
   return (doc.body.textContent || "").trim();
 }
 
@@ -139,6 +172,26 @@ function candidateTerms(input: string): string[] {
   const trimmed = input.trim();
   if (!trimmed) return [];
   const candidates = [trimmed];
+  const withoutParens = trimmed.replace(/\s*\([^)]*\)\s*/g, " ").trim();
+  if (withoutParens && withoutParens !== trimmed) {
+    candidates.push(withoutParens);
+  }
+  const withoutTrailingPunctuation = trimmed.replace(/[.,;:!?]+$/g, "").trim();
+  if (withoutTrailingPunctuation && withoutTrailingPunctuation !== trimmed) {
+    candidates.push(withoutTrailingPunctuation);
+  }
+  const skillPhraseMatch = trimmed.match(/^(.+?)\s+skill(?:\s+check)?$/i);
+  if (skillPhraseMatch?.[1]) {
+    candidates.push(skillPhraseMatch[1].trim());
+  }
+  const checkPhraseMatch = trimmed.match(/^(.+?)\s+check$/i);
+  if (checkPhraseMatch?.[1]) {
+    candidates.push(checkPhraseMatch[1].trim());
+  }
+  const trainedInMatch = trimmed.match(/^trained in\s+(.+)$/i);
+  if (trainedInMatch?.[1]) {
+    candidates.push(trainedInMatch[1].trim());
+  }
   const typoAliases: Record<string, string> = {
     teleporation: "teleportation",
     marial: "martial",
