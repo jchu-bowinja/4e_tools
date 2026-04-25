@@ -17,6 +17,12 @@ import { canEquipItem, computeSheetDerivedData, groupCombatPowers, sheetStateFro
 import { loadCharacterSheetState, saveCharacterSheetState } from "./storage";
 import { normalizeTooltipTerm, resolveTooltipText } from "../../data/tooltipGlossary";
 import { positionFixedTooltip } from "../../ui/glossaryTooltipPosition";
+import {
+  GLOSSARY_TOOLTIP_CLOSE_DELAY_MS,
+  GLOSSARY_TOOLTIP_OPEN_DELAY_MS,
+  STANDARD_GLOSSARY_TOOLTIP_LAYOUT,
+  STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE
+} from "../../ui/glossaryTooltip";
 import { findCaseInsensitiveMatches, scrollTextareaToMatch } from "../../ui/jsonSearch";
 
 type SheetTab = "overview" | "inventory";
@@ -383,7 +389,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   const glossaryHoverCloseTimerRef = useRef<number | null>(null);
   const jsonTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const lastHandledJsonSearchJumpTickRef = useRef(0);
-  const GLOSSARY_HOVER_CLOSE_DELAY_MS = 400;
   const glossaryTermLookupCacheRef = useRef<Map<string, boolean>>(new Map());
 
   const derived = useMemo(() => computeSheetDerivedData(sheet, index), [sheet, index]);
@@ -578,7 +583,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   ): void {
     cancelGlossaryHoverCloseTimer();
     const rect = event.currentTarget.getBoundingClientRect();
-    setGlossaryHoverPanelPos(positionFixedTooltip(rect, { panelWidth: 340, maxHeightVh: 50 }));
+    setGlossaryHoverPanelPos(positionFixedTooltip(rect, STANDARD_GLOSSARY_TOOLTIP_LAYOUT));
     const switchingHoverTarget = showGlossaryHoverInfo && glossaryHoverKey !== null && glossaryHoverKey !== key;
     if (switchingHoverTarget) {
       setShowGlossaryHoverInfo(false);
@@ -595,14 +600,14 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     glossaryHoverTimerRef.current = window.setTimeout(() => {
       setShowGlossaryHoverInfo(true);
       glossaryHoverTimerRef.current = null;
-    }, 1200);
+    }, GLOSSARY_TOOLTIP_OPEN_DELAY_MS);
   }
 
   function leaveGlossaryHoverInfo(): void {
     cancelGlossaryHoverCloseTimer();
     glossaryHoverCloseTimerRef.current = window.setTimeout(() => {
       hideGlossaryHoverInfoNow();
-    }, GLOSSARY_HOVER_CLOSE_DELAY_MS);
+    }, GLOSSARY_TOOLTIP_CLOSE_DELAY_MS);
   }
 
   function hasGlossaryHoverForTerm(term: string): boolean {
@@ -1166,7 +1171,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     raceHoverTimerRef.current = window.setTimeout(() => {
       setShowRaceHoverInfo(true);
       raceHoverTimerRef.current = null;
-    }, 1200);
+    }, GLOSSARY_TOOLTIP_OPEN_DELAY_MS);
   }
 
   function stopRaceHoverInfoTimerAndHide(): void {
@@ -1188,7 +1193,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     classHoverTimerRef.current = window.setTimeout(() => {
       setShowClassHoverInfo(true);
       classHoverTimerRef.current = null;
-    }, 1200);
+    }, GLOSSARY_TOOLTIP_OPEN_DELAY_MS);
   }
 
   function stopClassHoverInfoTimerAndHide(): void {
@@ -1772,23 +1777,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 top: glossaryHoverPanelPos.top,
                 left: glossaryHoverPanelPos.left,
                 transform: glossaryHoverPanelPos.transform ?? "none",
-                width: "340px",
-                maxHeight: "50vh",
-                overflow: "auto",
-                border: "1px solid var(--panel-border)",
-                backgroundColor: "var(--surface-0)",
-                borderRadius: "0.35rem",
-                padding: "0.45rem 0.5rem",
-                color: "var(--text-primary)",
-                textTransform: "none",
-                letterSpacing: "normal",
-                fontWeight: 500,
-                fontSize: "0.76rem",
-                lineHeight: 1.35,
-                zIndex: 1000,
-                boxShadow: "0 8px 24px rgba(45, 34, 16, 0.2)",
-                display: "grid",
-                gap: "0.2rem"
+                ...STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE
               }}
             >
               {glossaryContent(glossaryHoverKey)}

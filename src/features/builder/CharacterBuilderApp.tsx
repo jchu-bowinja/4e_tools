@@ -62,6 +62,12 @@ import { summarizeImplementAttack, summarizeMainWeaponAttack } from "../../rules
 import { RulesRichText } from "./RulesRichText";
 import { NEUTRAL_PAGE_BG } from "../../ui/tokens";
 import { positionFixedTooltip } from "../../ui/glossaryTooltipPosition";
+import {
+  GLOSSARY_TOOLTIP_CLOSE_DELAY_MS,
+  GLOSSARY_TOOLTIP_OPEN_DELAY_MS,
+  STANDARD_GLOSSARY_TOOLTIP_LAYOUT,
+  STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE
+} from "../../ui/glossaryTooltip";
 import { findCaseInsensitiveMatches, scrollTextareaToMatch } from "../../ui/jsonSearch";
 import { resolveTooltipText } from "../../data/tooltipGlossary";
 import {
@@ -205,7 +211,7 @@ function renderPowerCard(
   options?: {
     key?: string;
     keywordTooltip?: (keyword: string) => string | null;
-    onKeywordMouseEnter?: (event: React.MouseEvent<HTMLElement>, keyword: string) => void;
+    onKeywordMouseEnter?: (event: React.MouseEvent<HTMLElement> | React.FocusEvent<HTMLElement>, keyword: string) => void;
     onKeywordMouseLeave?: () => void;
   }
 ): JSX.Element {
@@ -262,6 +268,9 @@ function renderPowerCard(
                   title={hasHoverHandlers ? undefined : tooltip ?? undefined}
                   onMouseEnter={hasHoverHandlers ? (event) => options?.onKeywordMouseEnter?.(event, keyword) : undefined}
                   onMouseLeave={hasHoverHandlers ? options?.onKeywordMouseLeave : undefined}
+                  onFocus={hasHoverHandlers ? (event) => options?.onKeywordMouseEnter?.(event, keyword) : undefined}
+                  onBlur={hasHoverHandlers ? options?.onKeywordMouseLeave : undefined}
+                  tabIndex={hasHoverHandlers ? 0 : undefined}
                   style={{
                     color: "var(--text-primary)",
                     cursor: hasHoverHandlers || Boolean(tooltip) ? "help" : "default",
@@ -736,7 +745,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   const glossaryHoverCloseTimerRef = useRef<number | null>(null);
   const jsonTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const lastHandledJsonSearchJumpTickRef = useRef(0);
-  const GLOSSARY_HOVER_CLOSE_DELAY_MS = 400;
   const rulesById = useMemo(() => buildRulesIdLookup(index), [index]);
 
   const selectedRace = index.races.find((r) => r.id === build.raceId);
@@ -947,7 +955,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   function startGlossaryHover(event: React.MouseEvent<HTMLElement> | React.FocusEvent<HTMLElement>, key: BuilderGlossaryKey): void {
     cancelGlossaryHoverCloseTimer();
     const rect = event.currentTarget.getBoundingClientRect();
-    setGlossaryHoverPanelPos(positionFixedTooltip(rect, { panelWidth: 360, maxHeightVh: 48 }));
+    setGlossaryHoverPanelPos(positionFixedTooltip(rect, STANDARD_GLOSSARY_TOOLTIP_LAYOUT));
     const switchingHoverTarget = showGlossaryHoverInfo && glossaryHoverKey !== null && glossaryHoverKey !== key;
     if (switchingHoverTarget) {
       setShowGlossaryHoverInfo(false);
@@ -964,14 +972,14 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     glossaryHoverTimerRef.current = window.setTimeout(() => {
       setShowGlossaryHoverInfo(true);
       glossaryHoverTimerRef.current = null;
-    }, 1200);
+    }, GLOSSARY_TOOLTIP_OPEN_DELAY_MS);
   }
 
   function leaveGlossaryHover(): void {
     cancelGlossaryHoverCloseTimer();
     glossaryHoverCloseTimerRef.current = window.setTimeout(() => {
       hideGlossaryHoverNow();
-    }, GLOSSARY_HOVER_CLOSE_DELAY_MS);
+    }, GLOSSARY_TOOLTIP_CLOSE_DELAY_MS);
   }
 
   function glossaryHoverA11y(key: BuilderGlossaryKey): {
@@ -4407,21 +4415,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 top: glossaryHoverPanelPos.top,
                 left: glossaryHoverPanelPos.left,
                 transform: glossaryHoverPanelPos.transform ?? "none",
-                width: "360px",
-                maxHeight: "48vh",
-                overflow: "auto",
-                border: "1px solid var(--panel-border)",
-                backgroundColor: "var(--surface-0)",
-                borderRadius: "0.35rem",
-                padding: "0.45rem 0.5rem",
-                color: "var(--text-primary)",
-                textTransform: "none",
-                letterSpacing: "normal",
-                fontWeight: 500,
-                fontSize: "0.78rem",
-                lineHeight: 1.35,
-                zIndex: 1000,
-                boxShadow: "0 8px 24px rgba(45, 34, 16, 0.2)"
+                ...STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE
               }}
             >
               {glossaryContent(glossaryHoverKey)}
