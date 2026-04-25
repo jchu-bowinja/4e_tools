@@ -22,26 +22,144 @@ import {
   type MonsterPowerOutcomeEntry
 } from "./storage";
 
-const sheetPanel = {
+/** Matches CharacterSheetApp: panels, section titles, labels, and body scale. */
+const panelStyle: CSSProperties = {
+  backgroundColor: "var(--surface-0)",
   border: "1px solid var(--panel-border)",
   borderRadius: "0.35rem",
-  backgroundColor: "var(--surface-0)"
+  boxShadow: "0 1px 2px rgba(40, 30, 10, 0.08)"
 };
 
-const titleStyle = {
+const sheetPanel: CSSProperties = {
+  ...panelStyle
+};
+
+const sectionTitleStyle: CSSProperties = {
   margin: 0,
   fontSize: "0.9rem",
   letterSpacing: "0.08em",
-  textTransform: "uppercase" as const,
+  textTransform: "uppercase",
   color: "var(--text-primary)"
 };
 
-const statPanelStyle = {
+const microLabelStyle: CSSProperties = {
+  fontSize: "0.72rem",
+  color: "var(--text-muted)",
+  textTransform: "uppercase",
+  letterSpacing: "0.06em",
+  fontWeight: 700
+};
+
+const pageTitleStyle: CSSProperties = {
+  marginTop: 0,
+  marginBottom: "0.35rem",
+  fontSize: "1.05rem",
+  fontWeight: 700,
+  letterSpacing: "0.04em",
+  textTransform: "uppercase",
+  color: "var(--text-primary)"
+};
+
+const bodyPrimary: CSSProperties = { fontSize: "0.8rem", color: "var(--text-primary)" };
+const bodySecondary: CSSProperties = { fontSize: "0.8rem", color: "var(--text-secondary)" };
+const metaMuted: CSSProperties = { fontSize: "0.78rem", color: "var(--text-muted)" };
+const metaSecondary: CSSProperties = { fontSize: "0.78rem", color: "var(--text-secondary)" };
+const captionMuted: CSSProperties = { fontSize: "0.74rem", color: "var(--text-muted)" };
+
+const secondaryAttackTitleStyle: CSSProperties = {
+  fontSize: "0.78rem",
+  fontWeight: 700,
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+  color: "var(--text-secondary)"
+};
+
+const outcomeSectionLabelStyle: CSSProperties = {
+  fontSize: "0.74rem",
+  fontWeight: 700,
+  textTransform: "uppercase",
+  color: "var(--text-muted)"
+};
+
+const powerBucketHeaderStyle: CSSProperties = {
+  fontWeight: 700,
+  textTransform: "uppercase",
+  letterSpacing: "0.05em",
+  color: "var(--text-primary)"
+};
+
+const indexColumnHeaderStyle: CSSProperties = {
+  padding: "0.5rem 0.75rem",
+  borderBottom: "1px solid var(--panel-border)",
+  fontWeight: 700,
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+  fontSize: "0.78rem",
+  color: "var(--text-primary)"
+};
+
+const statPanelStyle: CSSProperties = {
   border: "1px solid var(--panel-border)",
   borderRadius: "0.35rem",
   padding: "0.5rem",
-  backgroundColor: "var(--surface-0)"
+  backgroundColor: "var(--surface-0)",
+  boxShadow: "0 1px 2px rgba(40, 30, 10, 0.08)"
 };
+
+const glossaryLinkUnderline: CSSProperties = {
+  cursor: "help",
+  borderBottom: "1px dotted var(--text-muted)"
+};
+
+const microLabelInteractive: CSSProperties = {
+  ...microLabelStyle,
+  ...glossaryLinkUnderline,
+  width: "fit-content"
+};
+
+const identityValueStyle: CSSProperties = {
+  fontWeight: 700,
+  fontSize: "0.8rem",
+  color: "var(--text-primary)"
+};
+
+const identityValueInteractive: CSSProperties = {
+  ...identityValueStyle,
+  cursor: "help",
+  width: "fit-content",
+  borderBottom: "1px dotted var(--text-muted)"
+};
+
+const identityValueRowWithPill: CSSProperties = {
+  ...identityValueInteractive,
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "0.35rem"
+};
+
+const sheetTagPillStyle: CSSProperties = {
+  fontSize: "0.72rem",
+  fontWeight: 700,
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+  color: "var(--text-secondary)",
+  border: "1px solid var(--panel-border)",
+  borderRadius: "999px",
+  padding: "0.05rem 0.35rem",
+  backgroundColor: "var(--surface-1)",
+  cursor: "help"
+};
+
+const richTextBodyPrimary: { paragraphStyle: CSSProperties; listItemStyle: CSSProperties } = {
+  paragraphStyle: { fontSize: "0.8rem", color: "var(--text-primary)", margin: "0.35rem 0 0 0" },
+  listItemStyle: { fontSize: "0.8rem", color: "var(--text-primary)" }
+};
+
+const statValueStrong: CSSProperties = { color: "var(--text-primary)", fontSize: "0.8rem", fontWeight: 700 };
+
+const statEmptyPlaceholder: CSSProperties = { fontWeight: 700, fontSize: "0.8rem", color: "var(--text-primary)" };
+
+const outcomeEntryTitleStyle: CSSProperties = { fontSize: "0.78rem", fontWeight: 700, color: "var(--text-primary)" };
 
 type MonsterPowerActionBucket = "standard" | "minor" | "triggered" | "other";
 type MonsterPowerColorBucket = "atWill" | "encounter" | "daily" | "other";
@@ -214,7 +332,7 @@ function renderStatValue(
 ): JSX.Element {
   if (Array.isArray(value)) {
     if (value.length === 0) {
-      return <span style={{ fontWeight: 600 }}>-</span>;
+      return <span style={statEmptyPlaceholder}>-</span>;
     }
     return (
       <span style={{ display: "inline-grid", gap: "0.12rem", justifyItems: "end", textAlign: "right" }}>
@@ -229,11 +347,11 @@ function renderStatValue(
                   <span
                     onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${movementType}`)}
                     onMouseLeave={leaveGlossaryHover}
-                    style={{ cursor: "help", borderBottom: "1px dotted var(--text-muted)", marginRight: "0.3rem" }}
+                    style={{ ...glossaryLinkUnderline, marginRight: "0.3rem" }}
                   >
                     {movementType}
                   </span>
-                  <strong style={{ color: "var(--text-primary)" }}>
+                  <strong style={statValueStrong}>
                     {formatValue(movementValue as string | number | boolean | undefined | null)}
                   </strong>
                 </span>
@@ -242,7 +360,7 @@ function renderStatValue(
           }
           return (
             <span key={`array-entry-${index}`} style={{ whiteSpace: "nowrap" }}>
-              <strong style={{ color: "var(--text-primary)" }}>
+              <strong style={statValueStrong}>
                 {formatValue(entry as string | number | boolean | undefined | null)}
               </strong>
             </span>
@@ -254,7 +372,7 @@ function renderStatValue(
   if (value && typeof value === "object" && !Array.isArray(value)) {
     const entries = Object.entries(value as Record<string, unknown>);
     if (entries.length === 0) {
-      return <span style={{ fontWeight: 600 }}>-</span>;
+      return <span style={statEmptyPlaceholder}>-</span>;
     }
     return (
       <span style={{ display: "inline-grid", gap: "0.12rem", justifyItems: "end", textAlign: "right" }}>
@@ -263,17 +381,17 @@ function renderStatValue(
             <span
               onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${formatStatLabel(nestedKey)}`)}
               onMouseLeave={leaveGlossaryHover}
-              style={{ cursor: "help", borderBottom: "1px dotted var(--text-muted)", marginRight: "0.3rem" }}
+              style={{ ...glossaryLinkUnderline, marginRight: "0.3rem" }}
             >
               {formatStatLabel(nestedKey)}
             </span>
-            <strong style={{ color: "var(--text-primary)" }}>{formatValue(nestedValue as string | number | boolean | undefined | null)}</strong>
+            <strong style={statValueStrong}>{formatValue(nestedValue as string | number | boolean | undefined | null)}</strong>
           </span>
         ))}
       </span>
     );
   }
-  return <span style={{ fontWeight: 700, color: "var(--text-primary)" }}>{formatValue(value as string | number | boolean | undefined | null)}</span>;
+  return <span style={statValueStrong}>{formatValue(value as string | number | boolean | undefined | null)}</span>;
 }
 
 function sectionChildKeys(section: unknown): string[] {
@@ -623,20 +741,18 @@ function renderOutcomeEntry(
   const damageSummary = renderDamageSummary(entry.damage);
   return (
     <div key={`${title}-${idx}`} style={{ borderLeft: "2px solid var(--panel-border)", paddingLeft: "0.45rem", marginTop: "0.3rem" }}>
-      <div style={{ fontSize: "0.78rem", fontWeight: 600 }}>
-        {entry.name || entry.kind || title}
-      </div>
+      <div style={outcomeEntryTitleStyle}>{entry.name || entry.kind || title}</div>
       {entry.description ? (
         <RulesRichText
           text={entry.description}
-          paragraphStyle={{ fontSize: "0.79rem", color: "var(--text-primary)", margin: "0.1rem 0 0.2rem 0" }}
-          listItemStyle={{ fontSize: "0.79rem", color: "var(--text-primary)" }}
+          paragraphStyle={{ ...richTextBodyPrimary.paragraphStyle, margin: "0.1rem 0 0.2rem 0" }}
+          listItemStyle={richTextBodyPrimary.listItemStyle}
         />
       ) : null}
-      {damageSummary ? <div style={{ fontSize: "0.74rem", color: "var(--text-muted)" }}>{damageSummary}</div> : null}
+      {damageSummary ? <div style={captionMuted}>{damageSummary}</div> : null}
       {entry.aftereffects?.length ? (
         <div style={{ marginTop: "0.2rem" }}>
-          <div style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)" }}>Aftereffects</div>
+          <div style={microLabelStyle}>Aftereffects</div>
           {entry.aftereffects.map((nested, nestedIdx) =>
             renderOutcomeEntry(nested, nestedIdx, "Aftereffect", startGlossaryHover, leaveGlossaryHover)
           )}
@@ -644,7 +760,7 @@ function renderOutcomeEntry(
       ) : null}
       {entry.sustains?.length ? (
         <div style={{ marginTop: "0.2rem" }}>
-          <div style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)" }}>Sustains</div>
+          <div style={microLabelStyle}>Sustains</div>
           {entry.sustains.map((nested, nestedIdx) =>
             renderOutcomeEntry(nested, nestedIdx, "Sustain", startGlossaryHover, leaveGlossaryHover)
           )}
@@ -652,9 +768,7 @@ function renderOutcomeEntry(
       ) : null}
       {entry.failedSavingThrows?.length ? (
         <div style={{ marginTop: "0.2rem" }}>
-          <div style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)" }}>
-            Failed Saving Throws
-          </div>
+          <div style={microLabelStyle}>Failed Saving Throws</div>
           {entry.failedSavingThrows.map((nested, nestedIdx) =>
             renderOutcomeEntry(nested, nestedIdx, "Failed Save", startGlossaryHover, leaveGlossaryHover)
           )}
@@ -673,17 +787,17 @@ function renderAttackOutcome(
   const damageSummary = renderDamageSummary(outcome.damage);
   return (
     <div style={{ marginTop: "0.28rem" }}>
-      <div style={{ fontSize: "0.74rem", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)" }}>{label}</div>
+      <div style={outcomeSectionLabelStyle}>{label}</div>
       {outcome.description ? (
         <RulesRichText
           text={outcome.description}
-          paragraphStyle={{ fontSize: "0.79rem", color: "var(--text-primary)", margin: "0.06rem 0 0.16rem 0" }}
-          listItemStyle={{ fontSize: "0.79rem", color: "var(--text-primary)" }}
+          paragraphStyle={{ ...richTextBodyPrimary.paragraphStyle, margin: "0.06rem 0 0.16rem 0" }}
+          listItemStyle={richTextBodyPrimary.listItemStyle}
         />
       ) : null}
-      {damageSummary ? <div style={{ fontSize: "0.74rem", color: "var(--text-muted)" }}>{damageSummary}</div> : null}
+      {damageSummary ? <div style={captionMuted}>{damageSummary}</div> : null}
       {outcome.nestedAttackDescriptions?.length ? (
-        <div style={{ fontSize: "0.74rem", color: "var(--text-secondary)", marginTop: "0.15rem" }}>
+        <div style={{ ...bodySecondary, marginTop: "0.15rem" }}>
           {outcome.nestedAttackDescriptions.map((text, idx) => (
             <div key={`${label}-nested-${idx}`}>{text}</div>
           ))}
@@ -691,7 +805,7 @@ function renderAttackOutcome(
       ) : null}
       {outcome.aftereffects?.length ? (
         <div style={{ marginTop: "0.18rem" }}>
-          <div style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)" }}>Aftereffects</div>
+          <div style={microLabelStyle}>Aftereffects</div>
           {outcome.aftereffects.map((entry, idx) =>
             renderOutcomeEntry(entry, idx, "Aftereffect", startGlossaryHover, leaveGlossaryHover)
           )}
@@ -699,15 +813,13 @@ function renderAttackOutcome(
       ) : null}
       {outcome.sustains?.length ? (
         <div style={{ marginTop: "0.18rem" }}>
-          <div style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)" }}>Sustains</div>
+          <div style={microLabelStyle}>Sustains</div>
           {outcome.sustains.map((entry, idx) => renderOutcomeEntry(entry, idx, "Sustain", startGlossaryHover, leaveGlossaryHover))}
         </div>
       ) : null}
       {outcome.failedSavingThrows?.length ? (
         <div style={{ marginTop: "0.18rem" }}>
-          <div style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)" }}>
-            Failed Saving Throws
-          </div>
+          <div style={microLabelStyle}>Failed Saving Throws</div>
           {outcome.failedSavingThrows.map((entry, idx) =>
             renderOutcomeEntry(entry, idx, "Failed Save", startGlossaryHover, leaveGlossaryHover)
           )}
@@ -731,11 +843,11 @@ function renderPowerAttacks(
           .join(", ");
         return (
           <div key={`${power.name}-attack-${attackIdx}`} style={{ border: "1px solid var(--panel-border)", borderRadius: "0.32rem", padding: "0.35rem", backgroundColor: "var(--surface-1)" }}>
-            <div style={{ fontSize: "0.8rem", fontWeight: 600 }}>
+            <div style={{ ...bodyPrimary, fontWeight: 700 }}>
               {attack.name || `Attack ${attackIdx + 1}`}
               {attack.kind ? ` (${attack.kind})` : ""}
             </div>
-            <div style={{ fontSize: "0.74rem", color: "var(--text-muted)", marginTop: "0.06rem" }}>
+            <div style={{ ...captionMuted, marginTop: "0.06rem" }}>
               {[attack.range, attack.targets, bonusText].filter(Boolean).join(" • ") || "No range/target/bonus details"}
             </div>
             {attack.hit ? renderAttackOutcome("hit", attack.hit, startGlossaryHover, leaveGlossaryHover) : null}
@@ -1013,17 +1125,15 @@ export function MonsterEditorApp({
       style={{
         maxWidth: 1360,
         margin: "0 auto",
-        padding: "0.9rem",
+        padding: "0.75rem",
         color: "var(--text-primary)",
-        background: "linear-gradient(180deg, var(--surface-1) 0%, var(--surface-1) 100%)",
+        background: "var(--character-sheet-background, linear-gradient(180deg, var(--surface-1) 0%, var(--surface-1) 100%))",
         border: "1px solid var(--panel-border)",
         borderRadius: "0.45rem"
       }}
     >
-      <h1 style={{ marginTop: 0, marginBottom: "0.35rem", textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "1.1rem" }}>
-        Monster Sheet
-      </h1>
-      <p style={{ marginTop: 0, color: "var(--text-muted)" }}>
+      <h1 style={pageTitleStyle}>Monster Sheet</h1>
+      <p style={{ marginTop: 0, marginBottom: "0.5rem", color: "var(--text-muted)", fontSize: "0.8rem" }}>
         JSON-backed viewer for `generated/monsters` artifacts with formatted blocks for identity, stats, powers, and parsed
         sections.
       </p>
@@ -1101,7 +1211,13 @@ export function MonsterEditorApp({
         </select>
       </div>
 
-      <div style={{ marginBottom: "0.75rem", color: message.toLowerCase().includes("could not") ? "var(--status-danger)" : "var(--text-muted)" }}>
+      <div
+        style={{
+          marginBottom: "0.75rem",
+          fontSize: "0.8rem",
+          color: message.toLowerCase().includes("could not") ? "var(--status-danger)" : "var(--text-muted)"
+        }}
+      >
         {message}
       </div>
 
@@ -1116,9 +1232,7 @@ export function MonsterEditorApp({
             maxHeight: "97.5vh"
           }}
         >
-          <div style={{ padding: "0.5rem 0.75rem", borderBottom: "1px solid var(--panel-border)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", fontSize: "0.78rem" }}>
-            Monsters ({filteredRows.length})
-          </div>
+          <div style={indexColumnHeaderStyle}>Monsters ({filteredRows.length})</div>
           <div style={{ minHeight: 0, overflow: "auto" }}>
             {filteredRows.map((entry) => {
               const selectedRow = selectedId === entry.id;
@@ -1138,14 +1252,14 @@ export function MonsterEditorApp({
                     cursor: "pointer"
                   }}
                 >
-                  <div style={{ fontWeight: 600 }}>{entry.name || entry.id}</div>
+                  <div style={{ fontWeight: 700 }}>{entry.name || entry.id}</div>
                   {entry.level && (
-                    <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                    <div style={metaMuted}>
                       Level {entry.level}
                       {entry.role ? ` • ${entry.role}` : ""}
                     </div>
                   )}
-                  {entry.parseError && <div style={{ fontSize: "0.75rem", color: "var(--status-danger)" }}>Invalid XML</div>}
+                  {entry.parseError && <div style={{ ...metaMuted, color: "var(--status-danger)" }}>Invalid XML</div>}
                 </button>
               );
             })}
@@ -1154,16 +1268,16 @@ export function MonsterEditorApp({
 
         <div style={{ ...sheetPanel, padding: "0.75rem" }}>
           {!activeMonster ? (
-            <p style={{ margin: 0, color: "var(--text-muted)" }}>Select a monster to view its generated JSON data.</p>
+            <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.8rem" }}>Select a monster to view its generated JSON data.</p>
           ) : (
             <>
               <div style={{ marginBottom: "0.75rem" }}>
-                <strong>{activeMonster.name}</strong>
-                <div style={{ color: "var(--text-secondary)", fontSize: "0.85rem" }}>
+                <div style={{ fontSize: "1.05rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--text-primary)" }}>{activeMonster.name}</div>
+                <div style={{ ...bodySecondary, marginTop: "0.12rem" }}>
                   <span
                     onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Level")}
                     onMouseLeave={leaveGlossaryHover}
-                    style={{ cursor: "help", borderBottom: "1px dotted var(--text-muted)" }}
+                    style={glossaryLinkUnderline}
                   >
                     Level
                   </span>{" "}
@@ -1173,18 +1287,18 @@ export function MonsterEditorApp({
                       startGlossaryHover(event, `glossaryTerm:${activeMonster.role || "Role"}`)
                     }
                     onMouseLeave={leaveGlossaryHover}
-                    style={{ cursor: "help", borderBottom: "1px dotted var(--text-muted)" }}
+                    style={glossaryLinkUnderline}
                   >
                     {activeMonster.role || ""}
                   </span>
                 </div>
-                <div style={{ color: "var(--text-secondary)", fontSize: "0.8rem" }}>
+                <div style={{ ...bodySecondary, marginTop: "0.12rem" }}>
                   <span
                     onMouseEnter={(event) =>
                       startGlossaryHover(event, `glossaryTerm:${activeMonster.size || "Size"}`)
                     }
                     onMouseLeave={leaveGlossaryHover}
-                    style={{ cursor: "help", borderBottom: "1px dotted var(--text-muted)" }}
+                    style={glossaryLinkUnderline}
                   >
                     {activeMonster.size || "Unknown size"}
                   </span>{" "}
@@ -1194,7 +1308,7 @@ export function MonsterEditorApp({
                       startGlossaryHover(event, `glossaryTerm:${activeMonster.origin || "Origin"}`)
                     }
                     onMouseLeave={leaveGlossaryHover}
-                    style={{ cursor: "help", borderBottom: "1px dotted var(--text-muted)" }}
+                    style={glossaryLinkUnderline}
                   >
                     {activeMonster.origin || "Unknown origin"}
                   </span>{" "}
@@ -1204,7 +1318,7 @@ export function MonsterEditorApp({
                       startGlossaryHover(event, `glossaryTerm:${activeMonster.type || "Type"}`)
                     }
                     onMouseLeave={leaveGlossaryHover}
-                    style={{ cursor: "help", borderBottom: "1px dotted var(--text-muted)" }}
+                    style={glossaryLinkUnderline}
                   >
                     {activeMonster.type || "Unknown type"}
                   </span>{" "}
@@ -1212,14 +1326,14 @@ export function MonsterEditorApp({
                   <span
                     onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Experience")}
                     onMouseLeave={leaveGlossaryHover}
-                    style={{ cursor: "help", borderBottom: "1px dotted var(--text-muted)" }}
+                    style={glossaryLinkUnderline}
                   >
                     XP
                   </span>{" "}
                   {formatValue(activeMonster.xp)}
                 </div>
                 {isRenderableCardValue(activeMonster.groupRole) ? (
-                  <div style={{ color: "var(--text-secondary)", fontSize: "0.8rem", marginTop: "0.12rem" }}>
+                  <div style={{ ...bodySecondary, marginTop: "0.12rem" }}>
                     Group Role: {String(activeMonster.groupRole)}
                   </div>
                 ) : null}
@@ -1249,14 +1363,14 @@ export function MonsterEditorApp({
                 }}
               >
                 <div style={{ border: "1px solid var(--panel-border)", borderRadius: 6, padding: "0.6rem", background: "var(--surface-1)" }}>
-                  <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 700 }}>Name</div>
-                  <div style={{ fontWeight: 600 }}>{activeMonster.name}</div>
+                  <div style={microLabelStyle}>Name</div>
+                  <div style={identityValueStyle}>{activeMonster.name}</div>
                 </div>
                 <div style={{ border: "1px solid var(--panel-border)", borderRadius: 6, padding: "0.6rem", background: "var(--surface-1)" }}>
                   <div
                     onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Role")}
                     onMouseLeave={leaveGlossaryHover}
-                    style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 700, cursor: "help", width: "fit-content", borderBottom: "1px dotted var(--text-muted)" }}
+                    style={microLabelInteractive}
                   >
                     Role
                   </div>
@@ -1265,25 +1379,14 @@ export function MonsterEditorApp({
                       startGlossaryHover(event, `glossaryTerm:${activeMonster.role || "Role"}`)
                     }
                     onMouseLeave={leaveGlossaryHover}
-                    style={{ fontWeight: 600, cursor: "help", width: "fit-content", borderBottom: "1px dotted var(--text-muted)", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
+                    style={identityValueRowWithPill}
                   >
                     {formatValue(activeMonster.role)}
                     {activeMonster.isLeader ? (
                       <span
                         onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Leader")}
                         onMouseLeave={leaveGlossaryHover}
-                        style={{
-                          fontSize: "0.68rem",
-                          fontWeight: 700,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.04em",
-                          color: "var(--text-secondary)",
-                          border: "1px solid var(--panel-border)",
-                          borderRadius: "999px",
-                          padding: "0.03rem 0.3rem",
-                          backgroundColor: "var(--surface-1)",
-                          cursor: "help"
-                        }}
+                        style={sheetTagPillStyle}
                       >
                         Leader
                       </span>
@@ -1294,14 +1397,14 @@ export function MonsterEditorApp({
                   <div
                     onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Level")}
                     onMouseLeave={leaveGlossaryHover}
-                    style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 700, cursor: "help", width: "fit-content", borderBottom: "1px dotted var(--text-muted)" }}
+                    style={microLabelInteractive}
                   >
                     Level / XP
                   </div>
                   <div
                     onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Level")}
                     onMouseLeave={leaveGlossaryHover}
-                    style={{ fontWeight: 600, cursor: "help", width: "fit-content", borderBottom: "1px dotted var(--text-muted)" }}
+                    style={identityValueInteractive}
                   >
                     {formatValue(activeMonster.level)} / {formatValue(activeMonster.xp)}
                   </div>
@@ -1310,7 +1413,7 @@ export function MonsterEditorApp({
                   <div
                     onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Size")}
                     onMouseLeave={leaveGlossaryHover}
-                    style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 700, cursor: "help", width: "fit-content", borderBottom: "1px dotted var(--text-muted)" }}
+                    style={microLabelInteractive}
                   >
                     Size
                   </div>
@@ -1319,7 +1422,7 @@ export function MonsterEditorApp({
                       startGlossaryHover(event, `glossaryTerm:${activeMonster.size || "Size"}`)
                     }
                     onMouseLeave={leaveGlossaryHover}
-                    style={{ fontWeight: 600, cursor: "help", width: "fit-content", borderBottom: "1px dotted var(--text-muted)" }}
+                    style={identityValueInteractive}
                   >
                     {formatValue(activeMonster.size)}
                   </div>
@@ -1328,7 +1431,7 @@ export function MonsterEditorApp({
                   <div
                     onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Origin")}
                     onMouseLeave={leaveGlossaryHover}
-                    style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 700, cursor: "help", width: "fit-content", borderBottom: "1px dotted var(--text-muted)" }}
+                    style={microLabelInteractive}
                   >
                     Origin
                   </div>
@@ -1337,7 +1440,7 @@ export function MonsterEditorApp({
                       startGlossaryHover(event, `glossaryTerm:${activeMonster.origin || "Origin"}`)
                     }
                     onMouseLeave={leaveGlossaryHover}
-                    style={{ fontWeight: 600, cursor: "help", width: "fit-content", borderBottom: "1px dotted var(--text-muted)" }}
+                    style={identityValueInteractive}
                   >
                     {formatValue(activeMonster.origin)}
                   </div>
@@ -1346,7 +1449,7 @@ export function MonsterEditorApp({
                   <div
                     onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Type")}
                     onMouseLeave={leaveGlossaryHover}
-                    style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 700, cursor: "help", width: "fit-content", borderBottom: "1px dotted var(--text-muted)" }}
+                    style={microLabelInteractive}
                   >
                     Type
                   </div>
@@ -1355,7 +1458,7 @@ export function MonsterEditorApp({
                       startGlossaryHover(event, `glossaryTerm:${activeMonster.type || "Type"}`)
                     }
                     onMouseLeave={leaveGlossaryHover}
-                    style={{ fontWeight: 600, cursor: "help", width: "fit-content", borderBottom: "1px dotted var(--text-muted)" }}
+                    style={identityValueInteractive}
                   >
                     {formatValue(activeMonster.type)}
                   </div>
@@ -1364,14 +1467,14 @@ export function MonsterEditorApp({
                   <div
                     onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Phasing")}
                     onMouseLeave={leaveGlossaryHover}
-                    style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 700, cursor: "help", width: "fit-content", borderBottom: "1px dotted var(--text-muted)" }}
+                    style={microLabelInteractive}
                   >
                     Phasing
                   </div>
                   <div
                     onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Phasing")}
                     onMouseLeave={leaveGlossaryHover}
-                    style={{ fontWeight: 600, cursor: "help", width: "fit-content", borderBottom: "1px dotted var(--text-muted)" }}
+                    style={identityValueInteractive}
                   >
                     {formatValue(activeMonster.phasing as string | number | boolean | undefined | null)}
                   </div>
@@ -1389,8 +1492,8 @@ export function MonsterEditorApp({
                   })
                   .map(([label, block]) => (
                   <div key={label} style={statPanelStyle}>
-                    <h3 style={titleStyle}>{formatStatLabel(label)}</h3>
-                    <div style={{ marginTop: "0.45rem", fontSize: "0.82rem", color: "var(--text-secondary)", display: "grid", gap: "0.2rem" }}>
+                    <h3 style={sectionTitleStyle}>{formatStatLabel(label)}</h3>
+                    <div style={{ marginTop: "0.45rem", ...bodySecondary, display: "grid", gap: "0.2rem" }}>
                       {Object.keys(block).length === 0
                         ? "No values"
                         : Object.entries(block).map(([k, v], idx) => (
@@ -1429,27 +1532,27 @@ export function MonsterEditorApp({
               </div>
 
               {isRenderableCardValue(activeMonster.tactics) ? (
-                <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", backgroundColor: "var(--surface-0)", padding: "0.5rem", marginBottom: "0.75rem" }}>
-                  <h3 style={titleStyle}>Tactics</h3>
+                <div style={{ ...panelStyle, padding: "0.5rem", marginBottom: "0.75rem" }}>
+                  <h3 style={sectionTitleStyle}>Tactics</h3>
                   <RulesRichText
                     text={String(activeMonster.tactics)}
-                    paragraphStyle={{ fontSize: "0.82rem", color: "var(--text-primary)", margin: "0.35rem 0 0 0" }}
-                    listItemStyle={{ fontSize: "0.82rem", color: "var(--text-primary)" }}
+                    paragraphStyle={richTextBodyPrimary.paragraphStyle}
+                    listItemStyle={richTextBodyPrimary.listItemStyle}
                   />
                 </div>
               ) : null}
 
               {(activeMonster.alignment?.name || isRenderableCardValue(activeMonster.description)) ? (
-                <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", backgroundColor: "var(--surface-0)", padding: "0.5rem", marginBottom: "0.75rem" }}>
-                  <h3 style={titleStyle}>Traits</h3>
+                <div style={{ ...panelStyle, padding: "0.5rem", marginBottom: "0.75rem" }}>
+                  <h3 style={sectionTitleStyle}>Traits</h3>
                   <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.3rem" }}>
                     {activeMonster.alignment?.name ? (
-                      <div style={{ fontSize: "0.82rem", color: "var(--text-primary)" }}>
+                      <div style={bodyPrimary}>
                         <strong>Alignment:</strong> {activeMonster.alignment.name}
                       </div>
                     ) : null}
                     {Array.isArray(activeMonster.senses) && activeMonster.senses.length > 0 ? (
-                      <div style={{ fontSize: "0.82rem", color: "var(--text-primary)" }}>
+                      <div style={bodyPrimary}>
                         <strong>Senses:</strong>{" "}
                         {activeMonster.senses
                           .map((sense) => {
@@ -1462,17 +1565,17 @@ export function MonsterEditorApp({
                           .join(", ")}
                       </div>
                     ) : null}
-                    <div style={{ fontSize: "0.82rem", color: "var(--text-primary)" }}>
+                    <div style={bodyPrimary}>
                       <strong>Languages:</strong> {renderTagList(activeMonster.languages)}
                     </div>
-                    <div style={{ fontSize: "0.82rem", color: "var(--text-primary)" }}>
+                    <div style={bodyPrimary}>
                       <strong>Keywords:</strong> {renderTagList(activeMonster.keywords)}
                     </div>
-                    <div style={{ fontSize: "0.82rem", color: "var(--text-primary)" }}>
+                    <div style={bodyPrimary}>
                       <strong>Immunities:</strong> {renderTagList(activeMonster.immunities)}
                     </div>
                     {Array.isArray(activeMonster.resistances) && activeMonster.resistances.length > 0 ? (
-                      <div style={{ fontSize: "0.82rem", color: "var(--text-primary)" }}>
+                      <div style={bodyPrimary}>
                         <strong>Resistances:</strong>{" "}
                         {activeMonster.resistances
                           .map((resistance) => weaknessLine(resistance as Record<string, unknown>))
@@ -1481,25 +1584,25 @@ export function MonsterEditorApp({
                       </div>
                     ) : null}
                     {Array.isArray(activeMonster.sourceBooks) && activeMonster.sourceBooks.length > 0 ? (
-                      <div style={{ fontSize: "0.82rem", color: "var(--text-primary)" }}>
+                      <div style={bodyPrimary}>
                         <strong>Sources:</strong> {activeMonster.sourceBooks.join(", ")}
                       </div>
                     ) : null}
                     {activeMonster.regeneration !== undefined && activeMonster.regeneration !== null && activeMonster.regeneration !== "" ? (
-                      <div style={{ fontSize: "0.82rem", color: "var(--text-primary)" }}>
+                      <div style={bodyPrimary}>
                         <strong>Regeneration:</strong> {String(activeMonster.regeneration)}
                       </div>
                     ) : null}
                     {isRenderableCardValue(activeMonster.compendiumUrl) ? (
-                      <div style={{ fontSize: "0.82rem", color: "var(--text-primary)", overflowWrap: "anywhere" }}>
+                      <div style={{ ...bodyPrimary, overflowWrap: "anywhere" }}>
                         <strong>Compendium URL:</strong> {String(activeMonster.compendiumUrl)}
                       </div>
                     ) : null}
                     {isRenderableCardValue(activeMonster.description) ? (
                       <RulesRichText
                         text={String(activeMonster.description)}
-                        paragraphStyle={{ fontSize: "0.82rem", color: "var(--text-primary)", margin: "0.2rem 0 0 0" }}
-                        listItemStyle={{ fontSize: "0.82rem", color: "var(--text-primary)" }}
+                        paragraphStyle={{ ...richTextBodyPrimary.paragraphStyle, margin: "0.2rem 0 0 0" }}
+                        listItemStyle={richTextBodyPrimary.listItemStyle}
                       />
                     ) : null}
                   </div>
@@ -1510,11 +1613,11 @@ export function MonsterEditorApp({
                 const weaknesses = sectionArrayOfObjects(activeMonster.weaknesses);
                 if (weaknesses.length === 0) return null;
                 return (
-                  <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", backgroundColor: "var(--surface-0)", padding: "0.5rem", marginBottom: "0.75rem" }}>
-                    <h3 style={titleStyle}>Weaknesses</h3>
+                  <div style={{ ...panelStyle, padding: "0.5rem", marginBottom: "0.75rem" }}>
+                    <h3 style={sectionTitleStyle}>Weaknesses</h3>
                     <div style={{ marginTop: "0.4rem", display: "grid", gap: "0.24rem" }}>
                       {weaknesses.map((entry, idx) => (
-                        <div key={`weakness-${idx}`} style={{ fontSize: "0.82rem", color: "var(--text-primary)" }}>
+                        <div key={`weakness-${idx}`} style={bodyPrimary}>
                           {weaknessLine(entry)}
                         </div>
                       ))}
@@ -1527,8 +1630,8 @@ export function MonsterEditorApp({
                 const items = sectionArrayOfObjects(activeMonster.items);
                 if (items.length === 0) return null;
                 return (
-                  <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", backgroundColor: "var(--surface-0)", padding: "0.5rem", marginBottom: "0.75rem" }}>
-                    <h3 style={titleStyle}>Items</h3>
+                  <div style={{ ...panelStyle, padding: "0.5rem", marginBottom: "0.75rem" }}>
+                    <h3 style={sectionTitleStyle}>Items</h3>
                     <div style={{ marginTop: "0.4rem", display: "grid", gap: "0.35rem" }}>
                       {items.map((item, idx) => {
                         const quantity = item.quantity;
@@ -1537,14 +1640,14 @@ export function MonsterEditorApp({
                         const description = String(item.description ?? "").trim();
                         return (
                           <div key={`item-${idx}`} style={{ border: "1px solid var(--panel-border)", borderRadius: "0.3rem", padding: "0.4rem", backgroundColor: "var(--surface-1)" }}>
-                            <div style={{ fontSize: "0.82rem", color: "var(--text-primary)" }}>
+                            <div style={bodyPrimary}>
                               <strong>{name || "Item"}</strong>
                               {quantity !== undefined && quantity !== null && quantity !== "" ? ` x${quantity}` : ""}
                               {id ? <span style={{ color: "var(--text-muted)" }}> ({id})</span> : null}
                             </div>
                             {isRenderableCardValue(description) ? (
                               <details style={{ marginTop: "0.22rem" }}>
-                                <summary style={{ cursor: "pointer", color: "var(--text-secondary)", fontSize: "0.76rem" }}>Description</summary>
+                                <summary style={{ cursor: "pointer", ...metaSecondary }}>Description</summary>
                                 <RulesRichText
                                   text={description}
                                   paragraphStyle={{ fontSize: "0.8rem", color: "var(--text-primary)", margin: "0.24rem 0 0 0" }}
@@ -1560,25 +1663,23 @@ export function MonsterEditorApp({
                 );
               })()}
 
-              <div style={{ border: "1px solid var(--panel-border-strong)", borderRadius: "0.35rem", backgroundColor: "var(--surface-0)", padding: "0.5rem", marginBottom: "0.75rem" }}>
-                <h3 style={titleStyle}>Powers ({activeMonster.powers.length})</h3>
+              <div
+                style={{
+                  ...panelStyle,
+                  borderColor: "var(--panel-border-strong)",
+                  padding: "0.5rem",
+                  marginBottom: "0.75rem"
+                }}
+              >
+                <h3 style={sectionTitleStyle}>Powers ({activeMonster.powers.length})</h3>
                 <div style={{ marginTop: "0.5rem", display: "grid", gap: "0.6rem" }}>
-                  {activeMonster.powers.length === 0 ? <div style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>No powers parsed.</div> : null}
+                  {activeMonster.powers.length === 0 ? <div style={metaMuted}>No powers parsed.</div> : null}
                   {(["standard", "minor", "triggered", "other"] as const).map((bucket) => {
                     const bucketPowers = groupedPowers[bucket];
                     if (bucketPowers.length === 0) return null;
                     return (
                       <div key={bucket} style={{ display: "grid", gap: "0.4rem" }}>
-                        <div
-                          style={{
-                            fontWeight: 700,
-                            textTransform: "uppercase",
-                            letterSpacing: "0.05em",
-                            color: "var(--text-primary)"
-                          }}
-                        >
-                          {usageBucketLabel(bucket)}
-                        </div>
+                        <div style={powerBucketHeaderStyle}>{usageBucketLabel(bucket)}</div>
                         <div style={{ display: "grid", gap: "0.45rem", gridTemplateColumns: "minmax(0, 1fr)", alignItems: "stretch" }}>
                           {bucketPowers.map((power, index) => {
                             const colorBucket = classifyMonsterPowerColorBucket(power.usage);
@@ -1601,24 +1702,8 @@ export function MonsterEditorApp({
                               }}
                             >
                           <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: "0.35rem" }}>
-                            <div style={{ fontWeight: 600 }}>{power.name || `Power ${index + 1}`}</div>
-                            {power.isBasic ? (
-                              <span
-                                style={{
-                                  fontSize: "0.72rem",
-                                  fontWeight: 700,
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.04em",
-                                  color: "var(--text-secondary)",
-                                  border: "1px solid var(--panel-border)",
-                                  borderRadius: "999px",
-                                  padding: "0.05rem 0.35rem",
-                                  backgroundColor: "var(--surface-1)"
-                                }}
-                              >
-                                Basic Attack
-                              </span>
-                            ) : null}
+                            <strong>{power.name || `Power ${index + 1}`}</strong>
+                            {power.isBasic ? <span style={{ ...sheetTagPillStyle, cursor: "default" }}>Basic Attack</span> : null}
                           </div>
                           {cardModel.usagePrimaryParts.length > 0 ? (
                             <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginTop: "0.12rem" }}>
@@ -1644,7 +1729,7 @@ export function MonsterEditorApp({
                                 </span>
                               ))}
                               {cardModel.usageDetailsLines.length > 0 ? (
-                                <div style={{ marginTop: "0.1rem", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                                <div style={{ marginTop: "0.1rem", ...metaSecondary }}>
                                   {cardModel.usageDetailsLines.map((line, lineIdx) => (
                                     <div key={`${power.name}-${index}-usage-details-${lineIdx}`}>{line}</div>
                                   ))}
@@ -1672,8 +1757,8 @@ export function MonsterEditorApp({
                               ))}
                             </div>
                           ) : null}
-                          {cardModel.keywordTokens.length > 0 ? (
-                            <div style={{ fontSize: "0.77rem", color: "var(--text-muted)", marginBottom: "0.25rem" }}>
+                            {cardModel.keywordTokens.length > 0 ? (
+                            <div style={{ ...bodySecondary, color: "var(--text-muted)", marginBottom: "0.25rem" }}>
                               <strong>Keywords:</strong>{" "}
                               {cardModel.keywordTokens.map((keyword, idx) => (
                                 <span key={`${power.name}-${index}-kw-${keyword}`}>
@@ -1731,9 +1816,7 @@ export function MonsterEditorApp({
                             >
                               {cardModel.secondaryAttacks.map((secondaryAttack, secondaryIndex) => (
                                 <div key={`${power.name}-${index}-secondary-${secondaryIndex}`} style={{ marginTop: secondaryIndex === 0 ? 0 : "0.3rem" }}>
-                                  <div style={{ fontSize: "0.74rem", fontWeight: 700, textTransform: "uppercase", color: "var(--text-secondary)" }}>
-                                    {secondaryAttack.name}
-                                  </div>
+                                  <div style={secondaryAttackTitleStyle}>{secondaryAttack.name}</div>
                                   {secondaryAttack.attackLineParts.length > 0 ? (
                                     <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginTop: "0.05rem", display: "flex", flexWrap: "wrap", gap: "0.22rem", alignItems: "center" }}>
                                       {secondaryAttack.attackLineParts.map((part, partIdx) => (
@@ -1788,21 +1871,21 @@ export function MonsterEditorApp({
                             </div>
                           ) : null}
                           {isRenderableCardValue(power.flavorText) ? (
-                            <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", marginBottom: "0.2rem", fontStyle: "italic" }}>
+                            <div style={{ ...bodySecondary, marginBottom: "0.2rem", fontStyle: "italic" }}>
                               {power.flavorText}
                             </div>
                           ) : null}
-                          <div style={{ fontSize: "0.82rem", color: "var(--text-primary)" }}>
+                          <div style={bodyPrimary}>
                             {isRenderableCardValue(cardModel.descriptionText) ? (
                               <RulesRichText
                                 text={cardModel.descriptionText}
-                                paragraphStyle={{ fontSize: "0.82rem", color: "var(--text-primary)", margin: "0 0 0.35rem 0" }}
-                                listItemStyle={{ fontSize: "0.82rem", color: "var(--text-primary)" }}
+                                paragraphStyle={{ ...richTextBodyPrimary.paragraphStyle, margin: "0 0 0.35rem 0" }}
+                                listItemStyle={richTextBodyPrimary.listItemStyle}
                               />
                             ) : null}
                           </div>
                           {isRenderableCardValue(cardModel.ongoingText) ? (
-                            <div style={{ marginTop: "0.05rem", fontSize: "0.8rem", color: "var(--text-primary)" }}>
+                            <div style={{ marginTop: "0.05rem", ...bodyPrimary }}>
                               <strong>ONGOING:</strong> {cardModel.ongoingText}
                             </div>
                           ) : null}
@@ -1821,7 +1904,7 @@ export function MonsterEditorApp({
         </div>
       </div>
 
-      <div style={{ marginTop: "0.85rem", border: "1px solid var(--panel-border)", borderRadius: "0.35rem", backgroundColor: "var(--surface-0)", padding: "0.55rem" }}>
+      <div style={{ marginTop: "0.85rem", ...panelStyle, padding: "0.55rem" }}>
         <details>
           <summary style={{ cursor: "pointer", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--text-primary)" }}>
             JSON
