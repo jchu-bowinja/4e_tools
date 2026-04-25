@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent
+} from "react";
 import type { RulesIndex } from "../../rules/models";
 import { resolveTooltipText } from "../../data/tooltipGlossary";
 import { positionFixedTooltip } from "../../ui/glossaryTooltipPosition";
@@ -254,7 +261,7 @@ function renderStatValue(
         {entries.map(([nestedKey, nestedValue]) => (
           <span key={nestedKey} style={{ whiteSpace: "nowrap" }}>
             <span
-              onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${nestedKey}`)}
+              onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${formatStatLabel(nestedKey)}`)}
               onMouseLeave={leaveGlossaryHover}
               style={{ cursor: "help", borderBottom: "1px dotted var(--text-muted)", marginRight: "0.3rem" }}
             >
@@ -1401,7 +1408,7 @@ export function MonsterEditorApp({
                               }}
                             >
                               <span
-                                onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${k}`)}
+                                onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${formatStatLabel(k)}`)}
                                 onMouseLeave={leaveGlossaryHover}
                                 style={{
                                   cursor: "help",
