@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState, type CSSProperties } from "react";
 import type { GlossaryTermRow } from "../../data/tooltipGlossary";
 import { displayTextForGlossaryRow, isNumberedRangeAlias, sanitizeGlossaryRows } from "../../data/tooltipGlossary";
 import { saveGlossaryRowsToStorage } from "../../data/glossaryStorage";
@@ -110,13 +110,17 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
     }
   }, [rows.length, selectedIndex]);
 
-  useEffect(() => {
+  // Resolve persisted id → list index on load / when rows or stored id changes. Do not depend on
+  // `selectedIndex`: if we did, this would run after a user click with a stale `storedSelectedTermId`
+  // and fight the new selection (rapid flicker). Runs in useLayoutEffect so the first paint of the
+  // side panel matches the selection before the persist effect can write an empty id and clear storage.
+  useLayoutEffect(() => {
     if (!storedSelectedTermId) return;
     const matchIndex = rows.findIndex((row) => String(row.id ?? "") === storedSelectedTermId);
-    if (matchIndex >= 0 && matchIndex !== selectedIndex) {
-      setSelectedIndex(matchIndex);
+    if (matchIndex >= 0) {
+      setSelectedIndex((prev) => (prev === matchIndex ? prev : matchIndex));
     }
-  }, [rows, selectedIndex, storedSelectedTermId]);
+  }, [rows, storedSelectedTermId]);
 
   useEffect(() => {
     const selectedId = selectedIndex != null && selectedIndex < rows.length ? String(rows[selectedIndex]?.id ?? "") : "";
