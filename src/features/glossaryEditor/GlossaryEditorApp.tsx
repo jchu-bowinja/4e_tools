@@ -13,10 +13,16 @@ const panel: CSSProperties = {
   backgroundColor: "var(--surface-1)",
   border: "1px solid var(--panel-border)",
   borderRadius: "8px",
-  padding: "0.75rem"
+  padding: "0.75rem",
+  boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 1px 2px rgba(20, 14, 8, 0.12)"
 };
 
 const labelStyle: CSSProperties = { display: "block", fontSize: "0.78rem", color: "var(--text-muted)", marginBottom: "0.2rem" };
+const fieldSurface: CSSProperties = {
+  backgroundColor: "var(--surface-0)",
+  border: "1px solid var(--panel-border)",
+  borderRadius: "6px"
+};
 
 function newTermRow(): GlossaryTermRow {
   return {
@@ -178,10 +184,11 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
             marginBottom: "0.75rem",
             padding: "0.5rem 0.65rem",
             borderRadius: "6px",
-            backgroundColor: "var(--surface-2)",
+            background: "linear-gradient(180deg, var(--surface-1) 0%, var(--surface-2) 100%)",
             border: "1px solid var(--panel-border)",
             color: "var(--text-muted)",
-            fontSize: "0.9rem"
+            fontSize: "0.9rem",
+            boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.16)"
           }}
         >
           {message}
@@ -230,7 +237,7 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              style={{ width: "100%", boxSizing: "border-box", marginTop: "0.15rem" }}
+              style={{ ...fieldSurface, width: "100%", boxSizing: "border-box", marginTop: "0.15rem" }}
             />
           </label>
           <div style={{ marginTop: "0.5rem", overflow: "auto", flex: 1, fontSize: "0.9rem" }}>
@@ -250,10 +257,13 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
                           textAlign: "left",
                           padding: "0.4rem 0.5rem",
                           borderRadius: "6px",
-                          border: active ? "1px solid var(--power-accent, #3b82f6)" : "1px solid transparent",
-                          background: active ? "var(--surface-2)" : "transparent",
+                          border: active ? "1px solid var(--panel-border-strong)" : "1px solid transparent",
+                          background: active
+                            ? "linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 88%, #ffffff 12%) 0%, var(--surface-2) 100%)"
+                            : "transparent",
                           color: "var(--text-primary)",
-                          cursor: "pointer"
+                          cursor: "pointer",
+                          boxShadow: active ? "inset 0 1px 0 rgba(255, 255, 255, 0.16)" : "none"
                         }}
                       >
                         <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>{row.name || "(no name)"}</div>
@@ -278,7 +288,7 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
                     type="text"
                     value={String(selected.name ?? "")}
                     onChange={(e) => patchSelected({ name: e.target.value })}
-                    style={{ width: "100%", boxSizing: "border-box" }}
+                    style={{ ...fieldSurface, width: "100%", boxSizing: "border-box" }}
                   />
                 </label>
                 <label>
@@ -287,7 +297,7 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
                     type="text"
                     value={String(selected.id ?? "")}
                     onChange={(e) => patchSelected({ id: e.target.value })}
-                    style={{ width: "100%", boxSizing: "border-box" }}
+                    style={{ ...fieldSurface, width: "100%", boxSizing: "border-box" }}
                   />
                 </label>
               </div>
@@ -298,7 +308,7 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
                     type="text"
                     value={String(selected.category ?? "")}
                     onChange={(e) => patchSelected({ category: e.target.value || null })}
-                    style={{ width: "100%", boxSizing: "border-box" }}
+                    style={{ ...fieldSurface, width: "100%", boxSizing: "border-box" }}
                   />
                 </label>
                 <label>
@@ -307,7 +317,7 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
                     type="text"
                     value={String(selected.type ?? "")}
                     onChange={(e) => patchSelected({ type: e.target.value || null })}
-                    style={{ width: "100%", boxSizing: "border-box" }}
+                    style={{ ...fieldSurface, width: "100%", boxSizing: "border-box" }}
                   />
                 </label>
               </div>
@@ -318,7 +328,7 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
                     type="text"
                     value={String(selected.sourceBook ?? "")}
                     onChange={(e) => patchSelected({ sourceBook: e.target.value || null })}
-                    style={{ width: "100%", boxSizing: "border-box" }}
+                    style={{ ...fieldSurface, width: "100%", boxSizing: "border-box" }}
                   />
                 </label>
                 <label>
@@ -327,7 +337,7 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
                     type="text"
                     value={String(selected.publishedIn ?? "")}
                     onChange={(e) => patchSelected({ publishedIn: e.target.value || null })}
-                    style={{ width: "100%", boxSizing: "border-box" }}
+                    style={{ ...fieldSurface, width: "100%", boxSizing: "border-box" }}
                   />
                 </label>
               </div>
@@ -338,7 +348,7 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
                   onChange={(e) => setAliasesDraft(e.target.value)}
                   onBlur={() => setAliasesFromText(aliasesDraft)}
                   rows={4}
-                  style={{ width: "100%", boxSizing: "border-box", fontFamily: "inherit", resize: "vertical" }}
+                  style={{ ...fieldSurface, width: "100%", boxSizing: "border-box", fontFamily: "inherit", resize: "vertical" }}
                 />
               </label>
               <label>
@@ -347,7 +357,7 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
                   value={String(selected.definition ?? "")}
                   onChange={(e) => patchSelected({ definition: e.target.value || null })}
                   rows={6}
-                  style={{ width: "100%", boxSizing: "border-box", fontFamily: "inherit", resize: "vertical" }}
+                  style={{ ...fieldSurface, width: "100%", boxSizing: "border-box", fontFamily: "inherit", resize: "vertical" }}
                 />
               </label>
               <label>
@@ -356,16 +366,24 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
                   value={String(selected.html ?? "")}
                   onChange={(e) => patchSelected({ html: e.target.value ? e.target.value : null })}
                   rows={5}
-                  style={{ width: "100%", boxSizing: "border-box", fontFamily: "monospace", fontSize: "0.82rem", resize: "vertical" }}
+                  style={{
+                    ...fieldSurface,
+                    width: "100%",
+                    boxSizing: "border-box",
+                    fontFamily: "monospace",
+                    fontSize: "0.82rem",
+                    resize: "vertical"
+                  }}
                 />
               </label>
               <div
                 style={{
                   padding: "0.55rem 0.65rem",
-                  backgroundColor: "var(--surface-0)",
+                  background: "linear-gradient(180deg, var(--surface-0) 0%, var(--surface-1) 100%)",
                   border: "1px solid var(--panel-border)",
                   borderRadius: "6px",
-                  fontSize: "0.88rem"
+                  fontSize: "0.88rem",
+                  boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.14)"
                 }}
               >
                 <div style={{ ...labelStyle, marginBottom: "0.35rem" }}>Tooltip preview (plain text)</div>

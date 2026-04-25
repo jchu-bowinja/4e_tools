@@ -485,7 +485,7 @@ function HybridClassDetailPanel(props: {
       ) : null}
       {spec["Build Options"] ? (
         <details open style={{ marginTop: "0.45rem" }}>
-          <summary style={{ fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}>Build Options</summary>
+          <summary style={detailsSummaryStyle}>Build Options</summary>
           <div style={{ marginTop: "0.35rem", fontSize: "0.82rem", color: "var(--text-secondary)" }}>
             <RulesRichText
               text={String(spec["Build Options"])}
@@ -497,7 +497,7 @@ function HybridClassDetailPanel(props: {
       ) : null}
       {body ? (
         <details open style={{ marginTop: "0.45rem" }}>
-          <summary style={{ fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}>Description</summary>
+          <summary style={detailsSummaryStyle}>Description</summary>
           <div style={{ marginTop: "0.35rem", fontSize: "0.82rem", color: "var(--text-secondary)" }}>
             <RulesRichText text={body} paragraphStyle={{ fontSize: "0.82rem", color: "var(--text-secondary)" }} listItemStyle={{ fontSize: "0.82rem", color: "var(--text-secondary)" }} />
           </div>
@@ -578,50 +578,94 @@ const ui = {
   mainColumn: {
     backgroundColor: "var(--surface-0)",
     border: "1px solid var(--panel-border)",
-    borderRadius: "12px",
+    borderRadius: "var(--ui-section-radius, 12px)",
     padding: "1.25rem 1.35rem",
-    boxShadow: "0 1px 4px rgba(15, 23, 42, 0.06)"
+    boxShadow: "var(--ui-panel-shadow, 0 1px 4px rgba(15, 23, 42, 0.06))"
   },
   sidebarColumn: {
     backgroundColor: "var(--surface-2)",
     border: "1px solid var(--panel-border)",
-    borderRadius: "12px",
+    borderRadius: "var(--ui-section-radius, 12px)",
     padding: "1.25rem 1.35rem",
-    boxShadow: "0 1px 4px rgba(15, 23, 42, 0.06)"
+    boxShadow: "var(--ui-panel-shadow, 0 1px 4px rgba(15, 23, 42, 0.06))"
   },
   blockTitle: {
     backgroundColor: "var(--surface-1)",
     border: "1px solid var(--panel-border)",
-    borderRadius: "10px",
+    borderRadius: "var(--ui-section-radius, 10px)",
     padding: "1rem 1.1rem",
     marginBottom: "0.9rem"
   },
   blockTabs: {
     backgroundColor: "var(--surface-2)",
     border: "1px solid var(--panel-border)",
-    borderRadius: "10px",
+    borderRadius: "var(--ui-section-radius, 10px)",
     padding: "0.55rem 0.65rem",
     marginBottom: "1rem"
   },
   blockContent: {
     backgroundColor: "var(--surface-1)",
     border: "1px solid var(--panel-border)",
-    borderRadius: "10px",
+    borderRadius: "var(--ui-section-radius, 10px)",
     padding: "1rem 1.1rem"
   },
   blockInset: {
     backgroundColor: "var(--surface-2)",
     border: "1px solid var(--panel-border)",
-    borderRadius: "8px",
+    borderRadius: "var(--ui-panel-radius, 8px)",
     padding: "0.65rem 0.85rem"
   },
   blockSheetSection: {
     backgroundColor: "var(--surface-3)",
     border: "1px solid var(--panel-border)",
-    borderRadius: "8px",
+    borderRadius: "var(--ui-panel-radius, 8px)",
     padding: "0.75rem 0.9rem",
     marginTop: "0.75rem"
   }
+};
+
+const pageTitleStyle: CSSProperties = {
+  margin: "0 0 0.65rem 0",
+  fontSize: "1.05rem",
+  fontWeight: 700,
+  letterSpacing: "0.04em",
+  textTransform: "uppercase",
+  color: "var(--text-primary)"
+};
+
+const sectionTitleStyle: CSSProperties = {
+  margin: "0 0 0.6rem 0",
+  fontSize: "0.9rem",
+  fontWeight: 700,
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+  color: "var(--text-primary)"
+};
+
+const subsectionTitleStyle: CSSProperties = {
+  margin: "0 0 0.45rem 0",
+  fontSize: "0.82rem",
+  fontWeight: 700,
+  letterSpacing: "0.04em",
+  textTransform: "uppercase",
+  color: "var(--text-secondary)"
+};
+
+const detailsSummaryStyle: CSSProperties = {
+  cursor: "pointer",
+  fontSize: "0.82rem",
+  fontWeight: 700,
+  letterSpacing: "0.04em",
+  textTransform: "uppercase",
+  color: "var(--text-secondary)"
+};
+
+const jsonSummaryStyle: CSSProperties = {
+  cursor: "pointer",
+  fontWeight: 700,
+  letterSpacing: "0.04em",
+  textTransform: "uppercase",
+  color: "var(--text-primary)"
 };
 
 function exportBuild(build: CharacterBuild): void {
@@ -1395,8 +1439,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   return (
     <div style={ui.page}>
       <div style={ui.mainColumn}>
+        <h1 style={pageTitleStyle}>D&amp;D 4e Character Builder</h1>
         <div style={ui.blockTitle}>
-          <h2 style={{ margin: "0 0 0.5rem 0", fontSize: "1.35rem", fontWeight: 700, color: "var(--text-primary)" }}>D&amp;D 4e Character Builder</h2>
           <label style={{ display: "block", fontSize: "0.9rem", color: "var(--text-secondary)" }}>
             Character Name
             <input
@@ -1496,7 +1540,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
           </div>
         </div>
         <div style={ui.blockSheetSection}>
-          <h4 style={{ margin: "0 0 0.5rem 0", fontSize: "0.95rem", color: "var(--text-primary)" }}>Validation Notes</h4>
+          <h4 style={subsectionTitleStyle}>Validation Notes</h4>
           {legality.warnings.length > 0 && (
             <ul style={{ margin: "0 0 0.5rem 0", paddingLeft: "1.2rem", color: "var(--status-warning)", fontSize: "0.88rem" }}>
               {legality.warnings.map((w) => (
@@ -1536,7 +1580,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         <div style={ui.blockContent}>
         {activeTab === "race" && (
           <div>
-            <h3>Race</h3>
+            <h3 style={sectionTitleStyle}>Race</h3>
             <select
               value={build.raceId || ""}
               onChange={(e) => {
@@ -1563,7 +1607,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 racePowerGroups.some((g) => g.choiceOnly) ||
                 parseRacialTraitIdsFromRace(selectedRace).includes(ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION)) && (
                 <div style={{ marginTop: "0.65rem", ...ui.blockInset, backgroundColor: "var(--surface-1)", borderColor: "var(--panel-border)" }}>
-                  <h4 style={{ margin: "0 0 0.5rem 0", fontSize: "0.95rem", color: "var(--text-secondary)" }}>Race choices</h4>
+                  <h4 style={subsectionTitleStyle}>Race choices</h4>
                   {parseRacialTraitIdsFromRace(selectedRace).includes(ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION) && (
                     <label style={{ display: "block", marginBottom: "0.75rem" }}>
                       <span style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem", fontSize: "0.85rem" }}>
@@ -1710,7 +1754,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 <p style={{ margin: "0.25rem 0 0 0" }}><strong>Languages:</strong> {String(raceSpecific["Languages"] || selectedRace.languages || "-")}</p>
                 {displayedRacialTraitRows.length > 0 && (
                   <div style={{ marginTop: "0.65rem" }}>
-                    <h4 style={{ margin: "0 0 0.45rem 0", fontSize: "0.95rem", color: "var(--text-primary)" }}>Racial traits</h4>
+                    <h4 style={subsectionTitleStyle}>Racial traits</h4>
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
                       {displayedRacialTraitRows.map(({ id, trait }) => (
                         <details
@@ -1742,7 +1786,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                               </p>
                             )}
                             {!trait && (
-                              <p style={{ margin: 0, color: "#a61" }}>
+                              <p style={{ margin: 0, color: "var(--status-warning)" }}>
                                 This trait is listed on the race but was not found in the loaded rules data ({id}).
                               </p>
                             )}
@@ -1755,7 +1799,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 )}
                 {racePowerGroups.some((g) => g.powerIds.length > 0 || g.dilettantePick) && (
                   <div style={{ marginTop: "0.8rem" }}>
-                    <h4 style={{ margin: "0 0 0.45rem 0", fontSize: "0.95rem", color: "var(--text-primary)" }}>Granted powers</h4>
+                    <h4 style={subsectionTitleStyle}>Granted powers</h4>
                     {racePowerGroups
                       .filter((g) => g.powerIds.length > 0 || g.dilettantePick)
                       .map((g) => {
@@ -1830,7 +1874,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 )}
                 {selectedRace.raw.body && (
                   <details open style={{ marginTop: "0.5rem" }}>
-                    <summary>Lore Overview</summary>
+                    <summary style={detailsSummaryStyle}>Lore Overview</summary>
                     <div style={{ marginTop: "0.4rem" }}>
                       <RulesRichText text={String(selectedRace.raw.body)} />
                     </div>
@@ -1838,7 +1882,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 )}
                 {raceSpecific["Physical Qualities"] && (
                   <details open style={{ marginTop: "0.4rem" }}>
-                    <summary>Physical Qualities</summary>
+                    <summary style={detailsSummaryStyle}>Physical Qualities</summary>
                     <div style={{ marginTop: "0.4rem" }}>
                       <RulesRichText text={String(raceSpecific["Physical Qualities"])} />
                     </div>
@@ -1846,7 +1890,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 )}
                 {raceSpecific["Playing"] && (
                   <details open style={{ marginTop: "0.4rem" }}>
-                    <summary>Playing This Race</summary>
+                    <summary style={detailsSummaryStyle}>Playing This Race</summary>
                     <div style={{ marginTop: "0.4rem" }}>
                       <RulesRichText text={String(raceSpecific["Playing"])} />
                     </div>
@@ -1859,7 +1903,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
 
         {activeTab === "class" && (
           <div>
-            <h3>Class</h3>
+            <h3 style={sectionTitleStyle}>Class</h3>
             <div style={{ marginBottom: "0.65rem", display: "flex", gap: "1rem", flexWrap: "wrap", alignItems: "center" }}>
               <label style={{ fontSize: "0.88rem", cursor: "pointer", display: "flex", gap: "0.35rem", alignItems: "center" }}>
                 <input
@@ -2217,7 +2261,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                       borderTop: "1px solid var(--panel-border)"
                     }}
                   >
-                    <h4 style={{ margin: "0 0 0.45rem 0", fontSize: "0.95rem", color: "var(--text-primary)" }}>Granted powers (both base classes)</h4>
+                    <h4 style={subsectionTitleStyle}>Granted powers (both base classes)</h4>
                     {classAutoGrantedPowers.map((p) => renderPowerCardWithSelections(p, `hybrid-class-tab-${p.id}`))}
                   </div>
                 )}
@@ -2238,7 +2282,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 )}
                 {selectedClass.raw.body && (
                   <details open style={{ marginTop: "0.5rem" }}>
-                    <summary>Class Lore Overview</summary>
+                    <summary style={detailsSummaryStyle}>Class Lore Overview</summary>
                     <div style={{ marginTop: "0.4rem" }}>
                       <RulesRichText text={String(selectedClass.raw.body)} />
                     </div>
@@ -2246,7 +2290,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 )}
                 {classSpecific["Build Options"] && (
                   <details open style={{ marginTop: "0.4rem" }}>
-                    <summary>Build Options</summary>
+                    <summary style={detailsSummaryStyle}>Build Options</summary>
                     <div style={{ marginTop: "0.4rem" }}>
                       <RulesRichText text={String(classSpecific["Build Options"])} />
                     </div>
@@ -2254,13 +2298,13 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 )}
                 {classAutoGrantedPowers.length > 0 && (
                   <div style={{ marginTop: "0.8rem" }}>
-                    <h4 style={{ margin: "0 0 0.45rem 0", fontSize: "0.95rem", color: "var(--text-primary)" }}>Granted powers</h4>
+                    <h4 style={subsectionTitleStyle}>Granted powers</h4>
                     {classAutoGrantedPowers.map((p) => renderPowerCardWithSelections(p, `class-tab-${p.id}`))}
                   </div>
                 )}
                 {classBuildOptions.length > 0 && (
                   <div style={{ marginTop: "0.85rem", paddingTop: "0.75rem", borderTop: "1px solid var(--panel-border)" }}>
-                    <h4 style={{ margin: "0 0 0.45rem 0", fontSize: "0.95rem", color: "var(--text-primary)" }}>Class choices</h4>
+                    <h4 style={subsectionTitleStyle}>Class choices</h4>
                     <label style={{ display: "block", maxWidth: "28rem" }}>
                       <span style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem", fontSize: "0.85rem" }}>
                         Build option
@@ -2325,7 +2369,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 )}
                 {classSpecific["Role"] && (
                   <details open style={{ marginTop: "0.4rem" }}>
-                    <summary>Role Details</summary>
+                    <summary style={detailsSummaryStyle}>Role Details</summary>
                     <div style={{ marginTop: "0.4rem" }}>
                       <RulesRichText text={String(classSpecific["Role"])} />
                     </div>
@@ -2339,7 +2383,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
 
         {activeTab === "abilities" && (
           <div>
-            <h3>Ability Scores</h3>
+            <h3 style={sectionTitleStyle}>Ability Scores</h3>
             <p style={{ margin: "0.25rem 0 0.75rem 0", color: "var(--text-muted)", fontSize: "0.9rem", lineHeight: 1.45 }}>
               Set <strong>base</strong> scores (8–18) using point buy. Modifiers below use your <strong>final</strong> score after level-based increases, then racial bonuses—those are what checks and attacks use.
             </p>
@@ -2389,7 +2433,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
 
             {requiredAsiMilestonesUpTo(build.level).length > 0 && (
               <section style={{ ...ui.blockInset, marginBottom: "0.85rem", backgroundColor: "var(--surface-1)" }}>
-                <h4 style={{ margin: "0 0 0.45rem 0" }}>Level-up ability increases</h4>
+                <h4 style={subsectionTitleStyle}>Level-up ability increases</h4>
                 <p style={{ margin: "0 0 0.75rem 0", fontSize: "0.85rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
                   At each listed level, pick two <strong>different</strong> abilities for +1 each (Player&apos;s Handbook). These stack with automatic +1 to all abilities at levels 11 and 21.
                 </p>
@@ -2643,7 +2687,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             </div>
 
             <details style={{ ...ui.blockInset, marginTop: "1rem", backgroundColor: "var(--surface-0)" }}>
-              <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: "0.9rem" }}>What do these abilities mean?</summary>
+              <summary style={detailsSummaryStyle}>What do these abilities mean?</summary>
               <div style={{ marginTop: "0.65rem", display: "flex", flexDirection: "column", gap: "0.65rem" }}>
                 {abilities.map((ability) => {
                   const lore = abilityLoreByCode.get(ability);
@@ -2666,7 +2710,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
 
         {activeTab === "skills" && (
           <div>
-            <h3>Skills</h3>
+            <h3 style={sectionTitleStyle}>Skills</h3>
             <p style={{ margin: "0.25rem 0 0.65rem 0", color: "var(--text-muted)", fontSize: "0.9rem", lineHeight: 1.45 }}>
               All skills are listed. You can only <strong>train</strong> skills from your class list (checkbox enabled). Other skills are shown for reference.
             </p>
@@ -2724,24 +2768,24 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                         </span>
                       )}
                       {!trainable && (
-                        <span style={{ marginLeft: "0.35rem", fontSize: "0.78rem", color: "#888", fontWeight: 400 }}>
+                        <span style={{ marginLeft: "0.35rem", fontSize: "0.78rem", color: "var(--text-muted)", fontWeight: 400 }}>
                           {selectedClass ? "— not on class list" : ""}
                         </span>
                       )}
                       {disableBecauseMaxed && (
-                        <span style={{ marginLeft: "0.35rem", fontSize: "0.78rem", color: "#777", fontWeight: 500 }}>
+                        <span style={{ marginLeft: "0.35rem", fontSize: "0.78rem", color: "var(--text-secondary)", fontWeight: 500 }}>
                           — max trained selected
                         </span>
                       )}
                       {checked && !trainable && selectedClass && (
-                        <span style={{ marginLeft: "0.35rem", fontSize: "0.78rem", color: "crimson", fontWeight: 600 }}>
+                        <span style={{ marginLeft: "0.35rem", fontSize: "0.78rem", color: "var(--status-danger)", fontWeight: 600 }}>
                           (clear — not a class skill)
                         </span>
                       )}
                     </label>
                     {skillBody && (
                       <details open style={{ marginLeft: "1.25rem", marginTop: "0.15rem" }}>
-                        <summary style={{ fontSize: "0.85rem" }}>Description</summary>
+                        <summary style={detailsSummaryStyle}>Description</summary>
                         <div style={{ fontSize: "0.8rem", margin: "0.25rem 0 0 0", color: "var(--text-secondary)" }}>
                           <RulesRichText text={skillBody} paragraphStyle={{ fontSize: "0.8rem", color: "var(--text-secondary)" }} listItemStyle={{ fontSize: "0.8rem", color: "var(--text-secondary)" }} />
                         </div>
@@ -2756,7 +2800,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
 
         {activeTab === "feats" && (
           <div>
-            <h3>Feat Selection</h3>
+            <h3 style={sectionTitleStyle}>Feat Selection</h3>
             <p style={{ margin: "0.25rem 0 0.5rem 0", fontSize: "0.85rem", color: "var(--text-muted)" }}>
               <strong>
                 {build.featIds.length} / {expectedFeatCount}
@@ -3029,7 +3073,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
 
         {activeTab === "powers" && (
           <div>
-            <h3>Power Selection</h3>
+            <h3 style={sectionTitleStyle}>Power Selection</h3>
             <p style={{ margin: "0.25rem 0 0.65rem 0", fontSize: "0.85rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
               Each <strong>class</strong> slot is a separate choice. The list for a slot only includes <strong>class</strong> powers whose{" "}
               <strong>printed level</strong> is at most that slot&apos;s gain level (for example, the 3rd-level encounter slot only lists encounter
@@ -3279,7 +3323,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   return (
                     <section key={def.key} style={{ marginBottom: "1rem" }}>
                       {showBucketHeader && (
-                        <h4 style={{ margin: "0 0 0.5rem 0", fontSize: "0.95rem", color: "var(--text-primary)", borderBottom: "1px solid var(--panel-border)", paddingBottom: "0.25rem" }}>
+                        <h4 style={{ ...subsectionTitleStyle, marginBottom: "0.5rem", borderBottom: "1px solid var(--panel-border)", paddingBottom: "0.25rem" }}>
                           {slotBucketSectionTitle(def.bucket)}
                         </h4>
                       )}
@@ -3338,14 +3382,14 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
 
         {activeTab === "paths" && (
           <div>
-            <h3>Theme, paragon path, and epic destiny</h3>
+            <h3 style={sectionTitleStyle}>Theme, paragon path, and epic destiny</h3>
             <p style={{ margin: "0.25rem 0 0.75rem 0", color: "var(--text-muted)", fontSize: "0.88rem", lineHeight: 1.45 }}>
               Themes are optional packages with prerequisites. Paragon paths require <strong>level 11+</strong>; epic destinies require{" "}
               <strong>level 21+</strong>. Dropping level clears a path or destiny that is no longer legal.
             </p>
 
             <section style={{ marginBottom: "1.25rem" }}>
-              <h4 style={{ margin: "0 0 0.35rem 0" }}>Theme</h4>
+              <h4 style={subsectionTitleStyle}>Theme</h4>
               <label style={{ display: "block", fontSize: "0.88rem", marginBottom: "0.4rem" }}>
                 Search themes
                 <input
@@ -3432,7 +3476,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               )}
               {selectedTheme?.raw?.body && typeof selectedTheme.raw.body === "string" && (
                 <details open style={{ marginTop: "0.5rem" }}>
-                  <summary>Theme details</summary>
+                  <summary style={detailsSummaryStyle}>Theme details</summary>
                   <div style={{ marginTop: "0.4rem" }}>
                     <RulesRichText text={String(selectedTheme.raw.body)} paragraphStyle={{ fontSize: "0.9rem" }} listItemStyle={{ fontSize: "0.9rem" }} />
                   </div>
@@ -3440,7 +3484,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               )}
               {themeGrantedPowers.length > 0 && (
                 <div style={{ marginTop: "0.75rem" }}>
-                  <h5 style={{ margin: "0 0 0.35rem 0", fontSize: "0.88rem" }}>Powers from this theme</h5>
+                  <h5 style={subsectionTitleStyle}>Powers from this theme</h5>
                   <p style={{ margin: "0 0 0.45rem 0", fontSize: "0.78rem", color: "var(--text-muted)" }}>
                     These are granted when your level reaches each power&apos;s printed level (same list as on the Powers tab).
                   </p>
@@ -3450,7 +3494,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             </section>
 
             <section style={{ marginBottom: "1.25rem" }}>
-              <h4 style={{ margin: "0 0 0.35rem 0" }}>Paragon path</h4>
+              <h4 style={subsectionTitleStyle}>Paragon path</h4>
               {build.level < 11 && (
                 <p style={{ margin: "0 0 0.5rem 0", fontSize: "0.85rem", color: "var(--status-warning)" }}>Set level to 11 or higher to choose a paragon path.</p>
               )}
@@ -3542,7 +3586,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               )}
               {selectedParagonPath?.raw?.body && typeof selectedParagonPath.raw.body === "string" && (
                 <details open style={{ marginTop: "0.5rem" }}>
-                  <summary>Paragon path details</summary>
+                  <summary style={detailsSummaryStyle}>Paragon path details</summary>
                   <div style={{ marginTop: "0.4rem" }}>
                     <RulesRichText
                       text={String(selectedParagonPath.raw.body)}
@@ -3555,7 +3599,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             </section>
 
             <section>
-              <h4 style={{ margin: "0 0 0.35rem 0" }}>Epic destiny</h4>
+              <h4 style={subsectionTitleStyle}>Epic destiny</h4>
               {build.level < 21 && (
                 <p style={{ margin: "0 0 0.5rem 0", fontSize: "0.85rem", color: "var(--status-warning)" }}>Set level to 21 or higher to choose an epic destiny.</p>
               )}
@@ -3647,7 +3691,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               )}
               {selectedEpicDestiny?.raw?.body && typeof selectedEpicDestiny.raw.body === "string" && (
                 <details open style={{ marginTop: "0.5rem" }}>
-                  <summary>Epic destiny details</summary>
+                  <summary style={detailsSummaryStyle}>Epic destiny details</summary>
                   <div style={{ marginTop: "0.4rem" }}>
                     <RulesRichText
                       text={String(selectedEpicDestiny.raw.body)}
@@ -3663,7 +3707,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
 
         {activeTab === "equipment" && (
           <div>
-            <h3>Equipment</h3>
+            <h3 style={sectionTitleStyle}>Equipment</h3>
             <div style={{ ...ui.blockInset, marginTop: "0.35rem", display: "grid", gap: "0.75rem", backgroundColor: "var(--surface-1)" }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.65rem" }}>
                 <label>
@@ -3885,7 +3929,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         </div>
         <div style={{ ...ui.blockInset, marginTop: "0.75rem", backgroundColor: "var(--surface-0)" }}>
           <details>
-            <summary style={{ cursor: "pointer", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--text-primary)" }}>
+            <summary style={jsonSummaryStyle}>
               JSON
             </summary>
             <div style={{ marginTop: "0.45rem", display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>
@@ -3928,7 +3972,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       </div>
 
       <div style={ui.sidebarColumn}>
-        <h3 style={{ margin: "0 0 0.75rem 0", fontSize: "1.1rem", color: "var(--text-primary)" }}>Live Character Sheet</h3>
+        <h3 style={{ ...sectionTitleStyle, marginBottom: "0.75rem" }}>Live Character Sheet</h3>
         <div style={{ ...ui.blockInset, backgroundColor: "var(--surface-1)", borderColor: "var(--panel-border)", display: "grid", gap: "0.75rem" }}>
           <div>
             <p style={{ margin: "0 0 0.4rem 0", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--text-secondary)", textTransform: "uppercase" }}>
@@ -4000,7 +4044,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Theme:</strong> {selectedTheme?.name || "None"}</p>
               {themeGrantedPowers.length > 0 && (
                 <details style={{ marginTop: "0.25rem", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
-                  <summary style={{ cursor: "pointer" }}>
+                  <summary style={detailsSummaryStyle}>
                     Theme granted powers ({themeGrantedPowers.length}) — summary
                   </summary>
                   <ul style={{ margin: "0.35rem 0 0 0", paddingLeft: "1.1rem" }}>
@@ -4017,7 +4061,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Epic Destiny:</strong> {selectedEpicDestiny?.name || "None"}</p>
               {multiclassFeatIdList.length > 0 && (
                 <details style={{ marginTop: "0.35rem", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
-                  <summary style={{ cursor: "pointer" }}>
+                  <summary style={detailsSummaryStyle}>
                     Multiclass-related feats ({multiclassFeatIdList.length})
                   </summary>
                   <ul style={{ margin: "0.35rem 0 0 0", paddingLeft: "1.1rem" }}>
@@ -4115,7 +4159,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Will:</strong> {derived.defenses.will}</p>
             </div>
             <details style={{ marginTop: "0.45rem", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
-              <summary style={{ cursor: "pointer", fontWeight: 600 }}>AC breakdown</summary>
+              <summary style={detailsSummaryStyle}>AC breakdown</summary>
               <p style={{ margin: "0.25rem 0 0 0", color: "var(--text-muted)" }}>
                 AC = 10 + armor + shield + best of DEX/INT when allowed by armor.
               </p>

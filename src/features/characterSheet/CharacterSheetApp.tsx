@@ -20,15 +20,31 @@ const tabLabel: Record<SheetTab, string> = {
 const panelStyle: CSSProperties = {
   backgroundColor: "var(--surface-0)",
   border: "1px solid var(--panel-border)",
-  borderRadius: "0.35rem",
+  borderRadius: "var(--ui-panel-radius, 0.35rem)",
   padding: "0.55rem",
-  boxShadow: "0 1px 2px rgba(40, 30, 10, 0.08)"
+  boxShadow: "var(--ui-panel-shadow, 0 1px 2px rgba(40, 30, 10, 0.08))"
+};
+
+const sectionInsetStyle: CSSProperties = {
+  backgroundColor: "var(--inset-section-bg, var(--surface-3))",
+  border: "1px solid var(--inset-section-border, var(--panel-border))",
+  borderRadius: "var(--ui-section-radius, 0.45rem)",
+  padding: "0.45rem",
+  boxShadow: "inset 0 1px 0 var(--inset-section-highlight, rgba(255, 255, 255, 0.12))"
 };
 
 const sectionTitleStyle: CSSProperties = {
   margin: 0,
   fontSize: "0.9rem",
   letterSpacing: "0.08em",
+  textTransform: "uppercase",
+  color: "var(--text-primary)"
+};
+
+const jsonSummaryStyle: CSSProperties = {
+  cursor: "pointer",
+  fontWeight: 700,
+  letterSpacing: "0.04em",
   textTransform: "uppercase",
   color: "var(--text-primary)"
 };
@@ -986,7 +1002,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 style={{
                   padding: "0.16rem 0.35rem",
                   borderRadius: "0.25rem",
-                  backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)"
+                  backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)",
+                  color: "var(--text-primary)"
                 }}
               >
                 {item.label}
@@ -998,7 +1015,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   padding: "0.16rem 0.35rem",
                   borderRadius: "0.25rem",
                   textAlign: "right",
-                  backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)"
+                  backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)",
+                  color: "var(--text-primary)"
                 }}
               >
                 {item.value}
@@ -1076,7 +1094,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         color: "var(--character-sheet-foreground)"
       }}
     >
-      <div style={{ marginBottom: "0.25rem", fontSize: "1.05rem", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+      <div style={{ marginBottom: "0.25rem", fontSize: "1.05rem", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--text-primary)" }}>
         D&D 4e Character Sheet
       </div>
       <div style={{ display: "flex", gap: "0.4rem", marginBottom: "0.5rem", flexWrap: "wrap" }}>
@@ -1131,7 +1149,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             </button>
           </div>
           <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "0.5rem", alignItems: "stretch" }}>
-            <div style={{ display: "grid", gap: "0.5rem", alignContent: "start" }}>
+            <div style={{ ...sectionInsetStyle, display: "grid", gap: "0.5rem", alignContent: "start" }}>
               <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.4rem", padding: "0.55rem", backgroundColor: "var(--surface-0)", display: "grid", gap: "0.35rem", boxShadow: "inset 0 0 0 1px var(--surface-2)" }}>
                 <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700 }}>
                   Character
@@ -1227,7 +1245,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 </div>
               </div>
             </div>
-            <div style={{ display: "grid", gap: "0.5rem", alignContent: "start" }}>
+            <div style={{ ...sectionInsetStyle, display: "grid", gap: "0.5rem", alignContent: "start" }}>
               <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.5rem", backgroundColor: "var(--surface-0)" }}>
                 <h3 style={sectionTitleStyle}>Feats</h3>
                 <div style={{ marginTop: "0.25rem", display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: "0.18rem" }}>
@@ -1267,7 +1285,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 </div>
               </div>
             </div>
-            <div style={{ display: "grid", gap: "0.5rem", alignContent: "start" }}>
+            <div style={{ ...sectionInsetStyle, display: "grid", gap: "0.5rem", alignContent: "start" }}>
               <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.5rem", backgroundColor: "var(--surface-0)" }}>
                 <h3
                   style={sectionTitleStyle}
@@ -1319,34 +1337,35 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               </div>
             </div>
           </div>
-          <div style={{ gridColumn: "1 / -1" }}>
+          <div style={{ ...sectionInsetStyle, gridColumn: "1 / -1" }}>
             {renderStatusPanel()}
           </div>
           {(["atWill", "encounter", "daily"] as const).map((bucket) => (
-            <div key={bucket} style={{ ...panelStyle, gridColumn: "1 / -1" }}>
-              <div
-                onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `powerUsage:${bucket}`)}
-                onMouseLeave={leaveGlossaryHoverInfo}
-                style={{
-                  fontWeight: 700,
-                  marginBottom: "0.35rem",
-                  borderLeft: `5px solid ${usageAccentColor(bucket)}`,
-                  paddingLeft: "0.45rem",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                  color: "var(--text-primary)"
-                }}
-              >
-                {bucket === "atWill" ? "At-Will" : bucket === "encounter" ? "Encounter" : "Daily"}
-              </div>
-              {(() => {
-                const orderedBucketPowers = getOrderedBucketPowers(groupedPowers[bucket]);
-                const usedSet = new Set(sheet.powers.expendedPowerIds);
-                return orderedBucketPowers.length === 0 ? (
-                <div style={{ color: "var(--text-muted)" }}>No cards selected.</div>
-              ) : (
-                <div style={{ display: "grid", gap: "0.4rem", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", alignItems: "stretch" }}>
-                  {orderedBucketPowers.map((power) => {
+            <div key={bucket} style={{ ...sectionInsetStyle, gridColumn: "1 / -1" }}>
+              <div style={panelStyle}>
+                <div
+                  onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `powerUsage:${bucket}`)}
+                  onMouseLeave={leaveGlossaryHoverInfo}
+                  style={{
+                    fontWeight: 700,
+                    marginBottom: "0.35rem",
+                    borderLeft: `5px solid ${usageAccentColor(bucket)}`,
+                    paddingLeft: "0.45rem",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    color: "var(--text-primary)"
+                  }}
+                >
+                  {bucket === "atWill" ? "At-Will" : bucket === "encounter" ? "Encounter" : "Daily"}
+                </div>
+                {(() => {
+                  const orderedBucketPowers = getOrderedBucketPowers(groupedPowers[bucket]);
+                  const usedSet = new Set(sheet.powers.expendedPowerIds);
+                  return orderedBucketPowers.length === 0 ? (
+                  <div style={{ color: "var(--text-muted)" }}>No cards selected.</div>
+                ) : (
+                  <div style={{ display: "grid", gap: "0.4rem", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", alignItems: "stretch" }}>
+                    {orderedBucketPowers.map((power) => {
                     const accent = usageAccentCardStyle(bucket);
                     const expended = usedSet.has(power.id);
                     const canExpend = bucket === "encounter" || bucket === "daily";
@@ -1530,9 +1549,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                       </div>
                       );
                     })}
-                </div>
-              );
-              })()}
+                  </div>
+                );
+                })()}
+              </div>
             </div>
           ))}
           {showRaceHoverInfo && derived.race && raceHoverPanelPos && (
@@ -1805,7 +1825,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
 
       <div style={{ marginTop: "0.75rem", border: "1px solid var(--panel-border)", borderRadius: "0.35rem", backgroundColor: "var(--surface-0)", padding: "0.5rem" }}>
         <details>
-          <summary style={{ cursor: "pointer", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--text-primary)" }}>
+          <summary style={jsonSummaryStyle}>
             JSON
           </summary>
           <div style={{ marginTop: "0.45rem", display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>

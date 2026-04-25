@@ -27,8 +27,8 @@ import {
 const panelStyle: CSSProperties = {
   backgroundColor: "var(--surface-0)",
   border: "1px solid var(--panel-border)",
-  borderRadius: "0.35rem",
-  boxShadow: "0 1px 2px rgba(40, 30, 10, 0.08)"
+  borderRadius: "var(--ui-panel-radius, 0.35rem)",
+  boxShadow: "var(--ui-panel-shadow, 0 1px 2px rgba(40, 30, 10, 0.08))"
 };
 
 const sheetPanel: CSSProperties = {
@@ -66,6 +66,21 @@ const bodySecondary: CSSProperties = { fontSize: "0.8rem", color: "var(--text-se
 const metaMuted: CSSProperties = { fontSize: "0.78rem", color: "var(--text-muted)" };
 const metaSecondary: CSSProperties = { fontSize: "0.78rem", color: "var(--text-secondary)" };
 const captionMuted: CSSProperties = { fontSize: "0.74rem", color: "var(--text-muted)" };
+const detailsSummaryStyle: CSSProperties = {
+  cursor: "pointer",
+  fontSize: "0.82rem",
+  fontWeight: 700,
+  letterSpacing: "0.04em",
+  textTransform: "uppercase",
+  color: "var(--text-secondary)"
+};
+const jsonSummaryStyle: CSSProperties = {
+  cursor: "pointer",
+  fontWeight: 700,
+  letterSpacing: "0.04em",
+  textTransform: "uppercase",
+  color: "var(--text-primary)"
+};
 
 const secondaryAttackTitleStyle: CSSProperties = {
   fontSize: "0.78rem",
@@ -101,10 +116,10 @@ const indexColumnHeaderStyle: CSSProperties = {
 
 const statPanelStyle: CSSProperties = {
   border: "1px solid var(--panel-border)",
-  borderRadius: "0.35rem",
+  borderRadius: "var(--ui-panel-radius, 0.35rem)",
   padding: "0.5rem",
   backgroundColor: "var(--surface-0)",
-  boxShadow: "0 1px 2px rgba(40, 30, 10, 0.08)"
+  boxShadow: "var(--ui-panel-shadow, 0 1px 2px rgba(40, 30, 10, 0.08))"
 };
 
 const glossaryLinkUnderline: CSSProperties = {
@@ -2103,7 +2118,7 @@ export function MonsterEditorApp({
                             </div>
                             {isRenderableCardValue(description) ? (
                               <details style={{ marginTop: "0.22rem" }}>
-                                <summary style={{ cursor: "pointer", ...metaSecondary }}>Description</summary>
+                                <summary style={detailsSummaryStyle}>Description</summary>
                                 <div style={{ fontSize: "0.8rem", color: "var(--text-primary)", margin: "0.24rem 0 0 0", whiteSpace: "pre-wrap" }}>
                                   {renderGlossaryAwareText(
                                     description,
@@ -2435,7 +2450,7 @@ export function MonsterEditorApp({
 
       <div style={{ marginTop: "0.85rem", ...panelStyle, padding: "0.55rem" }}>
         <details>
-          <summary style={{ cursor: "pointer", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--text-primary)" }}>
+          <summary style={jsonSummaryStyle}>
             JSON
           </summary>
           <div style={{ marginTop: "0.5rem", display: "flex", flexWrap: "wrap", gap: "0.35rem", alignItems: "center" }}>
