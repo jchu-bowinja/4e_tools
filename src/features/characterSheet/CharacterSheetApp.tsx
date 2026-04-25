@@ -591,7 +591,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     glossaryHoverTimerRef.current = window.setTimeout(() => {
       setShowGlossaryHoverInfo(true);
       glossaryHoverTimerRef.current = null;
-    }, 1000);
+    }, 1200);
   }
 
   function leaveGlossaryHoverInfo(): void {
@@ -793,10 +793,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   }
 
   function renderHitPointsPanel(): JSX.Element {
-    const isBloodied = sheet.resources.currentHp <= derived.bloodied;
-    const isDead = sheet.resources.currentHp <= -derived.bloodied || sheet.resources.deathSaves >= 3;
-    const isDying = sheet.resources.currentHp <= 0 && !isDead;
-
     return (
       <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.5rem", backgroundColor: "var(--surface-0)", display: "grid", gap: "0.35rem" }}>
         <div
@@ -832,37 +828,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 }}
               />
               <span style={{ fontWeight: 700, color: "var(--text-secondary)" }}>/ {derived.maxHp}</span>
-              {(isBloodied || isDying || isDead) && (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem", marginLeft: "0.15rem" }}>
-                  {isBloodied && (
-                    <div
-                      onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "bloodied")}
-                      onMouseLeave={leaveGlossaryHoverInfo}
-                      style={conditionBadgeStyle("bloodied")}
-                    >
-                      {conditionDisplayLabel("Bloodied")}
-                    </div>
-                  )}
-                  {isDying && (
-                    <div
-                      onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "dying")}
-                      onMouseLeave={leaveGlossaryHoverInfo}
-                      style={conditionBadgeStyle("dying")}
-                    >
-                      {conditionDisplayLabel("Dying")}
-                    </div>
-                  )}
-                  {isDead && (
-                    <div
-                      onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "dead")}
-                      onMouseLeave={leaveGlossaryHoverInfo}
-                      style={conditionBadgeStyle("dead")}
-                    >
-                      {conditionDisplayLabel("Dead")}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           </label>
           <label
@@ -886,16 +851,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               }
               style={{ width: numericInputWidthCh(sheet.resources.tempHp), textAlign: "center" }}
             />
-          </label>
-          <label
-            style={{ ...labelStyle, padding: "0.28rem 0.35rem", border: "1px solid var(--panel-border)", borderRadius: "0.3rem", backgroundColor: "var(--surface-0)" }}
-            onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "initiative")}
-            onMouseLeave={leaveGlossaryHoverInfo}
-          >
-            Initiative
-            <div style={{ fontWeight: 700, color: "var(--text-primary)", fontSize: "0.88rem", textTransform: "none", letterSpacing: "normal", textAlign: "left" }}>
-              {derived.initiative >= 0 ? `+${derived.initiative}` : derived.initiative}
-            </div>
           </label>
           <label
             style={{ ...labelStyle, padding: "0.28rem 0.35rem", border: "1px solid var(--panel-border)", borderRadius: "0.3rem", backgroundColor: "var(--surface-1)" }}
@@ -945,22 +900,61 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               }
             />
           </label>
-          <label
-            style={{ ...labelStyle, padding: "0.28rem 0.35rem", border: "1px solid var(--panel-border)", borderRadius: "0.3rem", backgroundColor: "var(--surface-1)" }}
-            onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "speed")}
-            onMouseLeave={leaveGlossaryHoverInfo}
-          >
-            Speed
-            <div style={{ fontWeight: 700, color: "var(--text-primary)", fontSize: "0.88rem", textTransform: "none", letterSpacing: "normal", textAlign: "left" }}>
-              {derived.speed}
+        </div>
+      </div>
+    );
+  }
+
+  function renderSpeedInitiativePanel(): JSX.Element {
+    return (
+      <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.4rem", backgroundColor: "var(--surface-0)" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr auto", rowGap: "0.2rem", columnGap: "0.5rem", fontVariantNumeric: "tabular-nums" }}>
+          {[
+            { key: "speed" as const, label: "Speed", value: derived.speed },
+            {
+              key: "initiative" as const,
+              label: "Initiative",
+              value: derived.initiative >= 0 ? `+${derived.initiative}` : String(derived.initiative)
+            }
+          ].map((item, idx) => (
+            <div key={item.key} style={{ display: "contents" }}>
+              <span
+                onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, item.key)}
+                onMouseLeave={leaveGlossaryHoverInfo}
+                style={{
+                  padding: "0.16rem 0.35rem",
+                  borderRadius: "0.25rem",
+                  backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)",
+                  color: "var(--text-primary)"
+                }}
+              >
+                {item.label}
+              </span>
+              <strong
+                onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, item.key)}
+                onMouseLeave={leaveGlossaryHoverInfo}
+                style={{
+                  padding: "0.16rem 0.35rem",
+                  borderRadius: "0.25rem",
+                  textAlign: "right",
+                  backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)",
+                  color: "var(--text-primary)"
+                }}
+              >
+                {item.value}
+              </strong>
             </div>
-          </label>
+          ))}
         </div>
       </div>
     );
   }
 
   function renderConditionsPanel(): JSX.Element {
+    const isBloodied = sheet.resources.currentHp <= derived.bloodied;
+    const isDead = sheet.resources.currentHp <= -derived.bloodied || sheet.resources.deathSaves >= 3;
+    const isDying = sheet.resources.currentHp <= 0 && !isDead;
+
     return (
       <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", backgroundColor: "var(--surface-1)", padding: "0.4rem", display: "grid", gap: "0.25rem", alignContent: "start" }}>
         <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700 }}>
@@ -1014,6 +1008,37 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             </button>
           )}
         </div>
+        {(isBloodied || isDying || isDead) && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem" }}>
+            {isBloodied && (
+              <div
+                onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "bloodied")}
+                onMouseLeave={leaveGlossaryHoverInfo}
+                style={conditionBadgeStyle("bloodied")}
+              >
+                {conditionDisplayLabel("Bloodied")}
+              </div>
+            )}
+            {isDying && (
+              <div
+                onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "dying")}
+                onMouseLeave={leaveGlossaryHoverInfo}
+                style={conditionBadgeStyle("dying")}
+              >
+                {conditionDisplayLabel("Dying")}
+              </div>
+            )}
+            {isDead && (
+              <div
+                onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "dead")}
+                onMouseLeave={leaveGlossaryHoverInfo}
+                style={conditionBadgeStyle("dead")}
+              >
+                {conditionDisplayLabel("Dead")}
+              </div>
+            )}
+          </div>
+        )}
         {sheet.resources.conditions.length === 0 && (
           <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>None</div>
         )}
@@ -1116,13 +1141,13 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
 
   function renderStatusPanel(): JSX.Element {
     return (
-      <div style={{ border: "1px solid var(--panel-border-strong)", borderRadius: "0.35rem", backgroundColor: "var(--surface-0)", padding: "0.5rem", display: "grid", gap: "0.45rem" }}>
-        <h3 style={sectionTitleStyle}>Status</h3>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "0.45rem", alignItems: "start" }}>
-          {renderHitPointsPanel()}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "0.45rem", alignItems: "start" }}>
+        {renderHitPointsPanel()}
+        <div style={{ display: "grid", gap: "0.45rem", alignContent: "start" }}>
+          {renderSpeedInitiativePanel()}
           {renderDefensesPanel()}
-          {renderConditionsPanel()}
         </div>
+        {renderConditionsPanel()}
       </div>
     );
   }
@@ -1137,7 +1162,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     raceHoverTimerRef.current = window.setTimeout(() => {
       setShowRaceHoverInfo(true);
       raceHoverTimerRef.current = null;
-    }, 1000);
+    }, 1200);
   }
 
   function stopRaceHoverInfoTimerAndHide(): void {
@@ -1159,7 +1184,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     classHoverTimerRef.current = window.setTimeout(() => {
       setShowClassHoverInfo(true);
       classHoverTimerRef.current = null;
-    }, 1000);
+    }, 1200);
   }
 
   function stopClassHoverInfoTimerAndHide(): void {
