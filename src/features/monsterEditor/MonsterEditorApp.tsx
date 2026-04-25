@@ -133,6 +133,28 @@ const microLabelInteractive: CSSProperties = {
   width: "fit-content"
 };
 
+const MONSTER_SELECTED_ID_STORAGE_KEY = "monsterEditor.selectedId";
+
+function readStoredSelectedMonsterId(): string {
+  try {
+    return window.localStorage.getItem(MONSTER_SELECTED_ID_STORAGE_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function writeStoredSelectedMonsterId(id: string): void {
+  try {
+    if (id.trim()) {
+      window.localStorage.setItem(MONSTER_SELECTED_ID_STORAGE_KEY, id);
+    } else {
+      window.localStorage.removeItem(MONSTER_SELECTED_ID_STORAGE_KEY);
+    }
+  } catch {
+    // Ignore storage failures and keep app behavior in-memory.
+  }
+}
+
 const identityValueStyle: CSSProperties = {
   fontWeight: 700,
   fontSize: "0.8rem",
@@ -1014,6 +1036,8 @@ const traitDetailGlossaryPhrases: string[] = [
   "prone",
   "marked",
   "grabbed",
+  "insubstantial",
+  "phasing",
   "charge attack",
   "charge",
   "shift",
@@ -1090,12 +1114,12 @@ export function MonsterEditorApp({
 }): JSX.Element {
   const [indexRows, setIndexRows] = useState<MonsterIndexEntry[]>([]);
   const [activeMonster, setActiveMonster] = useState<MonsterEntryFile | null>(null);
-  const [selectedId, setSelectedId] = useState<string>("");
+  const [selectedId, setSelectedId] = useState<string>(() => readStoredSelectedMonsterId());
   const [nameQuery, setNameQuery] = useState<string>("");
   const [levelQuery, setLevelQuery] = useState<string>("");
   const [roleQuery, setRoleQuery] = useState<string>("");
   const [leaderFilter, setLeaderFilter] = useState<"both" | "leader" | "notLeader">("both");
-  const [sortBy, setSortBy] = useState<"name" | "level">("name");
+  const [sortBy, setSortBy] = useState<"name" | "level">("level");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [message, setMessage] = useState<string>("Load monsters from generated JSON to begin.");
   const [isBusy, setIsBusy] = useState<boolean>(false);
@@ -1121,9 +1145,11 @@ export function MonsterEditorApp({
         const rows = await loadMonsterIndex();
         setIndexRows(rows);
         if (rows.length > 0) {
-          setSelectedId(rows[0].id);
+          const preferredId = selectedId && rows.some((row) => row.id === selectedId) ? selectedId : rows[0].id;
+          setSelectedId(preferredId);
           setMessage(`Loaded monster index (${rows.length} records).`);
         } else {
+          setSelectedId("");
           setMessage("Monster index is empty.");
         }
       } catch (error) {
@@ -1131,6 +1157,10 @@ export function MonsterEditorApp({
       }
     })();
   }, []);
+
+  useEffect(() => {
+    writeStoredSelectedMonsterId(selectedId);
+  }, [selectedId]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -1259,11 +1289,68 @@ export function MonsterEditorApp({
     return buckets;
   }, [activeMonster]);
 
+  const displayedAuras = useMemo(() => {
+    if (!activeMonster || !Array.isArray(activeMonster.auras)) return [];
+    return activeMonster.auras;
+  }, [activeMonster]);
+
+  const displayedTraits = useMemo(() => {
+    if (!activeMonster || !Array.isArray(activeMonster.traits)) return [];
+    const normalize = (value: unknown): string => String(value ?? "").trim().toLowerCase();
+    const auraSignatures = new Set(
+      displayedAuras.map((aura) =>
+        [normalize(aura.name), normalize(aura.range), normalize(aura.details)].join("||")
+      )
+    );
+    return activeMonster.traits.filter((trait) => {
+      const signature = [normalize(trait.name), normalize(trait.range), normalize(trait.details)].join("||");
+      return !auraSignatures.has(signature);
+    });
+  }, [activeMonster, displayedAuras]);
+
+  const auraHeadingColumnWidthCh = useMemo(() => {
+    if (displayedAuras.length === 0) return 12;
+    const longest = displayedAuras.reduce((max, aura) => {
+      const name = String(aura.name ?? "").trim() || "Aura";
+      const rangeValue = aura.range;
+      const rangeText =
+        rangeValue !== undefined && rangeValue !== null && String(rangeValue).trim() !== ""
+          ? ` • Range ${String(rangeValue).trim()}`
+          : "";
+      return Math.max(max, `${name}${rangeText}`.length);
+    }, 0);
+    return Math.max(10, Math.min(26, longest + 1));
+  }, [displayedAuras]);
+
+  const traitHeadingColumnWidthCh = useMemo(() => {
+    if (displayedTraits.length === 0) return 12;
+    const longest = displayedTraits.reduce((max, trait) => {
+      const name = String(trait.name ?? "").trim() || "Trait";
+      const rangeValue = trait.range;
+      const rangeText =
+        rangeValue !== undefined && rangeValue !== null && String(rangeValue).trim() !== ""
+          ? ` • Range ${String(rangeValue).trim()}`
+          : "";
+      return Math.max(max, `${name}${rangeText}`.length);
+    }, 0);
+    return Math.max(10, Math.min(26, longest + 1));
+  }, [displayedTraits]);
+
+  const auraHasAnyTags = useMemo(
+    () => displayedAuras.some((aura) => renderTraitMetaBadges(aura).length > 0),
+    [displayedAuras]
+  );
+  const traitHasAnyTags = useMemo(
+    () => displayedTraits.some((trait) => renderTraitMetaBadges(trait).length > 0),
+    [displayedTraits]
+  );
+
   const rawJsonText = useMemo(() => JSON.stringify(activeMonster, null, 2), [activeMonster]);
   const jsonSearchMatches = useMemo(
     () => findCaseInsensitiveMatches(rawJsonText, jsonSearchQuery),
     [rawJsonText, jsonSearchQuery]
   );
+  const lastHandledJsonSearchJumpTickRef = useRef<number>(0);
   const glossaryResolutionCacheRef = useRef<Map<string, boolean>>(new Map());
 
   useEffect(() => {
@@ -1272,6 +1359,8 @@ export function MonsterEditorApp({
 
   useEffect(() => {
     if (jsonSearchJumpTick === 0) return;
+    if (lastHandledJsonSearchJumpTickRef.current === jsonSearchJumpTick) return;
+    lastHandledJsonSearchJumpTickRef.current = jsonSearchJumpTick;
     if (!jsonSearchQuery.trim()) return;
     if (jsonSearchMatches.length === 0) return;
     const textarea = jsonTextareaRef.current;
@@ -1410,8 +1499,11 @@ export function MonsterEditorApp({
             void loadMonsterIndex()
               .then((rows) => {
                 setIndexRows(rows);
-                if (!selectedId && rows.length > 0) {
-                  setSelectedId(rows[0].id);
+                if (rows.length > 0) {
+                  const preferredId = selectedId && rows.some((row) => row.id === selectedId) ? selectedId : rows[0].id;
+                  setSelectedId(preferredId);
+                } else {
+                  setSelectedId("");
                 }
                 setMessage(`Reloaded generated index (${rows.length} records).`);
               })
@@ -1632,6 +1724,22 @@ export function MonsterEditorApp({
                 </div>
                 <div style={{ border: "1px solid var(--panel-border)", borderRadius: 6, padding: "0.6rem", background: "var(--surface-1)" }}>
                   <div
+                    onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Level")}
+                    onMouseLeave={leaveGlossaryHover}
+                    style={microLabelInteractive}
+                  >
+                    Level / XP
+                  </div>
+                  <div
+                    onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Level")}
+                    onMouseLeave={leaveGlossaryHover}
+                    style={identityValueInteractive}
+                  >
+                    {formatValue(activeMonster.level)} / {formatValue(activeMonster.xp)}
+                  </div>
+                </div>
+                <div style={{ border: "1px solid var(--panel-border)", borderRadius: 6, padding: "0.6rem", background: "var(--surface-1)" }}>
+                  <div
                     onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Role")}
                     onMouseLeave={leaveGlossaryHover}
                     style={microLabelInteractive}
@@ -1657,22 +1765,6 @@ export function MonsterEditorApp({
                         Leader
                       </span>
                     ) : null}
-                  </div>
-                </div>
-                <div style={{ border: "1px solid var(--panel-border)", borderRadius: 6, padding: "0.6rem", background: "var(--surface-1)" }}>
-                  <div
-                    onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Level")}
-                    onMouseLeave={leaveGlossaryHover}
-                    style={microLabelInteractive}
-                  >
-                    Level / XP
-                  </div>
-                  <div
-                    onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Level")}
-                    onMouseLeave={leaveGlossaryHover}
-                    style={identityValueInteractive}
-                  >
-                    {formatValue(activeMonster.level)} / {formatValue(activeMonster.xp)}
                   </div>
                 </div>
                 <div style={{ border: "1px solid var(--panel-border)", borderRadius: 6, padding: "0.6rem", background: "var(--surface-1)" }}>
@@ -1894,12 +1986,22 @@ export function MonsterEditorApp({
                 </div>
               ) : null}
 
-              {Array.isArray(activeMonster.auras) && activeMonster.auras.length > 0 ? (
+              {displayedAuras.length > 0 ? (
                 <div style={{ ...panelStyle, padding: "0.5rem", marginBottom: "0.75rem" }}>
                   <h3 style={sectionTitleStyle}>Auras</h3>
                   <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.2rem" }}>
-                    {activeMonster.auras.map((aura, idx) => (
-                      <div key={`aura-${idx}`} style={{ ...bodyPrimary, display: "grid", gap: "0.2rem" }}>
+                    {displayedAuras.map((aura, idx) => (
+                      <div
+                        key={`aura-${idx}`}
+                        style={{
+                          ...bodyPrimary,
+                          display: "grid",
+                          gap: "0.2rem",
+                          padding: "0.22rem 0.35rem",
+                          borderRadius: "0.25rem",
+                          backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)"
+                        }}
+                      >
                         <div>
                           {(() => {
                             const name = String(aura.name ?? "").trim();
@@ -1909,65 +2011,140 @@ export function MonsterEditorApp({
                               rangeValue !== undefined && rangeValue !== null && String(rangeValue).trim() !== ""
                                 ? `Range ${String(rangeValue).trim()}`
                                 : "";
-                            const heading = [name, rangeText].filter(Boolean).join(" • ");
                             const detailParts = splitByGlossaryPhrases(details, traitDetailGlossaryPhrases);
+                            const badges = renderTraitMetaBadges(aura);
+                            const stripeColor = idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)";
                             return (
-                              <>
-                                {heading ? `${heading}: ` : ""}
-                                {detailParts.map((part, partIdx) =>
-                                  part.glossaryTerm && shouldHighlightGlossaryTerm(part.glossaryTerm) ? (
-                                    <span
-                                      key={`aura-${idx}-detail-${partIdx}`}
-                                      onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${part.glossaryTerm}`)}
-                                      onMouseLeave={leaveGlossaryHover}
-                                      style={glossaryLinkUnderline}
-                                    >
-                                      {part.text}
+                              <div
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns: auraHasAnyTags
+                                    ? `minmax(10rem, ${auraHeadingColumnWidthCh}ch) 1px max-content 1px minmax(0, 1fr)`
+                                    : `minmax(10rem, ${auraHeadingColumnWidthCh}ch) 1px minmax(0, 1fr)`,
+                                  columnGap: "0.18rem",
+                                  alignItems: "start"
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    padding: "0.2rem 0.35rem",
+                                    borderRadius: "0.25rem",
+                                    backgroundColor: stripeColor,
+                                    fontWeight: 600,
+                                    lineHeight: 1.25
+                                  }}
+                                >
+                                  <div style={{ display: "grid", gap: "0.08rem" }}>
+                                    <strong>{name || "Aura"}</strong>
+                                    {rangeText ? (
+                                      <span
+                                        onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:range")}
+                                        onMouseLeave={leaveGlossaryHover}
+                                        style={{
+                                          color: "var(--text-secondary)",
+                                          fontSize: "0.76rem",
+                                          fontWeight: 600,
+                                          width: "fit-content",
+                                          ...(shouldHighlightGlossaryTerm("range") ? glossaryLinkUnderline : {})
+                                        }}
+                                      >
+                                        {rangeText}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                </span>
+                                <span
+                                  aria-hidden="true"
+                                  style={{
+                                    alignSelf: "stretch",
+                                    justifySelf: "center",
+                                    width: "1px",
+                                    backgroundColor: "var(--panel-border)"
+                                  }}
+                                />
+                                {auraHasAnyTags ? (
+                                  <>
+                                    <span style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem", paddingTop: "0.12rem" }}>
+                                      {badges.length > 0
+                                        ? badges.map((badge) =>
+                                        shouldHighlightGlossaryTerm(badge) ? (
+                                          <span
+                                            key={`aura-${idx}-${badge}`}
+                                            onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${badge}`)}
+                                            onMouseLeave={leaveGlossaryHover}
+                                            style={sheetTagPillStyle}
+                                          >
+                                            {badge}
+                                          </span>
+                                        ) : (
+                                          <span key={`aura-${idx}-${badge}`} style={{ ...sheetTagPillStyle, cursor: "default" }}>
+                                            {badge}
+                                          </span>
+                                        )
+                                      )
+                                        : null}
                                     </span>
-                                  ) : (
-                                    <span key={`aura-${idx}-detail-${partIdx}`}>{part.text}</span>
-                                  )
-                                )}
-                              </>
+                                    <span
+                                      aria-hidden="true"
+                                      style={{
+                                        alignSelf: "stretch",
+                                        justifySelf: "center",
+                                        width: "1px",
+                                        backgroundColor: "var(--panel-border)"
+                                      }}
+                                    />
+                                  </>
+                                ) : null}
+                                <span
+                                  style={{
+                                    padding: "0.2rem 0.32rem",
+                                    borderRadius: "0.25rem",
+                                    backgroundColor: stripeColor,
+                                    minHeight: "1.5rem",
+                                    lineHeight: 1.25
+                                  }}
+                                >
+                                  {detailParts.map((part, partIdx) =>
+                                    part.glossaryTerm && shouldHighlightGlossaryTerm(part.glossaryTerm) ? (
+                                      <span
+                                        key={`aura-${idx}-detail-${partIdx}`}
+                                        onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${part.glossaryTerm}`)}
+                                        onMouseLeave={leaveGlossaryHover}
+                                        style={glossaryLinkUnderline}
+                                      >
+                                        {part.text}
+                                      </span>
+                                    ) : (
+                                      <span key={`aura-${idx}-detail-${partIdx}`}>{part.text}</span>
+                                    )
+                                  )}
+                                </span>
+                              </div>
                             );
                           })()}
                         </div>
-                        {(() => {
-                          const badges = renderTraitMetaBadges(aura);
-                          if (badges.length === 0) return null;
-                          return (
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
-                              {badges.map((badge) => (
-                                shouldHighlightGlossaryTerm(badge) ? (
-                                  <span
-                                    key={`aura-${idx}-${badge}`}
-                                    onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${badge}`)}
-                                    onMouseLeave={leaveGlossaryHover}
-                                    style={sheetTagPillStyle}
-                                  >
-                                    {badge}
-                                  </span>
-                                ) : (
-                                  <span key={`aura-${idx}-${badge}`} style={{ ...sheetTagPillStyle, cursor: "default" }}>
-                                    {badge}
-                                  </span>
-                                )
-                              ))}
-                            </div>
-                          );
-                        })()}
                       </div>
                     ))}
                   </div>
                 </div>
               ) : null}
 
-              {Array.isArray(activeMonster.traits) && activeMonster.traits.length > 0 ? (
+              {displayedTraits.length > 0 ? (
                 <div style={{ ...panelStyle, padding: "0.5rem", marginBottom: "0.75rem" }}>
                   <h3 style={sectionTitleStyle}>Traits</h3>
                   <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.2rem" }}>
-                    {activeMonster.traits.map((trait, idx) => (
-                      <div key={`trait-${idx}`} style={{ ...bodyPrimary, display: "grid", gap: "0.2rem" }}>
+                    {displayedTraits.map((trait, idx) => (
+                      <div
+                        key={`trait-${idx}`}
+                        style={{
+                          ...bodyPrimary,
+                          display: "grid",
+                          gap: "0.2rem",
+                          padding: "0.22rem 0.35rem",
+                          borderRadius: "0.25rem",
+                          backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)"
+                        }}
+                      >
                         <div>
                           {(() => {
                             const name = String(trait.name ?? "").trim();
@@ -1977,53 +2154,118 @@ export function MonsterEditorApp({
                               rangeValue !== undefined && rangeValue !== null && String(rangeValue).trim() !== ""
                                 ? `Range ${String(rangeValue).trim()}`
                                 : "";
-                            const heading = [name, rangeText].filter(Boolean).join(" • ");
                             const detailParts = splitByGlossaryPhrases(details, traitDetailGlossaryPhrases);
+                            const badges = renderTraitMetaBadges(trait);
+                            const stripeColor = idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)";
                             return (
-                              <>
-                                {heading ? `${heading}: ` : ""}
-                                {detailParts.map((part, partIdx) =>
-                                  part.glossaryTerm && shouldHighlightGlossaryTerm(part.glossaryTerm) ? (
-                                    <span
-                                      key={`trait-${idx}-detail-${partIdx}`}
-                                      onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${part.glossaryTerm}`)}
-                                      onMouseLeave={leaveGlossaryHover}
-                                      style={glossaryLinkUnderline}
-                                    >
-                                      {part.text}
+                              <div
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns: traitHasAnyTags
+                                    ? `minmax(10rem, ${traitHeadingColumnWidthCh}ch) 1px max-content 1px minmax(0, 1fr)`
+                                    : `minmax(10rem, ${traitHeadingColumnWidthCh}ch) 1px minmax(0, 1fr)`,
+                                  columnGap: "0.18rem",
+                                  alignItems: "start"
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    padding: "0.2rem 0.35rem",
+                                    borderRadius: "0.25rem",
+                                    backgroundColor: stripeColor,
+                                    fontWeight: 600,
+                                    lineHeight: 1.25
+                                  }}
+                                >
+                                  <div style={{ display: "grid", gap: "0.08rem" }}>
+                                    <strong>{name || "Trait"}</strong>
+                                    {rangeText ? (
+                                      <span
+                                        onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:range")}
+                                        onMouseLeave={leaveGlossaryHover}
+                                        style={{
+                                          color: "var(--text-secondary)",
+                                          fontSize: "0.76rem",
+                                          fontWeight: 600,
+                                          width: "fit-content",
+                                          ...(shouldHighlightGlossaryTerm("range") ? glossaryLinkUnderline : {})
+                                        }}
+                                      >
+                                        {rangeText}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                </span>
+                                <span
+                                  aria-hidden="true"
+                                  style={{
+                                    alignSelf: "stretch",
+                                    justifySelf: "center",
+                                    width: "1px",
+                                    backgroundColor: "var(--panel-border)"
+                                  }}
+                                />
+                                {traitHasAnyTags ? (
+                                  <>
+                                    <span style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem", paddingTop: "0.12rem" }}>
+                                      {badges.length > 0
+                                        ? badges.map((badge) =>
+                                        shouldHighlightGlossaryTerm(badge) ? (
+                                          <span
+                                            key={`trait-${idx}-${badge}`}
+                                            onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${badge}`)}
+                                            onMouseLeave={leaveGlossaryHover}
+                                            style={sheetTagPillStyle}
+                                          >
+                                            {badge}
+                                          </span>
+                                        ) : (
+                                          <span key={`trait-${idx}-${badge}`} style={{ ...sheetTagPillStyle, cursor: "default" }}>
+                                            {badge}
+                                          </span>
+                                        )
+                                      )
+                                        : null}
                                     </span>
-                                  ) : (
-                                    <span key={`trait-${idx}-detail-${partIdx}`}>{part.text}</span>
-                                  )
-                                )}
-                              </>
+                                    <span
+                                      aria-hidden="true"
+                                      style={{
+                                        alignSelf: "stretch",
+                                        justifySelf: "center",
+                                        width: "1px",
+                                        backgroundColor: "var(--panel-border)"
+                                      }}
+                                    />
+                                  </>
+                                ) : null}
+                                <span
+                                  style={{
+                                    padding: "0.2rem 0.32rem",
+                                    borderRadius: "0.25rem",
+                                    backgroundColor: stripeColor,
+                                    minHeight: "1.5rem",
+                                    lineHeight: 1.25
+                                  }}
+                                >
+                                  {detailParts.map((part, partIdx) =>
+                                    part.glossaryTerm && shouldHighlightGlossaryTerm(part.glossaryTerm) ? (
+                                      <span
+                                        key={`trait-${idx}-detail-${partIdx}`}
+                                        onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${part.glossaryTerm}`)}
+                                        onMouseLeave={leaveGlossaryHover}
+                                        style={glossaryLinkUnderline}
+                                      >
+                                        {part.text}
+                                      </span>
+                                    ) : (
+                                      <span key={`trait-${idx}-detail-${partIdx}`}>{part.text}</span>
+                                    )
+                                  )}
+                                </span>
+                              </div>
                             );
                           })()}
                         </div>
-                        {(() => {
-                          const badges = renderTraitMetaBadges(trait);
-                          if (badges.length === 0) return null;
-                          return (
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
-                              {badges.map((badge) => (
-                                shouldHighlightGlossaryTerm(badge) ? (
-                                  <span
-                                    key={`trait-${idx}-${badge}`}
-                                    onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${badge}`)}
-                                    onMouseLeave={leaveGlossaryHover}
-                                    style={sheetTagPillStyle}
-                                  >
-                                    {badge}
-                                  </span>
-                                ) : (
-                                  <span key={`trait-${idx}-${badge}`} style={{ ...sheetTagPillStyle, cursor: "default" }}>
-                                    {badge}
-                                  </span>
-                                )
-                              ))}
-                            </div>
-                          );
-                        })()}
                       </div>
                     ))}
                   </div>
@@ -2039,7 +2281,11 @@ export function MonsterEditorApp({
                         const name = String(sense.name ?? "").trim();
                         const range = sense.range;
                         if (!name) return "";
-                        return range !== undefined && range !== null && range !== "" ? `${name} ${range}` : name;
+                        const displayName = name.charAt(0).toUpperCase() + name.slice(1);
+                        const normalizedRange = String(range ?? "").trim();
+                        return normalizedRange !== "" && normalizedRange !== "0"
+                          ? `${displayName} ${normalizedRange}`
+                          : displayName;
                       })
                       .filter(Boolean)
                       .map((line, idx) => (
@@ -2051,7 +2297,7 @@ export function MonsterEditorApp({
                           onMouseLeave={leaveGlossaryHover}
                           style={{ ...bodyPrimary, ...glossaryLinkUnderline, width: "fit-content" }}
                         >
-                          {line}
+                          <strong>{line}</strong>
                         </div>
                       ))}
                   </div>

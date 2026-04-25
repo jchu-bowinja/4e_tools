@@ -24,6 +24,28 @@ const fieldSurface: CSSProperties = {
   borderRadius: "6px"
 };
 
+const GLOSSARY_SELECTED_TERM_ID_STORAGE_KEY = "glossaryEditor.selectedTermId";
+
+function readStoredSelectedTermId(): string {
+  try {
+    return window.localStorage.getItem(GLOSSARY_SELECTED_TERM_ID_STORAGE_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function writeStoredSelectedTermId(id: string): void {
+  try {
+    if (id.trim()) {
+      window.localStorage.setItem(GLOSSARY_SELECTED_TERM_ID_STORAGE_KEY, id);
+    } else {
+      window.localStorage.removeItem(GLOSSARY_SELECTED_TERM_ID_STORAGE_KEY);
+    }
+  } catch {
+    // Ignore storage failures and keep selection in-memory.
+  }
+}
+
 function newTermRow(): GlossaryTermRow {
   return {
     id: `glossary_custom_${Date.now()}`,
@@ -55,6 +77,7 @@ function sanitizeAliases(aliases: string[] | null | undefined): string[] {
 export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Props): JSX.Element {
   const [search, setSearch] = useState("");
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [storedSelectedTermId, setStoredSelectedTermId] = useState<string>(() => readStoredSelectedTermId());
   const [message, setMessage] = useState("");
   const [resetBusy, setResetBusy] = useState(false);
   const [aliasesDraft, setAliasesDraft] = useState("");
@@ -86,6 +109,20 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
       setSelectedIndex(null);
     }
   }, [rows.length, selectedIndex]);
+
+  useEffect(() => {
+    if (!storedSelectedTermId) return;
+    const matchIndex = rows.findIndex((row) => String(row.id ?? "") === storedSelectedTermId);
+    if (matchIndex >= 0 && matchIndex !== selectedIndex) {
+      setSelectedIndex(matchIndex);
+    }
+  }, [rows, selectedIndex, storedSelectedTermId]);
+
+  useEffect(() => {
+    const selectedId = selectedIndex != null && selectedIndex < rows.length ? String(rows[selectedIndex]?.id ?? "") : "";
+    setStoredSelectedTermId(selectedId);
+    writeStoredSelectedTermId(selectedId);
+  }, [rows, selectedIndex]);
 
   const selected = selectedIndex != null && selectedIndex < rows.length ? rows[selectedIndex] : null;
 

@@ -1,11 +1,10 @@
 # TODO: Monster Power Cards
 
-- [ ] Handling monster nested attack
-  - Current card rendering uses the primary attack (`attacks[0]`) for compact lines and nested outcome text, but we intentionally rolled back full rendering of additional attacks (`attacks[1..n]`) for now.
-  - Investigation found nested attack details can appear in two forms:
-    - `nestedAttackDescriptions` text on an outcome (for example, secondary-target notes).
-    - Full additional attack entries with their own name/range/bonuses and hit/miss/effect blocks.
-  - Follow-up should design a compact, non-duplicative way to show secondary/nested attacks without reintroducing noisy duplicate lines.
+- [x] Handling monster nested attack
+  - Monster power cards now render compact nested attack details from both:
+    - `nestedAttackDescriptions` text on outcomes.
+    - Additional attack entries (`attacks[1..n]`) with their own name/range/bonuses and hit/miss/effect blocks.
+  - Rendering also deduplicates repeated outcome text between primary and secondary attack sections to reduce noise.
 
 - [ ] Improve ETL normalization for monster data
   - Standardize how source monster text is transformed into canonical fields so downstream rendering is less brittle.
@@ -13,3 +12,8 @@
 
 - [ ] Check for unrendered monster data (for example, traits)
   - Audit generated monster JSON against card output to identify fields that exist in data but are not rendered yet.
+
+- [ ] Move monster tooltip glossary matching away from hardcoded UI phrase lists
+  - Build description/details term matching from glossary data (term + aliases/subterms) instead of maintaining static phrase arrays in UI code.
+  - Keep a small UI fallback list for critical terms, but prefer glossary-driven coverage for speed of updates and consistency.
+  - Precompute/cache matcher artifacts (for example, sorted phrase regex or trie) so hover highlighting stays fast across large descriptions.
