@@ -17,6 +17,7 @@ import { canEquipItem, computeSheetDerivedData, groupCombatPowers, sheetStateFro
 import { loadCharacterSheetState, saveCharacterSheetState } from "./storage";
 import { normalizeTooltipTerm, resolveTooltipText } from "../../data/tooltipGlossary";
 import { positionFixedTooltip } from "../../ui/glossaryTooltipPosition";
+import { findCaseInsensitiveMatches, scrollTextareaToMatch } from "../../ui/jsonSearch";
 
 type SheetTab = "overview" | "inventory";
 
@@ -367,6 +368,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   } | null>(null);
   const [showGlossaryHoverInfo, setShowGlossaryHoverInfo] = useState(false);
   const [glossaryHoverKey, setGlossaryHoverKey] = useState<GlossaryKey | null>(null);
+  const [jsonSearchInput, setJsonSearchInput] = useState("");
+  const [jsonSearchQuery, setJsonSearchQuery] = useState("");
+  const [jsonSearchResultIdx, setJsonSearchResultIdx] = useState(0);
+  const [jsonSearchJumpTick, setJsonSearchJumpTick] = useState(0);
   const [glossaryHoverPanelPos, setGlossaryHoverPanelPos] = useState<{
     top: number;
     left: number;
@@ -376,6 +381,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   const classHoverTimerRef = useRef<number | null>(null);
   const glossaryHoverTimerRef = useRef<number | null>(null);
   const glossaryHoverCloseTimerRef = useRef<number | null>(null);
+  const jsonTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const lastHandledJsonSearchJumpTickRef = useRef(0);
   const GLOSSARY_HOVER_CLOSE_DELAY_MS = 400;
   const glossaryTermLookupCacheRef = useRef<Map<string, boolean>>(new Map());
 
@@ -383,6 +390,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   const groupedPowers = useMemo(() => groupCombatPowers(sheet, index), [sheet, index]);
   const rulesById = useMemo(() => buildRulesIdLookup(index), [index]);
   const expandedSheetJson = useMemo(() => JSON.stringify(expandJsonIds(sheet, rulesById), null, 2), [sheet, rulesById]);
+  const jsonSearchMatches = useMemo(
+    () => findCaseInsensitiveMatches(expandedSheetJson, jsonSearchQuery),
+    [expandedSheetJson, jsonSearchQuery]
+  );
   const abilityLoreByCode = useMemo(() => {
     const map = new Map<AbilityCode, { name: string; body?: string | null }>();
     for (const entry of index.abilityScores) {
@@ -421,6 +432,26 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   useEffect(() => {
     saveCharacterSheetState(sheet);
   }, [sheet]);
+
+  useEffect(() => {
+    setJsonSearchResultIdx(0);
+  }, [jsonSearchQuery, expandedSheetJson]);
+
+  useEffect(() => {
+    if (jsonSearchJumpTick === 0) return;
+    if (lastHandledJsonSearchJumpTickRef.current === jsonSearchJumpTick) return;
+    lastHandledJsonSearchJumpTickRef.current = jsonSearchJumpTick;
+    if (!jsonSearchQuery.trim()) return;
+    if (jsonSearchMatches.length === 0) return;
+    const textarea = jsonTextareaRef.current;
+    if (!textarea) return;
+    const safeIdx = Math.min(jsonSearchResultIdx, jsonSearchMatches.length - 1);
+    const start = jsonSearchMatches[safeIdx];
+    const end = start + jsonSearchQuery.trim().length;
+    textarea.focus();
+    textarea.setSelectionRange(start, end);
+    scrollTextareaToMatch(textarea, expandedSheetJson, start);
+  }, [expandedSheetJson, jsonSearchJumpTick, jsonSearchMatches, jsonSearchQuery, jsonSearchResultIdx]);
 
   useEffect(() => {
     return () => {
@@ -768,7 +799,13 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
 
     return (
       <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.5rem", backgroundColor: "var(--surface-0)", display: "grid", gap: "0.35rem" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.35rem" }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+            gap: "0.35rem"
+          }}
+        >
           <label
             style={{ ...labelStyle, padding: "0.28rem 0.35rem", border: "1px solid var(--panel-border)", borderRadius: "0.3rem", backgroundColor: "var(--surface-1)" }}
             onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "hp")}
@@ -829,6 +866,38 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             </div>
           </label>
           <label
+            style={{ ...labelStyle, padding: "0.28rem 0.35rem", border: "1px solid var(--panel-border)", borderRadius: "0.3rem", backgroundColor: "var(--surface-0)" }}
+            onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "tempHp")}
+            onMouseLeave={leaveGlossaryHoverInfo}
+          >
+            Temp HP
+            <input
+              type="number"
+              min={0}
+              value={sheet.resources.tempHp}
+              onChange={(e) =>
+                updateSheet((prev) => ({
+                  ...prev,
+                  resources: {
+                    ...prev.resources,
+                    tempHp: Math.max(0, Number(e.target.value) || 0)
+                  }
+                }))
+              }
+              style={{ width: numericInputWidthCh(sheet.resources.tempHp), textAlign: "center" }}
+            />
+          </label>
+          <label
+            style={{ ...labelStyle, padding: "0.28rem 0.35rem", border: "1px solid var(--panel-border)", borderRadius: "0.3rem", backgroundColor: "var(--surface-0)" }}
+            onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "initiative")}
+            onMouseLeave={leaveGlossaryHoverInfo}
+          >
+            Initiative
+            <div style={{ fontWeight: 700, color: "var(--text-primary)", fontSize: "0.88rem", textTransform: "none", letterSpacing: "normal", textAlign: "left" }}>
+              {derived.initiative >= 0 ? `+${derived.initiative}` : derived.initiative}
+            </div>
+          </label>
+          <label
             style={{ ...labelStyle, padding: "0.28rem 0.35rem", border: "1px solid var(--panel-border)", borderRadius: "0.3rem", backgroundColor: "var(--surface-1)" }}
             onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "surges")}
             onMouseLeave={leaveGlossaryHoverInfo}
@@ -858,38 +927,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             </div>
           </label>
           <label
-            style={{ ...labelStyle, padding: "0.28rem 0.35rem", border: "1px solid var(--panel-border)", borderRadius: "0.3rem", backgroundColor: "var(--surface-1)" }}
-            onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "speed")}
-            onMouseLeave={leaveGlossaryHoverInfo}
-          >
-            Speed
-            <div style={{ fontWeight: 700, color: "var(--text-primary)", fontSize: "0.88rem", textTransform: "none", letterSpacing: "normal", textAlign: "left" }}>
-              {derived.speed}
-            </div>
-          </label>
-          <label
-            style={{ ...labelStyle, padding: "0.28rem 0.35rem", border: "1px solid var(--panel-border)", borderRadius: "0.3rem", backgroundColor: "var(--surface-0)" }}
-            onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "tempHp")}
-            onMouseLeave={leaveGlossaryHoverInfo}
-          >
-            Temp HP
-            <input
-              type="number"
-              min={0}
-              value={sheet.resources.tempHp}
-              onChange={(e) =>
-                updateSheet((prev) => ({
-                  ...prev,
-                  resources: {
-                    ...prev.resources,
-                    tempHp: Math.max(0, Number(e.target.value) || 0)
-                  }
-                }))
-              }
-              style={{ width: numericInputWidthCh(sheet.resources.tempHp), textAlign: "center" }}
-            />
-          </label>
-          <label
             style={{ ...labelStyle, padding: "0.28rem 0.35rem", border: "1px solid var(--panel-border)", borderRadius: "0.3rem", backgroundColor: "var(--surface-0)" }}
             onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "deathSaves")}
             onMouseLeave={leaveGlossaryHoverInfo}
@@ -909,13 +946,13 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             />
           </label>
           <label
-            style={{ ...labelStyle, padding: "0.28rem 0.35rem", border: "1px solid var(--panel-border)", borderRadius: "0.3rem", backgroundColor: "var(--surface-0)" }}
-            onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "initiative")}
+            style={{ ...labelStyle, padding: "0.28rem 0.35rem", border: "1px solid var(--panel-border)", borderRadius: "0.3rem", backgroundColor: "var(--surface-1)" }}
+            onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "speed")}
             onMouseLeave={leaveGlossaryHoverInfo}
           >
-            Initiative
+            Speed
             <div style={{ fontWeight: 700, color: "var(--text-primary)", fontSize: "0.88rem", textTransform: "none", letterSpacing: "normal", textAlign: "left" }}>
-              {derived.initiative >= 0 ? `+${derived.initiative}` : derived.initiative}
+              {derived.speed}
             </div>
           </label>
         </div>
@@ -1889,6 +1926,58 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             JSON
           </summary>
           <div style={{ marginTop: "0.45rem", display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>
+            <input
+              value={jsonSearchInput}
+              onChange={(event) => setJsonSearchInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter") return;
+                event.preventDefault();
+                const committed = jsonSearchInput.trim();
+                setJsonSearchQuery(committed);
+                setJsonSearchResultIdx(0);
+                setJsonSearchJumpTick((prev) => prev + 1);
+              }}
+              placeholder="Search JSON..."
+              style={{
+                minWidth: 260,
+                border: "1px solid var(--panel-border)",
+                borderRadius: "0.28rem",
+                padding: "0.22rem 0.3rem"
+              }}
+            />
+            <button
+              type="button"
+              disabled={jsonSearchMatches.length === 0}
+              onClick={() =>
+                setJsonSearchResultIdx((prev) => {
+                  const nextIdx = jsonSearchMatches.length === 0 ? 0 : (prev - 1 + jsonSearchMatches.length) % jsonSearchMatches.length;
+                  setJsonSearchJumpTick((tick) => tick + 1);
+                  return nextIdx;
+                })
+              }
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              disabled={jsonSearchMatches.length === 0}
+              onClick={() =>
+                setJsonSearchResultIdx((prev) => {
+                  const nextIdx = jsonSearchMatches.length === 0 ? 0 : (prev + 1) % jsonSearchMatches.length;
+                  setJsonSearchJumpTick((tick) => tick + 1);
+                  return nextIdx;
+                })
+              }
+            >
+              Next
+            </button>
+            <span style={{ color: "var(--text-secondary)", fontSize: "0.8rem" }}>
+              {jsonSearchQuery.trim()
+                ? jsonSearchMatches.length > 0
+                  ? `${Math.min(jsonSearchResultIdx + 1, jsonSearchMatches.length)} of ${jsonSearchMatches.length}`
+                  : "0 matches"
+                : "Type and press Enter"}
+            </span>
             <button
               type="button"
               onClick={() => {
@@ -1898,11 +1987,13 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 }
                 void navigator.clipboard.writeText(expandedSheetJson);
               }}
+              style={{ marginLeft: "auto" }}
             >
               Copy Contents
             </button>
           </div>
           <textarea
+            ref={jsonTextareaRef}
             value={expandedSheetJson}
             readOnly
             style={{

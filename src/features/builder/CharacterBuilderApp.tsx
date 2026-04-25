@@ -62,6 +62,7 @@ import { summarizeImplementAttack, summarizeMainWeaponAttack } from "../../rules
 import { RulesRichText } from "./RulesRichText";
 import { NEUTRAL_PAGE_BG } from "../../ui/tokens";
 import { positionFixedTooltip } from "../../ui/glossaryTooltipPosition";
+import { findCaseInsensitiveMatches, scrollTextareaToMatch } from "../../ui/jsonSearch";
 import { resolveTooltipText } from "../../data/tooltipGlossary";
 import {
   ensureSelectedEntityInFiltered,
@@ -712,6 +713,10 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   const [mainWeaponSearch, setMainWeaponSearch] = useState("");
   const [offHandWeaponSearch, setOffHandWeaponSearch] = useState("");
   const [implementSearch, setImplementSearch] = useState("");
+  const [jsonSearchInput, setJsonSearchInput] = useState("");
+  const [jsonSearchQuery, setJsonSearchQuery] = useState("");
+  const [jsonSearchResultIdx, setJsonSearchResultIdx] = useState(0);
+  const [jsonSearchJumpTick, setJsonSearchJumpTick] = useState(0);
   const [showGlossaryHoverInfo, setShowGlossaryHoverInfo] = useState(false);
   const [glossaryHoverKey, setGlossaryHoverKey] = useState<BuilderGlossaryKey | null>(null);
   const [glossaryHoverPanelPos, setGlossaryHoverPanelPos] = useState<{
@@ -721,6 +726,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   } | null>(null);
   const glossaryHoverTimerRef = useRef<number | null>(null);
   const glossaryHoverCloseTimerRef = useRef<number | null>(null);
+  const jsonTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const lastHandledJsonSearchJumpTickRef = useRef(0);
   const GLOSSARY_HOVER_CLOSE_DELAY_MS = 400;
   const rulesById = useMemo(() => buildRulesIdLookup(index), [index]);
 
@@ -756,6 +763,10 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   const expandedBuildJson = useMemo(
     () => JSON.stringify(expandJsonIds(build, rulesById), null, 2),
     [build, rulesById]
+  );
+  const jsonSearchMatches = useMemo(
+    () => findCaseInsensitiveMatches(expandedBuildJson, jsonSearchQuery),
+    [expandedBuildJson, jsonSearchQuery]
   );
 
   const raceAbilityBonusInfo = useMemo(() => parseRaceAbilityBonusInfo(selectedRace), [selectedRace]);
@@ -810,6 +821,26 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     selectedHybridA,
     selectedHybridB
   ]);
+
+  useEffect(() => {
+    setJsonSearchResultIdx(0);
+  }, [jsonSearchQuery, expandedBuildJson]);
+
+  useEffect(() => {
+    if (jsonSearchJumpTick === 0) return;
+    if (lastHandledJsonSearchJumpTickRef.current === jsonSearchJumpTick) return;
+    lastHandledJsonSearchJumpTickRef.current = jsonSearchJumpTick;
+    if (!jsonSearchQuery.trim()) return;
+    if (jsonSearchMatches.length === 0) return;
+    const textarea = jsonTextareaRef.current;
+    if (!textarea) return;
+    const safeIdx = Math.min(jsonSearchResultIdx, jsonSearchMatches.length - 1);
+    const start = jsonSearchMatches[safeIdx];
+    const end = start + jsonSearchQuery.trim().length;
+    textarea.focus();
+    textarea.setSelectionRange(start, end);
+    scrollTextareaToMatch(textarea, expandedBuildJson, start);
+  }, [expandedBuildJson, jsonSearchJumpTick, jsonSearchMatches, jsonSearchQuery, jsonSearchResultIdx]);
 
   useEffect(() => {
     return () => {
@@ -3980,6 +4011,58 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               JSON
             </summary>
             <div style={{ marginTop: "0.45rem", display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>
+              <input
+                value={jsonSearchInput}
+                onChange={(event) => setJsonSearchInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter") return;
+                  event.preventDefault();
+                  const committed = jsonSearchInput.trim();
+                  setJsonSearchQuery(committed);
+                  setJsonSearchResultIdx(0);
+                  setJsonSearchJumpTick((prev) => prev + 1);
+                }}
+                placeholder="Search JSON..."
+                style={{
+                  minWidth: 260,
+                  border: "1px solid var(--panel-border)",
+                  borderRadius: "0.28rem",
+                  padding: "0.22rem 0.3rem"
+                }}
+              />
+              <button
+                type="button"
+                disabled={jsonSearchMatches.length === 0}
+                onClick={() =>
+                  setJsonSearchResultIdx((prev) => {
+                    const nextIdx = jsonSearchMatches.length === 0 ? 0 : (prev - 1 + jsonSearchMatches.length) % jsonSearchMatches.length;
+                    setJsonSearchJumpTick((tick) => tick + 1);
+                    return nextIdx;
+                  })
+                }
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                disabled={jsonSearchMatches.length === 0}
+                onClick={() =>
+                  setJsonSearchResultIdx((prev) => {
+                    const nextIdx = jsonSearchMatches.length === 0 ? 0 : (prev + 1) % jsonSearchMatches.length;
+                    setJsonSearchJumpTick((tick) => tick + 1);
+                    return nextIdx;
+                  })
+                }
+              >
+                Next
+              </button>
+              <span style={{ color: "var(--text-secondary)", fontSize: "0.8rem" }}>
+                {jsonSearchQuery.trim()
+                  ? jsonSearchMatches.length > 0
+                    ? `${Math.min(jsonSearchResultIdx + 1, jsonSearchMatches.length)} of ${jsonSearchMatches.length}`
+                    : "0 matches"
+                  : "Type and press Enter"}
+              </span>
               <button
                 type="button"
                 onClick={() => {
@@ -3989,11 +4072,13 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   }
                   void navigator.clipboard.writeText(expandedBuildJson);
                 }}
+                style={{ marginLeft: "auto" }}
               >
                 Copy Contents
               </button>
             </div>
             <textarea
+              ref={jsonTextareaRef}
               value={expandedBuildJson}
               readOnly
               style={{
