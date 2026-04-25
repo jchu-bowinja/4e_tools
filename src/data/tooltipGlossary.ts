@@ -247,6 +247,44 @@ export function resolveTooltipText(params: {
   return null;
 }
 
+/**
+ * Lookup order for STR/CON/… tooltips: prefer the rules row name, then full name + code
+ * (e.g. Strength, STR), then a generic “Ability Score” fallback — so we do not match the
+ * broad “Ability Scores” glossary entry before a specific ability.
+ */
+export function abilityTooltipResolveTerms(abilityCode: string, rulesEntryName?: string | null): string[] {
+  const byCode: Record<string, readonly [string, string]> = {
+    STR: ["Strength", "STR"],
+    CON: ["Constitution", "CON"],
+    DEX: ["Dexterity", "DEX"],
+    INT: ["Intelligence", "INT"],
+    WIS: ["Wisdom", "WIS"],
+    CHA: ["Charisma", "CHA"]
+  };
+  const upper = abilityCode.trim().toUpperCase();
+  const out: string[] = [];
+  const nameTrim = typeof rulesEntryName === "string" ? rulesEntryName.trim() : "";
+  if (nameTrim) out.push(nameTrim);
+  const pair = byCode[upper];
+  if (pair) {
+    out.push(pair[0], pair[1]);
+  } else if (abilityCode.trim()) {
+    out.push(abilityCode.trim());
+  }
+  out.push("Ability Score");
+  const seen = new Set<string>();
+  const deduped: string[] = [];
+  for (const t of out) {
+    const n = t.trim();
+    if (!n) continue;
+    const key = normalizeTerm(n);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(n);
+  }
+  return deduped;
+}
+
 export function normalizeTooltipTerm(value: string): string {
   return normalizeTerm(value);
 }

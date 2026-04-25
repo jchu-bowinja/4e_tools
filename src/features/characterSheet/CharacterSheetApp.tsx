@@ -15,7 +15,7 @@ import { createDefaultCharacterSheetState } from "./defaultState";
 import type { CharacterSheetState, EquipmentSlot, InventoryItem } from "./model";
 import { canEquipItem, computeSheetDerivedData, groupCombatPowers, sheetStateFromBuild } from "./selectors";
 import { loadCharacterSheetState, saveCharacterSheetState } from "./storage";
-import { normalizeTooltipTerm, resolveTooltipText } from "../../data/tooltipGlossary";
+import { abilityTooltipResolveTerms, normalizeTooltipTerm, resolveTooltipText } from "../../data/tooltipGlossary";
 import { positionFixedTooltip } from "../../ui/glossaryTooltipPosition";
 import {
   GLOSSARY_TOOLTIP_CLOSE_DELAY_MS,
@@ -511,7 +511,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     if (key.startsWith("ability:")) {
       const code = key.slice("ability:".length) as AbilityCode;
       const lore = abilityLoreByCode.get(code);
-      terms = [lore?.name || "", code, "Ability Score"];
+      terms = abilityTooltipResolveTerms(code, lore?.name);
     } else if (key.startsWith("skill:")) {
       const skillId = key.slice("skill:".length);
       const skill = skillById.get(skillId);
@@ -1316,18 +1316,26 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   </div>
                 </div>
               </div>
-              <div
-                style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.5rem", backgroundColor: "var(--surface-0)" }}
-                onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "abilityScores")}
-                onMouseLeave={leaveGlossaryHoverInfo}
-              >
-                <h3 style={sectionTitleStyle}>Ability Scores</h3>
+              <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.5rem", backgroundColor: "var(--surface-0)" }}>
+                <h3
+                  style={sectionTitleStyle}
+                  onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "abilityScores")}
+                  onMouseLeave={leaveGlossaryHoverInfo}
+                  onFocus={(event) => startGlossaryHoverInfoTimer(event, "abilityScores")}
+                  onBlur={leaveGlossaryHoverInfo}
+                  tabIndex={0}
+                >
+                  Ability Scores
+                </h3>
                 <div style={{ marginTop: "0.25rem", display: "grid", gap: "0.2rem", gridTemplateColumns: "minmax(0, 1fr)" }}>
                   {(["STR", "CON", "DEX", "INT", "WIS", "CHA"] as const).map((ab, idx) => (
                     <div
                       key={ab}
                       onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `ability:${ab}`)}
                       onMouseLeave={leaveGlossaryHoverInfo}
+                      onFocus={(event) => startGlossaryHoverInfoTimer(event, `ability:${ab}`)}
+                      onBlur={leaveGlossaryHoverInfo}
+                      tabIndex={0}
                       style={{
                         display: "grid",
                         gridTemplateColumns: "1fr auto",
@@ -1414,6 +1422,9 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   style={sectionTitleStyle}
                   onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "skills")}
                   onMouseLeave={leaveGlossaryHoverInfo}
+                  onFocus={(event) => startGlossaryHoverInfoTimer(event, "skills")}
+                  onBlur={leaveGlossaryHoverInfo}
+                  tabIndex={0}
                 >
                   Skills
                 </h3>
@@ -1421,8 +1432,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   {skillRows.map((row, idx) => (
                     <div
                       key={row.skillId}
-                      onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `skill:${row.skillId}`)}
-                      onMouseLeave={leaveGlossaryHoverInfo}
                       style={{
                         display: "grid",
                         gridTemplateColumns: "1fr auto",
@@ -1434,6 +1443,11 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                       }}
                     >
                       <span
+                        onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `skill:${row.skillId}`)}
+                        onMouseLeave={leaveGlossaryHoverInfo}
+                        onFocus={(event) => startGlossaryHoverInfoTimer(event, `skill:${row.skillId}`)}
+                        onBlur={leaveGlossaryHoverInfo}
+                        tabIndex={0}
                         style={{
                           color: "var(--text-primary)",
                           padding: "0.2rem 0.35rem",
@@ -1469,6 +1483,9 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 <div
                   onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `powerUsage:${bucket}`)}
                   onMouseLeave={leaveGlossaryHoverInfo}
+                  onFocus={(event) => startGlossaryHoverInfoTimer(event, `powerUsage:${bucket}`)}
+                  onBlur={leaveGlossaryHoverInfo}
+                  tabIndex={0}
                   style={{
                     fontWeight: 700,
                     marginBottom: "0.35rem",
@@ -1543,6 +1560,9 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                           <span
                             onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `powerUsage:${bucket}`)}
                             onMouseLeave={leaveGlossaryHoverInfo}
+                            onFocus={(event) => startGlossaryHoverInfoTimer(event, `powerUsage:${bucket}`)}
+                            onBlur={leaveGlossaryHoverInfo}
+                            tabIndex={0}
                             style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}
                           >
                             Lv {power.level ?? 0} • {power.usage || "-"}

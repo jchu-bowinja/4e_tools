@@ -69,7 +69,7 @@ import {
   STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE
 } from "../../ui/glossaryTooltip";
 import { findCaseInsensitiveMatches, scrollTextareaToMatch } from "../../ui/jsonSearch";
-import { resolveTooltipText } from "../../data/tooltipGlossary";
+import { abilityTooltipResolveTerms, normalizeTooltipTerm, resolveTooltipText } from "../../data/tooltipGlossary";
 import {
   ensureSelectedEntityInFiltered,
   ensureSelectedFeatsInList,
@@ -133,6 +133,38 @@ function splitPowerKeywords(rawKeywords: string): string[] {
     .map((part) => part.trim())
     .filter((part) => part.length > 0);
 }
+
+function inferPowerUsageBucket(usageRaw: string): "atWill" | "encounter" | "daily" | null {
+  const u = usageRaw.toLowerCase();
+  if (u.includes("at-will") || u.includes("at will")) return "atWill";
+  if (u.includes("encounter")) return "encounter";
+  if (u.includes("daily")) return "daily";
+  return null;
+}
+
+type BuilderAbilityCode = "STR" | "CON" | "DEX" | "INT" | "WIS" | "CHA";
+
+type BuilderGlossaryKey =
+  | "race"
+  | "class"
+  | "level"
+  | "hp"
+  | "surges"
+  | "surgeValue"
+  | "skills"
+  | "abilityScores"
+  | "ac"
+  | "fortitude"
+  | "reflex"
+  | "will"
+  | "speed"
+  | "initiative"
+  | `ability:${BuilderAbilityCode}`
+  | `skill:${string}`
+  | `powerKeyword:${string}`
+  | `powerUsage:${"atWill" | "encounter" | "daily"}`;
+
+const BUILDER_GLOSSARY_TOOLTIP_ID = "builder-glossary-tooltip";
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -213,6 +245,11 @@ function renderPowerCard(
     keywordTooltip?: (keyword: string) => string | null;
     onKeywordMouseEnter?: (event: React.MouseEvent<HTMLElement> | React.FocusEvent<HTMLElement>, keyword: string) => void;
     onKeywordMouseLeave?: () => void;
+    glossaryHover?: {
+      start: (event: React.MouseEvent<HTMLElement> | React.FocusEvent<HTMLElement>, key: BuilderGlossaryKey) => void;
+      leave: () => void;
+    };
+    renderRuleText?: (raw: string, keyPrefix: string) => JSX.Element;
   }
 ): JSX.Element {
   const raw = (power.raw || {}) as Record<string, unknown>;
@@ -220,6 +257,7 @@ function renderPowerCard(
   const flavor = typeof raw.flavor === "string" ? raw.flavor : "";
   const body = typeof raw.body === "string" ? raw.body : "";
   const usage = String(specific["Power Usage"] || power.usage || "-");
+  const usageBucket = inferPowerUsageBucket(usage);
   const accent = powerCardUsageAccent(usage);
   const powerType = String(specific["Power Type"] || "-");
   const level = power.level ?? null;
@@ -251,7 +289,26 @@ function renderPowerCard(
       <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "baseline" }}>
         <div style={{ fontWeight: 700, color: "var(--text-primary)" }}>{power.name}</div>
         <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
-          {usage} {powerType !== "-" ? `• ${powerType}` : ""}
+          {usageBucket && options?.glossaryHover ? (
+            <span
+              onMouseEnter={(event) => options.glossaryHover!.start(event, `powerUsage:${usageBucket}`)}
+              onMouseLeave={options.glossaryHover.leave}
+              onFocus={(event) => options.glossaryHover!.start(event, `powerUsage:${usageBucket}`)}
+              onBlur={options.glossaryHover.leave}
+              tabIndex={0}
+              style={{
+                cursor: "help",
+                textDecoration: "underline dotted",
+                textUnderlineOffset: "2px",
+                color: "var(--text-muted)"
+              }}
+            >
+              {usage}
+            </span>
+          ) : (
+            usage
+          )}{" "}
+          {powerType !== "-" ? `• ${powerType}` : ""}
           {level != null && level > 0 ? ` • Lv ${level}` : ""}
         </div>
       </div>
@@ -262,24 +319,29 @@ function renderPowerCard(
           {keywordTokens.map((keyword, idx) => {
             const tooltip = options?.keywordTooltip?.(keyword) ?? null;
             const hasHoverHandlers = Boolean(options?.onKeywordMouseEnter && options?.onKeywordMouseLeave);
+            const isParalysisKeyword = keyword.trim().toLowerCase() === "paralysis";
             return (
               <span key={`${power.id}-kw-${keyword}`}>
-                <span
-                  title={hasHoverHandlers ? undefined : tooltip ?? undefined}
-                  onMouseEnter={hasHoverHandlers ? (event) => options?.onKeywordMouseEnter?.(event, keyword) : undefined}
-                  onMouseLeave={hasHoverHandlers ? options?.onKeywordMouseLeave : undefined}
-                  onFocus={hasHoverHandlers ? (event) => options?.onKeywordMouseEnter?.(event, keyword) : undefined}
-                  onBlur={hasHoverHandlers ? options?.onKeywordMouseLeave : undefined}
-                  tabIndex={hasHoverHandlers ? 0 : undefined}
-                  style={{
-                    color: "var(--text-primary)",
-                    cursor: hasHoverHandlers || Boolean(tooltip) ? "help" : "default",
-                    textDecoration: hasHoverHandlers || Boolean(tooltip) ? "underline dotted" : "none",
-                    textUnderlineOffset: "2px"
-                  }}
-                >
-                  {keyword}
-                </span>
+                {isParalysisKeyword ? (
+                  <span style={{ color: "var(--text-primary)" }}>{keyword}</span>
+                ) : (
+                  <span
+                    title={hasHoverHandlers ? undefined : tooltip ?? undefined}
+                    onMouseEnter={hasHoverHandlers ? (event) => options?.onKeywordMouseEnter?.(event, keyword) : undefined}
+                    onMouseLeave={hasHoverHandlers ? options?.onKeywordMouseLeave : undefined}
+                    onFocus={hasHoverHandlers ? (event) => options?.onKeywordMouseEnter?.(event, keyword) : undefined}
+                    onBlur={hasHoverHandlers ? options?.onKeywordMouseLeave : undefined}
+                    tabIndex={hasHoverHandlers ? 0 : undefined}
+                    style={{
+                      color: "var(--text-primary)",
+                      cursor: hasHoverHandlers || Boolean(tooltip) ? "help" : "default",
+                      textDecoration: hasHoverHandlers || Boolean(tooltip) ? "underline dotted" : "none",
+                      textUnderlineOffset: "2px"
+                    }}
+                  >
+                    {keyword}
+                  </span>
+                )}
                 {idx < keywordTokens.length - 1 ? <span> </span> : null}
               </span>
             );
@@ -288,19 +350,61 @@ function renderPowerCard(
       )}
       {(actionType || attackType || target || trigger || requirement) && (
         <div style={{ marginTop: "0.3rem", fontSize: "0.78rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
-          {actionType && <div><strong>Action:</strong> {actionType}</div>}
-          {attackType && <div><strong>Range/Area:</strong> {attackType}</div>}
-          {target && <div><strong>Target:</strong> {target}</div>}
-          {trigger && <div><strong>Trigger:</strong> {trigger}</div>}
-          {requirement && <div><strong>Requirement:</strong> {requirement}</div>}
+          {actionType && (
+            <div>
+              <strong>Action:</strong>{" "}
+              {options?.renderRuleText ? options.renderRuleText(actionType, `${power.id}-action`) : actionType}
+            </div>
+          )}
+          {attackType && (
+            <div>
+              <strong>Range/Area:</strong>{" "}
+              {options?.renderRuleText ? options.renderRuleText(attackType, `${power.id}-attack-type`) : attackType}
+            </div>
+          )}
+          {target && (
+            <div>
+              <strong>Target:</strong> {options?.renderRuleText ? options.renderRuleText(target, `${power.id}-target`) : target}
+            </div>
+          )}
+          {trigger && (
+            <div>
+              <strong>Trigger:</strong>{" "}
+              {options?.renderRuleText ? options.renderRuleText(trigger, `${power.id}-trigger`) : trigger}
+            </div>
+          )}
+          {requirement && (
+            <div>
+              <strong>Requirement:</strong>{" "}
+              {options?.renderRuleText ? options.renderRuleText(requirement, `${power.id}-requirement`) : requirement}
+            </div>
+          )}
         </div>
       )}
       {(hit || miss || effect || special) && (
         <div style={{ marginTop: "0.3rem", fontSize: "0.78rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
-          {hit && <div><strong>Hit:</strong> {hit}</div>}
-          {miss && <div><strong>Miss:</strong> {miss}</div>}
-          {effect && <div><strong>Effect:</strong> {effect}</div>}
-          {special && <div><strong>Special:</strong> {special}</div>}
+          {hit && (
+            <div>
+              <strong>Hit:</strong> {options?.renderRuleText ? options.renderRuleText(hit, `${power.id}-hit`) : hit}
+            </div>
+          )}
+          {miss && (
+            <div>
+              <strong>Miss:</strong> {options?.renderRuleText ? options.renderRuleText(miss, `${power.id}-miss`) : miss}
+            </div>
+          )}
+          {effect && (
+            <div>
+              <strong>Effect:</strong>{" "}
+              {options?.renderRuleText ? options.renderRuleText(effect, `${power.id}-effect`) : effect}
+            </div>
+          )}
+          {special && (
+            <div>
+              <strong>Special:</strong>{" "}
+              {options?.renderRuleText ? options.renderRuleText(special, `${power.id}-special`) : special}
+            </div>
+          )}
         </div>
       )}
       {flavor && <p style={{ margin: "0.35rem 0 0 0", fontStyle: "italic", fontSize: "0.8rem", color: "var(--text-muted)" }}>{flavor}</p>}
@@ -521,18 +625,6 @@ const abilities: Array<keyof CharacterBuild["abilityScores"]> = ["STR", "CON", "
 const PHYSICAL_ABILITIES: Ability[] = ["STR", "CON", "DEX"];
 const MENTAL_ABILITIES: Ability[] = ["INT", "WIS", "CHA"];
 type BuilderTab = "race" | "class" | "abilities" | "skills" | "feats" | "powers" | "paths" | "equipment" | "summary";
-type BuilderGlossaryKey =
-  | "race"
-  | "class"
-  | "level"
-  | "hp"
-  | "surges"
-  | "surgeValue"
-  | "skills"
-  | "abilityScores"
-  | `powerKeyword:${string}`;
-
-const BUILDER_GLOSSARY_TOOLTIP_ID = "builder-glossary-tooltip";
 
 function abilityModifier(score: number): number {
   return Math.floor((score - 10) / 2);
@@ -745,6 +837,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   const glossaryHoverCloseTimerRef = useRef<number | null>(null);
   const jsonTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const lastHandledJsonSearchJumpTickRef = useRef(0);
+  const glossaryTermLookupCacheRef = useRef<Map<string, boolean>>(new Map());
   const rulesById = useMemo(() => buildRulesIdLookup(index), [index]);
 
   const selectedRace = index.races.find((r) => r.id === build.raceId);
@@ -784,6 +877,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     () => findCaseInsensitiveMatches(expandedBuildJson, jsonSearchQuery),
     [expandedBuildJson, jsonSearchQuery]
   );
+
+  const skillById = useMemo(() => new Map(index.skills.map((skill) => [skill.id, skill])), [index.skills]);
 
   const raceAbilityBonusInfo = useMemo(() => parseRaceAbilityBonusInfo(selectedRace), [selectedRace]);
   const raceSecondarySlots = useMemo(() => getRaceSecondarySelectSlots(selectedRace), [selectedRace]);
@@ -884,6 +979,10 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   }, []);
 
   useEffect(() => {
+    glossaryTermLookupCacheRef.current.clear();
+  }, [tooltipGlossary, index]);
+
+  useEffect(() => {
     function onWindowKeyDown(event: KeyboardEvent): void {
       if (event.key !== "Escape") return;
       if (glossaryHoverTimerRef.current != null) {
@@ -913,7 +1012,50 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       if (resolved) return <div style={{ whiteSpace: "pre-wrap" }}>{resolved}</div>;
       return <div>No glossary entry found in `generated/glossary_terms.json` or `generated/rules_index.json`.</div>;
     }
-    const termCandidates: Record<Exclude<BuilderGlossaryKey, `powerKeyword:${string}`>, string[]> = {
+    if (key.startsWith("powerUsage:")) {
+      const usage = key.slice("powerUsage:".length).trim();
+      let terms: string[] = [];
+      if (usage === "atWill") {
+        terms = ["At-Will", "At-Will Power", "At Will"];
+      } else if (usage === "encounter") {
+        terms = ["Encounter", "Encounter Power"];
+      } else if (usage === "daily") {
+        terms = ["Daily", "Daily Power"];
+      }
+      const resolved = resolveTooltipText({ terms, glossaryByName: tooltipGlossary, index });
+      if (resolved) return <div style={{ whiteSpace: "pre-wrap" }}>{resolved}</div>;
+      return <div>No glossary entry found in `generated/glossary_terms.json` or `generated/rules_index.json`.</div>;
+    }
+    if (key.startsWith("ability:")) {
+      const code = key.slice("ability:".length) as BuilderAbilityCode;
+      const entry = index.abilityScores.find((e) => e.abilityCode === code);
+      const terms = abilityTooltipResolveTerms(code, entry?.name);
+      const resolved = resolveTooltipText({
+        terms,
+        glossaryByName: tooltipGlossary,
+        index
+      });
+      if (resolved) return <div style={{ whiteSpace: "pre-wrap" }}>{resolved}</div>;
+      return <div>No glossary entry found in `generated/glossary_terms.json` or `generated/rules_index.json`.</div>;
+    }
+    if (key.startsWith("skill:")) {
+      const skillId = key.slice("skill:".length);
+      const skill = skillById.get(skillId);
+      const resolved = resolveTooltipText({
+        terms: [skill?.name || ""].filter(Boolean),
+        glossaryByName: tooltipGlossary,
+        index
+      });
+      if (resolved) return <div style={{ whiteSpace: "pre-wrap" }}>{resolved}</div>;
+      return <div>No glossary entry found in `generated/glossary_terms.json` or `generated/rules_index.json`.</div>;
+    }
+    const coreTerms: Record<
+      Exclude<
+        BuilderGlossaryKey,
+        `powerKeyword:${string}` | `powerUsage:${string}` | `ability:${BuilderAbilityCode}` | `skill:${string}`
+      >,
+      string[]
+    > = {
       race: [selectedRace?.name || "", "Race"],
       class: [selectedClass?.name || "", "Class"],
       level: ["Level"],
@@ -921,10 +1063,16 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       surges: ["Healing Surges", "Healing Surge"],
       surgeValue: ["Surge Value", "Healing Surge Value"],
       skills: ["Skill", "Skills"],
-      abilityScores: ["Ability Score", "Ability Scores"]
+      abilityScores: ["Ability Score", "Ability Scores"],
+      ac: ["Armor Class", "AC"],
+      fortitude: ["Fortitude"],
+      reflex: ["Reflex"],
+      will: ["Will"],
+      speed: ["Speed"],
+      initiative: ["Initiative"]
     };
     const resolved = resolveTooltipText({
-      terms: termCandidates[key].filter(Boolean),
+      terms: coreTerms[key].filter(Boolean),
       glossaryByName: tooltipGlossary,
       index
     });
@@ -999,6 +1147,77 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       tabIndex: 0,
       "aria-describedby": active ? BUILDER_GLOSSARY_TOOLTIP_ID : undefined
     };
+  }
+
+  function hasGlossaryHoverForTerm(term: string): boolean {
+    const normalized = normalizeTooltipTerm(term);
+    if (!normalized) return false;
+    const cache = glossaryTermLookupCacheRef.current;
+    const cached = cache.get(normalized);
+    if (cached != null) return cached;
+    const found = Boolean(
+      resolveTooltipText({
+        terms: [term],
+        glossaryByName: tooltipGlossary,
+        index
+      })
+    );
+    cache.set(normalized, found);
+    return found;
+  }
+
+  function renderPowerTextWithGlossaryHovers(value: string, keyPrefix: string): JSX.Element {
+    const parts = value.split(/(\s+|[,;:/()])/g);
+    return (
+      <>
+        {parts.map((part, idx) => {
+          const term = part.trim();
+          if (!term || !/[A-Za-z]/.test(term) || !hasGlossaryHoverForTerm(term)) {
+            return <span key={`${keyPrefix}-${idx}`}>{part}</span>;
+          }
+          return (
+            <span
+              key={`${keyPrefix}-${idx}`}
+              onMouseEnter={(event) => startGlossaryHover(event, `powerKeyword:${term}`)}
+              onFocus={(event) => startGlossaryHover(event, `powerKeyword:${term}`)}
+              onMouseLeave={leaveGlossaryHover}
+              onBlur={leaveGlossaryHover}
+              tabIndex={0}
+              style={{
+                cursor: "help",
+                textDecoration: "underline dotted",
+                textUnderlineOffset: "2px"
+              }}
+            >
+              {part}
+            </span>
+          );
+        })}
+      </>
+    );
+  }
+
+  function renderPowerGlossaryRuleText(raw: string, keyPrefix: string): JSX.Element {
+    const trimmed = raw.trim();
+    if (hasGlossaryHoverForTerm(trimmed)) {
+      return (
+        <span
+          onMouseEnter={(event) => startGlossaryHover(event, `powerKeyword:${trimmed}`)}
+          onFocus={(event) => startGlossaryHover(event, `powerKeyword:${trimmed}`)}
+          onMouseLeave={leaveGlossaryHover}
+          onBlur={leaveGlossaryHover}
+          tabIndex={0}
+          style={{
+            cursor: "help",
+            textDecoration: "underline dotted",
+            textUnderlineOffset: "2px"
+          }}
+        >
+          {raw}
+        </span>
+      );
+    }
+    return renderPowerTextWithGlossaryHovers(raw, keyPrefix);
   }
 
   const skillSheetRows = useMemo(() => {
@@ -1451,7 +1670,9 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
           key: `${cardKey}-card`,
           keywordTooltip: powerKeywordTooltip,
           onKeywordMouseEnter: (event, keyword) => startGlossaryHover(event, `powerKeyword:${keyword}`),
-          onKeywordMouseLeave: leaveGlossaryHover
+          onKeywordMouseLeave: leaveGlossaryHover,
+          glossaryHover: { start: startGlossaryHover, leave: leaveGlossaryHover },
+          renderRuleText: renderPowerGlossaryRuleText
         })}
         <PowerConstructionSelects power={p} build={build} onChange={updateBuild} />
       </div>
@@ -1960,7 +2181,9 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                                         key: `race-tab-${g.traitId}-${p.id}`,
                                         keywordTooltip: powerKeywordTooltip,
                                         onKeywordMouseEnter: (event, keyword) => startGlossaryHover(event, `powerKeyword:${keyword}`),
-                                        onKeywordMouseLeave: leaveGlossaryHover
+                                        onKeywordMouseLeave: leaveGlossaryHover,
+                                        glossaryHover: { start: startGlossaryHover, leave: leaveGlossaryHover },
+                                        renderRuleText: renderPowerGlossaryRuleText
                                       })
                                     ) : (
                                       <p style={{ margin: 0, fontSize: "0.82rem", color: "var(--status-warning)" }}>
@@ -1977,7 +2200,9 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                                     key: `race-tab-${g.traitId}-${p.id}`,
                                     keywordTooltip: powerKeywordTooltip,
                                     onKeywordMouseEnter: (event, keyword) => startGlossaryHover(event, `powerKeyword:${keyword}`),
-                                    onKeywordMouseLeave: leaveGlossaryHover
+                                    onKeywordMouseLeave: leaveGlossaryHover,
+                                    glossaryHover: { start: startGlossaryHover, leave: leaveGlossaryHover },
+                                    renderRuleText: renderPowerGlossaryRuleText
                                   })
                                 )
                               )}
@@ -2748,8 +2973,10 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                         return (
                           <tr key={ability}>
                             <td style={{ padding: "0.45rem 0.25rem 0.45rem 0", verticalAlign: "middle" }}>
-                              <span style={{ fontWeight: 600 }}>{ability}</span>
-                              <span style={{ display: "block", fontSize: "0.78rem", color: "var(--text-muted)", fontWeight: 400 }}>{getAbilityLabel(ability)}</span>
+                              <span {...glossaryHoverA11y(`ability:${ability}`)}>
+                                <span style={{ fontWeight: 600 }}>{ability}</span>
+                                <span style={{ display: "block", fontSize: "0.78rem", color: "var(--text-muted)", fontWeight: 400 }}>{getAbilityLabel(ability)}</span>
+                              </span>
                             </td>
                             <td style={{ padding: "0.35rem 0.25rem", verticalAlign: "middle", textAlign: "center", width: "3.75rem" }}>
                               <input
@@ -2882,7 +3109,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                         }}
                       />{" "}
                       <span style={{ fontWeight: trainable || checked ? 600 : 400 }}>
-                        {skill.name} ({skill.keyAbility || "N/A"})
+                        <span {...glossaryHoverA11y(`skill:${skill.id}`)}>{skill.name}</span> ({skill.keyAbility || "N/A"})
                       </span>
                       <span style={{ marginLeft: "0.4rem", fontSize: "0.84rem", color: "var(--text-primary)", fontWeight: 600 }}>
                         {skillScore === null ? "Score —" : `Score ${formatAbilityMod(skillScore)}`}
@@ -4256,8 +4483,12 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 >
                   <strong>HP:</strong> {derived.maxHp}
                 </p>
-                <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Speed:</strong> {derived.speed}</p>
-                <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Initiative:</strong> {derived.initiative >= 0 ? `+${derived.initiative}` : derived.initiative}</p>
+                <p style={{ margin: 0, fontSize: "0.88rem" }} {...glossaryHoverA11y("speed")}>
+                  <strong>Speed:</strong> {derived.speed}
+                </p>
+                <p style={{ margin: 0, fontSize: "0.88rem" }} {...glossaryHoverA11y("initiative")}>
+                  <strong>Initiative:</strong> {derived.initiative >= 0 ? `+${derived.initiative}` : derived.initiative}
+                </p>
                 <p
                   style={{ margin: 0, fontSize: "0.88rem" }}
                   {...glossaryHoverA11y("surges")}
@@ -4362,7 +4593,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 const score = effectiveAbilityScores[ability];
                 const mod = abilityModifier(score);
                 return (
-                  <p key={ability} style={{ margin: 0, fontSize: "0.88rem" }}>
+                  <p key={ability} style={{ margin: 0, fontSize: "0.88rem" }} {...glossaryHoverA11y(`ability:${ability}`)}>
                     <strong>{ability}:</strong> {score} ({formatAbilityMod(mod)})
                   </p>
                 );
@@ -4391,7 +4622,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     fontVariantNumeric: "tabular-nums"
                   }}
                 >
-                  <span style={{ color: "var(--text-secondary)" }}>
+                  <span style={{ color: "var(--text-secondary)" }} {...glossaryHoverA11y(`skill:${row.skillId}`)}>
                     {row.name}
                     {row.trained ? " (T)" : ""}
                   </span>

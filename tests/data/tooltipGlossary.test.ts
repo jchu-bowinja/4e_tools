@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { displayTextForGlossaryRow, loadTooltipGlossary, resolveTooltipText, sanitizeGlossaryRows } from "../../src/data/tooltipGlossary";
+import {
+  abilityTooltipResolveTerms,
+  displayTextForGlossaryRow,
+  loadTooltipGlossary,
+  resolveTooltipText,
+  sanitizeGlossaryRows
+} from "../../src/data/tooltipGlossary";
 import type { RulesIndex } from "../../src/rules/models";
 
 function emptyIndex(): RulesIndex {
@@ -24,6 +30,26 @@ function emptyIndex(): RulesIndex {
     classBuildOptionsByClassId: {}
   };
 }
+
+describe("abilityTooltipResolveTerms", () => {
+  it("orders full name and code before generic Ability Score", () => {
+    expect(abilityTooltipResolveTerms("STR", "Strength")).toEqual(["Strength", "STR", "Ability Score"]);
+  });
+
+  it("dedupes when rules name matches full name", () => {
+    expect(abilityTooltipResolveTerms("DEX", "Dexterity")).toEqual(["Dexterity", "DEX", "Ability Score"]);
+  });
+
+  it("lets resolveTooltipText match a specific ability before generic ability scores", () => {
+    const glossaryByName = {
+      strength: "STR-specific body",
+      "ability scores": "Generic ability scores body",
+      "ability score": "Generic singular body"
+    };
+    const terms = abilityTooltipResolveTerms("STR", "Strength");
+    expect(resolveTooltipText({ terms, glossaryByName, index: emptyIndex() })).toBe("STR-specific body");
+  });
+});
 
 describe("resolveTooltipText range normalization", () => {
   it("resolves Melee X and Ranged X to base glossary keys", () => {
