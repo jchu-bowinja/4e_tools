@@ -93,6 +93,10 @@ After deploy, share the generated URL with others.
 - `tests/` - ETL and rules tests
 - `generated/` - generated rules and ETL artifacts
 
+## UI Guidelines
+
+- `docs/ui-bible.md` - project UI style and design bible for consistency, reuse, and UI review passes.
+
 ## Acceptance Checklist
 
 - Build a new level-1 hybrid character and verify legal hybrid power slots are enforced.

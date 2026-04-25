@@ -1,0 +1,34 @@
+---
+description: Require UI bible consultation for UI-facing source changes
+globs: src/**/*
+alwaysApply: false
+---
+
+# UI Bible First
+
+When a request touches UI behavior, styling, layout, or look-and-feel, consult `docs/ui-bible.md` before making changes.
+
+## Required Workflow
+
+1. Identify whether the change is UI-facing.
+2. Read `docs/ui-bible.md` and apply relevant guidance (consistency, reuse, states, responsiveness, and drift prevention).
+3. Prefer existing shared patterns/components before introducing new UI patterns.
+4. Compare planned UI decisions against documented UI bible guidance.
+5. If a change is not documented in the UI bible or differs from it, pause and ask the user how to proceed before finalizing the implementation.
+6. Present exactly two options when divergence is detected:
+   - Update implementation to align with the current UI bible.
+   - Keep the new UI direction and update `docs/ui-bible.md` to reflect the new standard.
+7. Only proceed with divergence after explicit user confirmation.
+8. If the user approves a new direction, include corresponding `docs/ui-bible.md` updates in the same task whenever appropriate.
+
+## UI-Facing Change Examples
+
+- React component updates in `src/features/**` or `src/**/*.tsx`
+- CSS/SCSS style edits
+- Visual hierarchy, spacing, typography, color, or interaction-state changes
+
+## Response Expectations
+
+- Briefly note that `docs/ui-bible.md` was consulted for UI changes.
+- If divergence exists, ask the user to choose between alignment vs updating the UI bible.
+- Call out any intentional deviations from the UI bible and whether the bible was updated.
