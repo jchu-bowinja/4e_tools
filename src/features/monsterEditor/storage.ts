@@ -88,6 +88,14 @@ export interface MonsterPowerAttack {
   effect?: MonsterPowerOutcome;
 }
 
+export interface MonsterTrait {
+  name?: string;
+  details?: string;
+  range?: string | number;
+  type?: string;
+  keywords?: string[];
+}
+
 export interface MonsterEntryFile extends MonsterIndexEntry {
   sourceRoot: string;
   size: string;
@@ -109,6 +117,8 @@ export interface MonsterEntryFile extends MonsterIndexEntry {
   phasing?: boolean;
   compendiumUrl?: string;
   description?: string;
+  traits?: MonsterTrait[];
+  auras?: MonsterTrait[];
   stats: MonsterStats;
   powers: MonsterPower[];
   sections?: Record<string, unknown>;

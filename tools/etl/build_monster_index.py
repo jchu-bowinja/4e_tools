@@ -381,6 +381,73 @@ def _extract_section_text(root: ET.Element, section_name: str) -> str:
     return _normalized_optional_text(section.text)
 
 
+def _extract_traits_and_auras(root: ET.Element) -> Dict[str, List[Dict[str, Any]]]:
+    section = _find_first_section(root, "Powers")
+    if section is None:
+        return {}
+
+    traits: List[Dict[str, Any]] = []
+    auras: List[Dict[str, Any]] = []
+
+    for node in section.iter():
+        if _local_name(node.tag) != "MonsterTrait":
+            continue
+        name = _first_available_text(node, ["Name", "Display"])
+        details = _first_available_text(node, ["Details", "Description"])
+        trait_type = _first_available_text(node, ["Type"])
+        range_attr = _first_descendant_attr(node, "Range", "FinalValue")
+        range_text = _first_available_text(node, ["Range"])
+        range_value_raw = range_attr if range_attr is not None else range_text
+        range_value = _coerce_value(range_value_raw) if range_value_raw not in {None, ""} else None
+
+        keywords: List[str] = []
+        keyword_section = _find_first_section(node, "Keywords")
+        if keyword_section is not None:
+            keyword_names = _extract_reference_names_from_section(node, "Keywords")
+            keywords = [keyword for keyword in keyword_names if keyword]
+
+        trait_entry: Dict[str, Any] = {}
+        if name:
+            trait_entry["name"] = name
+        if details:
+            trait_entry["details"] = details
+        if range_value not in {None, ""}:
+            trait_entry["range"] = range_value
+        if trait_type:
+            trait_entry["type"] = trait_type
+        if keywords:
+            trait_entry["keywords"] = keywords
+        if not trait_entry:
+            continue
+        traits.append(trait_entry)
+
+        trait_text = " ".join(
+            [
+                str(name or ""),
+                str(details or ""),
+                str(trait_type or ""),
+                str(range_value if range_value is not None else ""),
+            ]
+        ).lower()
+        range_number = None
+        if isinstance(range_value, (int, float)):
+            range_number = float(range_value)
+        elif isinstance(range_value, str):
+            stripped = range_value.strip()
+            if re.fullmatch(r"-?\d+(\.\d+)?", stripped):
+                range_number = float(stripped)
+        is_aura = "aura" in trait_text or (range_number is not None and range_number > 0)
+        if is_aura:
+            auras.append(trait_entry)
+
+    out: Dict[str, List[Dict[str, Any]]] = {}
+    if traits:
+        out["traits"] = traits
+    if auras:
+        out["auras"] = auras
+    return out
+
+
 def _extract_phasing(root: ET.Element) -> Optional[bool]:
     value = _extract_section_text(root, "Phasing")
     if not value:
@@ -894,6 +961,7 @@ def _extract_normalized_monster_fields(root: ET.Element) -> Dict[str, Any]:
         "phasing": _extract_phasing(root),
         "compendiumUrl": _extract_section_text(root, "CompendiumUrl"),
         "description": _extract_section_text(root, "Description"),
+        **_extract_traits_and_auras(root),
     }
     return {k: v for k, v in values.items() if not (v == "" or v == [] or v == {})}
 

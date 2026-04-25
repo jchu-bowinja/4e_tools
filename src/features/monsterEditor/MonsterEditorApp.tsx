@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -9,7 +10,6 @@ import {
 import type { RulesIndex } from "../../rules/models";
 import { resolveTooltipText } from "../../data/tooltipGlossary";
 import { positionFixedTooltip } from "../../ui/glossaryTooltipPosition";
-import { RulesRichText } from "../builder/RulesRichText";
 import {
   loadMonsterEntry,
   loadMonsterIndex,
@@ -19,7 +19,8 @@ import {
   type MonsterPowerAttack,
   type MonsterPowerDamage,
   type MonsterPowerOutcome,
-  type MonsterPowerOutcomeEntry
+  type MonsterPowerOutcomeEntry,
+  type MonsterTrait
 } from "./storage";
 
 /** Matches CharacterSheetApp: panels, section titles, labels, and body scale. */
@@ -427,6 +428,37 @@ function renderTagList(values: string[] | undefined): string {
   return values.join(", ");
 }
 
+function renderTraitMetaBadges(trait: MonsterTrait): string[] {
+  const badges: string[] = [];
+  const type = String(trait.type ?? "").trim();
+  if (type && type.toLowerCase() !== "trait") badges.push(type);
+  if (Array.isArray(trait.keywords) && trait.keywords.length > 0) {
+    for (const keyword of trait.keywords) {
+      const token = String(keyword ?? "").trim();
+      if (!token) continue;
+      badges.push(token);
+    }
+  }
+  return [...new Set(badges)];
+}
+
+function extractMovementEntries(activeMonster: MonsterEntryFile | null): Array<{ type: string; value: string | number }> {
+  const rawMovement = activeMonster?.stats?.otherNumbers?.movement;
+  if (!Array.isArray(rawMovement)) return [];
+  return rawMovement
+    .map((entry) => {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
+      const record = entry as Record<string, unknown>;
+      const type = String(record.type ?? "").trim();
+      const valueRaw = record.value;
+      const valueText = String(valueRaw ?? "").trim();
+      if (!type || !valueText) return null;
+      const numeric = typeof valueRaw === "number" ? valueRaw : Number(valueText);
+      return { type, value: Number.isFinite(numeric) ? numeric : valueText };
+    })
+    .filter((entry): entry is { type: string; value: string | number } => entry !== null);
+}
+
 function statsDisplayOrder(label: string): number {
   const normalized = label.trim().toLowerCase();
   if (normalized === "skills") return 1;
@@ -736,25 +768,31 @@ function renderOutcomeEntry(
   idx: number,
   title: string,
   startGlossaryHover: (event: ReactMouseEvent<HTMLElement>, key: MonsterGlossaryHoverKey) => void,
-  leaveGlossaryHover: () => void
+  leaveGlossaryHover: () => void,
+  shouldHighlightTerm: (term: string) => boolean
 ): JSX.Element {
   const damageSummary = renderDamageSummary(entry.damage);
   return (
     <div key={`${title}-${idx}`} style={{ borderLeft: "2px solid var(--panel-border)", paddingLeft: "0.45rem", marginTop: "0.3rem" }}>
       <div style={outcomeEntryTitleStyle}>{entry.name || entry.kind || title}</div>
       {entry.description ? (
-        <RulesRichText
-          text={entry.description}
-          paragraphStyle={{ ...richTextBodyPrimary.paragraphStyle, margin: "0.1rem 0 0.2rem 0" }}
-          listItemStyle={richTextBodyPrimary.listItemStyle}
-        />
+        <div style={{ ...richTextBodyPrimary.paragraphStyle, margin: "0.1rem 0 0.2rem 0", whiteSpace: "pre-wrap" }}>
+          {renderGlossaryAwareText(
+            entry.description,
+            commonDescriptiveGlossaryPhrases,
+            startGlossaryHover,
+            leaveGlossaryHover,
+            `${title}-${idx}-entry-description`,
+            shouldHighlightTerm
+          )}
+        </div>
       ) : null}
       {damageSummary ? <div style={captionMuted}>{damageSummary}</div> : null}
       {entry.aftereffects?.length ? (
         <div style={{ marginTop: "0.2rem" }}>
           <div style={microLabelStyle}>Aftereffects</div>
           {entry.aftereffects.map((nested, nestedIdx) =>
-            renderOutcomeEntry(nested, nestedIdx, "Aftereffect", startGlossaryHover, leaveGlossaryHover)
+            renderOutcomeEntry(nested, nestedIdx, "Aftereffect", startGlossaryHover, leaveGlossaryHover, shouldHighlightTerm)
           )}
         </div>
       ) : null}
@@ -762,7 +800,7 @@ function renderOutcomeEntry(
         <div style={{ marginTop: "0.2rem" }}>
           <div style={microLabelStyle}>Sustains</div>
           {entry.sustains.map((nested, nestedIdx) =>
-            renderOutcomeEntry(nested, nestedIdx, "Sustain", startGlossaryHover, leaveGlossaryHover)
+            renderOutcomeEntry(nested, nestedIdx, "Sustain", startGlossaryHover, leaveGlossaryHover, shouldHighlightTerm)
           )}
         </div>
       ) : null}
@@ -770,7 +808,7 @@ function renderOutcomeEntry(
         <div style={{ marginTop: "0.2rem" }}>
           <div style={microLabelStyle}>Failed Saving Throws</div>
           {entry.failedSavingThrows.map((nested, nestedIdx) =>
-            renderOutcomeEntry(nested, nestedIdx, "Failed Save", startGlossaryHover, leaveGlossaryHover)
+            renderOutcomeEntry(nested, nestedIdx, "Failed Save", startGlossaryHover, leaveGlossaryHover, shouldHighlightTerm)
           )}
         </div>
       ) : null}
@@ -782,24 +820,39 @@ function renderAttackOutcome(
   label: "hit" | "miss" | "effect",
   outcome: MonsterPowerOutcome,
   startGlossaryHover: (event: ReactMouseEvent<HTMLElement>, key: MonsterGlossaryHoverKey) => void,
-  leaveGlossaryHover: () => void
+  leaveGlossaryHover: () => void,
+  shouldHighlightTerm: (term: string) => boolean
 ): JSX.Element {
   const damageSummary = renderDamageSummary(outcome.damage);
   return (
     <div style={{ marginTop: "0.28rem" }}>
       <div style={outcomeSectionLabelStyle}>{label}</div>
       {outcome.description ? (
-        <RulesRichText
-          text={outcome.description}
-          paragraphStyle={{ ...richTextBodyPrimary.paragraphStyle, margin: "0.06rem 0 0.16rem 0" }}
-          listItemStyle={richTextBodyPrimary.listItemStyle}
-        />
+        <div style={{ ...richTextBodyPrimary.paragraphStyle, margin: "0.06rem 0 0.16rem 0", whiteSpace: "pre-wrap" }}>
+          {renderGlossaryAwareText(
+            outcome.description,
+            commonDescriptiveGlossaryPhrases,
+            startGlossaryHover,
+            leaveGlossaryHover,
+            `${label}-outcome-description`,
+            shouldHighlightTerm
+          )}
+        </div>
       ) : null}
       {damageSummary ? <div style={captionMuted}>{damageSummary}</div> : null}
       {outcome.nestedAttackDescriptions?.length ? (
         <div style={{ ...bodySecondary, marginTop: "0.15rem" }}>
           {outcome.nestedAttackDescriptions.map((text, idx) => (
-            <div key={`${label}-nested-${idx}`}>{text}</div>
+            <div key={`${label}-nested-${idx}`}>
+              {renderGlossaryAwareText(
+                text,
+                commonDescriptiveGlossaryPhrases,
+                startGlossaryHover,
+                leaveGlossaryHover,
+                `${label}-nested-${idx}`,
+                shouldHighlightTerm
+              )}
+            </div>
           ))}
         </div>
       ) : null}
@@ -807,21 +860,23 @@ function renderAttackOutcome(
         <div style={{ marginTop: "0.18rem" }}>
           <div style={microLabelStyle}>Aftereffects</div>
           {outcome.aftereffects.map((entry, idx) =>
-            renderOutcomeEntry(entry, idx, "Aftereffect", startGlossaryHover, leaveGlossaryHover)
+            renderOutcomeEntry(entry, idx, "Aftereffect", startGlossaryHover, leaveGlossaryHover, shouldHighlightTerm)
           )}
         </div>
       ) : null}
       {outcome.sustains?.length ? (
         <div style={{ marginTop: "0.18rem" }}>
           <div style={microLabelStyle}>Sustains</div>
-          {outcome.sustains.map((entry, idx) => renderOutcomeEntry(entry, idx, "Sustain", startGlossaryHover, leaveGlossaryHover))}
+          {outcome.sustains.map((entry, idx) =>
+            renderOutcomeEntry(entry, idx, "Sustain", startGlossaryHover, leaveGlossaryHover, shouldHighlightTerm)
+          )}
         </div>
       ) : null}
       {outcome.failedSavingThrows?.length ? (
         <div style={{ marginTop: "0.18rem" }}>
           <div style={microLabelStyle}>Failed Saving Throws</div>
           {outcome.failedSavingThrows.map((entry, idx) =>
-            renderOutcomeEntry(entry, idx, "Failed Save", startGlossaryHover, leaveGlossaryHover)
+            renderOutcomeEntry(entry, idx, "Failed Save", startGlossaryHover, leaveGlossaryHover, shouldHighlightTerm)
           )}
         </div>
       ) : null}
@@ -832,7 +887,8 @@ function renderAttackOutcome(
 function renderPowerAttacks(
   power: MonsterPower,
   startGlossaryHover: (event: ReactMouseEvent<HTMLElement>, key: MonsterGlossaryHoverKey) => void,
-  leaveGlossaryHover: () => void
+  leaveGlossaryHover: () => void,
+  shouldHighlightTerm: (term: string) => boolean
 ): JSX.Element | null {
   if (!power.attacks?.length) return null;
   return (
@@ -850,9 +906,9 @@ function renderPowerAttacks(
             <div style={{ ...captionMuted, marginTop: "0.06rem" }}>
               {[attack.range, attack.targets, bonusText].filter(Boolean).join(" • ") || "No range/target/bonus details"}
             </div>
-            {attack.hit ? renderAttackOutcome("hit", attack.hit, startGlossaryHover, leaveGlossaryHover) : null}
-            {attack.miss ? renderAttackOutcome("miss", attack.miss, startGlossaryHover, leaveGlossaryHover) : null}
-            {attack.effect ? renderAttackOutcome("effect", attack.effect, startGlossaryHover, leaveGlossaryHover) : null}
+            {attack.hit ? renderAttackOutcome("hit", attack.hit, startGlossaryHover, leaveGlossaryHover, shouldHighlightTerm) : null}
+            {attack.miss ? renderAttackOutcome("miss", attack.miss, startGlossaryHover, leaveGlossaryHover, shouldHighlightTerm) : null}
+            {attack.effect ? renderAttackOutcome("effect", attack.effect, startGlossaryHover, leaveGlossaryHover, shouldHighlightTerm) : null}
           </div>
         );
       })}
@@ -872,7 +928,143 @@ function splitTooltipTerms(rawTerm: string): string[] {
   return [term];
 }
 
-type MonsterGlossaryHoverKey = `powerKeyword:${string}` | `glossaryTerm:${string}`;
+function findCaseInsensitiveMatches(text: string, query: string): number[] {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return [];
+  const haystack = text.toLowerCase();
+  const matches: number[] = [];
+  let start = 0;
+  while (start < haystack.length) {
+    const idx = haystack.indexOf(needle, start);
+    if (idx === -1) break;
+    matches.push(idx);
+    start = idx + Math.max(1, needle.length);
+  }
+  return matches;
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function splitByGlossaryPhrases(
+  text: string,
+  phrases: string[]
+): Array<{ text: string; glossaryTerm?: string }> {
+  const source = String(text || "");
+  if (!source) return [{ text: "" }];
+  const cleaned = [...new Set(phrases.map((phrase) => phrase.trim()).filter(Boolean))];
+  if (cleaned.length === 0) return [{ text: source }];
+  const sorted = [...cleaned].sort((a, b) => b.length - a.length);
+  const regex = new RegExp(`\\b(${sorted.map((phrase) => escapeRegex(phrase)).join("|")})\\b`, "gi");
+  const parts: Array<{ text: string; glossaryTerm?: string }> = [];
+  let cursor = 0;
+  let match = regex.exec(source);
+  while (match) {
+    const idx = match.index;
+    const matchedText = match[0] ?? "";
+    if (idx > cursor) {
+      parts.push({ text: source.slice(cursor, idx) });
+    }
+    parts.push({ text: matchedText, glossaryTerm: matchedText });
+    cursor = idx + matchedText.length;
+    match = regex.exec(source);
+  }
+  if (cursor < source.length) {
+    parts.push({ text: source.slice(cursor) });
+  }
+  return parts;
+}
+
+const traitDetailGlossaryPhrases: string[] = [
+  "combat advantage",
+  "difficult terrain",
+  "saving throws",
+  "saving throw",
+  "ongoing damage",
+  "hit points",
+  "healing surge",
+  "temporary hit points",
+  "range",
+  "aura",
+  "weakened",
+  "slowed",
+  "dazed",
+  "stunned",
+  "dominated",
+  "immobilized",
+  "restrained",
+  "blinded",
+  "deafened",
+  "prone",
+  "marked",
+  "grabbed",
+  "charge attack",
+  "charge",
+  "shift",
+  "shifts"
+];
+
+const commonDescriptiveGlossaryPhrases: string[] = [
+  ...traitDetailGlossaryPhrases,
+  "melee",
+  "ranged",
+  "close burst",
+  "close blast",
+  "opportunity attack",
+  "immediate interrupt",
+  "immediate reaction",
+  "save ends",
+  "bloodied",
+  "critical hit",
+  "ongoing",
+  "push",
+  "pull",
+  "slide",
+  "teleport"
+];
+
+function renderGlossaryAwareText(
+  text: string,
+  phrases: string[],
+  startGlossaryHover: (event: ReactMouseEvent<HTMLElement>, key: MonsterGlossaryHoverKey) => void,
+  leaveGlossaryHover: () => void,
+  keyPrefix: string,
+  shouldHighlightTerm: (term: string) => boolean
+): JSX.Element {
+  const parts = splitByGlossaryPhrases(text, phrases);
+  return (
+    <>
+      {parts.map((part, idx) =>
+        part.glossaryTerm && shouldHighlightTerm(part.glossaryTerm) ? (
+          <span
+            key={`${keyPrefix}-${idx}`}
+            onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${part.glossaryTerm}`)}
+            onMouseLeave={leaveGlossaryHover}
+            style={glossaryLinkUnderline}
+          >
+            {part.text}
+          </span>
+        ) : (
+          <span key={`${keyPrefix}-${idx}`}>{part.text}</span>
+        )
+      )}
+    </>
+  );
+}
+
+function scrollTextareaToMatch(textarea: HTMLTextAreaElement, text: string, matchStart: number): void {
+  const prefix = text.slice(0, Math.max(0, matchStart));
+  const lineNumber = prefix.split("\n").length - 1;
+  const computed = window.getComputedStyle(textarea);
+  const parsedLineHeight = Number.parseFloat(computed.lineHeight);
+  const fallbackLineHeight = 16;
+  const lineHeight = Number.isFinite(parsedLineHeight) && parsedLineHeight > 0 ? parsedLineHeight : fallbackLineHeight;
+  const targetTop = Math.max(0, (lineNumber - 2) * lineHeight);
+  textarea.scrollTop = targetTop;
+}
+
+type MonsterGlossaryHoverKey = `powerKeyword:${string}` | `glossaryTerm:${string}` | `glossaryTerms:${string}`;
 
 export function MonsterEditorApp({
   index,
@@ -892,6 +1084,10 @@ export function MonsterEditorApp({
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [message, setMessage] = useState<string>("Load monsters from generated JSON to begin.");
   const [isBusy, setIsBusy] = useState<boolean>(false);
+  const [jsonSearchInput, setJsonSearchInput] = useState<string>("");
+  const [jsonSearchQuery, setJsonSearchQuery] = useState<string>("");
+  const [jsonSearchResultIdx, setJsonSearchResultIdx] = useState<number>(0);
+  const [jsonSearchJumpTick, setJsonSearchJumpTick] = useState<number>(0);
   const [showGlossaryHoverInfo, setShowGlossaryHoverInfo] = useState(false);
   const [glossaryHoverKey, setGlossaryHoverKey] = useState<MonsterGlossaryHoverKey | null>(null);
   const [glossaryHoverPanelPos, setGlossaryHoverPanelPos] = useState<{
@@ -901,6 +1097,7 @@ export function MonsterEditorApp({
   } | null>(null);
   const glossaryHoverTimerRef = useRef<number | null>(null);
   const glossaryHoverCloseTimerRef = useRef<number | null>(null);
+  const jsonTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const GLOSSARY_HOVER_CLOSE_DELAY_MS = 400;
 
   useEffect(() => {
@@ -1047,11 +1244,49 @@ export function MonsterEditorApp({
     return buckets;
   }, [activeMonster]);
 
+  const rawJsonText = useMemo(() => JSON.stringify(activeMonster, null, 2), [activeMonster]);
+  const jsonSearchMatches = useMemo(
+    () => findCaseInsensitiveMatches(rawJsonText, jsonSearchQuery),
+    [rawJsonText, jsonSearchQuery]
+  );
+  const glossaryResolutionCacheRef = useRef<Map<string, boolean>>(new Map());
+
+  useEffect(() => {
+    setJsonSearchResultIdx(0);
+  }, [jsonSearchQuery, rawJsonText]);
+
+  useEffect(() => {
+    if (jsonSearchJumpTick === 0) return;
+    if (!jsonSearchQuery.trim()) return;
+    if (jsonSearchMatches.length === 0) return;
+    const textarea = jsonTextareaRef.current;
+    if (!textarea) return;
+    const safeIdx = Math.min(jsonSearchResultIdx, jsonSearchMatches.length - 1);
+    const start = jsonSearchMatches[safeIdx];
+    const end = start + jsonSearchQuery.trim().length;
+    textarea.focus();
+    textarea.setSelectionRange(start, end);
+    scrollTextareaToMatch(textarea, rawJsonText, start);
+  }, [jsonSearchJumpTick, jsonSearchMatches, jsonSearchQuery, jsonSearchResultIdx, rawJsonText]);
+
   function monsterGlossaryContent(key: MonsterGlossaryHoverKey): JSX.Element {
     let terms: string[] = [];
     if (key.startsWith("powerKeyword:")) {
       const keyword = key.slice("powerKeyword:".length).trim();
       terms = [keyword, "Keyword"];
+    } else if (key.startsWith("glossaryTerms:")) {
+      const encoded = key.slice("glossaryTerms:".length).trim();
+      terms = encoded
+        .split("|")
+        .map((token) => {
+          try {
+            return decodeURIComponent(token);
+          } catch {
+            return token;
+          }
+        })
+        .map((term) => term.trim())
+        .filter(Boolean);
     } else {
       const term = key.slice("glossaryTerm:".length).trim();
       terms = splitTooltipTerms(term);
@@ -1080,6 +1315,20 @@ export function MonsterEditorApp({
     }
     return <div>No glossary entry found in `generated/glossary_terms.json` or `generated/rules_index.json`.</div>;
   }
+
+  const shouldHighlightGlossaryTerm = useCallback(
+    (term: string): boolean => {
+      const normalized = term.trim().toLowerCase();
+      if (!normalized) return false;
+      const cached = glossaryResolutionCacheRef.current.get(normalized);
+      if (cached !== undefined) return cached;
+      const resolvedText = resolveTooltipText({ terms: splitTooltipTerms(term), glossaryByName: tooltipGlossary, index });
+      const hasEntry = Boolean(resolvedText && resolvedText.trim().length > 0);
+      glossaryResolutionCacheRef.current.set(normalized, hasEntry);
+      return hasEntry;
+    },
+    [index, tooltipGlossary]
+  );
 
   function cancelGlossaryHoverCloseTimer(): void {
     if (glossaryHoverCloseTimerRef.current != null) {
@@ -1463,23 +1712,37 @@ export function MonsterEditorApp({
                     {formatValue(activeMonster.type)}
                   </div>
                 </div>
-                <div style={{ border: "1px solid var(--panel-border)", borderRadius: 6, padding: "0.6rem", background: "var(--surface-1)" }}>
-                  <div
-                    onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Phasing")}
-                    onMouseLeave={leaveGlossaryHover}
-                    style={microLabelInteractive}
-                  >
-                    Phasing
-                  </div>
-                  <div
-                    onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Phasing")}
-                    onMouseLeave={leaveGlossaryHover}
-                    style={identityValueInteractive}
-                  >
-                    {formatValue(activeMonster.phasing as string | number | boolean | undefined | null)}
-                  </div>
-                </div>
               </div>
+
+              {(() => {
+                const movementEntries = extractMovementEntries(activeMonster);
+                const showPhasing = activeMonster.phasing === true;
+                if (movementEntries.length === 0 && !showPhasing) return null;
+                return (
+                  <div style={{ ...panelStyle, padding: "0.5rem", marginBottom: "0.75rem" }}>
+                    <h3 style={sectionTitleStyle}>Movement</h3>
+                    <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.24rem" }}>
+                      {movementEntries.map((entry, idx) => (
+                        <div key={`movement-${idx}`} style={bodyPrimary}>
+                          <strong>{entry.type}:</strong> {String(entry.value)}
+                        </div>
+                      ))}
+                      {showPhasing ? (
+                        <div style={{ ...bodyPrimary, display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+                          <span
+                            onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Phasing")}
+                            onMouseLeave={leaveGlossaryHover}
+                            style={sheetTagPillStyle}
+                          >
+                            Phasing
+                          </span>
+                          <span>Can move through obstacles and creatures.</span>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(280px, 1fr))", gap: "0.75rem", marginBottom: "0.75rem" }}>
                 {Object.entries(activeMonster.stats)
@@ -1494,9 +1757,11 @@ export function MonsterEditorApp({
                   <div key={label} style={statPanelStyle}>
                     <h3 style={sectionTitleStyle}>{formatStatLabel(label)}</h3>
                     <div style={{ marginTop: "0.45rem", ...bodySecondary, display: "grid", gap: "0.2rem" }}>
-                      {Object.keys(block).length === 0
+                      {Object.keys(block).filter((k) => !(label === "otherNumbers" && k === "movement")).length === 0
                         ? "No values"
-                        : Object.entries(block).map(([k, v], idx) => (
+                        : Object.entries(block)
+                            .filter(([k]) => !(label === "otherNumbers" && k === "movement"))
+                            .map(([k, v], idx) => (
                             <div
                               key={k}
                               style={{
@@ -1525,7 +1790,72 @@ export function MonsterEditorApp({
                               </span>
                               {renderStatValue(v, startGlossaryHover, leaveGlossaryHover)}
                             </div>
-                          ))}
+                            ))}
+                      {label === "defenses" ? (
+                        <>
+                          {Array.isArray(activeMonster.immunities) && activeMonster.immunities.length > 0 ? (
+                            <div
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns: "1fr auto",
+                                alignItems: "center",
+                                columnGap: "0.5rem",
+                                fontVariantNumeric: "tabular-nums",
+                                padding: "0.22rem 0.35rem",
+                                borderRadius: "0.25rem",
+                                backgroundColor: "var(--table-stripe-even)"
+                              }}
+                            >
+                              <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>Immunities</span>
+                              <strong style={statValueStrong}>{renderTagList(activeMonster.immunities)}</strong>
+                            </div>
+                          ) : null}
+                          {Array.isArray(activeMonster.resistances) && activeMonster.resistances.length > 0 ? (
+                            <div
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns: "1fr auto",
+                                alignItems: "center",
+                                columnGap: "0.5rem",
+                                fontVariantNumeric: "tabular-nums",
+                                padding: "0.22rem 0.35rem",
+                                borderRadius: "0.25rem",
+                                backgroundColor: "var(--table-stripe-odd)"
+                              }}
+                            >
+                              <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>Resists</span>
+                              <strong style={statValueStrong}>
+                                {activeMonster.resistances
+                                  .map((resistance) => weaknessLine(resistance as Record<string, unknown>))
+                                  .filter(Boolean)
+                                  .join(", ")}
+                              </strong>
+                            </div>
+                          ) : null}
+                          {Array.isArray(activeMonster.weaknesses) && activeMonster.weaknesses.length > 0 ? (
+                            <div
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns: "1fr auto",
+                                alignItems: "center",
+                                columnGap: "0.5rem",
+                                fontVariantNumeric: "tabular-nums",
+                                padding: "0.22rem 0.35rem",
+                                borderRadius: "0.25rem",
+                                backgroundColor: "var(--table-stripe-even)"
+                              }}
+                            >
+                              <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>Vulnerabilities</span>
+                              <strong style={statValueStrong}>
+                                {activeMonster.weaknesses
+                                  .map((weakness) => weaknessLine(weakness as Record<string, unknown>))
+                                  .filter(Boolean)
+                                  .join(", ")}
+                              </strong>
+                            </div>
+                          ) : null}
+                        </>
+                      ) : null}
                     </div>
                   </div>
                 ))}
@@ -1534,35 +1864,190 @@ export function MonsterEditorApp({
               {isRenderableCardValue(activeMonster.tactics) ? (
                 <div style={{ ...panelStyle, padding: "0.5rem", marginBottom: "0.75rem" }}>
                   <h3 style={sectionTitleStyle}>Tactics</h3>
-                  <RulesRichText
-                    text={String(activeMonster.tactics)}
-                    paragraphStyle={richTextBodyPrimary.paragraphStyle}
-                    listItemStyle={richTextBodyPrimary.listItemStyle}
-                  />
+                  <div style={{ ...richTextBodyPrimary.paragraphStyle, whiteSpace: "pre-wrap" }}>
+                    {renderGlossaryAwareText(
+                      String(activeMonster.tactics),
+                      commonDescriptiveGlossaryPhrases,
+                      startGlossaryHover,
+                      leaveGlossaryHover,
+                      "tactics",
+                      shouldHighlightGlossaryTerm
+                    )}
+                  </div>
+                </div>
+              ) : null}
+
+              {Array.isArray(activeMonster.auras) && activeMonster.auras.length > 0 ? (
+                <div style={{ ...panelStyle, padding: "0.5rem", marginBottom: "0.75rem" }}>
+                  <h3 style={sectionTitleStyle}>Auras</h3>
+                  <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.2rem" }}>
+                    {activeMonster.auras.map((aura, idx) => (
+                      <div key={`aura-${idx}`} style={{ ...bodyPrimary, display: "grid", gap: "0.2rem" }}>
+                        <div>
+                          {(() => {
+                            const name = String(aura.name ?? "").trim();
+                            const details = String(aura.details ?? "").trim();
+                            const rangeValue = aura.range;
+                            const rangeText =
+                              rangeValue !== undefined && rangeValue !== null && String(rangeValue).trim() !== ""
+                                ? `Range ${String(rangeValue).trim()}`
+                                : "";
+                            const heading = [name, rangeText].filter(Boolean).join(" • ");
+                            const detailParts = splitByGlossaryPhrases(details, traitDetailGlossaryPhrases);
+                            return (
+                              <>
+                                {heading ? `${heading}: ` : ""}
+                                {detailParts.map((part, partIdx) =>
+                                  part.glossaryTerm && shouldHighlightGlossaryTerm(part.glossaryTerm) ? (
+                                    <span
+                                      key={`aura-${idx}-detail-${partIdx}`}
+                                      onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${part.glossaryTerm}`)}
+                                      onMouseLeave={leaveGlossaryHover}
+                                      style={glossaryLinkUnderline}
+                                    >
+                                      {part.text}
+                                    </span>
+                                  ) : (
+                                    <span key={`aura-${idx}-detail-${partIdx}`}>{part.text}</span>
+                                  )
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
+                        {(() => {
+                          const badges = renderTraitMetaBadges(aura);
+                          if (badges.length === 0) return null;
+                          return (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
+                              {badges.map((badge) => (
+                                shouldHighlightGlossaryTerm(badge) ? (
+                                  <span
+                                    key={`aura-${idx}-${badge}`}
+                                    onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${badge}`)}
+                                    onMouseLeave={leaveGlossaryHover}
+                                    style={sheetTagPillStyle}
+                                  >
+                                    {badge}
+                                  </span>
+                                ) : (
+                                  <span key={`aura-${idx}-${badge}`} style={{ ...sheetTagPillStyle, cursor: "default" }}>
+                                    {badge}
+                                  </span>
+                                )
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {Array.isArray(activeMonster.traits) && activeMonster.traits.length > 0 ? (
+                <div style={{ ...panelStyle, padding: "0.5rem", marginBottom: "0.75rem" }}>
+                  <h3 style={sectionTitleStyle}>Traits</h3>
+                  <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.2rem" }}>
+                    {activeMonster.traits.map((trait, idx) => (
+                      <div key={`trait-${idx}`} style={{ ...bodyPrimary, display: "grid", gap: "0.2rem" }}>
+                        <div>
+                          {(() => {
+                            const name = String(trait.name ?? "").trim();
+                            const details = String(trait.details ?? "").trim();
+                            const rangeValue = trait.range;
+                            const rangeText =
+                              rangeValue !== undefined && rangeValue !== null && String(rangeValue).trim() !== ""
+                                ? `Range ${String(rangeValue).trim()}`
+                                : "";
+                            const heading = [name, rangeText].filter(Boolean).join(" • ");
+                            const detailParts = splitByGlossaryPhrases(details, traitDetailGlossaryPhrases);
+                            return (
+                              <>
+                                {heading ? `${heading}: ` : ""}
+                                {detailParts.map((part, partIdx) =>
+                                  part.glossaryTerm && shouldHighlightGlossaryTerm(part.glossaryTerm) ? (
+                                    <span
+                                      key={`trait-${idx}-detail-${partIdx}`}
+                                      onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${part.glossaryTerm}`)}
+                                      onMouseLeave={leaveGlossaryHover}
+                                      style={glossaryLinkUnderline}
+                                    >
+                                      {part.text}
+                                    </span>
+                                  ) : (
+                                    <span key={`trait-${idx}-detail-${partIdx}`}>{part.text}</span>
+                                  )
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
+                        {(() => {
+                          const badges = renderTraitMetaBadges(trait);
+                          if (badges.length === 0) return null;
+                          return (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
+                              {badges.map((badge) => (
+                                shouldHighlightGlossaryTerm(badge) ? (
+                                  <span
+                                    key={`trait-${idx}-${badge}`}
+                                    onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${badge}`)}
+                                    onMouseLeave={leaveGlossaryHover}
+                                    style={sheetTagPillStyle}
+                                  >
+                                    {badge}
+                                  </span>
+                                ) : (
+                                  <span key={`trait-${idx}-${badge}`} style={{ ...sheetTagPillStyle, cursor: "default" }}>
+                                    {badge}
+                                  </span>
+                                )
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {Array.isArray(activeMonster.senses) && activeMonster.senses.length > 0 ? (
+                <div style={{ ...panelStyle, padding: "0.5rem", marginBottom: "0.75rem" }}>
+                  <h3 style={sectionTitleStyle}>Senses</h3>
+                  <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.24rem" }}>
+                    {activeMonster.senses
+                      .map((sense) => {
+                        const name = String(sense.name ?? "").trim();
+                        const range = sense.range;
+                        if (!name) return "";
+                        return range !== undefined && range !== null && range !== "" ? `${name} ${range}` : name;
+                      })
+                      .filter(Boolean)
+                      .map((line, idx) => (
+                        <div
+                          key={`sense-${idx}`}
+                          onMouseEnter={(event) =>
+                            startGlossaryHover(event, `glossaryTerm:${String(activeMonster.senses?.[idx]?.name ?? "Senses")}`)
+                          }
+                          onMouseLeave={leaveGlossaryHover}
+                          style={{ ...bodyPrimary, ...glossaryLinkUnderline, width: "fit-content" }}
+                        >
+                          {line}
+                        </div>
+                      ))}
+                  </div>
                 </div>
               ) : null}
 
               {(activeMonster.alignment?.name || isRenderableCardValue(activeMonster.description)) ? (
                 <div style={{ ...panelStyle, padding: "0.5rem", marginBottom: "0.75rem" }}>
-                  <h3 style={sectionTitleStyle}>Traits</h3>
+                  <h3 style={sectionTitleStyle}>Details</h3>
                   <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.3rem" }}>
                     {activeMonster.alignment?.name ? (
                       <div style={bodyPrimary}>
                         <strong>Alignment:</strong> {activeMonster.alignment.name}
-                      </div>
-                    ) : null}
-                    {Array.isArray(activeMonster.senses) && activeMonster.senses.length > 0 ? (
-                      <div style={bodyPrimary}>
-                        <strong>Senses:</strong>{" "}
-                        {activeMonster.senses
-                          .map((sense) => {
-                            const name = String(sense.name ?? "").trim();
-                            const range = sense.range;
-                            if (!name) return "";
-                            return range !== undefined && range !== null && range !== "" ? `${name} ${range}` : name;
-                          })
-                          .filter(Boolean)
-                          .join(", ")}
                       </div>
                     ) : null}
                     <div style={bodyPrimary}>
@@ -1571,18 +2056,6 @@ export function MonsterEditorApp({
                     <div style={bodyPrimary}>
                       <strong>Keywords:</strong> {renderTagList(activeMonster.keywords)}
                     </div>
-                    <div style={bodyPrimary}>
-                      <strong>Immunities:</strong> {renderTagList(activeMonster.immunities)}
-                    </div>
-                    {Array.isArray(activeMonster.resistances) && activeMonster.resistances.length > 0 ? (
-                      <div style={bodyPrimary}>
-                        <strong>Resistances:</strong>{" "}
-                        {activeMonster.resistances
-                          .map((resistance) => weaknessLine(resistance as Record<string, unknown>))
-                          .filter(Boolean)
-                          .join(", ")}
-                      </div>
-                    ) : null}
                     {Array.isArray(activeMonster.sourceBooks) && activeMonster.sourceBooks.length > 0 ? (
                       <div style={bodyPrimary}>
                         <strong>Sources:</strong> {activeMonster.sourceBooks.join(", ")}
@@ -1593,38 +2066,21 @@ export function MonsterEditorApp({
                         <strong>Regeneration:</strong> {String(activeMonster.regeneration)}
                       </div>
                     ) : null}
-                    {isRenderableCardValue(activeMonster.compendiumUrl) ? (
-                      <div style={{ ...bodyPrimary, overflowWrap: "anywhere" }}>
-                        <strong>Compendium URL:</strong> {String(activeMonster.compendiumUrl)}
-                      </div>
-                    ) : null}
                     {isRenderableCardValue(activeMonster.description) ? (
-                      <RulesRichText
-                        text={String(activeMonster.description)}
-                        paragraphStyle={{ ...richTextBodyPrimary.paragraphStyle, margin: "0.2rem 0 0 0" }}
-                        listItemStyle={richTextBodyPrimary.listItemStyle}
-                      />
+                      <div style={{ ...richTextBodyPrimary.paragraphStyle, margin: "0.2rem 0 0 0", whiteSpace: "pre-wrap" }}>
+                        {renderGlossaryAwareText(
+                          String(activeMonster.description),
+                          commonDescriptiveGlossaryPhrases,
+                          startGlossaryHover,
+                          leaveGlossaryHover,
+                          "details-description",
+                          shouldHighlightGlossaryTerm
+                        )}
+                      </div>
                     ) : null}
                   </div>
                 </div>
               ) : null}
-
-              {(() => {
-                const weaknesses = sectionArrayOfObjects(activeMonster.weaknesses);
-                if (weaknesses.length === 0) return null;
-                return (
-                  <div style={{ ...panelStyle, padding: "0.5rem", marginBottom: "0.75rem" }}>
-                    <h3 style={sectionTitleStyle}>Weaknesses</h3>
-                    <div style={{ marginTop: "0.4rem", display: "grid", gap: "0.24rem" }}>
-                      {weaknesses.map((entry, idx) => (
-                        <div key={`weakness-${idx}`} style={bodyPrimary}>
-                          {weaknessLine(entry)}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })()}
 
               {(() => {
                 const items = sectionArrayOfObjects(activeMonster.items);
@@ -1648,11 +2104,16 @@ export function MonsterEditorApp({
                             {isRenderableCardValue(description) ? (
                               <details style={{ marginTop: "0.22rem" }}>
                                 <summary style={{ cursor: "pointer", ...metaSecondary }}>Description</summary>
-                                <RulesRichText
-                                  text={description}
-                                  paragraphStyle={{ fontSize: "0.8rem", color: "var(--text-primary)", margin: "0.24rem 0 0 0" }}
-                                  listItemStyle={{ fontSize: "0.8rem", color: "var(--text-primary)" }}
-                                />
+                                <div style={{ fontSize: "0.8rem", color: "var(--text-primary)", margin: "0.24rem 0 0 0", whiteSpace: "pre-wrap" }}>
+                                  {renderGlossaryAwareText(
+                                    description,
+                                    commonDescriptiveGlossaryPhrases,
+                                    startGlossaryHover,
+                                    leaveGlossaryHover,
+                                    `item-${idx}-description`,
+                                    shouldHighlightGlossaryTerm
+                                  )}
+                                </div>
                               </details>
                             ) : null}
                           </div>
@@ -1787,16 +2248,40 @@ export function MonsterEditorApp({
                                     <>
                                       {isRenderableCardValue(split.mainText) ? (
                                         <div>
-                                          <strong>{line.label}:</strong> {split.mainText}
+                                          <strong>{line.label}:</strong>{" "}
+                                          {renderGlossaryAwareText(
+                                            split.mainText,
+                                            commonDescriptiveGlossaryPhrases,
+                                            startGlossaryHover,
+                                            leaveGlossaryHover,
+                                            `${power.name}-${index}-${line.label}-main`,
+                                            shouldHighlightGlossaryTerm
+                                          )}
                                         </div>
                                       ) : (
                                         <div>
-                                          <strong>{line.label}:</strong> {line.text}
+                                          <strong>{line.label}:</strong>{" "}
+                                          {renderGlossaryAwareText(
+                                            line.text,
+                                            commonDescriptiveGlossaryPhrases,
+                                            startGlossaryHover,
+                                            leaveGlossaryHover,
+                                            `${power.name}-${index}-${line.label}-fallback`,
+                                            shouldHighlightGlossaryTerm
+                                          )}
                                         </div>
                                       )}
                                       {split.failedEscapeTexts.map((failedText) => (
                                         <div key={`${power.name}-${index}-${line.label}-failed-${failedText}`} style={{ marginTop: "0.04rem" }}>
-                                          <strong>Failed Escape Attempt:</strong> {failedText}
+                                          <strong>Failed Escape Attempt:</strong>{" "}
+                                          {renderGlossaryAwareText(
+                                            failedText,
+                                            commonDescriptiveGlossaryPhrases,
+                                            startGlossaryHover,
+                                            leaveGlossaryHover,
+                                            `${power.name}-${index}-${line.label}-failed`,
+                                            shouldHighlightGlossaryTerm
+                                          )}
                                         </div>
                                       ))}
                                     </>
@@ -1848,16 +2333,40 @@ export function MonsterEditorApp({
                                             <>
                                               {isRenderableCardValue(split.mainText) ? (
                                                 <div>
-                                                  <strong>{line.label}:</strong> {split.mainText}
+                                                  <strong>{line.label}:</strong>{" "}
+                                                  {renderGlossaryAwareText(
+                                                    split.mainText,
+                                                    commonDescriptiveGlossaryPhrases,
+                                                    startGlossaryHover,
+                                                    leaveGlossaryHover,
+                                                    `${power.name}-${index}-secondary-${secondaryIndex}-${line.label}-main`,
+                                                    shouldHighlightGlossaryTerm
+                                                  )}
                                                 </div>
                                               ) : (
                                                 <div>
-                                                  <strong>{line.label}:</strong> {line.text}
+                                                  <strong>{line.label}:</strong>{" "}
+                                                  {renderGlossaryAwareText(
+                                                    line.text,
+                                                    commonDescriptiveGlossaryPhrases,
+                                                    startGlossaryHover,
+                                                    leaveGlossaryHover,
+                                                    `${power.name}-${index}-secondary-${secondaryIndex}-${line.label}-fallback`,
+                                                    shouldHighlightGlossaryTerm
+                                                  )}
                                                 </div>
                                               )}
                                               {split.failedEscapeTexts.map((failedText) => (
                                                 <div key={`${power.name}-${index}-secondary-${secondaryIndex}-${line.label}-failed-${failedText}`} style={{ marginTop: "0.04rem" }}>
-                                                  <strong>Failed Escape Attempt:</strong> {failedText}
+                                                  <strong>Failed Escape Attempt:</strong>{" "}
+                                                  {renderGlossaryAwareText(
+                                                    failedText,
+                                                    commonDescriptiveGlossaryPhrases,
+                                                    startGlossaryHover,
+                                                    leaveGlossaryHover,
+                                                    `${power.name}-${index}-secondary-${secondaryIndex}-${line.label}-failed`,
+                                                    shouldHighlightGlossaryTerm
+                                                  )}
                                                 </div>
                                               ))}
                                             </>
@@ -1872,21 +2381,41 @@ export function MonsterEditorApp({
                           ) : null}
                           {isRenderableCardValue(power.flavorText) ? (
                             <div style={{ ...bodySecondary, marginBottom: "0.2rem", fontStyle: "italic" }}>
-                              {power.flavorText}
+                              {renderGlossaryAwareText(
+                                String(power.flavorText),
+                                commonDescriptiveGlossaryPhrases,
+                                startGlossaryHover,
+                                leaveGlossaryHover,
+                                `${power.name}-${index}-flavor`,
+                                shouldHighlightGlossaryTerm
+                              )}
                             </div>
                           ) : null}
                           <div style={bodyPrimary}>
                             {isRenderableCardValue(cardModel.descriptionText) ? (
-                              <RulesRichText
-                                text={cardModel.descriptionText}
-                                paragraphStyle={{ ...richTextBodyPrimary.paragraphStyle, margin: "0 0 0.35rem 0" }}
-                                listItemStyle={richTextBodyPrimary.listItemStyle}
-                              />
+                              <div style={{ ...richTextBodyPrimary.paragraphStyle, margin: "0 0 0.35rem 0", whiteSpace: "pre-wrap" }}>
+                                {renderGlossaryAwareText(
+                                  cardModel.descriptionText,
+                                  commonDescriptiveGlossaryPhrases,
+                                  startGlossaryHover,
+                                  leaveGlossaryHover,
+                                  `${power.name}-${index}-description`,
+                                  shouldHighlightGlossaryTerm
+                                )}
+                              </div>
                             ) : null}
                           </div>
                           {isRenderableCardValue(cardModel.ongoingText) ? (
                             <div style={{ marginTop: "0.05rem", ...bodyPrimary }}>
-                              <strong>ONGOING:</strong> {cardModel.ongoingText}
+                              <strong>ONGOING:</strong>{" "}
+                              {renderGlossaryAwareText(
+                                cardModel.ongoingText,
+                                commonDescriptiveGlossaryPhrases,
+                                startGlossaryHover,
+                                leaveGlossaryHover,
+                                `${power.name}-${index}-ongoing`,
+                                shouldHighlightGlossaryTerm
+                              )}
                             </div>
                           ) : null}
                             </div>
@@ -1909,23 +2438,76 @@ export function MonsterEditorApp({
           <summary style={{ cursor: "pointer", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--text-primary)" }}>
             JSON
           </summary>
-          <div style={{ marginTop: "0.5rem" }}>
+          <div style={{ marginTop: "0.5rem", display: "flex", flexWrap: "wrap", gap: "0.35rem", alignItems: "center" }}>
+            <input
+              value={jsonSearchInput}
+              onChange={(event) => setJsonSearchInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter") return;
+                event.preventDefault();
+                const committed = jsonSearchInput.trim();
+                setJsonSearchQuery(committed);
+                setJsonSearchResultIdx(0);
+                setJsonSearchJumpTick((prev) => prev + 1);
+              }}
+              placeholder="Search JSON..."
+              style={{
+                minWidth: 260,
+                border: "1px solid var(--panel-border)",
+                borderRadius: "0.28rem",
+                padding: "0.22rem 0.3rem"
+              }}
+            />
+            <button
+              type="button"
+              disabled={jsonSearchMatches.length === 0}
+              onClick={() =>
+                setJsonSearchResultIdx((prev) => {
+                  const nextIdx = jsonSearchMatches.length === 0 ? 0 : (prev - 1 + jsonSearchMatches.length) % jsonSearchMatches.length;
+                  setJsonSearchJumpTick((tick) => tick + 1);
+                  return nextIdx;
+                })
+              }
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              disabled={jsonSearchMatches.length === 0}
+              onClick={() =>
+                setJsonSearchResultIdx((prev) => {
+                  const nextIdx = jsonSearchMatches.length === 0 ? 0 : (prev + 1) % jsonSearchMatches.length;
+                  setJsonSearchJumpTick((tick) => tick + 1);
+                  return nextIdx;
+                })
+              }
+            >
+              Next
+            </button>
+            <span style={metaSecondary}>
+              {jsonSearchQuery.trim()
+                ? jsonSearchMatches.length > 0
+                  ? `${Math.min(jsonSearchResultIdx + 1, jsonSearchMatches.length)} of ${jsonSearchMatches.length}`
+                  : "0 matches"
+                : "Type and press Enter"}
+            </span>
             <button
               type="button"
               onClick={() => {
-                const rawJson = JSON.stringify(activeMonster, null, 2);
                 if (!navigator.clipboard?.writeText) {
                   alert("Clipboard API unavailable in this browser.");
                   return;
                 }
-                void navigator.clipboard.writeText(rawJson);
+                void navigator.clipboard.writeText(rawJsonText);
               }}
+              style={{ marginLeft: "auto" }}
             >
               Copy Contents
             </button>
           </div>
           <textarea
-            value={JSON.stringify(activeMonster, null, 2)}
+            ref={jsonTextareaRef}
+            value={rawJsonText}
             readOnly
             style={{
               margin: "0.55rem 0 0 0",

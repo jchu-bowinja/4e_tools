@@ -76,6 +76,16 @@ This document describes normalized fields currently emitted under `sections` by 
   - Example values:
     - `"THE GOD OF HONOR, JUSTICE AND NOBILITY, Bahamut is known as..."`
 
+- `traits: Array<{ name?: string; details?: string; range?: string | number; type?: string; keywords?: string[] }>`
+  - Extracted from `MonsterTrait` nodes in source powers.
+  - Example values:
+    - `[{"name":"Flash Fire","details":"The dragon can enter enemies’ spaces during its movement.","range":0,"type":"Trait"}]`
+
+- `auras: Array<{ name?: string; details?: string; range?: string | number; type?: string; keywords?: string[] }>`
+  - Aura-classified subset of `traits` (trait text contains `"aura"` or range is greater than 0).
+  - Example values:
+    - `[{"name":"Withering Heat","details":"Any enemy that ends its turn in the aura takes 3 fire damage...","range":1,"type":"Trait","keywords":["Fire"]}]`
+
 ## Related Normalized Stat Fields
 
 These are normalized under `stats.otherNumbers` (not under `sections`):
