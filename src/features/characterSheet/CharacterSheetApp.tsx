@@ -191,7 +191,7 @@ const CONDITION_EMOJIS: Record<string, string> = {
 };
 
 function conditionBadgeStyle(name: string): CSSProperties {
-  const colors = CONDITION_COLORS[name.trim().toLowerCase()] ?? { background: "#e8edf5", text: "var(--text-primary)" };
+  const colors = CONDITION_COLORS[name.trim().toLowerCase()] ?? { background: "var(--surface-3)", text: "var(--text-primary)" };
   return {
     padding: "0.14rem 0.35rem",
     borderRadius: "0.25rem",
@@ -762,6 +762,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   }
 
   function renderHitPointsPanel(): JSX.Element {
+    const isBloodied = sheet.resources.currentHp <= derived.bloodied;
+    const isDead = sheet.resources.currentHp <= -derived.bloodied || sheet.resources.deathSaves >= 3;
+    const isDying = sheet.resources.currentHp <= 0 && !isDead;
+
     return (
       <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.5rem", backgroundColor: "var(--surface-0)", display: "grid", gap: "0.35rem" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.35rem" }}>
@@ -771,7 +775,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             onMouseLeave={leaveGlossaryHoverInfo}
           >
             Hit Points
-            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexWrap: "wrap" }}>
               <input
                 type="number"
                 max={derived.maxHp}
@@ -791,6 +795,37 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 }}
               />
               <span style={{ fontWeight: 700, color: "var(--text-secondary)" }}>/ {derived.maxHp}</span>
+              {(isBloodied || isDying || isDead) && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem", marginLeft: "0.15rem" }}>
+                  {isBloodied && (
+                    <div
+                      onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "bloodied")}
+                      onMouseLeave={leaveGlossaryHoverInfo}
+                      style={conditionBadgeStyle("bloodied")}
+                    >
+                      {conditionDisplayLabel("Bloodied")}
+                    </div>
+                  )}
+                  {isDying && (
+                    <div
+                      onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "dying")}
+                      onMouseLeave={leaveGlossaryHoverInfo}
+                      style={conditionBadgeStyle("dying")}
+                    >
+                      {conditionDisplayLabel("Dying")}
+                    </div>
+                  )}
+                  {isDead && (
+                    <div
+                      onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "dead")}
+                      onMouseLeave={leaveGlossaryHoverInfo}
+                      style={conditionBadgeStyle("dead")}
+                    >
+                      {conditionDisplayLabel("Dead")}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </label>
           <label
@@ -889,10 +924,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   }
 
   function renderConditionsPanel(): JSX.Element {
-    const isBloodied = sheet.resources.currentHp <= derived.bloodied;
-    const isDead = sheet.resources.currentHp <= -derived.bloodied || sheet.resources.deathSaves >= 3;
-    const isDying = sheet.resources.currentHp <= 0 && !isDead;
-
     return (
       <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", backgroundColor: "var(--surface-1)", padding: "0.4rem", display: "grid", gap: "0.25rem", alignContent: "start" }}>
         <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700 }}>
@@ -946,35 +977,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             </button>
           )}
         </div>
-        {!isBloodied && !isDying && !isDead && sheet.resources.conditions.length === 0 && (
+        {sheet.resources.conditions.length === 0 && (
           <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>None</div>
-        )}
-        {isBloodied && (
-          <div
-            onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "bloodied")}
-            onMouseLeave={leaveGlossaryHoverInfo}
-            style={conditionBadgeStyle("bloodied")}
-          >
-            {conditionDisplayLabel("Bloodied")}
-          </div>
-        )}
-        {isDying && (
-          <div
-            onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "dying")}
-            onMouseLeave={leaveGlossaryHoverInfo}
-            style={conditionBadgeStyle("dying")}
-          >
-            {conditionDisplayLabel("Dying")}
-          </div>
-        )}
-        {isDead && (
-          <div
-            onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "dead")}
-            onMouseLeave={leaveGlossaryHoverInfo}
-            style={conditionBadgeStyle("dead")}
-          >
-            {conditionDisplayLabel("Dead")}
-          </div>
         )}
         {sheet.resources.conditions.length > 0 && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "0.25rem" }}>
