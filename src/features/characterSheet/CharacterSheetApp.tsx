@@ -579,6 +579,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     cancelGlossaryHoverCloseTimer();
     const rect = event.currentTarget.getBoundingClientRect();
     setGlossaryHoverPanelPos(positionFixedTooltip(rect, { panelWidth: 340, maxHeightVh: 50 }));
+    const switchingHoverTarget = showGlossaryHoverInfo && glossaryHoverKey !== null && glossaryHoverKey !== key;
+    if (switchingHoverTarget) {
+      setShowGlossaryHoverInfo(false);
+    }
     setGlossaryHoverKey(key);
     if (glossaryHoverTimerRef.current != null) {
       window.clearTimeout(glossaryHoverTimerRef.current);

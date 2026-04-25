@@ -926,6 +926,10 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     cancelGlossaryHoverCloseTimer();
     const rect = event.currentTarget.getBoundingClientRect();
     setGlossaryHoverPanelPos(positionFixedTooltip(rect, { panelWidth: 360, maxHeightVh: 48 }));
+    const switchingHoverTarget = showGlossaryHoverInfo && glossaryHoverKey !== null && glossaryHoverKey !== key;
+    if (switchingHoverTarget) {
+      setShowGlossaryHoverInfo(false);
+    }
     setGlossaryHoverKey(key);
     if (glossaryHoverTimerRef.current != null) {
       window.clearTimeout(glossaryHoverTimerRef.current);
@@ -938,7 +942,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     glossaryHoverTimerRef.current = window.setTimeout(() => {
       setShowGlossaryHoverInfo(true);
       glossaryHoverTimerRef.current = null;
-    }, 1000);
+    }, 1200);
   }
 
   function leaveGlossaryHover(): void {

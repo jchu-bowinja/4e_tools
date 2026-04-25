@@ -1455,6 +1455,10 @@ export function MonsterEditorApp({
     cancelGlossaryHoverCloseTimer();
     const rect = event.currentTarget.getBoundingClientRect();
     setGlossaryHoverPanelPos(positionFixedTooltip(rect, { panelWidth: 340, maxHeightVh: 50 }));
+    const switchingHoverTarget = showGlossaryHoverInfo && glossaryHoverKey !== null && glossaryHoverKey !== key;
+    if (switchingHoverTarget) {
+      setShowGlossaryHoverInfo(false);
+    }
     setGlossaryHoverKey(key);
     if (glossaryHoverTimerRef.current != null) {
       window.clearTimeout(glossaryHoverTimerRef.current);
@@ -1467,7 +1471,7 @@ export function MonsterEditorApp({
     glossaryHoverTimerRef.current = window.setTimeout(() => {
       setShowGlossaryHoverInfo(true);
       glossaryHoverTimerRef.current = null;
-    }, 1000);
+    }, 1200);
   }
 
   function leaveGlossaryHover(): void {
