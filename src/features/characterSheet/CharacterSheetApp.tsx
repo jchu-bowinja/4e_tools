@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FocusEvent as ReactFocusEvent,
+  type MouseEvent as ReactMouseEvent
+} from "react";
 import type { Armor, Implement, RulesIndex, Weapon } from "../../rules/models";
 import { computeSkillSheetRows } from "../../rules/skillCalculator";
 import { loadSavedCharacters, type SavedCharacterEntry } from "../builder/storage";
@@ -331,6 +339,7 @@ type GlossaryKey =
   | `powerUsage:daily`
   | `ability:${AbilityCode}`
   | `skill:${string}`;
+const CHARACTER_SHEET_GLOSSARY_TOOLTIP_ID = "character-sheet-glossary-tooltip";
 
 export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesIndex; tooltipGlossary: Record<string, string> }): JSX.Element {
   const [sheet, setSheet] = useState<CharacterSheetState>(() => loadCharacterSheetState());
@@ -431,6 +440,25 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   }, []);
 
   useEffect(() => {
+    function onWindowKeyDown(event: KeyboardEvent): void {
+      if (event.key !== "Escape") return;
+      if (glossaryHoverTimerRef.current != null) {
+        window.clearTimeout(glossaryHoverTimerRef.current);
+        glossaryHoverTimerRef.current = null;
+      }
+      if (glossaryHoverCloseTimerRef.current != null) {
+        window.clearTimeout(glossaryHoverCloseTimerRef.current);
+        glossaryHoverCloseTimerRef.current = null;
+      }
+      setShowGlossaryHoverInfo(false);
+      setGlossaryHoverKey(null);
+      setGlossaryHoverPanelPos(null);
+    }
+    window.addEventListener("keydown", onWindowKeyDown);
+    return () => window.removeEventListener("keydown", onWindowKeyDown);
+  }, []);
+
+  useEffect(() => {
     glossaryTermLookupCacheRef.current.clear();
   }, [tooltipGlossary, index]);
 
@@ -513,13 +541,21 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     setGlossaryHoverPanelPos(null);
   }
 
-  function startGlossaryHoverInfoTimer(event: ReactMouseEvent<HTMLElement>, key: GlossaryKey): void {
+  function startGlossaryHoverInfoTimer(
+    event: ReactMouseEvent<HTMLElement> | ReactFocusEvent<HTMLElement>,
+    key: GlossaryKey
+  ): void {
     cancelGlossaryHoverCloseTimer();
     const rect = event.currentTarget.getBoundingClientRect();
     setGlossaryHoverPanelPos(positionFixedTooltip(rect, { panelWidth: 340, maxHeightVh: 50 }));
     setGlossaryHoverKey(key);
     if (glossaryHoverTimerRef.current != null) {
       window.clearTimeout(glossaryHoverTimerRef.current);
+    }
+    if (event.type === "focus") {
+      setShowGlossaryHoverInfo(true);
+      glossaryHoverTimerRef.current = null;
+      return;
     }
     glossaryHoverTimerRef.current = window.setTimeout(() => {
       setShowGlossaryHoverInfo(true);
@@ -564,7 +600,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             <span
               key={`${keyPrefix}-${idx}`}
               onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `powerKeyword:${term}`)}
+              onFocus={(event) => startGlossaryHoverInfoTimer(event, `powerKeyword:${term}`)}
               onMouseLeave={leaveGlossaryHoverInfo}
+              onBlur={leaveGlossaryHoverInfo}
+              tabIndex={0}
               style={{
                 cursor: "help",
                 textDecoration: "underline dotted",
@@ -725,7 +764,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   function renderHitPointsPanel(): JSX.Element {
     return (
       <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.5rem", backgroundColor: "var(--surface-0)", display: "grid", gap: "0.35rem" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "0.35rem" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.35rem" }}>
           <label
             style={{ ...labelStyle, padding: "0.28rem 0.35rem", border: "1px solid var(--panel-border)", borderRadius: "0.3rem", backgroundColor: "var(--surface-1)" }}
             onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "hp")}
@@ -938,7 +977,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           </div>
         )}
         {sheet.resources.conditions.length > 0 && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "0.25rem" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "0.25rem" }}>
             {sheet.resources.conditions.map((condition) => (
               <div
                 key={condition}
@@ -957,7 +996,13 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   letterSpacing: "0.04em"
                 }}
               >
-                <span onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `condition:${condition}`)} onMouseLeave={leaveGlossaryHoverInfo}>
+                <span
+                  onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `condition:${condition}`)}
+                  onFocus={(event) => startGlossaryHoverInfoTimer(event, `condition:${condition}`)}
+                  onMouseLeave={leaveGlossaryHoverInfo}
+                  onBlur={leaveGlossaryHoverInfo}
+                  tabIndex={0}
+                >
                   {conditionDisplayLabel(condition)}
                 </span>
                 <button
@@ -1032,7 +1077,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     return (
       <div style={{ border: "1px solid var(--panel-border-strong)", borderRadius: "0.35rem", backgroundColor: "var(--surface-0)", padding: "0.5rem", display: "grid", gap: "0.45rem" }}>
         <h3 style={sectionTitleStyle}>Status</h3>
-        <div style={{ display: "grid", gridTemplateColumns: "0.82fr 0.58fr 1.6fr", gap: "0.45rem", alignItems: "start" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "0.45rem", alignItems: "start" }}>
           {renderHitPointsPanel()}
           {renderDefensesPanel()}
           {renderConditionsPanel()}
@@ -1088,7 +1133,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   return (
     <div
       style={{
-        padding: "0.75rem",
+        padding: "clamp(0.65rem, 1.4vw, 1rem)",
+        maxWidth: "1440px",
+        margin: "0 auto",
+        boxSizing: "border-box",
         background: "var(--character-sheet-background, linear-gradient(180deg, var(--surface-1) 0%, var(--surface-1) 100%))",
         minHeight: "100%",
         color: "var(--character-sheet-foreground)"
@@ -1148,7 +1196,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               Refresh Saved List
             </button>
           </div>
-          <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "0.5rem", alignItems: "stretch" }}>
+          <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "0.5rem", alignItems: "stretch" }}>
             <div style={{ ...sectionInsetStyle, display: "grid", gap: "0.5rem", alignContent: "start" }}>
               <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.4rem", padding: "0.55rem", backgroundColor: "var(--surface-0)", display: "grid", gap: "0.35rem", boxShadow: "inset 0 0 0 1px var(--surface-2)" }}>
                 <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700 }}>
@@ -1364,7 +1412,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   return orderedBucketPowers.length === 0 ? (
                   <div style={{ color: "var(--text-muted)" }}>No cards selected.</div>
                 ) : (
-                  <div style={{ display: "grid", gap: "0.4rem", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", alignItems: "stretch" }}>
+                  <div style={{ display: "grid", gap: "0.4rem", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", alignItems: "stretch" }}>
                     {orderedBucketPowers.map((power) => {
                     const accent = usageAccentCardStyle(bucket);
                     const expended = usedSet.has(power.id);
@@ -1465,7 +1513,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                                   return (
                                     <span
                                       onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `powerKeyword:${keyword}`)}
+                                      onFocus={(event) => startGlossaryHoverInfoTimer(event, `powerKeyword:${keyword}`)}
                                       onMouseLeave={leaveGlossaryHoverInfo}
+                                      onBlur={leaveGlossaryHoverInfo}
+                                      tabIndex={0}
                                       style={{
                                         color: "var(--text-primary)",
                                         cursor: "help",
@@ -1490,7 +1541,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                                 {hasGlossaryHoverForTerm(actionType) ? (
                                   <span
                                     onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `powerKeyword:${actionType}`)}
+                                    onFocus={(event) => startGlossaryHoverInfoTimer(event, `powerKeyword:${actionType}`)}
                                     onMouseLeave={leaveGlossaryHoverInfo}
+                                    onBlur={leaveGlossaryHoverInfo}
+                                    tabIndex={0}
                                     style={{ cursor: "help", textDecoration: "underline dotted", textUnderlineOffset: "2px" }}
                                   >
                                     {actionType}
@@ -1639,6 +1693,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           )}
           {showGlossaryHoverInfo && glossaryHoverKey && glossaryHoverPanelPos && (
             <div
+              id={CHARACTER_SHEET_GLOSSARY_TOOLTIP_ID}
+              role="tooltip"
               onMouseEnter={cancelGlossaryHoverCloseTimer}
               onMouseLeave={leaveGlossaryHoverInfo}
               style={{
@@ -1777,7 +1833,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
 
           <div style={panelStyle}>
             <div style={{ fontWeight: 700, marginBottom: "0.5rem" }}>Equipment</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: "0.5rem" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.5rem" }}>
               {(["armor", "shield", "mainHand", "offHand", "implement"] as const).map((slot) => {
                 const equippedId = sheet.equipment[slot];
                 return (

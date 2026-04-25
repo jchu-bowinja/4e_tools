@@ -110,7 +110,7 @@ export function UtilitiesApp(): JSX.Element {
   }
 
   return (
-    <div style={{ maxWidth: 1120, margin: "0 auto", padding: "1rem" }}>
+    <div style={{ maxWidth: 1360, margin: "0 auto", padding: "clamp(0.75rem, 1.5vw, 1.15rem)", boxSizing: "border-box" }}>
       <h1 style={{ marginTop: 0 }}>Utilities</h1>
       <p style={{ marginTop: 0, color: "var(--text-muted)" }}>
         Import JSON character data into Character Builder saved characters, with duplicate ID/name handling.
@@ -119,7 +119,9 @@ export function UtilitiesApp(): JSX.Element {
       <div style={{ ...panelStyle, marginBottom: "0.75rem" }}>
         <label style={{ display: "block", marginBottom: "0.6rem", fontWeight: 600 }}>Source File</label>
         <input type="file" accept=".json,application/json,text/json" onChange={onFileSelected} />
-        <div style={{ marginTop: "0.6rem", color: statusColor }}>{statusMessage}</div>
+        <div role="status" aria-live="polite" style={{ marginTop: "0.6rem", color: statusColor }}>
+          {statusMessage}
+        </div>
       </div>
 
       <div style={panelStyle}>

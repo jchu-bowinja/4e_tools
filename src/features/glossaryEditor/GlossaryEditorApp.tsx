@@ -207,7 +207,7 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
   }
 
   return (
-    <div style={{ maxWidth: 1280, margin: "0 auto", padding: "1rem", color: "var(--text-primary)" }}>
+    <div style={{ maxWidth: 1360, margin: "0 auto", padding: "clamp(0.75rem, 1.5vw, 1.15rem)", color: "var(--text-primary)", boxSizing: "border-box" }}>
       <h1 style={{ marginTop: 0 }}>Glossary</h1>
       <p style={{ marginTop: 0, color: "var(--text-muted)", maxWidth: "52rem" }}>
         View and edit terms from <code>generated/glossary_terms.json</code>. Use <strong>Save to browser</strong> to store
@@ -217,6 +217,8 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
 
       {message && (
         <div
+          role="status"
+          aria-live="polite"
           style={{
             marginBottom: "0.75rem",
             padding: "0.5rem 0.65rem",
@@ -318,7 +320,7 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
             <div style={{ color: "var(--text-muted)" }}>Select a term, or create a new one.</div>
           ) : (
             <div style={{ display: "grid", gap: "0.65rem" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.65rem" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "0.65rem" }}>
                 <label>
                   <span style={labelStyle}>Name</span>
                   <input
@@ -338,7 +340,7 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
                   />
                 </label>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.65rem" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "0.65rem" }}>
                 <label>
                   <span style={labelStyle}>Category</span>
                   <input
@@ -358,7 +360,7 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
                   />
                 </label>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.65rem" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "0.65rem" }}>
                 <label>
                   <span style={labelStyle}>Source book</span>
                   <input

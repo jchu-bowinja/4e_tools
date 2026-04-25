@@ -522,6 +522,8 @@ type BuilderGlossaryKey =
   | "abilityScores"
   | `powerKeyword:${string}`;
 
+const BUILDER_GLOSSARY_TOOLTIP_ID = "builder-glossary-tooltip";
+
 function abilityModifier(score: number): number {
   return Math.floor((score - 10) / 2);
 }
@@ -565,11 +567,13 @@ const DEFAULT_POINT_BUY_BUDGET = 22;
 const ui = {
   page: {
     display: "grid" as const,
-    gridTemplateColumns: "2fr 1fr",
+    gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
     gap: "1.25rem",
     alignItems: "start" as const,
-    padding: "1.25rem",
-    minHeight: "100vh",
+    padding: "clamp(0.75rem, 1.5vw, 1.25rem)",
+    minHeight: "100%",
+    maxWidth: "1440px",
+    margin: "0 auto",
     boxSizing: "border-box" as const,
     fontFamily: "system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
     backgroundColor: "var(--app-background, " + NEUTRAL_PAGE_BG + ")",
@@ -818,6 +822,25 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     };
   }, []);
 
+  useEffect(() => {
+    function onWindowKeyDown(event: KeyboardEvent): void {
+      if (event.key !== "Escape") return;
+      if (glossaryHoverTimerRef.current != null) {
+        window.clearTimeout(glossaryHoverTimerRef.current);
+        glossaryHoverTimerRef.current = null;
+      }
+      if (glossaryHoverCloseTimerRef.current != null) {
+        window.clearTimeout(glossaryHoverCloseTimerRef.current);
+        glossaryHoverCloseTimerRef.current = null;
+      }
+      setShowGlossaryHoverInfo(false);
+      setGlossaryHoverKey(null);
+      setGlossaryHoverPanelPos(null);
+    }
+    window.addEventListener("keydown", onWindowKeyDown);
+    return () => window.removeEventListener("keydown", onWindowKeyDown);
+  }, []);
+
   function glossaryContent(key: BuilderGlossaryKey): JSX.Element {
     if (key.startsWith("powerKeyword:")) {
       const keyword = key.slice("powerKeyword:".length).trim();
@@ -868,13 +891,18 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     setGlossaryHoverPanelPos(null);
   }
 
-  function startGlossaryHover(event: React.MouseEvent<HTMLElement>, key: BuilderGlossaryKey): void {
+  function startGlossaryHover(event: React.MouseEvent<HTMLElement> | React.FocusEvent<HTMLElement>, key: BuilderGlossaryKey): void {
     cancelGlossaryHoverCloseTimer();
     const rect = event.currentTarget.getBoundingClientRect();
     setGlossaryHoverPanelPos(positionFixedTooltip(rect, { panelWidth: 360, maxHeightVh: 48 }));
     setGlossaryHoverKey(key);
     if (glossaryHoverTimerRef.current != null) {
       window.clearTimeout(glossaryHoverTimerRef.current);
+    }
+    if (event.type === "focus") {
+      setShowGlossaryHoverInfo(true);
+      glossaryHoverTimerRef.current = null;
+      return;
     }
     glossaryHoverTimerRef.current = window.setTimeout(() => {
       setShowGlossaryHoverInfo(true);
@@ -887,6 +915,25 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     glossaryHoverCloseTimerRef.current = window.setTimeout(() => {
       hideGlossaryHoverNow();
     }, GLOSSARY_HOVER_CLOSE_DELAY_MS);
+  }
+
+  function glossaryHoverA11y(key: BuilderGlossaryKey): {
+    onMouseEnter: (event: React.MouseEvent<HTMLElement>) => void;
+    onMouseLeave: () => void;
+    onFocus: (event: React.FocusEvent<HTMLElement>) => void;
+    onBlur: () => void;
+    tabIndex: number;
+    "aria-describedby"?: string;
+  } {
+    const active = showGlossaryHoverInfo && glossaryHoverKey === key;
+    return {
+      onMouseEnter: (event) => startGlossaryHover(event, key),
+      onMouseLeave: leaveGlossaryHover,
+      onFocus: (event) => startGlossaryHover(event, key),
+      onBlur: leaveGlossaryHover,
+      tabIndex: 0,
+      "aria-describedby": active ? BUILDER_GLOSSARY_TOOLTIP_ID : undefined
+    };
   }
 
   const skillSheetRows = useMemo(() => {
@@ -3709,7 +3756,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
           <div>
             <h3 style={sectionTitleStyle}>Equipment</h3>
             <div style={{ ...ui.blockInset, marginTop: "0.35rem", display: "grid", gap: "0.75rem", backgroundColor: "var(--surface-1)" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.65rem" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "0.65rem" }}>
                 <label>
                   Armor
                   <select value={build.armorId || ""} onChange={(e) => updateBuild({ ...build, armorId: e.target.value || undefined })} style={{ width: "100%" }}>
@@ -3981,15 +4028,13 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             <div style={{ display: "grid", gap: "0.25rem" }}>
               <p
                 style={{ margin: 0, fontSize: "0.88rem" }}
-                onMouseEnter={(event) => startGlossaryHover(event, "race")}
-                onMouseLeave={leaveGlossaryHover}
+                {...glossaryHoverA11y("race")}
               >
                 <strong>Race:</strong> {selectedRace?.name || "None"}
               </p>
               <p
                 style={{ margin: 0, fontSize: "0.88rem" }}
-                onMouseEnter={(event) => startGlossaryHover(event, "class")}
-                onMouseLeave={leaveGlossaryHover}
+                {...glossaryHoverA11y("class")}
               >
                 <strong>Class:</strong>{" "}
                 {isHybridBuild && (selectedHybridA || selectedHybridB)
@@ -4036,8 +4081,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               )}
               <p
                 style={{ margin: 0, fontSize: "0.88rem" }}
-                onMouseEnter={(event) => startGlossaryHover(event, "level")}
-                onMouseLeave={leaveGlossaryHover}
+                {...glossaryHoverA11y("level")}
               >
                 <strong>Level:</strong> {build.level}
               </p>
@@ -4079,11 +4123,10 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             <p style={{ margin: "0 0 0.4rem 0", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--text-secondary)", textTransform: "uppercase" }}>
               Combat Stats
             </p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.3rem 0.75rem" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "0.3rem 0.75rem" }}>
               <p
                 style={{ margin: 0, fontSize: "0.88rem" }}
-                onMouseEnter={(event) => startGlossaryHover(event, "hp")}
-                onMouseLeave={leaveGlossaryHover}
+                {...glossaryHoverA11y("hp")}
               >
                 <strong>HP:</strong> {derived.maxHp}
               </p>
@@ -4091,15 +4134,13 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Initiative:</strong> {derived.initiative >= 0 ? `+${derived.initiative}` : derived.initiative}</p>
               <p
                 style={{ margin: 0, fontSize: "0.88rem" }}
-                onMouseEnter={(event) => startGlossaryHover(event, "surges")}
-                onMouseLeave={leaveGlossaryHover}
+                {...glossaryHoverA11y("surges")}
               >
                 <strong>Healing Surges:</strong> {derived.healingSurgesPerDay}
               </p>
               <p
                 style={{ margin: 0, fontSize: "0.88rem" }}
-                onMouseEnter={(event) => startGlossaryHover(event, "surgeValue")}
-                onMouseLeave={leaveGlossaryHover}
+                {...glossaryHoverA11y("surgeValue")}
               >
                 <strong>Surge Value:</strong> {derived.surgeValue}
               </p>
@@ -4152,7 +4193,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             <p style={{ margin: "0 0 0.4rem 0", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--text-secondary)", textTransform: "uppercase" }}>
               Defenses
             </p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.3rem 0.75rem" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "0.3rem 0.75rem" }}>
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>AC:</strong> {derived.defenses.ac}</p>
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Fortitude:</strong> {derived.defenses.fortitude}</p>
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Reflex:</strong> {derived.defenses.reflex}</p>
@@ -4191,12 +4232,11 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
           <div style={{ borderTop: "1px solid var(--panel-border)", paddingTop: "0.65rem" }}>
             <p
               style={{ margin: "0 0 0.4rem 0", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--text-secondary)", textTransform: "uppercase" }}
-              onMouseEnter={(event) => startGlossaryHover(event, "abilityScores")}
-              onMouseLeave={leaveGlossaryHover}
+              {...glossaryHoverA11y("abilityScores")}
             >
               Ability Scores
             </p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.3rem 0.75rem", fontVariantNumeric: "tabular-nums" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "0.3rem 0.75rem", fontVariantNumeric: "tabular-nums" }}>
               {abilities.map((ability) => {
                 const score = effectiveAbilityScores[ability];
                 const mod = abilityModifier(score);
@@ -4212,8 +4252,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
           <div style={{ borderTop: "1px solid var(--panel-border)", paddingTop: "0.65rem" }}>
             <p
               style={{ margin: "0 0 0.4rem 0", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--text-secondary)", textTransform: "uppercase" }}
-              onMouseEnter={(event) => startGlossaryHover(event, "skills")}
-              onMouseLeave={leaveGlossaryHover}
+              {...glossaryHoverA11y("skills")}
             >
               Skills
             </p>
@@ -4246,6 +4285,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
 
           {showGlossaryHoverInfo && glossaryHoverKey && glossaryHoverPanelPos && (
             <div
+              id={BUILDER_GLOSSARY_TOOLTIP_ID}
+              role="tooltip"
               onMouseEnter={cancelGlossaryHoverCloseTimer}
               onMouseLeave={leaveGlossaryHover}
               style={{

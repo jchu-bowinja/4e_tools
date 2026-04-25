@@ -15,8 +15,9 @@ import { MonsterEditorApp } from "./features/monsterEditor/MonsterEditorApp";
 import { GlossaryEditorApp } from "./features/glossaryEditor/GlossaryEditorApp";
 import { glossaryRowsToTooltipMap, type GlossaryTermRow } from "./data/tooltipGlossary";
 import { loadInitialGlossaryRows, reloadGlossaryRowsFromBundle } from "./data/loadGlossaryRows";
+import { UtilitiesApp } from "./features/utilities/UtilitiesApp";
 
-type AppScreen = "builder" | "resourceEditor" | "characterSheet" | "monsters" | "glossary";
+type AppScreen = "builder" | "resourceEditor" | "characterSheet" | "monsters" | "glossary" | "utilities";
 type AppTheme = "light" | "dark";
 
 const THEME_STORAGE_KEY = "dnd4e.app.theme";
@@ -26,7 +27,8 @@ const SCREEN_HASH: Record<AppScreen, string> = {
   resourceEditor: "#/resource-editor",
   characterSheet: "#/character-sheet",
   monsters: "#/monsters",
-  glossary: "#/glossary"
+  glossary: "#/glossary",
+  utilities: "#/utilities"
 };
 
 function screenFromHash(hash: string): AppScreen {
@@ -35,6 +37,7 @@ function screenFromHash(hash: string): AppScreen {
   if (normalized === "#/character-sheet") return "characterSheet";
   if (normalized === "#/monsters") return "monsters";
   if (normalized === "#/glossary") return "glossary";
+  if (normalized === "#/utilities") return "utilities";
   return "builder";
 }
 
@@ -136,12 +139,18 @@ export default function App(): JSX.Element {
   const colors = THEME_COLORS[theme];
 
   if (error) {
-    return <pre style={{ padding: "1rem", color: colors.errorText }}>{error}</pre>;
+    return (
+      <pre role="alert" style={{ padding: "1rem", color: colors.errorText }}>
+        {error}
+      </pre>
+    );
   }
   if (!index) {
     return (
       <div style={{ ...appLoadingShell, backgroundColor: colors.appBackground, color: colors.text }}>
         <div
+          role="status"
+          aria-live="polite"
           style={{
             ...appLoadingCard,
             backgroundColor: colors.toggleBackground,
@@ -164,32 +173,54 @@ export default function App(): JSX.Element {
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: colors.appBackground, color: colors.text }}>
+      <a href="#app-main-content" className="skip-link">
+        Skip to main content
+      </a>
       <header
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          gap: "0.75rem",
+          flexWrap: "wrap",
           padding: "0.65rem 1rem",
           borderBottom: `1px solid ${colors.headerBorder}`,
-          backgroundColor: colors.headerBackground
+          backgroundColor: colors.headerBackground,
+          position: "sticky",
+          top: 0,
+          zIndex: 20
         }}
       >
-        <strong>4E Builder Tools</strong>
-        <nav style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-          <button type="button" onClick={() => goToScreen("builder")} disabled={screen === "builder"}>
+        <strong style={{ letterSpacing: "0.02em" }}>4E Builder Tools</strong>
+        <nav
+          aria-label="Primary"
+          style={{
+            display: "flex",
+            gap: "0.5rem",
+            alignItems: "center",
+            flexWrap: "nowrap",
+            maxWidth: "100%",
+            overflowX: "auto",
+            paddingBottom: "0.1rem"
+          }}
+        >
+          <button type="button" aria-current={screen === "builder" ? "page" : undefined} onClick={() => goToScreen("builder")} disabled={screen === "builder"}>
             Character Builder
           </button>
-          <button type="button" onClick={() => goToScreen("characterSheet")} disabled={screen === "characterSheet"}>
+          <button type="button" aria-current={screen === "characterSheet" ? "page" : undefined} onClick={() => goToScreen("characterSheet")} disabled={screen === "characterSheet"}>
             Character Sheet
           </button>
-          <button type="button" onClick={() => goToScreen("monsters")} disabled={screen === "monsters"}>
+          <button type="button" aria-current={screen === "monsters" ? "page" : undefined} onClick={() => goToScreen("monsters")} disabled={screen === "monsters"}>
             Monsters
           </button>
-          <button type="button" onClick={() => goToScreen("glossary")} disabled={screen === "glossary"}>
+          <button type="button" aria-current={screen === "glossary" ? "page" : undefined} onClick={() => goToScreen("glossary")} disabled={screen === "glossary"}>
             Glossary
           </button>
-          <button type="button" onClick={() => goToScreen("resourceEditor")} disabled={screen === "resourceEditor"}>
+          <button type="button" aria-current={screen === "resourceEditor" ? "page" : undefined} onClick={() => goToScreen("resourceEditor")} disabled={screen === "resourceEditor"}>
             Resource Editor
+          </button>
+          <button type="button" aria-current={screen === "utilities" ? "page" : undefined} onClick={() => goToScreen("utilities")} disabled={screen === "utilities"}>
+            Utilities
           </button>
           <button
             type="button"
@@ -206,26 +237,30 @@ export default function App(): JSX.Element {
           </button>
         </nav>
       </header>
-      {screen === "builder" ? (
-        <CharacterBuilderApp index={effectiveIndex} tooltipGlossary={tooltipGlossary} />
-      ) : screen === "resourceEditor" ? (
-        <ResourceEditorApp
-          index={effectiveIndex}
-          overlay={editorOverlay}
-          onSaveOverlay={handleSaveOverlay}
-          onResetOverlay={handleResetOverlay}
-        />
-      ) : screen === "characterSheet" ? (
-        <CharacterSheetApp index={effectiveIndex} tooltipGlossary={tooltipGlossary} />
-      ) : screen === "monsters" ? (
-        <MonsterEditorApp index={effectiveIndex} tooltipGlossary={tooltipGlossary} />
-      ) : screen === "glossary" && glossaryRows != null ? (
-        <GlossaryEditorApp rows={glossaryRows} onRowsChange={setGlossaryRows} onResetToBundled={handleGlossaryResetToBundled} />
-      ) : screen === "glossary" ? (
-        <div style={{ padding: "1.25rem", color: "var(--text-muted, inherit)" }}>Loading glossary…</div>
-      ) : (
-        <CharacterBuilderApp index={effectiveIndex} tooltipGlossary={tooltipGlossary} />
-      )}
+      <main id="app-main-content" tabIndex={-1}>
+        {screen === "builder" ? (
+          <CharacterBuilderApp index={effectiveIndex} tooltipGlossary={tooltipGlossary} />
+        ) : screen === "resourceEditor" ? (
+          <ResourceEditorApp
+            index={effectiveIndex}
+            overlay={editorOverlay}
+            onSaveOverlay={handleSaveOverlay}
+            onResetOverlay={handleResetOverlay}
+          />
+        ) : screen === "characterSheet" ? (
+          <CharacterSheetApp index={effectiveIndex} tooltipGlossary={tooltipGlossary} />
+        ) : screen === "monsters" ? (
+          <MonsterEditorApp index={effectiveIndex} tooltipGlossary={tooltipGlossary} />
+        ) : screen === "glossary" && glossaryRows != null ? (
+          <GlossaryEditorApp rows={glossaryRows} onRowsChange={setGlossaryRows} onResetToBundled={handleGlossaryResetToBundled} />
+        ) : screen === "glossary" ? (
+          <div style={{ padding: "1.25rem", color: "var(--text-muted, inherit)" }}>Loading glossary…</div>
+        ) : screen === "utilities" ? (
+          <UtilitiesApp />
+        ) : (
+          <CharacterBuilderApp index={effectiveIndex} tooltipGlossary={tooltipGlossary} />
+        )}
+      </main>
     </div>
   );
 }

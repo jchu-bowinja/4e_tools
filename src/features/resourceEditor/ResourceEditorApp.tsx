@@ -381,7 +381,7 @@ export function ResourceEditorApp({ index, overlay, onSaveOverlay, onResetOverla
   const collectionOverlay = normalizedOverlay.collections[collection] ?? { upserts: {}, deletes: [] };
 
   return (
-    <div style={{ maxWidth: 1280, margin: "0 auto", padding: "1rem", color: "var(--text-primary)" }}>
+    <div style={{ maxWidth: 1360, margin: "0 auto", padding: "clamp(0.75rem, 1.5vw, 1.15rem)", color: "var(--text-primary)", boxSizing: "border-box" }}>
       <h1 style={{ marginTop: 0 }}>Resource Editor</h1>
       <p style={{ marginTop: 0, color: "var(--text-muted)" }}>
         Local prototype mode: edits are stored in browser storage and layered over generated rules data.
@@ -445,7 +445,11 @@ export function ResourceEditorApp({ index, overlay, onSaveOverlay, onResetOverla
         </button>
       </div>
 
-      <div style={{ marginBottom: "0.75rem", color: message.includes("must") ? "var(--status-danger)" : "var(--text-secondary)" }}>
+      <div
+        role="status"
+        aria-live="polite"
+        style={{ marginBottom: "0.75rem", color: message.includes("must") ? "var(--status-danger)" : "var(--text-secondary)" }}
+      >
         {message || "Select an item or create a new draft."}
       </div>
       {referentialWarnings.length > 0 && (
@@ -467,7 +471,7 @@ export function ResourceEditorApp({ index, overlay, onSaveOverlay, onResetOverla
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: "1rem", minHeight: "60vh" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "1rem", minHeight: "60vh" }}>
         <div style={{ border: "1px solid var(--panel-border)", borderRadius: 8, backgroundColor: "var(--surface-0)", overflow: "hidden" }}>
           <div style={{ padding: "0.5rem 0.75rem", borderBottom: "1px solid var(--panel-border)", fontWeight: 600 }}>
             {LABELS[collection]} ({filteredItems.length})

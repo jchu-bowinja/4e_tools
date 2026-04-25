@@ -17,3 +17,7 @@
   - Build description/details term matching from glossary data (term + aliases/subterms) instead of maintaining static phrase arrays in UI code.
   - Keep a small UI fallback list for critical terms, but prefer glossary-driven coverage for speed of updates and consistency.
   - Precompute/cache matcher artifacts (for example, sorted phrase regex or trie) so hover highlighting stays fast across large descriptions.
+
+- [ ] Refactor shared glossary tooltip trigger + overlay architecture
+  - Extract a reusable glossary trigger wrapper/component to avoid repeating hover/focus wiring and ARIA linking in each screen.
+  - Centralize tooltip overlay rendering/positioning behavior (including keyboard dismissal and reduced-motion behavior) so Builder, Character Sheet, and Monster Editor stay in sync.

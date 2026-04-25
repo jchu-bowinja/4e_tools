@@ -42,10 +42,33 @@
   --ui-panel-radius: 0.45rem;
   --ui-section-radius: 0.5rem;
   --ui-panel-shadow: 0 1px 2px rgba(40, 30, 10, 0.08);
+  --control-radius: 6px;
+  --control-padding-y: 0.38rem;
+  --control-padding-x: 0.62rem;
+  --control-shadow: 0 1px 1px rgba(24, 18, 10, 0.08);
+  --control-hover-bg: color-mix(in srgb, var(--button-background) 86%, var(--surface-2) 14%);
+  --control-active-bg: color-mix(in srgb, var(--button-background) 78%, var(--surface-2) 22%);
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
+}
+
+.skip-link {
+  position: absolute;
+  left: 0.75rem;
+  top: -3rem;
+  z-index: 100;
+  background: var(--surface-0);
+  color: var(--text-primary);
+  border: 1px solid var(--panel-border-strong);
+  border-radius: 6px;
+  padding: 0.45rem 0.65rem;
+  text-decoration: none;
+}
+
+.skip-link:focus-visible {
+  top: 0.55rem;
 }
 
 html,
@@ -72,14 +95,33 @@ button {
   border: 1px solid var(--button-border, #cbd5e1);
   background: var(--button-background, #ffffff);
   color: var(--button-foreground, #111827);
-  border-radius: 6px;
-  padding: 0.35rem 0.6rem;
+  border-radius: var(--control-radius);
+  padding: var(--control-padding-y) var(--control-padding-x);
   cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease, transform 80ms ease;
+  box-shadow: var(--control-shadow);
+  touch-action: manipulation;
+}
+
+button:hover:not(:disabled) {
+  background: var(--control-hover-bg);
+}
+
+button:active:not(:disabled) {
+  background: var(--control-active-bg);
+  transform: translateY(1px);
+}
+
+button[aria-current="page"] {
+  border-color: var(--panel-border-strong);
+  background: var(--surface-2);
+  font-weight: 700;
 }
 
 button:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: default;
+  box-shadow: none;
 }
 
 a {
@@ -99,7 +141,8 @@ button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
-a:focus-visible {
+a:focus-visible,
+[tabindex]:focus-visible {
   outline: 2px solid var(--focus-outline);
   outline-offset: 2px;
 }
@@ -110,7 +153,26 @@ textarea {
   background-color: var(--surface-0);
   color: var(--text-primary);
   border: 1px solid var(--panel-border);
-  border-radius: 6px;
+  border-radius: var(--control-radius);
+  padding: var(--control-padding-y) var(--control-padding-x);
+  transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+}
+
+select,
+textarea,
+input[type="text"],
+input[type="search"],
+input[type="number"],
+input[type="email"],
+input[type="password"],
+input[type="url"] {
+  min-height: 2.1rem;
+}
+
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: var(--panel-border-strong);
 }
 
 :root[data-theme="dark"] body {
@@ -164,4 +226,42 @@ textarea {
   background-color: var(--surface-1);
   color: var(--text-primary);
   border-color: var(--panel-border);
+}
+
+@media (max-width: 980px) {
+  body {
+    font-size: 15px;
+  }
+}
+
+@media (pointer: coarse) {
+  button {
+    min-height: 2.5rem;
+    padding: 0.52rem 0.8rem;
+  }
+
+  input,
+  select,
+  textarea {
+    min-height: 2.5rem;
+    padding: 0.5rem 0.72rem;
+    font-size: 16px;
+  }
+
+  input[type="checkbox"],
+  input[type="radio"] {
+    min-height: unset;
+    width: 1.15rem;
+    height: 1.15rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type FocusEvent as ReactFocusEvent,
   type MouseEvent as ReactMouseEvent
 } from "react";
 import type { RulesIndex } from "../../rules/models";
@@ -1104,6 +1105,7 @@ function scrollTextareaToMatch(textarea: HTMLTextAreaElement, text: string, matc
 }
 
 type MonsterGlossaryHoverKey = `powerKeyword:${string}` | `glossaryTerm:${string}` | `glossaryTerms:${string}`;
+const MONSTER_GLOSSARY_TOOLTIP_ID = "monster-glossary-tooltip";
 
 export function MonsterEditorApp({
   index,
@@ -1187,6 +1189,25 @@ export function MonsterEditorApp({
         window.clearTimeout(glossaryHoverCloseTimerRef.current);
       }
     };
+  }, []);
+
+  useEffect(() => {
+    function onWindowKeyDown(event: KeyboardEvent): void {
+      if (event.key !== "Escape") return;
+      if (glossaryHoverTimerRef.current != null) {
+        window.clearTimeout(glossaryHoverTimerRef.current);
+        glossaryHoverTimerRef.current = null;
+      }
+      if (glossaryHoverCloseTimerRef.current != null) {
+        window.clearTimeout(glossaryHoverCloseTimerRef.current);
+        glossaryHoverCloseTimerRef.current = null;
+      }
+      setShowGlossaryHoverInfo(false);
+      setGlossaryHoverKey(null);
+      setGlossaryHoverPanelPos(null);
+    }
+    window.addEventListener("keydown", onWindowKeyDown);
+    return () => window.removeEventListener("keydown", onWindowKeyDown);
   }, []);
 
   useEffect(() => {
@@ -1452,13 +1473,21 @@ export function MonsterEditorApp({
     setGlossaryHoverPanelPos(null);
   }
 
-  function startGlossaryHover(event: ReactMouseEvent<HTMLElement>, key: MonsterGlossaryHoverKey): void {
+  function startGlossaryHover(
+    event: ReactMouseEvent<HTMLElement> | ReactFocusEvent<HTMLElement>,
+    key: MonsterGlossaryHoverKey
+  ): void {
     cancelGlossaryHoverCloseTimer();
     const rect = event.currentTarget.getBoundingClientRect();
     setGlossaryHoverPanelPos(positionFixedTooltip(rect, { panelWidth: 340, maxHeightVh: 50 }));
     setGlossaryHoverKey(key);
     if (glossaryHoverTimerRef.current != null) {
       window.clearTimeout(glossaryHoverTimerRef.current);
+    }
+    if (event.type === "focus") {
+      setShowGlossaryHoverInfo(true);
+      glossaryHoverTimerRef.current = null;
+      return;
     }
     glossaryHoverTimerRef.current = window.setTimeout(() => {
       setShowGlossaryHoverInfo(true);
@@ -1473,12 +1502,32 @@ export function MonsterEditorApp({
     }, GLOSSARY_HOVER_CLOSE_DELAY_MS);
   }
 
+  function glossaryHoverA11y(key: MonsterGlossaryHoverKey): {
+    onMouseEnter: (event: ReactMouseEvent<HTMLElement>) => void;
+    onMouseLeave: () => void;
+    onFocus: (event: ReactFocusEvent<HTMLElement>) => void;
+    onBlur: () => void;
+    tabIndex: number;
+    "aria-describedby"?: string;
+  } {
+    const active = showGlossaryHoverInfo && glossaryHoverKey === key;
+    return {
+      onMouseEnter: (event) => startGlossaryHover(event, key),
+      onMouseLeave: leaveGlossaryHover,
+      onFocus: (event) => startGlossaryHover(event, key),
+      onBlur: leaveGlossaryHover,
+      tabIndex: 0,
+      "aria-describedby": active ? MONSTER_GLOSSARY_TOOLTIP_ID : undefined
+    };
+  }
+
   return (
     <div
       style={{
-        maxWidth: 1360,
+        maxWidth: 1440,
         margin: "0 auto",
-        padding: "0.75rem",
+        padding: "clamp(0.65rem, 1.4vw, 1rem)",
+        boxSizing: "border-box",
         color: "var(--text-primary)",
         background: "var(--character-sheet-background, linear-gradient(180deg, var(--surface-1) 0%, var(--surface-1) 100%))",
         border: "1px solid var(--panel-border)",
@@ -1568,6 +1617,8 @@ export function MonsterEditorApp({
       </div>
 
       <div
+        role="status"
+        aria-live="polite"
         style={{
           marginBottom: "0.75rem",
           fontSize: "0.8rem",
@@ -1577,7 +1628,7 @@ export function MonsterEditorApp({
         {message}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: "1rem", minHeight: "65vh" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "1rem", minHeight: "65vh" }}>
         <div
           style={{
             ...sheetPanel,
@@ -1631,18 +1682,14 @@ export function MonsterEditorApp({
                 <div style={{ fontSize: "1.05rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--text-primary)" }}>{activeMonster.name}</div>
                 <div style={{ ...bodySecondary, marginTop: "0.12rem" }}>
                   <span
-                    onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Level")}
-                    onMouseLeave={leaveGlossaryHover}
+                    {...glossaryHoverA11y("glossaryTerm:Level")}
                     style={glossaryLinkUnderline}
                   >
                     Level
                   </span>{" "}
                   {formatValue(activeMonster.level)}{" "}
                   <span
-                    onMouseEnter={(event) =>
-                      startGlossaryHover(event, `glossaryTerm:${activeMonster.role || "Role"}`)
-                    }
-                    onMouseLeave={leaveGlossaryHover}
+                    {...glossaryHoverA11y(`glossaryTerm:${activeMonster.role || "Role"}`)}
                     style={glossaryLinkUnderline}
                   >
                     {activeMonster.role || ""}
@@ -1650,38 +1697,28 @@ export function MonsterEditorApp({
                 </div>
                 <div style={{ ...bodySecondary, marginTop: "0.12rem" }}>
                   <span
-                    onMouseEnter={(event) =>
-                      startGlossaryHover(event, `glossaryTerm:${activeMonster.size || "Size"}`)
-                    }
-                    onMouseLeave={leaveGlossaryHover}
+                    {...glossaryHoverA11y(`glossaryTerm:${activeMonster.size || "Size"}`)}
                     style={glossaryLinkUnderline}
                   >
                     {activeMonster.size || "Unknown size"}
                   </span>{" "}
                   •{" "}
                   <span
-                    onMouseEnter={(event) =>
-                      startGlossaryHover(event, `glossaryTerm:${activeMonster.origin || "Origin"}`)
-                    }
-                    onMouseLeave={leaveGlossaryHover}
+                    {...glossaryHoverA11y(`glossaryTerm:${activeMonster.origin || "Origin"}`)}
                     style={glossaryLinkUnderline}
                   >
                     {activeMonster.origin || "Unknown origin"}
                   </span>{" "}
                   •{" "}
                   <span
-                    onMouseEnter={(event) =>
-                      startGlossaryHover(event, `glossaryTerm:${activeMonster.type || "Type"}`)
-                    }
-                    onMouseLeave={leaveGlossaryHover}
+                    {...glossaryHoverA11y(`glossaryTerm:${activeMonster.type || "Type"}`)}
                     style={glossaryLinkUnderline}
                   >
                     {activeMonster.type || "Unknown type"}
                   </span>{" "}
                   •{" "}
                   <span
-                    onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:Experience")}
-                    onMouseLeave={leaveGlossaryHover}
+                    {...glossaryHoverA11y("glossaryTerm:Experience")}
                     style={glossaryLinkUnderline}
                   >
                     XP
@@ -1713,7 +1750,7 @@ export function MonsterEditorApp({
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(3, minmax(180px, 1fr))",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
                   gap: "0.75rem",
                   marginBottom: "0.75rem"
                 }}
@@ -1853,7 +1890,7 @@ export function MonsterEditorApp({
                 );
               })()}
 
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(280px, 1fr))", gap: "0.75rem", marginBottom: "0.75rem" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "0.75rem", marginBottom: "0.75rem" }}>
                 {Object.entries(activeMonster.stats)
                   .filter(([label]) => label !== "attackBonuses")
                   .sort(([labelA], [labelB]) => {
@@ -2795,6 +2832,8 @@ export function MonsterEditorApp({
 
       {showGlossaryHoverInfo && glossaryHoverKey && glossaryHoverPanelPos && (
         <div
+          id={MONSTER_GLOSSARY_TOOLTIP_ID}
+          role="tooltip"
           onMouseEnter={cancelGlossaryHoverCloseTimer}
           onMouseLeave={leaveGlossaryHover}
           style={{
