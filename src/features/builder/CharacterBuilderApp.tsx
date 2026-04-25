@@ -666,7 +666,11 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   const [implementSearch, setImplementSearch] = useState("");
   const [showGlossaryHoverInfo, setShowGlossaryHoverInfo] = useState(false);
   const [glossaryHoverKey, setGlossaryHoverKey] = useState<BuilderGlossaryKey | null>(null);
-  const [glossaryHoverPanelPos, setGlossaryHoverPanelPos] = useState<{ top: number; left: number } | null>(null);
+  const [glossaryHoverPanelPos, setGlossaryHoverPanelPos] = useState<{
+    top: number;
+    left: number;
+    transform?: "translateY(-100%)";
+  } | null>(null);
   const glossaryHoverTimerRef = useRef<number | null>(null);
   const glossaryHoverCloseTimerRef = useRef<number | null>(null);
   const GLOSSARY_HOVER_CLOSE_DELAY_MS = 400;
@@ -823,8 +827,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   function startGlossaryHover(event: React.MouseEvent<HTMLElement>, key: BuilderGlossaryKey): void {
     cancelGlossaryHoverCloseTimer();
     const rect = event.currentTarget.getBoundingClientRect();
-    const { top, left } = positionFixedTooltip(rect, { panelWidth: 360, maxHeightVh: 48 });
-    setGlossaryHoverPanelPos({ top, left });
+    setGlossaryHoverPanelPos(positionFixedTooltip(rect, { panelWidth: 360, maxHeightVh: 48 }));
     setGlossaryHoverKey(key);
     if (glossaryHoverTimerRef.current != null) {
       window.clearTimeout(glossaryHoverTimerRef.current);
@@ -4205,6 +4208,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 position: "fixed",
                 top: glossaryHoverPanelPos.top,
                 left: glossaryHoverPanelPos.left,
+                transform: glossaryHoverPanelPos.transform ?? "none",
                 width: "360px",
                 maxHeight: "48vh",
                 overflow: "auto",

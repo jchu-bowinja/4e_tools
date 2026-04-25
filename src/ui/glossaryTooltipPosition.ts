@@ -8,11 +8,21 @@ export type FixedTooltipLayout = {
   maxHeightVh: number;
 };
 
+export type FixedTooltipPosition = {
+  top: number;
+  left: number;
+  /**
+   * When set, apply to the panel so a short box sits flush above the trigger (avoids
+   * reserving a full `maxHeight` of vertical gap). Ignored for placement below the trigger.
+   */
+  transform?: "translateY(-100%)";
+};
+
 /**
  * Chooses `top` / `left` for a `position: fixed` tooltip so it stays in the window.
  * If there is not enough room below the trigger, places it above when that fits; otherwise clamps.
  */
-export function positionFixedTooltip(triggerRect: DOMRectReadOnly, layout: FixedTooltipLayout): { top: number; left: number } {
+export function positionFixedTooltip(triggerRect: DOMRectReadOnly, layout: FixedTooltipLayout): FixedTooltipPosition {
   const w = window.innerWidth;
   const h = window.innerHeight;
   const { panelWidth, maxHeightVh } = layout;
@@ -28,9 +38,9 @@ export function positionFixedTooltip(triggerRect: DOMRectReadOnly, layout: Fixed
     return { top: belowTop, left };
   }
 
-  const aboveTop = triggerRect.top - GAP - panelMaxHeightPx;
-  if (aboveTop >= minTop) {
-    return { top: aboveTop, left };
+  const canFitAboveAtMaxHeight = triggerRect.top - GAP - panelMaxHeightPx >= minTop;
+  if (canFitAboveAtMaxHeight) {
+    return { top: triggerRect.top - GAP, left, transform: "translateY(-100%)" };
   }
 
   return { top: Math.max(minTop, Math.min(belowTop, maxTop)), left };

@@ -775,7 +775,11 @@ export function MonsterEditorApp({
   const [isBusy, setIsBusy] = useState<boolean>(false);
   const [showGlossaryHoverInfo, setShowGlossaryHoverInfo] = useState(false);
   const [glossaryHoverKey, setGlossaryHoverKey] = useState<MonsterGlossaryHoverKey | null>(null);
-  const [glossaryHoverPanelPos, setGlossaryHoverPanelPos] = useState<{ top: number; left: number } | null>(null);
+  const [glossaryHoverPanelPos, setGlossaryHoverPanelPos] = useState<{
+    top: number;
+    left: number;
+    transform?: "translateY(-100%)";
+  } | null>(null);
   const glossaryHoverTimerRef = useRef<number | null>(null);
   const glossaryHoverCloseTimerRef = useRef<number | null>(null);
   const GLOSSARY_HOVER_CLOSE_DELAY_MS = 400;
@@ -979,8 +983,7 @@ export function MonsterEditorApp({
   function startGlossaryHover(event: ReactMouseEvent<HTMLElement>, key: MonsterGlossaryHoverKey): void {
     cancelGlossaryHoverCloseTimer();
     const rect = event.currentTarget.getBoundingClientRect();
-    const { top, left } = positionFixedTooltip(rect, { panelWidth: 340, maxHeightVh: 50 });
-    setGlossaryHoverPanelPos({ top, left });
+    setGlossaryHoverPanelPos(positionFixedTooltip(rect, { panelWidth: 340, maxHeightVh: 50 }));
     setGlossaryHoverKey(key);
     if (glossaryHoverTimerRef.current != null) {
       window.clearTimeout(glossaryHoverTimerRef.current);
@@ -1863,6 +1866,7 @@ export function MonsterEditorApp({
             position: "fixed",
             top: glossaryHoverPanelPos.top,
             left: glossaryHoverPanelPos.left,
+            transform: glossaryHoverPanelPos.transform ?? "none",
             width: "340px",
             maxHeight: "50vh",
             overflow: "auto",

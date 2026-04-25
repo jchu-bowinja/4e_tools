@@ -329,12 +329,24 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   const [selectedConditionOption, setSelectedConditionOption] = useState("");
   const [customConditionText, setCustomConditionText] = useState("");
   const [showRaceHoverInfo, setShowRaceHoverInfo] = useState(false);
-  const [raceHoverPanelPos, setRaceHoverPanelPos] = useState<{ top: number; left: number } | null>(null);
+  const [raceHoverPanelPos, setRaceHoverPanelPos] = useState<{
+    top: number;
+    left: number;
+    transform?: "translateY(-100%)";
+  } | null>(null);
   const [showClassHoverInfo, setShowClassHoverInfo] = useState(false);
-  const [classHoverPanelPos, setClassHoverPanelPos] = useState<{ top: number; left: number } | null>(null);
+  const [classHoverPanelPos, setClassHoverPanelPos] = useState<{
+    top: number;
+    left: number;
+    transform?: "translateY(-100%)";
+  } | null>(null);
   const [showGlossaryHoverInfo, setShowGlossaryHoverInfo] = useState(false);
   const [glossaryHoverKey, setGlossaryHoverKey] = useState<GlossaryKey | null>(null);
-  const [glossaryHoverPanelPos, setGlossaryHoverPanelPos] = useState<{ top: number; left: number } | null>(null);
+  const [glossaryHoverPanelPos, setGlossaryHoverPanelPos] = useState<{
+    top: number;
+    left: number;
+    transform?: "translateY(-100%)";
+  } | null>(null);
   const raceHoverTimerRef = useRef<number | null>(null);
   const classHoverTimerRef = useRef<number | null>(null);
   const glossaryHoverTimerRef = useRef<number | null>(null);
@@ -488,8 +500,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   function startGlossaryHoverInfoTimer(event: ReactMouseEvent<HTMLElement>, key: GlossaryKey): void {
     cancelGlossaryHoverCloseTimer();
     const rect = event.currentTarget.getBoundingClientRect();
-    const { top, left } = positionFixedTooltip(rect, { panelWidth: 340, maxHeightVh: 50 });
-    setGlossaryHoverPanelPos({ top, left });
+    setGlossaryHoverPanelPos(positionFixedTooltip(rect, { panelWidth: 340, maxHeightVh: 50 }));
     setGlossaryHoverKey(key);
     if (glossaryHoverTimerRef.current != null) {
       window.clearTimeout(glossaryHoverTimerRef.current);
@@ -1015,8 +1026,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   function startRaceHoverInfoTimer(event: ReactMouseEvent<HTMLDivElement>): void {
     if (!derived.race) return;
     const rect = event.currentTarget.getBoundingClientRect();
-    const { top, left } = positionFixedTooltip(rect, { panelWidth: 360, maxHeightVh: 52 });
-    setRaceHoverPanelPos({ top, left });
+    setRaceHoverPanelPos(positionFixedTooltip(rect, { panelWidth: 360, maxHeightVh: 52 }));
     if (raceHoverTimerRef.current != null) {
       window.clearTimeout(raceHoverTimerRef.current);
     }
@@ -1038,8 +1048,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   function startClassHoverInfoTimer(event: ReactMouseEvent<HTMLDivElement>): void {
     if (!derived.cls) return;
     const rect = event.currentTarget.getBoundingClientRect();
-    const { top, left } = positionFixedTooltip(rect, { panelWidth: 380, maxHeightVh: 52 });
-    setClassHoverPanelPos({ top, left });
+    setClassHoverPanelPos(positionFixedTooltip(rect, { panelWidth: 380, maxHeightVh: 52 }));
     if (classHoverTimerRef.current != null) {
       window.clearTimeout(classHoverTimerRef.current);
     }
@@ -1532,6 +1541,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 position: "fixed",
                 top: raceHoverPanelPos.top,
                 left: raceHoverPanelPos.left,
+                transform: raceHoverPanelPos.transform ?? "none",
                 width: "360px",
                 maxHeight: "52vh",
                 overflow: "auto",
@@ -1571,6 +1581,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 position: "fixed",
                 top: classHoverPanelPos.top,
                 left: classHoverPanelPos.left,
+                transform: classHoverPanelPos.transform ?? "none",
                 width: "380px",
                 maxHeight: "52vh",
                 overflow: "auto",
@@ -1614,6 +1625,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 position: "fixed",
                 top: glossaryHoverPanelPos.top,
                 left: glossaryHoverPanelPos.left,
+                transform: glossaryHoverPanelPos.transform ?? "none",
                 width: "340px",
                 maxHeight: "50vh",
                 overflow: "auto",
