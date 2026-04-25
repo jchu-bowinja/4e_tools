@@ -1,0 +1,28 @@
+---
+description: Require full glossary entries and explicit subterm aliases
+globs: generated/glossary_terms.json
+alwaysApply: false
+---
+
+# Glossary Term Completeness
+
+When adding or updating glossary terms, preserve complete source information and avoid shortening or summarizing definitions.
+
+## Requirements
+
+- Do not summarize term text; include full term details from the source material.
+- Include all relevant subterms under the parent term.
+- Add aliases from the parent term to its subterms.
+- Include parameterized subterm aliases where applicable (for example, `melee [value]`).
+
+## Example: Melee
+
+- Parent term: `melee`
+- Required subterms:
+  - `melee weapon`
+  - `melee touch`
+  - `melee [value]` (such as `melee 1`, `melee 2`, and so on)
+- Expected behavior:
+  - `melee` includes complete, unsummarized text.
+  - `melee` aliases point to all listed subterms.
+  - Subterm entries keep their complete wording and examples.
