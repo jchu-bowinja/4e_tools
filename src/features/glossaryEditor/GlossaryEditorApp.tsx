@@ -51,6 +51,7 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [message, setMessage] = useState("");
   const [resetBusy, setResetBusy] = useState(false);
+  const [aliasesDraft, setAliasesDraft] = useState("");
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -63,6 +64,13 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
         const aliases = Array.isArray(row.aliases) ? row.aliases.join(" ") : "";
         const hay = `${name} ${id} ${aliases}`.toLowerCase();
         return hay.includes(q);
+      })
+      .sort((a, b) => {
+        const aName = String(a.row.name ?? "").trim();
+        const bName = String(b.row.name ?? "").trim();
+        const byName = aName.localeCompare(bName, undefined, { sensitivity: "base" });
+        if (byName !== 0) return byName;
+        return a.index - b.index;
       });
   }, [rows, search]);
 
@@ -74,6 +82,14 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
   }, [rows.length, selectedIndex]);
 
   const selected = selectedIndex != null && selectedIndex < rows.length ? rows[selectedIndex] : null;
+
+  useEffect(() => {
+    if (!selected) {
+      setAliasesDraft("");
+      return;
+    }
+    setAliasesDraft(Array.isArray(selected.aliases) ? selected.aliases.join("\n") : "");
+  }, [selected]);
 
   function patchSelected(patch: Partial<GlossaryTermRow>): void {
     if (selectedIndex == null) return;
@@ -146,8 +162,6 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
     };
     reader.readAsText(file);
   }
-
-  const aliasesText = selected ? (Array.isArray(selected.aliases) ? selected.aliases.join("\n") : "") : "";
 
   return (
     <div style={{ maxWidth: 1280, margin: "0 auto", padding: "1rem", color: "var(--text-primary)" }}>
@@ -243,7 +257,6 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
                         }}
                       >
                         <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>{row.name || "(no name)"}</div>
-                        {row.id && <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{row.id}</div>}
                       </button>
                     </li>
                   );
@@ -321,8 +334,9 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
               <label>
                 <span style={labelStyle}>Aliases (one per line; optional)</span>
                 <textarea
-                  value={aliasesText}
-                  onChange={(e) => setAliasesFromText(e.target.value)}
+                  value={aliasesDraft}
+                  onChange={(e) => setAliasesDraft(e.target.value)}
+                  onBlur={() => setAliasesFromText(aliasesDraft)}
                   rows={4}
                   style={{ width: "100%", boxSizing: "border-box", fontFamily: "inherit", resize: "vertical" }}
                 />
