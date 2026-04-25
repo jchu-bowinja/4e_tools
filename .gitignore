@@ -24,6 +24,7 @@ generated_*/
 
 # ETL / conversion logs
 *.jsonl
+debug.log
 
 # Local env
 .env
