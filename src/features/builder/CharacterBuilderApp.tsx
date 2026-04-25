@@ -568,8 +568,8 @@ const DEFAULT_POINT_BUY_BUDGET = 22;
 const ui = {
   page: {
     display: "grid" as const,
-    gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-    gap: "1.25rem",
+    gridTemplateColumns: "minmax(0, 1fr) minmax(300px, 400px)",
+    gap: "0.65rem",
     alignItems: "start" as const,
     padding: "clamp(0.75rem, 1.5vw, 1.25rem)",
     minHeight: "100%",
@@ -581,6 +581,9 @@ const ui = {
     color: "var(--text-primary)"
   },
   mainColumn: {
+    minWidth: 0,
+    maxWidth: "100%",
+    overflowX: "auto" as const,
     backgroundColor: "var(--surface-0)",
     border: "1px solid var(--panel-border)",
     borderRadius: "var(--ui-section-radius, 12px)",
@@ -588,6 +591,10 @@ const ui = {
     boxShadow: "var(--ui-panel-shadow, 0 1px 4px rgba(15, 23, 42, 0.06))"
   },
   sidebarColumn: {
+    minWidth: 0,
+    maxWidth: "420px",
+    width: "100%",
+    justifySelf: "end" as const,
     backgroundColor: "var(--surface-2)",
     border: "1px solid var(--panel-border)",
     borderRadius: "var(--ui-section-radius, 12px)",
@@ -718,6 +725,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   const [jsonSearchResultIdx, setJsonSearchResultIdx] = useState(0);
   const [jsonSearchJumpTick, setJsonSearchJumpTick] = useState(0);
   const [showGlossaryHoverInfo, setShowGlossaryHoverInfo] = useState(false);
+  const [useSingleColumnLayout, setUseSingleColumnLayout] = useState(() => window.innerWidth <= 1380);
   const [glossaryHoverKey, setGlossaryHoverKey] = useState<BuilderGlossaryKey | null>(null);
   const [glossaryHoverPanelPos, setGlossaryHoverPanelPos] = useState<{
     top: number;
@@ -821,6 +829,20 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     selectedHybridA,
     selectedHybridB
   ]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 1380px)");
+    const onLayoutChange = (event: MediaQueryListEvent): void => {
+      setUseSingleColumnLayout(event.matches);
+    };
+    setUseSingleColumnLayout(mediaQuery.matches);
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", onLayoutChange);
+      return () => mediaQuery.removeEventListener("change", onLayoutChange);
+    }
+    mediaQuery.addListener(onLayoutChange);
+    return () => mediaQuery.removeListener(onLayoutChange);
+  }, []);
 
   useEffect(() => {
     setJsonSearchResultIdx(0);
@@ -1519,8 +1541,21 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   }, [autoGrantedSkillIds.join("|"), build.trainedSkillIds.join("|")]);
 
   return (
-    <div style={ui.page}>
-      <div style={ui.mainColumn}>
+    <div
+      style={{
+        ...ui.page,
+        display: useSingleColumnLayout ? "grid" : "flex",
+        gridTemplateColumns: useSingleColumnLayout ? "minmax(0, 1fr)" : undefined,
+        alignItems: "start"
+      }}
+    >
+      <div
+        style={{
+          ...ui.mainColumn,
+          flex: useSingleColumnLayout ? undefined : "1 1 0",
+          width: useSingleColumnLayout ? undefined : 0
+        }}
+      >
         <h1 style={pageTitleStyle}>D&amp;D 4e Character Builder</h1>
         <div style={ui.blockTitle}>
           <label style={{ display: "block", fontSize: "0.9rem", color: "var(--text-secondary)" }}>
@@ -4107,7 +4142,15 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         </div>
       </div>
 
-      <div style={ui.sidebarColumn}>
+      <div
+        style={{
+          ...ui.sidebarColumn,
+          maxWidth: useSingleColumnLayout ? "100%" : "400px",
+          width: useSingleColumnLayout ? "100%" : "400px",
+          flex: useSingleColumnLayout ? undefined : "0 0 400px",
+          justifySelf: useSingleColumnLayout ? "stretch" : "auto"
+        }}
+      >
         <h3 style={{ ...sectionTitleStyle, marginBottom: "0.75rem" }}>Live Character Sheet</h3>
         <div style={{ ...ui.blockInset, backgroundColor: "var(--surface-1)", borderColor: "var(--panel-border)", display: "grid", gap: "0.75rem" }}>
           <div>
@@ -4175,21 +4218,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 <strong>Level:</strong> {build.level}
               </p>
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Theme:</strong> {selectedTheme?.name || "None"}</p>
-              {themeGrantedPowers.length > 0 && (
-                <details style={{ marginTop: "0.25rem", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
-                  <summary style={detailsSummaryStyle}>
-                    Theme granted powers ({themeGrantedPowers.length}) — summary
-                  </summary>
-                  <ul style={{ margin: "0.35rem 0 0 0", paddingLeft: "1.1rem" }}>
-                    {themeGrantedPowers.map((p) => (
-                      <li key={p.id}>
-                        {p.name}
-                        {p.level != null ? ` (lvl ${p.level})` : ""}
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              )}
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Paragon Path:</strong> {selectedParagonPath?.name || "None"}</p>
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Epic Destiny:</strong> {selectedEpicDestiny?.name || "None"}</p>
               {multiclassFeatIdList.length > 0 && (
@@ -4212,28 +4240,51 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             <p style={{ margin: "0 0 0.4rem 0", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--text-secondary)", textTransform: "uppercase" }}>
               Combat Stats
             </p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "0.3rem 0.75rem" }}>
-              <p
-                style={{ margin: 0, fontSize: "0.88rem" }}
-                {...glossaryHoverA11y("hp")}
-              >
-                <strong>HP:</strong> {derived.maxHp}
-              </p>
-              <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Speed:</strong> {derived.speed}</p>
-              <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Initiative:</strong> {derived.initiative >= 0 ? `+${derived.initiative}` : derived.initiative}</p>
-              <p
-                style={{ margin: 0, fontSize: "0.88rem" }}
-                {...glossaryHoverA11y("surges")}
-              >
-                <strong>Healing Surges:</strong> {derived.healingSurgesPerDay}
-              </p>
-              <p
-                style={{ margin: 0, fontSize: "0.88rem" }}
-                {...glossaryHoverA11y("surgeValue")}
-              >
-                <strong>Surge Value:</strong> {derived.surgeValue}
-              </p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "0.3rem 0.75rem" }}>
+              <div style={{ display: "grid", gap: "0.3rem" }}>
+                <p
+                  style={{ margin: 0, fontSize: "0.88rem" }}
+                  {...glossaryHoverA11y("hp")}
+                >
+                  <strong>HP:</strong> {derived.maxHp}
+                </p>
+                <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Speed:</strong> {derived.speed}</p>
+                <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Initiative:</strong> {derived.initiative >= 0 ? `+${derived.initiative}` : derived.initiative}</p>
+                <p
+                  style={{ margin: 0, fontSize: "0.88rem" }}
+                  {...glossaryHoverA11y("surges")}
+                >
+                  <strong>Healing Surges:</strong> {derived.healingSurgesPerDay}
+                </p>
+                <p
+                  style={{ margin: 0, fontSize: "0.88rem" }}
+                  {...glossaryHoverA11y("surgeValue")}
+                >
+                  <strong>Surge Value:</strong> {derived.surgeValue}
+                </p>
+              </div>
+              <div style={{ display: "grid", gap: "0.3rem" }}>
+                <p style={{ margin: 0, fontSize: "0.88rem" }} {...glossaryHoverA11y("ac")}><strong>AC:</strong> {derived.defenses.ac}</p>
+                <p style={{ margin: 0, fontSize: "0.88rem" }} {...glossaryHoverA11y("fortitude")}><strong>Fortitude:</strong> {derived.defenses.fortitude}</p>
+                <p style={{ margin: 0, fontSize: "0.88rem" }} {...glossaryHoverA11y("reflex")}><strong>Reflex:</strong> {derived.defenses.reflex}</p>
+                <p style={{ margin: 0, fontSize: "0.88rem" }} {...glossaryHoverA11y("will")}><strong>Will:</strong> {derived.defenses.will}</p>
+              </div>
             </div>
+            <details style={{ marginTop: "0.45rem", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+              <summary style={detailsSummaryStyle}>AC breakdown</summary>
+              <p style={{ margin: "0.25rem 0 0 0", color: "var(--text-muted)" }}>
+                AC = 10 + armor + shield + best of DEX/INT when allowed by armor.
+              </p>
+              <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.15rem", fontVariantNumeric: "tabular-nums" }}>
+                <span>Base {derived.acBreakdown.base}</span>
+                <span>Armor +{derived.acBreakdown.armorBonus}</span>
+                <span>Shield +{derived.acBreakdown.shieldBonus}</span>
+                <span>
+                  Ability ({derived.acBreakdown.abilityLabel}){" "}
+                  {derived.acBreakdown.abilityLabel === "—" ? "—" : `${derived.acBreakdown.abilityBonus >= 0 ? "+" : ""}${derived.acBreakdown.abilityBonus}`}
+                </span>
+              </div>
+            </details>
             {derived.armorCheckPenalty > 0 && (
               <p style={{ margin: "0.45rem 0 0 0", fontSize: "0.82rem", color: "var(--status-warning)" }}>
                 Armor check penalty −{derived.armorCheckPenalty} on untrained Strength / Dexterity skills (see Skills).
@@ -4280,33 +4331,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
 
           <div style={{ borderTop: "1px solid var(--panel-border)", paddingTop: "0.65rem" }}>
             <p style={{ margin: "0 0 0.4rem 0", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--text-secondary)", textTransform: "uppercase" }}>
-              Defenses
-            </p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "0.3rem 0.75rem" }}>
-              <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>AC:</strong> {derived.defenses.ac}</p>
-              <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Fortitude:</strong> {derived.defenses.fortitude}</p>
-              <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Reflex:</strong> {derived.defenses.reflex}</p>
-              <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Will:</strong> {derived.defenses.will}</p>
-            </div>
-            <details style={{ marginTop: "0.45rem", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
-              <summary style={detailsSummaryStyle}>AC breakdown</summary>
-              <p style={{ margin: "0.25rem 0 0 0", color: "var(--text-muted)" }}>
-                AC = 10 + armor + shield + best of DEX/INT when allowed by armor.
-              </p>
-              <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.15rem", fontVariantNumeric: "tabular-nums" }}>
-                <span>Base {derived.acBreakdown.base}</span>
-                <span>Armor +{derived.acBreakdown.armorBonus}</span>
-                <span>Shield +{derived.acBreakdown.shieldBonus}</span>
-                <span>
-                  Ability ({derived.acBreakdown.abilityLabel}){" "}
-                  {derived.acBreakdown.abilityLabel === "—" ? "—" : `${derived.acBreakdown.abilityBonus >= 0 ? "+" : ""}${derived.acBreakdown.abilityBonus}`}
-                </span>
-              </div>
-            </details>
-          </div>
-
-          <div style={{ borderTop: "1px solid var(--panel-border)", paddingTop: "0.65rem" }}>
-            <p style={{ margin: "0 0 0.4rem 0", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--text-secondary)", textTransform: "uppercase" }}>
               Equipment
             </p>
             <div style={{ display: "grid", gap: "0.25rem" }}>
@@ -4348,7 +4372,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.76rem", color: "var(--text-muted)" }}>
               Includes untrained skills; trained rows add +5 and ignore armor check penalty.
             </p>
-            <div style={{ display: "grid", gap: "0.2rem", fontSize: "0.82rem", maxHeight: "11rem", overflow: "auto" }}>
+            <div style={{ display: "grid", gap: "0.2rem", fontSize: "0.82rem" }}>
               {skillSheetRows.map((row) => (
                 <div
                   key={row.skillId}
