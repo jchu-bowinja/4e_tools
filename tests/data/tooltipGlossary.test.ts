@@ -91,6 +91,44 @@ describe("abilityTooltipResolveTerms", () => {
   });
 });
 
+describe("mergeBuiltinTooltipLookupMap / damage and built-in aliases", () => {
+  it("aliases electricity to the lightning glossary entry", () => {
+    expect(
+      resolveTooltipText({
+        terms: ["electricity"],
+        glossaryByName: { lightning: "Lightning damage rules." }
+      })
+    ).toBe("Lightning damage rules.");
+  });
+
+  it("defines silver when absent from bundled glossary rows", () => {
+    const text = resolveTooltipText({
+      terms: ["silver"],
+      glossaryByName: {}
+    });
+    expect(text).toContain("silver");
+    expect(text).toContain("Silvered");
+  });
+
+  it("aliases common data typos to canonical glossary entries", () => {
+    expect(
+      resolveTooltipText({
+        terms: ["ilusion"],
+        glossaryByName: { illusion: "Illusion keyword rules." }
+      })
+    ).toBe("Illusion keyword rules.");
+  });
+
+  it("composes nonmagical fire from the fire entry when present", () => {
+    const text = resolveTooltipText({
+      terms: ["nonmagical fire"],
+      glossaryByName: { fire: "Fire damage rules." }
+    });
+    expect(text).toContain("Fire damage rules.");
+    expect(text).toContain("Nonmagical fire");
+  });
+});
+
 describe("resolveTooltipText monster immunity phrasing", () => {
   const glossaryByName = {
     slowed: "Slowed glossary.",

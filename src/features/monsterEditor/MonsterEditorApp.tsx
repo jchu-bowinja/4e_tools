@@ -868,6 +868,7 @@ const traitDetailGlossaryPhrases: string[] = [
   "restrained",
   "blinded",
   "deafened",
+  "radiant",
   "prone",
   "marked",
   "grabbed",
@@ -1879,10 +1880,31 @@ export function MonsterEditorApp({
                       {(Array.isArray(activeMonster.weaknesses) && activeMonster.weaknesses.length > 0) ? (
                         <div style={centerFlowLineStyle}>
                           <strong style={centerFlowLabelStrongStyle}>Vulnerabilities:</strong>{" "}
-                          {activeMonster.weaknesses
-                            .map((weakness) => weaknessLine(weakness as Record<string, unknown>))
-                            .filter(Boolean)
-                            .join(", ")}
+                          {activeMonster.weaknesses.map((weakness, idx) => {
+                            const w = weakness as Record<string, unknown>;
+                            const name = String(w.name ?? "").trim();
+                            const rawAmount = w.amount;
+                            const amount = typeof rawAmount === "number" ? rawAmount : Number(rawAmount);
+                            const amountPart = Number.isFinite(amount) && amount !== 0 ? `${amount} ` : "";
+                            const detailsPart = String(w.details ?? "").trim();
+                            return (
+                              <span key={`flow-weak-${idx}`}>
+                                {idx > 0 ? ", " : null}
+                                {amountPart}
+                                {name ? (
+                                  <span
+                                    {...glossaryTooltipUi.hoverA11y(buildGlossaryHoverKeyForTerm(name, { tryDamageTypeEntry: true }))}
+                                    style={glossaryLinkUnderline}
+                                  >
+                                    {name}
+                                  </span>
+                                ) : (
+                                  weaknessLine(w)
+                                )}
+                                {detailsPart ? ` ${detailsPart}` : ""}
+                              </span>
+                            );
+                          })}
                         </div>
                       ) : null}
                     </div>

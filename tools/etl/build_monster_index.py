@@ -404,6 +404,38 @@ def _migrate_numeric_prefixed_immunities_to_resistances(
     return kept, merged
 
 
+def _split_comma_immunity_segments(raw: str) -> List[str]:
+    return [s.strip() for s in str(raw or "").split(",") if s.strip()]
+
+
+def _postprocess_immunity_strings(immunities: List[str]) -> List[str]:
+    """Fix known source typos and split fused segments so immunity lists comma-split cleanly."""
+    seen: Set[str] = set()
+    out: List[str] = []
+    for imm in immunities:
+        for seg in _split_comma_immunity_segments(str(imm)):
+            st = seg.strip()
+            if not st:
+                continue
+            sl = st.lower()
+            if sl == "poison. sleep":
+                for part in ("poison", "sleep"):
+                    lk = part.lower()
+                    if lk not in seen:
+                        seen.add(lk)
+                        out.append(part)
+                continue
+            if sl == "ilusion":
+                st = "illusion"
+            elif sl == "pertrification":
+                st = "petrification"
+            lk = st.lower()
+            if lk not in seen:
+                seen.add(lk)
+                out.append(_normalize_text(st))
+    return out
+
+
 def _extract_reference_section(root: ET.Element, section_name: str) -> Dict[str, Any]:
     section = _find_first_section(root, section_name)
     if section is None:
@@ -1043,6 +1075,7 @@ def _extract_unmapped_sections(root: ET.Element) -> Dict[str, Any]:
 
 def _extract_normalized_monster_fields(root: ET.Element) -> Dict[str, Any]:
     immunities = _extract_reference_names_from_section(root, "Immunities")
+    immunities = _postprocess_immunity_strings(immunities)
     resistances = _extract_susceptibilities(root, "Resistances")
     immunities, resistances = _migrate_numeric_prefixed_immunities_to_resistances(immunities, resistances)
     values: Dict[str, Any] = {

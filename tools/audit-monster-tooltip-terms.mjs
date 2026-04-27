@@ -38,7 +38,24 @@ function mergeBuiltinTooltipLookupMap(glossaryByName) {
   const TYPO_TO_CANONICAL_NAME = {
     teleporation: "teleportation",
     marial: "martial",
-    arcare: "arcane"
+    arcare: "arcane",
+    ilusion: "illusion",
+    pertrification: "petrified"
+  };
+  const DAMAGE_AND_KEYWORD_ALIAS_TO_CANONICAL_NAME = {
+    electricity: "lightning"
+  };
+  const BUILTIN_FALLBACK_DEFINITIONS = {
+    silver:
+      "Many monsters are vulnerable to damage from silver or silvered weapons. Silvered weapons use the silvered modifier on ammunition or melee weapons.",
+    silvered:
+      "Silvered weapons (or silver ammunition) satisfy vulnerabilities that mention silver.",
+    variable:
+      "Variable resistance or immunity changes depending on circumstance; see this creature's powers or encounter text for how to apply it.",
+    adaptive:
+      "Adaptive resistance changes situationally; see the creature's powers or tactical notes for current values.",
+    determined:
+      "Determined when used in a stat block; see this creature's powers or the encounter setup for how this applies."
   };
   for (const [alias, canonName] of Object.entries(CONDITION_VERB_TO_CANONICAL_NAME)) {
     const canonKey = normalizeTerm(canonName);
@@ -53,6 +70,25 @@ function mergeBuiltinTooltipLookupMap(glossaryByName) {
     if (!text) continue;
     const typoKey = normalizeTerm(typo);
     if (!out[typoKey]) out[typoKey] = text;
+  }
+  for (const [alias, canonName] of Object.entries(DAMAGE_AND_KEYWORD_ALIAS_TO_CANONICAL_NAME)) {
+    const canonKey = normalizeTerm(canonName);
+    const text = out[canonKey];
+    if (!text) continue;
+    const aliasKey = normalizeTerm(alias);
+    if (!out[aliasKey]) out[aliasKey] = text;
+  }
+  const nonmagicalFireKey = normalizeTerm("nonmagical fire");
+  if (!out[nonmagicalFireKey]) {
+    const fireText = out[normalizeTerm("fire")];
+    if (fireText) {
+      out[nonmagicalFireKey] =
+        `${fireText}\n\nNonmagical fire is fire damage from a nonmagical source when the stat block distinguishes it from magical fire.`;
+    }
+  }
+  for (const [key, text] of Object.entries(BUILTIN_FALLBACK_DEFINITIONS)) {
+    const nk = normalizeTerm(key);
+    if (!out[nk]) out[nk] = text;
   }
   return out;
 }
@@ -83,6 +119,10 @@ function candidateTerms(input) {
     candidates.push("prone");
   }
 
+  if (/^nonmagical\s+fire$/i.test(trimmed)) {
+    candidates.push("fire");
+  }
+
   const withoutParens = trimmed.replace(/\s*\([^)]*\)\s*/g, " ").trim();
   if (withoutParens && withoutParens !== trimmed) candidates.push(withoutParens);
   const withoutTrailingPunctuation = trimmed.replace(/[.,;:!?]+$/g, "").trim();
@@ -96,7 +136,9 @@ function candidateTerms(input) {
   const TYPO_TO_CANONICAL_NAME = {
     teleporation: "teleportation",
     marial: "martial",
-    arcare: "arcane"
+    arcare: "arcane",
+    ilusion: "illusion",
+    pertrification: "petrified"
   };
   const normalized = normalizeTerm(trimmed);
   const typoCanon = TYPO_TO_CANONICAL_NAME[normalized];

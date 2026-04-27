@@ -46,6 +46,29 @@ TYPO_TO_CANONICAL_NAME: Dict[str, str] = {
     "teleporation": "teleportation",
     "marial": "martial",
     "arcare": "arcane",
+    "ilusion": "illusion",
+    "pertrification": "petrified",
+}
+
+DAMAGE_AND_KEYWORD_ALIAS_TO_CANONICAL_NAME: Dict[str, str] = {"electricity": "lightning"}
+
+BUILTIN_FALLBACK_DEFINITIONS: Dict[str, str] = {
+    "silver": (
+        "Many monsters are vulnerable to damage from silver or silvered weapons. "
+        "Silvered weapons use the silvered modifier on ammunition or melee weapons."
+    ),
+    "silvered": ("Silvered weapons (or silver ammunition) satisfy vulnerabilities that mention silver."),
+    "variable": (
+        "Variable resistance or immunity changes depending on circumstance; see this creature's powers "
+        "or encounter text for how to apply it."
+    ),
+    "adaptive": (
+        "Adaptive resistance changes situationally; see the creature's powers or tactical notes for current values."
+    ),
+    "determined": (
+        "Determined when used in a stat block; see this creature's powers or the encounter setup "
+        "for how this applies."
+    ),
 }
 
 
@@ -68,6 +91,28 @@ def merge_builtin_tooltip_lookup_map(glossary_by_name: Dict[str, str]) -> Dict[s
         typo_key = normalize_term(typo)
         if typo_key not in out:
             out[typo_key] = text
+    for alias, canon_name in DAMAGE_AND_KEYWORD_ALIAS_TO_CANONICAL_NAME.items():
+        canon_key = normalize_term(canon_name)
+        text = out.get(canon_key)
+        if not text:
+            continue
+        alias_key = normalize_term(alias)
+        if alias_key not in out:
+            out[alias_key] = text
+
+    nm_fire_key = normalize_term("nonmagical fire")
+    if nm_fire_key not in out:
+        fire_text = out.get(normalize_term("fire"))
+        if fire_text:
+            out[nm_fire_key] = (
+                f"{fire_text}\n\nNonmagical fire is fire damage from a nonmagical source when "
+                "the stat block distinguishes it from magical fire."
+            )
+
+    for key, text in BUILTIN_FALLBACK_DEFINITIONS.items():
+        nk = normalize_term(key)
+        if nk not in out:
+            out[nk] = text
     return out
 
 
@@ -97,6 +142,9 @@ def candidate_terms(input_term: str) -> List[str]:
 
     if re.match(r"^knocked\s+prone$", trimmed, re.I):
         candidates.append("prone")
+
+    if re.match(r"^nonmagical\s+fire$", trimmed, re.I):
+        candidates.append("fire")
 
     without_parens = re.sub(r"\s*\([^)]*\)\s*", " ", trimmed).strip()
     if without_parens and without_parens != trimmed:
