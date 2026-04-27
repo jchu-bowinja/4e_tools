@@ -2473,14 +2473,12 @@ export function MonsterEditorApp({
                       {items.map((item, idx) => {
                         const quantity = item.quantity;
                         const name = String(item.name ?? "").trim();
-                        const id = String(item.id ?? "").trim();
                         const description = String(item.description ?? "").trim();
                         return (
                           <div key={`item-${idx}`} style={{ border: "1px solid var(--panel-border)", borderRadius: "0.3rem", padding: "0.4rem", backgroundColor: "var(--surface-1)" }}>
                             <div style={bodyPrimary}>
                               <strong>{name || "Item"}</strong>
                               {quantity !== undefined && quantity !== null && quantity !== "" ? ` x${quantity}` : ""}
-                              {id ? <span style={{ color: "var(--text-muted)" }}> ({id})</span> : null}
                             </div>
                             {isRenderableCardValue(description) ? (
                               <details style={{ marginTop: "0.22rem" }}>
