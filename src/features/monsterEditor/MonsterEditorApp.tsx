@@ -163,16 +163,24 @@ const centerBulletStyle: CSSProperties = {
   userSelect: "none"
 };
 
-const centerQuickStatsGridStyle: CSSProperties = {
+/** Monster sheet quick stats: three columns (identity / defenses / resources). */
+const centerQuickStatsThreeColumnsStyle: CSSProperties = {
   marginTop: "0.5rem",
   display: "grid",
-  gridTemplateColumns: "minmax(7rem, auto) minmax(0, 1fr)",
-  columnGap: "1.25rem",
-  rowGap: "0.35rem",
-  alignItems: "baseline",
+  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+  columnGap: "1rem",
+  alignItems: "start",
   fontSize: "0.8125rem",
   lineHeight: 1.45,
   color: "var(--text-primary)"
+};
+
+const centerQuickStatsColumnGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(6.5rem, auto) minmax(0, 1fr)",
+  columnGap: "0.75rem",
+  rowGap: "0.35rem",
+  alignItems: "baseline"
 };
 
 const centerQuickStatValueStyle: CSSProperties = {
@@ -417,6 +425,18 @@ function formatValue(value: string | number | boolean | undefined | null): strin
   return String(value);
 }
 
+/** Case-insensitive lookup for monster stat maps (skills, otherNumbers, etc.). */
+function pickFromStatBlock(block: Record<string, unknown>, candidates: string[]): string {
+  const lower = new Map(Object.entries(block).map(([k, v]) => [k.toLowerCase(), v]));
+  for (const c of candidates) {
+    const v = lower.get(c.toLowerCase());
+    if (v !== undefined && v !== null && String(v).trim() !== "") {
+      return formatValue(v as string | number | boolean | undefined | null);
+    }
+  }
+  return "-";
+}
+
 /** Initiative / saving throws: show a leading + when the value is a positive number. */
 function formatLeadingPlusIfPositive(formatted: string): string {
   if (formatted === "-") return "-";
@@ -425,6 +445,14 @@ function formatLeadingPlusIfPositive(formatted: string): string {
   const num = Number(trimmed.replace(/,/g, ""));
   if (Number.isFinite(num) && num > 0) return `+${trimmed}`;
   return formatted;
+}
+
+/** Show a stat row when missing/blank is false; if the value is a finite number, show only when nonzero (like Regeneration). */
+function includeUnlessZeroNumeric(formatted: string): boolean {
+  if (formatted === "-") return false;
+  const num = Number(String(formatted).trim().replace(/,/g, ""));
+  if (Number.isFinite(num)) return num !== 0;
+  return true;
 }
 
 function splitFailedEscapeAttemptSections(text: string): { mainText: string; failedEscapeTexts: string[] } {
@@ -1648,6 +1676,7 @@ export function MonsterEditorApp({
                 </div>
                 {(() => {
                   const on = (activeMonster.stats?.otherNumbers ?? {}) as Record<string, unknown>;
+                  const skillsBlock = (activeMonster.stats?.skills ?? {}) as Record<string, unknown>;
                   const pick = (candidates: string[]): string => {
                     const lower = new Map(Object.entries(on).map(([k, v]) => [k.toLowerCase(), v]));
                     for (const c of candidates) {
@@ -1660,6 +1689,9 @@ export function MonsterEditorApp({
                   };
                   const initiative = pick(["initiative"]);
                   const hitPoints = pick(["hp", "hitPoints", "hit points"]);
+                  const perceptionFromSkills = pickFromStatBlock(skillsBlock, ["perception"]);
+                  const perception =
+                    perceptionFromSkills !== "-" ? perceptionFromSkills : pick(["perception"]);
                   const actionPts = pick(["actionPoints", "action points"]);
                   const saves = pick(["savingThrows", "saving throws"]);
                   const defensesBlock = (activeMonster.stats?.defenses ?? {}) as Record<string, unknown>;
@@ -1692,46 +1724,56 @@ export function MonsterEditorApp({
                       );
                     }
                   }
-                  const rows: Array<{ label: string; glossary: MonsterGlossaryHoverKey; val: string }> = [];
+                  type QuickStatRow = { label: string; glossary: MonsterGlossaryHoverKey; val: string };
+                  const col1: QuickStatRow[] = [];
+                  const col2: QuickStatRow[] = [];
+                  const col3: QuickStatRow[] = [];
+                  if (hitPoints !== "-") {
+                    col1.push({ label: "Hit Points", glossary: "glossaryTerm:Hit Points", val: hitPoints });
+                  }
                   if (initiative !== "-") {
-                    rows.push({
+                    col1.push({
                       label: "Initiative",
                       glossary: "glossaryTerm:Initiative",
                       val: formatLeadingPlusIfPositive(initiative)
                     });
                   }
-                  if (hitPoints !== "-") {
-                    rows.push({ label: "Hit Points", glossary: "glossaryTerm:Hit Points", val: hitPoints });
+                  if (perception !== "-") {
+                    col1.push({
+                      label: "Perception",
+                      glossary: "glossaryTerm:Perception",
+                      val: formatLeadingPlusIfPositive(perception)
+                    });
                   }
+                  if (ac !== "-") col2.push({ label: "AC", glossary: "glossaryTerm:AC", val: ac });
+                  if (fortitude !== "-") {
+                    col2.push({ label: "Fortitude", glossary: "glossaryTerm:Fortitude", val: fortitude });
+                  }
+                  if (reflex !== "-") col2.push({ label: "Reflex", glossary: "glossaryTerm:Reflex", val: reflex });
+                  if (will !== "-") col2.push({ label: "Will", glossary: "glossaryTerm:Will", val: will });
                   if (regenerationVal !== null) {
-                    rows.push({
+                    col3.push({
                       label: "Regeneration",
                       glossary: "glossaryTerm:Regeneration",
                       val: regenerationVal
                     });
                   }
-                  if (ac !== "-") rows.push({ label: "AC", glossary: "glossaryTerm:AC", val: ac });
-                  if (fortitude !== "-") {
-                    rows.push({ label: "Fortitude", glossary: "glossaryTerm:Fortitude", val: fortitude });
+                  if (includeUnlessZeroNumeric(actionPts)) {
+                    col3.push({ label: "Action Points", glossary: "glossaryTerm:Action Points", val: actionPts });
                   }
-                  if (reflex !== "-") rows.push({ label: "Reflex", glossary: "glossaryTerm:Reflex", val: reflex });
-                  if (will !== "-") rows.push({ label: "Will", glossary: "glossaryTerm:Will", val: will });
-                  if (actionPts !== "-") {
-                    rows.push({ label: "Action Points", glossary: "glossaryTerm:Action Points", val: actionPts });
-                  }
-                  if (saves !== "-") {
-                    rows.push({
+                  if (includeUnlessZeroNumeric(saves)) {
+                    col3.push({
                       label: "Saving Throws",
                       glossary: "glossaryTerm:Saving Throws",
                       val: formatLeadingPlusIfPositive(saves)
                     });
                   }
-                  if (rows.length === 0) return null;
-                  return (
-                    <div style={centerQuickStatsGridStyle}>
+                  if (col1.length === 0 && col2.length === 0 && col3.length === 0) return null;
+                  const renderQuickStatColumn = (rows: QuickStatRow[], colKey: string) => (
+                    <div key={colKey} style={centerQuickStatsColumnGridStyle}>
                       {rows.flatMap((r) => [
                         <span
-                          key={`${r.label}-l`}
+                          key={`${colKey}-${r.label}-l`}
                           {...glossaryHoverA11y(r.glossary)}
                           style={{
                             ...microLabelStyle,
@@ -1743,10 +1785,17 @@ export function MonsterEditorApp({
                         >
                           {r.label}
                         </span>,
-                        <span key={`${r.label}-v`} style={centerQuickStatValueStyle}>
+                        <span key={`${colKey}-${r.label}-v`} style={centerQuickStatValueStyle}>
                           {r.val}
                         </span>
                       ])}
+                    </div>
+                  );
+                  return (
+                    <div style={centerQuickStatsThreeColumnsStyle}>
+                      {renderQuickStatColumn(col1, "c1")}
+                      {renderQuickStatColumn(col2, "c2")}
+                      {renderQuickStatColumn(col3, "c3")}
                     </div>
                   );
                 })()}
@@ -1773,7 +1822,15 @@ export function MonsterEditorApp({
                 const movementEntries = extractMovementEntries(activeMonster);
                 const showPhasing = activeMonster.phasing === true;
                 const otherNumbers = activeMonster.stats?.otherNumbers ?? {};
-                const bloodied = formatValue((otherNumbers as Record<string, unknown>).bloodied as string | number | boolean | undefined | null);
+                const otherMap = otherNumbers as Record<string, unknown>;
+                const skillsMap = (activeMonster.stats?.skills ?? {}) as Record<string, unknown>;
+                const bloodied = formatValue(otherMap.bloodied as string | number | boolean | undefined | null);
+                const initiativeFlow = pickFromStatBlock(otherMap, ["initiative"]);
+                const perceptionFromSkillsFlow = pickFromStatBlock(skillsMap, ["perception"]);
+                const perceptionFlow =
+                  perceptionFromSkillsFlow !== "-"
+                    ? perceptionFromSkillsFlow
+                    : pickFromStatBlock(otherMap, ["perception"]);
                 return (
                   <>
                     <div style={centerStatFlowSectionStyle}>
@@ -1781,6 +1838,18 @@ export function MonsterEditorApp({
                         <div style={centerFlowLineStyle}>
                           <strong style={centerFlowLabelStrongStyle}>Bloodied:</strong>
                           {bloodied}
+                        </div>
+                      ) : null}
+                      {initiativeFlow !== "-" ? (
+                        <div style={centerFlowLineStyle}>
+                          <strong style={centerFlowLabelStrongStyle}>Initiative:</strong>{" "}
+                          {formatLeadingPlusIfPositive(initiativeFlow)}
+                        </div>
+                      ) : null}
+                      {perceptionFlow !== "-" ? (
+                        <div style={centerFlowLineStyle}>
+                          <strong style={centerFlowLabelStrongStyle}>Perception:</strong>{" "}
+                          {formatLeadingPlusIfPositive(perceptionFlow)}
                         </div>
                       ) : null}
                       {(movementEntries.length > 0 || showPhasing) ? (
