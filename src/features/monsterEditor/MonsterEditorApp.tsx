@@ -2501,11 +2501,11 @@ export function MonsterEditorApp({
                                 </span>
                               ))}
                               {cardModel.usageDetailsLines.length > 0 ? (
-                                <div style={{ marginTop: "0.1rem", ...metaSecondary }}>
-                                  {cardModel.usageDetailsLines.map((line, lineIdx) => (
-                                    <div key={`${power.name}-${index}-usage-details-${lineIdx}`}>{line}</div>
-                                  ))}
-                                </div>
+                                <span style={{ ...metaSecondary, fontWeight: 400 }}>
+                                  {"("}
+                                  {cardModel.usageDetailsLines.join(" ")}
+                                  {")"}
+                                </span>
                               ) : null}
                             </div>
                           ) : null}
