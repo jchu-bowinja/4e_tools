@@ -944,6 +944,15 @@ function splitCommaListSegments(raw: string): string[] {
     .filter((s) => s.length > 0);
 }
 
+/** Short entries ("fire", "cold") match glossary terms; full-sentence rules should stay plain text. */
+function immunitySegmentEligibleForGlossaryHover(text: string): boolean {
+  const t = text.trim();
+  if (!t) return false;
+  if (t.length > 56) return false;
+  const words = t.split(/\s+/).filter(Boolean).length;
+  return words <= 6;
+}
+
 /**
  * Build hover lookup key(s). Damage types often appear in glossary as "X damage".
  * Sense names may be lowercased in JSON while glossary uses title case.
@@ -1890,12 +1899,16 @@ export function MonsterEditorApp({
                             return segments.map((text, idx) => (
                               <span key={`flow-imm-${idx}`}>
                                 {idx > 0 ? ", " : null}
-                                <span
-                                  {...glossaryHoverA11y(buildGlossaryHoverKeyForTerm(text))}
-                                  style={glossaryLinkUnderline}
-                                >
-                                  {text}
-                                </span>
+                                {immunitySegmentEligibleForGlossaryHover(text) ? (
+                                  <span
+                                    {...glossaryHoverA11y(buildGlossaryHoverKeyForTerm(text))}
+                                    style={glossaryLinkUnderline}
+                                  >
+                                    {text}
+                                  </span>
+                                ) : (
+                                  <span>{text}</span>
+                                )}
                               </span>
                             ));
                           })()}
