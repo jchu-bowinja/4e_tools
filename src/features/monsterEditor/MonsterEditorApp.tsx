@@ -38,6 +38,8 @@ import {
   monsterStatGlossaryTermForKey,
   normalizeSemicolonWhitespace,
   normalizeTextForDupCompare,
+  parseAttackLineVsDefenseHighlightSegments,
+  splitMonsterAttackRangeLineForGlossary,
   titleCaseWords
 } from "./monsterTextUtils";
 import { buildMonsterPowerCardViewModel } from "./monsterPowerCardViewModel";
@@ -238,6 +240,13 @@ const statPanelStyle: CSSProperties = {
 const glossaryLinkUnderline: CSSProperties = {
   cursor: "help",
   borderBottom: "1px dotted var(--text-muted)"
+};
+
+/** Glossary underline on attack-line range/type wording only (numbers/distances stay plain). */
+const monsterAttackLineGlossaryUnderline: CSSProperties = {
+  cursor: "help",
+  borderBottom: "1px dotted var(--text-muted)",
+  color: "var(--text-primary)"
 };
 
 const microLabelInteractive: CSSProperties = {
@@ -978,6 +987,67 @@ function buildGlossaryHoverKeyForTerm(
   });
   if (unique.length === 1) return `glossaryTerm:${unique[0]}`;
   return `glossaryTerms:${unique.map((v) => encodeURIComponent(v)).join("|")}`;
+}
+
+function renderMonsterAttackLinePartWithRangeGlossary(
+  part: string,
+  startGlossaryHover: (event: ReactMouseEvent<HTMLElement>, key: MonsterGlossaryHoverKey) => void,
+  leaveGlossaryHover: () => void
+): JSX.Element {
+  const vsSegments = parseAttackLineVsDefenseHighlightSegments(part);
+  if (vsSegments) {
+    return (
+      <>
+        {vsSegments.map((seg, idx) =>
+          seg.kind === "text" ? (
+            <span key={`vs-seg-${idx}`}>{seg.value}</span>
+          ) : (
+            <span
+              key={`vs-seg-${idx}`}
+              onMouseEnter={(event) =>
+                startGlossaryHover(event, buildGlossaryHoverKeyForTerm(seg.value, { tryTitleCaseVariant: true }))
+              }
+              onMouseLeave={leaveGlossaryHover}
+              style={monsterAttackLineGlossaryUnderline}
+            >
+              {seg.value}
+            </span>
+          )
+        )}
+      </>
+    );
+  }
+
+  const split = splitMonsterAttackRangeLineForGlossary(part);
+  if (split.kind === "full") {
+    return (
+      <span
+        onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${split.text}`)}
+        onMouseLeave={leaveGlossaryHover}
+        style={monsterAttackLineGlossaryUnderline}
+      >
+        {split.text}
+      </span>
+    );
+  }
+  const { glossary, tail } = split;
+  return (
+    <>
+      <span
+        onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${glossary}`)}
+        onMouseLeave={leaveGlossaryHover}
+        style={monsterAttackLineGlossaryUnderline}
+      >
+        {glossary}
+      </span>
+      {tail ? (
+        <>
+          {" "}
+          {tail}
+        </>
+      ) : null}
+    </>
+  );
 }
 
 const MONSTER_GLOSSARY_TOOLTIP_ID = "monster-glossary-tooltip";
@@ -2513,17 +2583,7 @@ export function MonsterEditorApp({
                             <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginTop: "0.05rem", display: "flex", flexWrap: "wrap", gap: "0.22rem", alignItems: "center" }}>
                               {cardModel.attackLineParts.map((part, partIdx) => (
                                 <span key={`${power.name}-${index}-attackline-${partIdx}`}>
-                                  <span
-                                    onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${part}`)}
-                                    onMouseLeave={leaveGlossaryHover}
-                                    style={{
-                                      cursor: "help",
-                                      borderBottom: "1px dotted var(--text-muted)",
-                                      color: "var(--text-primary)"
-                                    }}
-                                  >
-                                    {part}
-                                  </span>
+                                  {renderMonsterAttackLinePartWithRangeGlossary(part, startGlossaryHover, leaveGlossaryHover)}
                                   {partIdx < cardModel.attackLineParts.length - 1 ? <span style={{ color: "var(--text-muted)", margin: "0 0.1rem" }}>•</span> : null}
                                 </span>
                               ))}
@@ -2617,17 +2677,7 @@ export function MonsterEditorApp({
                                     <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginTop: "0.05rem", display: "flex", flexWrap: "wrap", gap: "0.22rem", alignItems: "center" }}>
                                       {secondaryAttack.attackLineParts.map((part, partIdx) => (
                                         <span key={`${power.name}-${index}-secondary-${secondaryIndex}-attackline-${partIdx}`}>
-                                          <span
-                                            onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${part}`)}
-                                            onMouseLeave={leaveGlossaryHover}
-                                            style={{
-                                              cursor: "help",
-                                              borderBottom: "1px dotted var(--text-muted)",
-                                              color: "var(--text-primary)"
-                                            }}
-                                          >
-                                            {part}
-                                          </span>
+                                          {renderMonsterAttackLinePartWithRangeGlossary(part, startGlossaryHover, leaveGlossaryHover)}
                                           {partIdx < secondaryAttack.attackLineParts.length - 1 ? (
                                             <span style={{ color: "var(--text-muted)", margin: "0 0.1rem" }}>•</span>
                                           ) : null}
