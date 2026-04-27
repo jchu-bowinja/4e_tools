@@ -91,6 +91,40 @@ describe("abilityTooltipResolveTerms", () => {
   });
 });
 
+describe("resolveTooltipText monster immunity phrasing", () => {
+  const glossaryByName = {
+    slowed: "Slowed glossary.",
+    stunned: "Stunned glossary.",
+    dominated: "Dominated glossary.",
+    charm: "Charm glossary.",
+    sleep: "Sleep glossary.",
+    gaze: "Gaze glossary.",
+    prone: "Prone glossary.",
+    petrified: "Petrified glossary."
+  };
+
+  it("maps verb-style immunity lines to canonical condition glossary entries", () => {
+    expect(resolveTooltipText({ terms: ["slow"], glossaryByName })).toBe("Slowed glossary.");
+    expect(resolveTooltipText({ terms: ["stun"], glossaryByName })).toBe("Stunned glossary.");
+    expect(resolveTooltipText({ terms: ["dominate"], glossaryByName })).toBe("Dominated glossary.");
+    expect(resolveTooltipText({ terms: ["petrification"], glossaryByName })).toBe("Petrified glossary.");
+  });
+
+  it("uses the first word before … effect(s) as the glossary key", () => {
+    expect(resolveTooltipText({ terms: ["charm effects"], glossaryByName })).toBe("Charm glossary.");
+    expect(resolveTooltipText({ terms: ["sleep effects"], glossaryByName })).toBe("Sleep glossary.");
+    expect(resolveTooltipText({ terms: ["gaze effects"], glossaryByName })).toBe("Gaze glossary.");
+  });
+
+  it("maps stunning effects → stunned via the first word + alias", () => {
+    expect(resolveTooltipText({ terms: ["stunning effects"], glossaryByName })).toBe("Stunned glossary.");
+  });
+
+  it("maps knocked prone → prone", () => {
+    expect(resolveTooltipText({ terms: ["knocked prone"], glossaryByName })).toBe("Prone glossary.");
+  });
+});
+
 describe("resolveTooltipText range normalization", () => {
   it("resolves Melee X and Ranged X to base glossary keys", () => {
     const glossaryByName = {

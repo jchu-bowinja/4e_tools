@@ -2023,13 +2023,16 @@ export function MonsterEditorApp({
                                   if (!name) return null;
                                   const displayName = name.charAt(0).toUpperCase() + name.slice(1);
                                   const normalizedRange = String(sense.range ?? "").trim();
-                                  const text =
+                                  const rangePart =
                                     normalizedRange !== "" && normalizedRange !== "0"
-                                      ? `${displayName} ${normalizedRange}`
-                                      : displayName;
-                                  return { name, text };
+                                      ? normalizedRange
+                                      : "";
+                                  return { name, displayName, rangePart };
                                 })
-                                .filter((e): e is { name: string; text: string } => e !== null)
+                                .filter(
+                                  (e): e is { name: string; displayName: string; rangePart: string } =>
+                                    e !== null
+                                )
                             : [];
                         if (entries.length === 0) return null;
                         return (
@@ -2042,8 +2045,9 @@ export function MonsterEditorApp({
                                   {...glossaryHoverA11y(buildGlossaryHoverKeyForTerm(entry.name, { tryTitleCaseVariant: true }))}
                                   style={glossaryLinkUnderline}
                                 >
-                                  {entry.text}
+                                  {entry.displayName}
                                 </span>
+                                {entry.rangePart ? ` ${entry.rangePart}` : null}
                               </span>
                             ))}
                           </div>

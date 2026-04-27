@@ -119,10 +119,45 @@ export async function loadTooltipGlossary(): Promise<Record<string, string>> {
   return glossaryRowsToTooltipMap(rows);
 }
 
-function candidateTerms(input: string): string[] {
+/** Verb / noun phrases in monster Immunities vs canonical glossary condition names */
+const IMMUNITY_TERM_ALIASES: Record<string, readonly string[]> = {
+  slow: ["slowed"],
+  stun: ["stunned"],
+  dominate: ["dominated"],
+  stunning: ["stunned"],
+  petrification: ["petrified"]
+};
+
+/**
+ * Expands a displayed string into glossary lookup keys (`resolveTooltipText` tries them in order).
+ * Keep `tools/audit-monster-tooltip-terms.mjs` and `audit_monster_tooltip_terms.py` in sync.
+ */
+export function candidateTerms(input: string): string[] {
   const trimmed = input.trim();
   if (!trimmed) return [];
   const candidates = [trimmed];
+
+  const effectsSuffixMatch = trimmed.match(/^(\S+)\s+effects?$/i);
+  if (effectsSuffixMatch?.[1]) {
+    candidates.push(effectsSuffixMatch[1]);
+  }
+
+  if (/^knocked\s+prone$/i.test(trimmed)) {
+    candidates.push("prone");
+  }
+
+  const normTrimmed = normalizeTerm(trimmed);
+  const immAliases = IMMUNITY_TERM_ALIASES[normTrimmed];
+  if (immAliases) {
+    candidates.push(...immAliases);
+  }
+  if (effectsSuffixMatch?.[1]) {
+    const fwAliases = IMMUNITY_TERM_ALIASES[normalizeTerm(effectsSuffixMatch[1])];
+    if (fwAliases) {
+      candidates.push(...fwAliases);
+    }
+  }
+
   const withoutParens = trimmed.replace(/\s*\([^)]*\)\s*/g, " ").trim();
   if (withoutParens && withoutParens !== trimmed) {
     candidates.push(withoutParens);

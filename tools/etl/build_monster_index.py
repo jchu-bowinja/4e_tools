@@ -3,7 +3,7 @@ import re
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 
 def _safe_id(path_value: str) -> str:
@@ -306,6 +306,102 @@ def _extract_susceptibilities(root: ET.Element, section_name: str) -> List[Dict[
         if row:
             rows.append(row)
     return rows
+
+
+# Source XML sometimes puts resistances inside Immunities as a bare name like "10 cold".
+_NUMERIC_PREFIX_IMMUNITY_PATTERN = re.compile(r"^(\d+)\s+(.+)$")
+
+_STANDARD_DAMAGE_TYPES = frozenset(
+    {
+        "acid",
+        "cold",
+        "fire",
+        "force",
+        "lightning",
+        "necrotic",
+        "poison",
+        "psychic",
+        "radiant",
+        "thunder",
+    }
+)
+
+
+def _title_case_damage_keyword_phrase(raw: str) -> str:
+    """Cold, Necrotic, Nonmagical Fire — match typical resistance name casing."""
+    parts: List[str] = []
+    for w in raw.strip().split():
+        if not w:
+            continue
+        parts.append(w[:1].upper() + w[1:].lower())
+    return " ".join(parts)
+
+
+def _tail_matches_resistance_damage_keyword(tail: str) -> bool:
+    """
+    Only promote when the text after the number is clearly a damage keyword (not a sentence).
+    Covers: "cold", "necrotic", "nonmagical fire", "fire damage", "cold and fire".
+    """
+    words = [w for w in tail.lower().split() if w]
+    if not words:
+        return False
+    if len(words) > 4:
+        return False
+    if len(words) == 1:
+        return words[0] in _STANDARD_DAMAGE_TYPES
+    if len(words) == 2:
+        a, b = words[0], words[1]
+        if a == "nonmagical" and b in _STANDARD_DAMAGE_TYPES:
+            return True
+        if a in _STANDARD_DAMAGE_TYPES and b == "damage":
+            return True
+    if len(words) == 3 and words[1] == "and":
+        return words[0] in _STANDARD_DAMAGE_TYPES and words[2] in _STANDARD_DAMAGE_TYPES
+    return False
+
+
+def _migrate_numeric_prefixed_immunities_to_resistances(
+    immunities: List[str],
+    resistances: List[Dict[str, Any]],
+) -> Tuple[List[str], List[Dict[str, Any]]]:
+    """
+    Promote immunity strings that are clearly numeric resistances (mis-tagged in source),
+    e.g. "10 cold" -> resistance name Cold, amount 10.
+
+    Long tails stay as immunities (likely prose rules). Commas/semicolons suggest compound text, not a single keyword.
+    """
+    kept: List[str] = []
+    promoted: List[Dict[str, Any]] = []
+    seen_kept: set[str] = set()
+
+    for imm in immunities:
+        stripped = imm.strip()
+        m = _NUMERIC_PREFIX_IMMUNITY_PATTERN.match(stripped)
+        if not m:
+            low = stripped.lower()
+            if low and low not in seen_kept:
+                seen_kept.add(low)
+                kept.append(imm)
+            continue
+        amount = int(m.group(1))
+        tail = m.group(2).strip()
+        if not tail or any(ch in tail for ch in ",;"):
+            low = stripped.lower()
+            if low and low not in seen_kept:
+                seen_kept.add(low)
+                kept.append(imm)
+            continue
+        if not _tail_matches_resistance_damage_keyword(tail):
+            low = stripped.lower()
+            if low and low not in seen_kept:
+                seen_kept.add(low)
+                kept.append(imm)
+            continue
+        row = {"name": _title_case_damage_keyword_phrase(tail), "amount": amount}
+        promoted.append(row)
+
+    merged = list(resistances) + promoted
+    return kept, merged
 
 
 def _extract_reference_section(root: ET.Element, section_name: str) -> Dict[str, Any]:
@@ -946,14 +1042,17 @@ def _extract_unmapped_sections(root: ET.Element) -> Dict[str, Any]:
 
 
 def _extract_normalized_monster_fields(root: ET.Element) -> Dict[str, Any]:
+    immunities = _extract_reference_names_from_section(root, "Immunities")
+    resistances = _extract_susceptibilities(root, "Resistances")
+    immunities, resistances = _migrate_numeric_prefixed_immunities_to_resistances(immunities, resistances)
     values: Dict[str, Any] = {
         "groupRole": _extract_reference_name(_find_first_section(root, "GroupRole")) if _find_first_section(root, "GroupRole") is not None else "",
         "alignment": _extract_reference_section(root, "Alignment"),
         "languages": _extract_reference_names_from_section(root, "Languages"),
         "keywords": _extract_reference_names_from_section(root, "Keywords"),
-        "immunities": _extract_reference_names_from_section(root, "Immunities"),
+        "immunities": immunities,
         "senses": _extract_senses(root),
-        "resistances": _extract_susceptibilities(root, "Resistances"),
+        "resistances": resistances,
         "weaknesses": _extract_susceptibilities(root, "Weaknesses"),
         "sourceBooks": _extract_source_books(root),
         "regeneration": _extract_regeneration_value(root),
