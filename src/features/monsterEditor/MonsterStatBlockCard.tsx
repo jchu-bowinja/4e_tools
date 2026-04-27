@@ -55,8 +55,9 @@ function abilityMod(score: number): number {
 function formatAbilityShort(code: string, score: number): string {
   const mod = abilityMod(score);
   const sign = mod >= 0 ? "+" : "";
-  const short = code.charAt(0).toUpperCase() + code.slice(1).toLowerCase();
-  return `${short} ${score} (${sign}${mod})`;
+  const k = code.trim().toLowerCase();
+  const abbr = /^(str|dex|con|int|wis|cha)$/.test(k) ? k.toUpperCase() : code.trim().slice(0, 3).toUpperCase();
+  return `${abbr} ${score} (${sign}${mod})`;
 }
 
 function readAbilityScores(monster: MonsterEntryFile): Record<string, number> {
@@ -173,14 +174,7 @@ export function MonsterStatBlockCard(props: MonsterStatBlockCardProps): ReactEle
   const will = pickScalar(defenses, ["will", "Will"]);
 
   const abilities = readAbilityScores(monster);
-  const orderA: Array<{ key: string; label: string }> = [
-    { key: "str", label: "Str" },
-    { key: "dex", label: "Dex" },
-    { key: "wis", label: "Wis" },
-    { key: "con", label: "Con" },
-    { key: "int", label: "Int" },
-    { key: "cha", label: "Cha" }
-  ];
+  const orderA = ["str", "dex", "wis", "con", "int", "cha"] as const;
 
   const creatureTypeFormatted = formatMonsterCreatureTypeLine(monster);
 
@@ -395,7 +389,7 @@ export function MonsterStatBlockCard(props: MonsterStatBlockCardProps): ReactEle
           fontSize: "0.74rem"
         }}
       >
-        {orderA.map(({ key }) => {
+        {orderA.map((key) => {
           const score = abilities[key];
           if (!Number.isFinite(score)) return <span key={key} />;
           return <span key={key}>{formatAbilityShort(key, score)}</span>;

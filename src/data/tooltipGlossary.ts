@@ -1,3 +1,5 @@
+import type { RulesIndex } from "../rules/models";
+
 /** One glossary entry as stored in `generated/glossary_terms.json`. */
 export interface GlossaryTermRow {
   id?: string;
@@ -189,10 +191,60 @@ export function resolveTooltipText(params: {
   return null;
 }
 
+function firstRulesText(...values: Array<unknown>): string | null {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+/** Plain rules text from a compendium-style entity (skills, abilities, etc.). */
+export function extractRulesEntityTooltipText(entity: {
+  shortDescription?: string | null;
+  body?: string | null;
+  raw?: Record<string, unknown>;
+}): string | null {
+  const raw = entity.raw || {};
+  return firstRulesText(
+    entity.shortDescription,
+    entity.body,
+    raw.body,
+    raw.flavor,
+    raw["Short Description"],
+    raw["Description"],
+    raw["Rules Text"],
+    raw["Text"]
+  );
+}
+
 /**
- * Lookup order for STR/CON/… tooltips: prefer the rules row name, then full name + code
- * (e.g. Strength, STR), then a generic “Ability Score” fallback — so we do not match the
- * broad “Ability Scores” glossary entry before a specific ability.
+ * Tooltip body for an ability score row when the glossary has no matching entry.
+ * Uses `rules_index.json` ability score lore (`abilityScores` entries).
+ */
+export function tooltipTextForAbilityByCode(index: RulesIndex, abilityCode: string): string | null {
+  const upper = abilityCode.trim().toUpperCase();
+  const entry = index.abilityScores.find((a) => a.abilityCode === upper);
+  if (!entry) return null;
+  return extractRulesEntityTooltipText(entry);
+}
+
+/**
+ * Tooltip body for a skill row when the glossary has no usable entry (many skill rows in
+ * `glossary_terms.json` are placeholders without definition/html).
+ */
+export function tooltipTextForSkillById(index: RulesIndex, skillId: string): string | null {
+  const skill = index.skills.find((s) => s.id === skillId);
+  if (!skill) return null;
+  return extractRulesEntityTooltipText(skill);
+}
+
+/**
+ * Lookup keys for STR/CON/… tooltips: rules row name (when provided), then full name + code
+ * (e.g. Strength, STR).
+ *
+ * Intentionally **no** trailing “Ability Score” term: `resolveTooltipText` expands variants that
+ * match the broad glossary entry “Ability Scores”, which would win before rules-index fallback
+ * and made every attribute row show the generic ability-scores blurb instead of Strength/Constitution/etc.
  */
 export function abilityTooltipResolveTerms(abilityCode: string, rulesEntryName?: string | null): string[] {
   const byCode: Record<string, readonly [string, string]> = {
@@ -213,7 +265,6 @@ export function abilityTooltipResolveTerms(abilityCode: string, rulesEntryName?:
   } else if (abilityCode.trim()) {
     out.push(abilityCode.trim());
   }
-  out.push("Ability Score");
   const seen = new Set<string>();
   const deduped: string[] = [];
   for (const t of out) {

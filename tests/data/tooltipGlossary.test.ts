@@ -1,22 +1,86 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { RulesIndex } from "../../src/rules/models";
 import {
   abilityTooltipResolveTerms,
   displayTextForGlossaryRow,
   loadTooltipGlossary,
   resolveTooltipText,
-  sanitizeGlossaryRows
+  sanitizeGlossaryRows,
+  tooltipTextForAbilityByCode,
+  tooltipTextForSkillById
 } from "../../src/data/tooltipGlossary";
 
+function minimalRulesIndex(overrides: Partial<RulesIndex>): RulesIndex {
+  return {
+    meta: { version: 1, counts: {} },
+    races: [],
+    classes: [],
+    feats: [],
+    powers: [],
+    skills: [],
+    languages: [],
+    armors: [],
+    abilityScores: [],
+    racialTraits: [],
+    themes: [],
+    paragonPaths: [],
+    epicDestinies: [],
+    hybridClasses: [],
+    weapons: [],
+    implements: [],
+    autoGrantedPowerIdsByClassId: {},
+    autoGrantedSkillTrainingNamesBySupportId: {},
+    classBuildOptionsByClassId: {},
+    ...overrides
+  };
+}
+
+describe("tooltipTextForAbilityByCode / tooltipTextForSkillById", () => {
+  it("returns ability lore from rules index by code", () => {
+    const index = minimalRulesIndex({
+      abilityScores: [
+        {
+          id: "a1",
+          name: "Strength",
+          slug: "strength",
+          source: "",
+          abilityCode: "STR",
+          body: "Strength rules text.",
+          raw: {}
+        }
+      ]
+    });
+    expect(tooltipTextForAbilityByCode(index, "STR")).toBe("Strength rules text.");
+    expect(tooltipTextForAbilityByCode(index, "str")).toBe("Strength rules text.");
+  });
+
+  it("returns skill text from raw.body when top-level body is absent", () => {
+    const index = minimalRulesIndex({
+      skills: [
+        {
+          id: "skill-1",
+          name: "Acrobatics",
+          slug: "acrobatics",
+          source: "",
+          keyAbility: "Dex",
+          raw: { body: "Acrobatics from raw." }
+        }
+      ]
+    });
+    expect(tooltipTextForSkillById(index, "skill-1")).toBe("Acrobatics from raw.");
+  });
+});
+
 describe("abilityTooltipResolveTerms", () => {
-  it("orders full name and code before generic Ability Score", () => {
-    expect(abilityTooltipResolveTerms("STR", "Strength")).toEqual(["Strength", "STR", "Ability Score"]);
+  it("orders rules name then full name and ability code", () => {
+    expect(abilityTooltipResolveTerms("STR", "Strength")).toEqual(["Strength", "STR"]);
   });
 
   it("dedupes when rules name matches full name", () => {
-    expect(abilityTooltipResolveTerms("DEX", "Dexterity")).toEqual(["Dexterity", "DEX", "Ability Score"]);
+    expect(abilityTooltipResolveTerms("DEX", "Dexterity")).toEqual(["Dexterity", "DEX"]);
   });
 
-  it("lets resolveTooltipText match a specific ability before generic ability scores", () => {
+  it("lets resolveTooltipText match glossary entries for specific abilities without hitting generic Ability Scores", () => {
     const glossaryByName = {
       strength: "STR-specific body",
       "ability scores": "Generic ability scores body",
