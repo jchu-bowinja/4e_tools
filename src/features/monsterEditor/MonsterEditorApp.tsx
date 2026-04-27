@@ -9,14 +9,9 @@ import {
   type MouseEvent as ReactMouseEvent
 } from "react";
 import type { RulesIndex } from "../../rules/models";
-import { resolveTooltipText, tooltipTextForAbilityByCode } from "../../data/tooltipGlossary";
-import { positionFixedTooltip } from "../../ui/glossaryTooltipPosition";
-import {
-  GLOSSARY_TOOLTIP_CLOSE_DELAY_MS,
-  GLOSSARY_TOOLTIP_OPEN_DELAY_MS,
-  STANDARD_GLOSSARY_TOOLTIP_LAYOUT,
-  STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE
-} from "../../ui/glossaryTooltip";
+import { STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE } from "../../ui/glossaryTooltip";
+import { useGlossaryTooltip } from "../../ui/useGlossaryTooltip";
+import { resolveMonsterGlossaryHoverSections, resolveMonsterStyleTooltip } from "./monsterTooltipResolve";
 import { GlossaryTooltipRichText } from "../builder/RulesRichText";
 import { findCaseInsensitiveMatches, scrollTextareaToMatch } from "../../ui/jsonSearch";
 import {
@@ -820,18 +815,6 @@ function renderPowerAttacks(
   );
 }
 
-export function splitTooltipTerms(rawTerm: string): string[] {
-  const term = rawTerm.trim();
-  if (!term) return [];
-  const attackVsMatch = term.match(/^(.+?)\s+vs\.?\s+(.+)$/i);
-  if (attackVsMatch) {
-    const left = attackVsMatch[1]?.trim();
-    const right = attackVsMatch[2]?.trim();
-    return [left, right].filter((part): part is string => Boolean(part));
-  }
-  return [term];
-}
-
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -1074,15 +1057,12 @@ export function MonsterEditorApp({
   const [jsonSearchQuery, setJsonSearchQuery] = useState<string>("");
   const [jsonSearchResultIdx, setJsonSearchResultIdx] = useState<number>(0);
   const [jsonSearchJumpTick, setJsonSearchJumpTick] = useState<number>(0);
-  const [showGlossaryHoverInfo, setShowGlossaryHoverInfo] = useState(false);
-  const [glossaryHoverKey, setGlossaryHoverKey] = useState<MonsterGlossaryHoverKey | null>(null);
-  const [glossaryHoverPanelPos, setGlossaryHoverPanelPos] = useState<{
-    top: number;
-    left: number;
-    transform?: "translateY(-100%)";
-  } | null>(null);
-  const glossaryHoverTimerRef = useRef<number | null>(null);
-  const glossaryHoverCloseTimerRef = useRef<number | null>(null);
+  const glossaryTooltipUi = useGlossaryTooltip({
+    tooltipId: MONSTER_GLOSSARY_TOOLTIP_ID,
+    resetDeps: [selectedId]
+  });
+  const startGlossaryHover = glossaryTooltipUi.startHover;
+  const leaveGlossaryHover = glossaryTooltipUi.leaveHover;
   const jsonTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
@@ -1122,50 +1102,6 @@ export function MonsterEditorApp({
         setIsBusy(false);
       }
     })();
-  }, [selectedId]);
-
-  useEffect(() => {
-    return () => {
-      if (glossaryHoverTimerRef.current != null) {
-        window.clearTimeout(glossaryHoverTimerRef.current);
-      }
-      if (glossaryHoverCloseTimerRef.current != null) {
-        window.clearTimeout(glossaryHoverCloseTimerRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    function onWindowKeyDown(event: KeyboardEvent): void {
-      if (event.key !== "Escape") return;
-      if (glossaryHoverTimerRef.current != null) {
-        window.clearTimeout(glossaryHoverTimerRef.current);
-        glossaryHoverTimerRef.current = null;
-      }
-      if (glossaryHoverCloseTimerRef.current != null) {
-        window.clearTimeout(glossaryHoverCloseTimerRef.current);
-        glossaryHoverCloseTimerRef.current = null;
-      }
-      setShowGlossaryHoverInfo(false);
-      setGlossaryHoverKey(null);
-      setGlossaryHoverPanelPos(null);
-    }
-    window.addEventListener("keydown", onWindowKeyDown);
-    return () => window.removeEventListener("keydown", onWindowKeyDown);
-  }, []);
-
-  useEffect(() => {
-    if (glossaryHoverTimerRef.current != null) {
-      window.clearTimeout(glossaryHoverTimerRef.current);
-      glossaryHoverTimerRef.current = null;
-    }
-    if (glossaryHoverCloseTimerRef.current != null) {
-      window.clearTimeout(glossaryHoverCloseTimerRef.current);
-      glossaryHoverCloseTimerRef.current = null;
-    }
-    setShowGlossaryHoverInfo(false);
-    setGlossaryHoverKey(null);
-    setGlossaryHoverPanelPos(null);
   }, [selectedId]);
 
   const filteredRows = useMemo(() => {
@@ -1342,52 +1278,9 @@ export function MonsterEditorApp({
     scrollTextareaToMatch(textarea, rawJsonText, start);
   }, [jsonSearchJumpTick, jsonSearchMatches, jsonSearchQuery, jsonSearchResultIdx, rawJsonText]);
 
-  function resolveMonsterTooltipBody(term: string): string | null {
-    const fromGlossary = resolveTooltipText({
-      terms: splitTooltipTerms(term),
-      glossaryByName: tooltipGlossary
-    });
-    if (fromGlossary) return fromGlossary;
-    const candidates = [...new Set([term, ...splitTooltipTerms(term)])];
-    for (const c of candidates) {
-      const code = monsterAbilityAbbrevFromStatKey(c);
-      if (code) {
-        const lore = tooltipTextForAbilityByCode(index, code);
-        if (lore) return lore;
-      }
-    }
-    return null;
-  }
-
   function monsterGlossaryContent(key: MonsterGlossaryHoverKey): JSX.Element {
-    let terms: string[] = [];
-    if (key.startsWith("powerKeyword:")) {
-      const keyword = key.slice("powerKeyword:".length).trim();
-      terms = [keyword, "Keyword"];
-    } else if (key.startsWith("glossaryTerms:")) {
-      const encoded = key.slice("glossaryTerms:".length).trim();
-      terms = encoded
-        .split("|")
-        .map((token) => {
-          try {
-            return decodeURIComponent(token);
-          } catch {
-            return token;
-          }
-        })
-        .map((term) => term.trim())
-        .filter(Boolean);
-    } else {
-      const term = key.slice("glossaryTerm:".length).trim();
-      terms = splitTooltipTerms(term);
-    }
-    const uniqueTerms = [...new Set(terms.filter(Boolean))];
-    const resolvedEntries = uniqueTerms
-      .map((term) => {
-        const text = resolveMonsterTooltipBody(term);
-        return text ? { term, text } : null;
-      })
-      .filter((entry): entry is { term: string; text: string } => entry !== null);
+    const monsterCtx = { glossaryByName: tooltipGlossary, index };
+    const resolvedEntries = resolveMonsterGlossaryHoverSections(key, monsterCtx);
     if (resolvedEntries.length === 1) {
       return <GlossaryTooltipRichText text={resolvedEntries[0].text} />;
     }
@@ -1412,83 +1305,13 @@ export function MonsterEditorApp({
       if (!normalized) return false;
       const cached = glossaryResolutionCacheRef.current.get(normalized);
       if (cached !== undefined) return cached;
-      const resolvedText = resolveMonsterTooltipBody(term);
+      const resolvedText = resolveMonsterStyleTooltip(term, { glossaryByName: tooltipGlossary, index });
       const hasEntry = Boolean(resolvedText && resolvedText.trim().length > 0);
       glossaryResolutionCacheRef.current.set(normalized, hasEntry);
       return hasEntry;
     },
     [index, tooltipGlossary]
   );
-
-  function cancelGlossaryHoverCloseTimer(): void {
-    if (glossaryHoverCloseTimerRef.current != null) {
-      window.clearTimeout(glossaryHoverCloseTimerRef.current);
-      glossaryHoverCloseTimerRef.current = null;
-    }
-  }
-
-  function hideGlossaryHoverNow(): void {
-    cancelGlossaryHoverCloseTimer();
-    if (glossaryHoverTimerRef.current != null) {
-      window.clearTimeout(glossaryHoverTimerRef.current);
-      glossaryHoverTimerRef.current = null;
-    }
-    setShowGlossaryHoverInfo(false);
-    setGlossaryHoverKey(null);
-    setGlossaryHoverPanelPos(null);
-  }
-
-  function startGlossaryHover(
-    event: ReactMouseEvent<HTMLElement> | ReactFocusEvent<HTMLElement>,
-    key: MonsterGlossaryHoverKey
-  ): void {
-    cancelGlossaryHoverCloseTimer();
-    const rect = event.currentTarget.getBoundingClientRect();
-    setGlossaryHoverPanelPos(positionFixedTooltip(rect, STANDARD_GLOSSARY_TOOLTIP_LAYOUT));
-    const switchingHoverTarget = showGlossaryHoverInfo && glossaryHoverKey !== null && glossaryHoverKey !== key;
-    if (switchingHoverTarget) {
-      setShowGlossaryHoverInfo(false);
-    }
-    setGlossaryHoverKey(key);
-    if (glossaryHoverTimerRef.current != null) {
-      window.clearTimeout(glossaryHoverTimerRef.current);
-    }
-    if (event.type === "focus") {
-      setShowGlossaryHoverInfo(true);
-      glossaryHoverTimerRef.current = null;
-      return;
-    }
-    glossaryHoverTimerRef.current = window.setTimeout(() => {
-      setShowGlossaryHoverInfo(true);
-      glossaryHoverTimerRef.current = null;
-    }, GLOSSARY_TOOLTIP_OPEN_DELAY_MS);
-  }
-
-  function leaveGlossaryHover(): void {
-    cancelGlossaryHoverCloseTimer();
-    glossaryHoverCloseTimerRef.current = window.setTimeout(() => {
-      hideGlossaryHoverNow();
-    }, GLOSSARY_TOOLTIP_CLOSE_DELAY_MS);
-  }
-
-  function glossaryHoverA11y(key: MonsterGlossaryHoverKey): {
-    onMouseEnter: (event: ReactMouseEvent<HTMLElement>) => void;
-    onMouseLeave: () => void;
-    onFocus: (event: ReactFocusEvent<HTMLElement>) => void;
-    onBlur: () => void;
-    tabIndex: number;
-    "aria-describedby"?: string;
-  } {
-    const active = showGlossaryHoverInfo && glossaryHoverKey === key;
-    return {
-      onMouseEnter: (event) => startGlossaryHover(event, key),
-      onMouseLeave: leaveGlossaryHover,
-      onFocus: (event) => startGlossaryHover(event, key),
-      onBlur: leaveGlossaryHover,
-      tabIndex: 0,
-      "aria-describedby": active ? MONSTER_GLOSSARY_TOOLTIP_ID : undefined
-    };
-  }
 
   return (
     <div
@@ -1663,7 +1486,7 @@ export function MonsterEditorApp({
                     <>
                       {" "}
                       <span
-                        {...glossaryHoverA11y(`glossaryTerm:${activeMonster.alignment.name}`)}
+                        {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${activeMonster.alignment.name}`)}
                         style={{
                           cursor: "help",
                           borderBottom: "1px dotted var(--text-muted)",
@@ -1679,7 +1502,7 @@ export function MonsterEditorApp({
                 </div>
                 <div style={centerMetaLineStyle}>
                   <span
-                    {...glossaryHoverA11y("glossaryTerm:Level")}
+                    {...glossaryTooltipUi.hoverA11y("glossaryTerm:Level")}
                     style={glossaryLinkUnderline}
                   >
                     Level
@@ -1688,7 +1511,7 @@ export function MonsterEditorApp({
                   {isRenderableCardValue(activeMonster.groupRole) ? (
                     <>
                       <span
-                        {...glossaryHoverA11y(`glossaryTerm:${String(activeMonster.groupRole)}`)}
+                        {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${String(activeMonster.groupRole)}`)}
                         style={glossaryLinkUnderline}
                       >
                         {String(activeMonster.groupRole)}
@@ -1696,7 +1519,7 @@ export function MonsterEditorApp({
                     </>
                   ) : null}
                   <span
-                    {...glossaryHoverA11y(`glossaryTerm:${activeMonster.role || "Role"}`)}
+                    {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${activeMonster.role || "Role"}`)}
                     style={glossaryLinkUnderline}
                   >
                     {activeMonster.role || ""}
@@ -1704,7 +1527,7 @@ export function MonsterEditorApp({
                 </div>
                 <div style={centerMetaLineStyle}>
                   <span
-                    {...glossaryHoverA11y(`glossaryTerm:${activeMonster.size || "Size"}`)}
+                    {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${activeMonster.size || "Size"}`)}
                     style={glossaryLinkUnderline}
                   >
                     {activeMonster.size || "Unknown size"}
@@ -1713,7 +1536,7 @@ export function MonsterEditorApp({
                     •
                   </span>{" "}
                   <span
-                    {...glossaryHoverA11y(`glossaryTerm:${activeMonster.origin || "Origin"}`)}
+                    {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${activeMonster.origin || "Origin"}`)}
                     style={glossaryLinkUnderline}
                   >
                     {activeMonster.origin || "Unknown origin"}
@@ -1722,7 +1545,7 @@ export function MonsterEditorApp({
                     •
                   </span>{" "}
                   <span
-                    {...glossaryHoverA11y(`glossaryTerm:${activeMonster.type || "Type"}`)}
+                    {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${activeMonster.type || "Type"}`)}
                     style={glossaryLinkUnderline}
                   >
                     {activeMonster.type || "Unknown type"}
@@ -1734,7 +1557,7 @@ export function MonsterEditorApp({
                             •
                           </span>{" "}
                           <span
-                            {...glossaryHoverA11y(`glossaryTerm:${String(kw)}`)}
+                            {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${String(kw)}`)}
                             style={glossaryLinkUnderline}
                           >
                             {titleCaseWords(String(kw))}
@@ -1746,7 +1569,7 @@ export function MonsterEditorApp({
                     •
                   </span>{" "}
                   <span
-                    {...glossaryHoverA11y("glossaryTerm:Experience")}
+                    {...glossaryTooltipUi.hoverA11y("glossaryTerm:Experience")}
                     style={glossaryLinkUnderline}
                   >
                     XP
@@ -1853,7 +1676,7 @@ export function MonsterEditorApp({
                       {rows.flatMap((r) => [
                         <span
                           key={`${colKey}-${r.label}-l`}
-                          {...glossaryHoverA11y(r.glossary)}
+                          {...glossaryTooltipUi.hoverA11y(r.glossary)}
                           style={{
                             ...microLabelStyle,
                             cursor: "help",
@@ -1939,7 +1762,7 @@ export function MonsterEditorApp({
                                 <span key={`flow-mv-${idx}-${entry.type}`}>
                                   {idx > 0 ? ", " : null}
                                   <span
-                                    {...glossaryHoverA11y(`glossaryTerm:${entry.type}`)}
+                                    {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${entry.type}`)}
                                     style={glossaryLinkUnderline}
                                   >
                                     {entry.type}
@@ -1951,7 +1774,7 @@ export function MonsterEditorApp({
                           {showPhasing ? (
                             <>
                               {movementEntries.length > 0 ? "; " : null}
-                              <span {...glossaryHoverA11y("glossaryTerm:Phasing")} style={glossaryLinkUnderline}>
+                              <span {...glossaryTooltipUi.hoverA11y("glossaryTerm:Phasing")} style={glossaryLinkUnderline}>
                                 Phasing
                               </span>
                             </>
@@ -1971,7 +1794,7 @@ export function MonsterEditorApp({
                                 {idx > 0 ? ", " : null}
                                 {immunitySegmentEligibleForGlossaryHover(text) ? (
                                   <span
-                                    {...glossaryHoverA11y(buildGlossaryHoverKeyForTerm(text))}
+                                    {...glossaryTooltipUi.hoverA11y(buildGlossaryHoverKeyForTerm(text))}
                                     style={glossaryLinkUnderline}
                                   >
                                     {text}
@@ -2000,7 +1823,7 @@ export function MonsterEditorApp({
                                 {amountPart}
                                 {name ? (
                                   <span
-                                    {...glossaryHoverA11y(buildGlossaryHoverKeyForTerm(name, { tryDamageTypeEntry: true }))}
+                                    {...glossaryTooltipUi.hoverA11y(buildGlossaryHoverKeyForTerm(name, { tryDamageTypeEntry: true }))}
                                     style={glossaryLinkUnderline}
                                   >
                                     {name}
@@ -2042,7 +1865,7 @@ export function MonsterEditorApp({
                               <span key={`flow-sense-${idx}-${entry.name}`}>
                                 {idx > 0 ? ", " : null}
                                 <span
-                                  {...glossaryHoverA11y(buildGlossaryHoverKeyForTerm(entry.name, { tryTitleCaseVariant: true }))}
+                                  {...glossaryTooltipUi.hoverA11y(buildGlossaryHoverKeyForTerm(entry.name, { tryTitleCaseVariant: true }))}
                                   style={glossaryLinkUnderline}
                                 >
                                   {entry.displayName}
@@ -2892,21 +2715,21 @@ export function MonsterEditorApp({
         </details>
       </div>
 
-      {showGlossaryHoverInfo && glossaryHoverKey && glossaryHoverPanelPos && (
+      {glossaryTooltipUi.showPanel && glossaryTooltipUi.hoverKey && glossaryTooltipUi.panelPos && (
         <div
           id={MONSTER_GLOSSARY_TOOLTIP_ID}
           role="tooltip"
-          onMouseEnter={cancelGlossaryHoverCloseTimer}
+          onMouseEnter={glossaryTooltipUi.cancelPendingClose}
           onMouseLeave={leaveGlossaryHover}
           style={{
             position: "fixed",
-            top: glossaryHoverPanelPos.top,
-            left: glossaryHoverPanelPos.left,
-            transform: glossaryHoverPanelPos.transform ?? "none",
+            top: glossaryTooltipUi.panelPos.top,
+            left: glossaryTooltipUi.panelPos.left,
+            transform: glossaryTooltipUi.panelPos.transform ?? "none",
             ...STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE
           }}
         >
-          {monsterGlossaryContent(glossaryHoverKey)}
+          {monsterGlossaryContent(glossaryTooltipUi.hoverKey as MonsterGlossaryHoverKey)}
         </div>
       )}
     </div>

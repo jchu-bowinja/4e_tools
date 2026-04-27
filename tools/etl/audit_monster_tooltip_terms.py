@@ -34,13 +34,54 @@ def normalize_term(value: str) -> str:
     return " ".join(value.strip().lower().split())
 
 
-_IMMUNITY_TERM_ALIASES: Dict[str, List[str]] = {
-    "slow": ["slowed"],
-    "stun": ["stunned"],
-    "dominate": ["dominated"],
-    "stunning": ["stunned"],
-    "petrification": ["petrified"],
+CONDITION_VERB_TO_CANONICAL_NAME: Dict[str, str] = {
+    "slow": "slowed",
+    "stun": "stunned",
+    "dominate": "dominated",
+    "stunning": "stunned",
+    "petrification": "petrified",
 }
+
+TYPO_TO_CANONICAL_NAME: Dict[str, str] = {
+    "teleporation": "teleportation",
+    "marial": "martial",
+    "arcare": "arcane",
+}
+
+
+def merge_builtin_tooltip_lookup_map(glossary_by_name: Dict[str, str]) -> Dict[str, str]:
+    """Mirror of tooltipGlossary.mergeBuiltinTooltipLookupMap."""
+    out = dict(glossary_by_name)
+    for alias, canon_name in CONDITION_VERB_TO_CANONICAL_NAME.items():
+        canon_key = normalize_term(canon_name)
+        text = out.get(canon_key)
+        if not text:
+            continue
+        alias_key = normalize_term(alias)
+        if alias_key not in out:
+            out[alias_key] = text
+    for typo, canon_name in TYPO_TO_CANONICAL_NAME.items():
+        canon_key = normalize_term(canon_name)
+        text = out.get(canon_key)
+        if not text:
+            continue
+        typo_key = normalize_term(typo)
+        if typo_key not in out:
+            out[typo_key] = text
+    return out
+
+
+def expand_tooltip_lookup_terms(raw_term: str) -> List[str]:
+    """Mirror of tooltipGlossary.expandTooltipLookupTerms."""
+    term = raw_term.strip()
+    if not term:
+        return []
+    m = re.match(r"^(.+?)\s+vs\.?\s+(.+)$", term, re.I)
+    if m:
+        left = m.group(1).strip()
+        right = m.group(2).strip()
+        return [x for x in (left, right) if x]
+    return [term]
 
 
 def candidate_terms(input_term: str) -> List[str]:
@@ -57,12 +98,6 @@ def candidate_terms(input_term: str) -> List[str]:
     if re.match(r"^knocked\s+prone$", trimmed, re.I):
         candidates.append("prone")
 
-    for a in _IMMUNITY_TERM_ALIASES.get(normalize_term(trimmed), []):
-        candidates.append(a)
-    if m_effects and m_effects.group(1):
-        for a in _IMMUNITY_TERM_ALIASES.get(normalize_term(m_effects.group(1)), []):
-            candidates.append(a)
-
     without_parens = re.sub(r"\s*\([^)]*\)\s*", " ", trimmed).strip()
     if without_parens and without_parens != trimmed:
         candidates.append(without_parens)
@@ -78,10 +113,9 @@ def candidate_terms(input_term: str) -> List[str]:
     m_trained = re.match(r"^trained in\s+(.+)$", trimmed, re.I)
     if m_trained and m_trained.group(1):
         candidates.append(m_trained.group(1).strip())
-    typo_aliases = {"teleporation": "teleportation", "marial": "martial", "arcare": "arcane"}
-    alias = typo_aliases.get(normalize_term(trimmed))
-    if alias:
-        candidates.append(alias)
+    typo_canon = TYPO_TO_CANONICAL_NAME.get(normalize_term(trimmed))
+    if typo_canon:
+        candidates.append(typo_canon)
     if len(trimmed) > 1 and trimmed.endswith("s"):
         candidates.append(trimmed[:-1])
     if not trimmed.endswith("s"):
@@ -142,13 +176,14 @@ def glossary_map_from_json(rows: List[Dict[str, Any]]) -> Dict[str, str]:
             nk = normalize_term(k)
             if nk and nk not in by_name:
                 by_name[nk] = text
-    return by_name
+    return merge_builtin_tooltip_lookup_map(by_name)
 
 
 def term_resolves(term: str, glossary_by_name: Dict[str, str]) -> bool:
-    for c in candidate_terms(term):
-        if glossary_by_name.get(normalize_term(c)):
-            return True
+    for t in expand_tooltip_lookup_terms(term):
+        for c in candidate_terms(t):
+            if glossary_by_name.get(normalize_term(c)):
+                return True
     return False
 
 

@@ -26,13 +26,48 @@ function normalizeTerm(value) {
     .replace(/\s+/g, " ");
 }
 
-const IMMUNITY_TERM_ALIASES = {
-  slow: ["slowed"],
-  stun: ["stunned"],
-  dominate: ["dominated"],
-  stunning: ["stunned"],
-  petrification: ["petrified"]
-};
+function mergeBuiltinTooltipLookupMap(glossaryByName) {
+  const out = { ...glossaryByName };
+  const CONDITION_VERB_TO_CANONICAL_NAME = {
+    slow: "slowed",
+    stun: "stunned",
+    dominate: "dominated",
+    stunning: "stunned",
+    petrification: "petrified"
+  };
+  const TYPO_TO_CANONICAL_NAME = {
+    teleporation: "teleportation",
+    marial: "martial",
+    arcare: "arcane"
+  };
+  for (const [alias, canonName] of Object.entries(CONDITION_VERB_TO_CANONICAL_NAME)) {
+    const canonKey = normalizeTerm(canonName);
+    const text = out[canonKey];
+    if (!text) continue;
+    const aliasKey = normalizeTerm(alias);
+    if (!out[aliasKey]) out[aliasKey] = text;
+  }
+  for (const [typo, canonName] of Object.entries(TYPO_TO_CANONICAL_NAME)) {
+    const canonKey = normalizeTerm(canonName);
+    const text = out[canonKey];
+    if (!text) continue;
+    const typoKey = normalizeTerm(typo);
+    if (!out[typoKey]) out[typoKey] = text;
+  }
+  return out;
+}
+
+function expandTooltipLookupTerms(rawTerm) {
+  const term = String(rawTerm ?? "").trim();
+  if (!term) return [];
+  const attackVsMatch = term.match(/^(.+?)\s+vs\.?\s+(.+)$/i);
+  if (attackVsMatch) {
+    const left = attackVsMatch[1]?.trim();
+    const right = attackVsMatch[2]?.trim();
+    return [left, right].filter(Boolean);
+  }
+  return [term];
+}
 
 function candidateTerms(input) {
   const trimmed = String(input ?? "").trim();
@@ -48,17 +83,6 @@ function candidateTerms(input) {
     candidates.push("prone");
   }
 
-  const immAliases = IMMUNITY_TERM_ALIASES[normalizeTerm(trimmed)];
-  if (immAliases) {
-    for (const a of immAliases) candidates.push(a);
-  }
-  if (effectsSuffixMatch?.[1]) {
-    const fwAliases = IMMUNITY_TERM_ALIASES[normalizeTerm(effectsSuffixMatch[1])];
-    if (fwAliases) {
-      for (const a of fwAliases) candidates.push(a);
-    }
-  }
-
   const withoutParens = trimmed.replace(/\s*\([^)]*\)\s*/g, " ").trim();
   if (withoutParens && withoutParens !== trimmed) candidates.push(withoutParens);
   const withoutTrailingPunctuation = trimmed.replace(/[.,;:!?]+$/g, "").trim();
@@ -69,14 +93,14 @@ function candidateTerms(input) {
   if (checkPhraseMatch?.[1]) candidates.push(checkPhraseMatch[1].trim());
   const trainedInMatch = trimmed.match(/^trained in\s+(.+)$/i);
   if (trainedInMatch?.[1]) candidates.push(trainedInMatch[1].trim());
-  const typoAliases = {
+  const TYPO_TO_CANONICAL_NAME = {
     teleporation: "teleportation",
     marial: "martial",
     arcare: "arcane"
   };
   const normalized = normalizeTerm(trimmed);
-  const alias = typoAliases[normalized];
-  if (alias) candidates.push(alias);
+  const typoCanon = TYPO_TO_CANONICAL_NAME[normalized];
+  if (typoCanon) candidates.push(typoCanon);
   if (trimmed.endsWith("s") && trimmed.length > 1) candidates.push(trimmed.slice(0, -1));
   if (!trimmed.endsWith("s")) candidates.push(`${trimmed}s`);
   const compoundParts = trimmed
@@ -92,9 +116,11 @@ function candidateTerms(input) {
 }
 
 function resolvesTerm(term, glossaryByName) {
-  for (const c of candidateTerms(term)) {
-    const k = normalizeTerm(c);
-    if (glossaryByName[k]) return true;
+  for (const t of expandTooltipLookupTerms(term)) {
+    for (const c of candidateTerms(t)) {
+      const k = normalizeTerm(c);
+      if (glossaryByName[k]) return true;
+    }
   }
   return false;
 }
@@ -172,7 +198,7 @@ async function loadGlossaryMap(generatedRoot) {
       if (!byName[key]) byName[key] = text;
     }
   }
-  return byName;
+  return mergeBuiltinTooltipLookupMap(byName);
 }
 
 async function main() {

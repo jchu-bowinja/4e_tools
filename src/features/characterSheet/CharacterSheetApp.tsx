@@ -15,20 +15,10 @@ import { createDefaultCharacterSheetState } from "./defaultState";
 import type { CharacterSheetState, EquipmentSlot, InventoryItem } from "./model";
 import { canEquipItem, computeSheetDerivedData, groupCombatPowers, sheetStateFromBuild } from "./selectors";
 import { loadCharacterSheetState, saveCharacterSheetState } from "./storage";
-import {
-  abilityTooltipResolveTerms,
-  normalizeTooltipTerm,
-  resolveTooltipText,
-  tooltipTextForAbilityByCode,
-  tooltipTextForSkillById
-} from "../../data/tooltipGlossary";
+import { resolveUiGlossaryHoverPlainText, termHasPowerKeywordTooltipBody } from "../../data/glossaryHoverResolve";
 import { positionFixedTooltip } from "../../ui/glossaryTooltipPosition";
-import {
-  GLOSSARY_TOOLTIP_CLOSE_DELAY_MS,
-  GLOSSARY_TOOLTIP_OPEN_DELAY_MS,
-  STANDARD_GLOSSARY_TOOLTIP_LAYOUT,
-  STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE
-} from "../../ui/glossaryTooltip";
+import { GLOSSARY_TOOLTIP_OPEN_DELAY_MS, STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE } from "../../ui/glossaryTooltip";
+import { useGlossaryTooltip } from "../../ui/useGlossaryTooltip";
 import { findCaseInsensitiveMatches, scrollTextareaToMatch } from "../../ui/jsonSearch";
 
 type SheetTab = "overview" | "inventory";
@@ -378,21 +368,13 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     left: number;
     transform?: "translateY(-100%)";
   } | null>(null);
-  const [showGlossaryHoverInfo, setShowGlossaryHoverInfo] = useState(false);
-  const [glossaryHoverKey, setGlossaryHoverKey] = useState<GlossaryKey | null>(null);
   const [jsonSearchInput, setJsonSearchInput] = useState("");
   const [jsonSearchQuery, setJsonSearchQuery] = useState("");
   const [jsonSearchResultIdx, setJsonSearchResultIdx] = useState(0);
   const [jsonSearchJumpTick, setJsonSearchJumpTick] = useState(0);
-  const [glossaryHoverPanelPos, setGlossaryHoverPanelPos] = useState<{
-    top: number;
-    left: number;
-    transform?: "translateY(-100%)";
-  } | null>(null);
+  const glossaryTooltipUi = useGlossaryTooltip({ tooltipId: CHARACTER_SHEET_GLOSSARY_TOOLTIP_ID });
   const raceHoverTimerRef = useRef<number | null>(null);
   const classHoverTimerRef = useRef<number | null>(null);
-  const glossaryHoverTimerRef = useRef<number | null>(null);
-  const glossaryHoverCloseTimerRef = useRef<number | null>(null);
   const jsonTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const lastHandledJsonSearchJumpTickRef = useRef(0);
   const glossaryTermLookupCacheRef = useRef<Map<string, boolean>>(new Map());
@@ -405,15 +387,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     () => findCaseInsensitiveMatches(expandedSheetJson, jsonSearchQuery),
     [expandedSheetJson, jsonSearchQuery]
   );
-  const abilityLoreByCode = useMemo(() => {
-    const map = new Map<AbilityCode, { name: string; body?: string | null }>();
-    for (const entry of index.abilityScores) {
-      if (entry.abilityCode) {
-        map.set(entry.abilityCode, { name: entry.name, body: entry.body });
-      }
-    }
-    return map;
-  }, [index.abilityScores]);
   const skillById = useMemo(() => new Map(index.skills.map((skill) => [skill.id, skill])), [index.skills]);
   const featsById = useMemo(() => new Map(index.feats.map((feat) => [feat.id, feat])), [index.feats]);
   const selectedFeatRows = useMemo(
@@ -472,32 +445,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
       if (classHoverTimerRef.current != null) {
         window.clearTimeout(classHoverTimerRef.current);
       }
-      if (glossaryHoverTimerRef.current != null) {
-        window.clearTimeout(glossaryHoverTimerRef.current);
-      }
-      if (glossaryHoverCloseTimerRef.current != null) {
-        window.clearTimeout(glossaryHoverCloseTimerRef.current);
-      }
     };
-  }, []);
-
-  useEffect(() => {
-    function onWindowKeyDown(event: KeyboardEvent): void {
-      if (event.key !== "Escape") return;
-      if (glossaryHoverTimerRef.current != null) {
-        window.clearTimeout(glossaryHoverTimerRef.current);
-        glossaryHoverTimerRef.current = null;
-      }
-      if (glossaryHoverCloseTimerRef.current != null) {
-        window.clearTimeout(glossaryHoverCloseTimerRef.current);
-        glossaryHoverCloseTimerRef.current = null;
-      }
-      setShowGlossaryHoverInfo(false);
-      setGlossaryHoverKey(null);
-      setGlossaryHoverPanelPos(null);
-    }
-    window.addEventListener("keydown", onWindowKeyDown);
-    return () => window.removeEventListener("keydown", onWindowKeyDown);
   }, []);
 
   useEffect(() => {
@@ -513,131 +461,25 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   }, [sheet.classId]);
 
   function glossaryContent(key: GlossaryKey): JSX.Element {
-    let terms: string[] = [];
-    let abilityCodeForRules: AbilityCode | null = null;
-    let skillIdForRules: string | null = null;
-    if (key.startsWith("ability:")) {
-      const code = key.slice("ability:".length) as AbilityCode;
-      abilityCodeForRules = code;
-      const lore = abilityLoreByCode.get(code);
-      terms = abilityTooltipResolveTerms(code, lore?.name);
-    } else if (key.startsWith("skill:")) {
-      const skillId = key.slice("skill:".length);
-      skillIdForRules = skillId;
-      const skill = skillById.get(skillId);
-      terms = [skill?.name || ""];
-    } else if (key.startsWith("condition:")) {
-      const condition = key.slice("condition:".length).trim();
-      terms = [condition, "Condition"];
-    } else if (key.startsWith("powerKeyword:")) {
-      const keyword = key.slice("powerKeyword:".length).trim();
-      terms = [keyword, "Keyword"];
-    } else if (key.startsWith("powerUsage:")) {
-      const usage = key.slice("powerUsage:".length).trim();
-      if (usage === "atWill") {
-        terms = ["At-Will", "At-Will Power", "At Will"];
-      } else if (usage === "encounter") {
-        terms = ["Encounter", "Encounter Power"];
-      } else if (usage === "daily") {
-        terms = ["Daily", "Daily Power"];
-      }
-    } else {
-      const coreTerms: Record<Exclude<GlossaryKey, `condition:${string}` | `powerKeyword:${string}` | `ability:${AbilityCode}` | `skill:${string}`>, string[]> = {
-        level: ["Level"],
-        hp: ["Hit Points", "HP"],
-        tempHp: ["Temporary Hit Points", "Temp HP"],
-        surges: ["Healing Surges", "Healing Surge"],
-        surgeValue: ["Surge Value", "Healing Surge Value"],
-        bloodied: ["Bloodied"],
-        dying: ["Dying"],
-        dead: ["Dead"],
-        speed: ["Speed"],
-        initiative: ["Initiative"],
-        defenses: ["Defense", "Defenses"],
-        ac: ["Armor Class", "AC"],
-        fortitude: ["Fortitude"],
-        reflex: ["Reflex"],
-        will: ["Will"],
-        deathSaves: ["Death Saving Throw", "Death Save"],
-        skills: ["Skills", "Skill"],
-        abilityScores: ["Ability Scores", "Ability Score"]
-      };
-      terms = coreTerms[key];
-    }
-    let resolved = resolveTooltipText({ terms: terms.filter(Boolean), glossaryByName: tooltipGlossary });
-    if (!resolved && abilityCodeForRules) {
-      resolved = tooltipTextForAbilityByCode(index, abilityCodeForRules);
-    }
-    if (!resolved && skillIdForRules) {
-      resolved = tooltipTextForSkillById(index, skillIdForRules);
-    }
+    const resolved = resolveUiGlossaryHoverPlainText(
+      key,
+      {
+        glossaryByName: tooltipGlossary,
+        index
+      },
+      "sheet"
+    );
     if (resolved) return <GlossaryTooltipRichText text={resolved} />;
     return <div>No description available.</div>;
   }
 
-  function cancelGlossaryHoverCloseTimer(): void {
-    if (glossaryHoverCloseTimerRef.current != null) {
-      window.clearTimeout(glossaryHoverCloseTimerRef.current);
-      glossaryHoverCloseTimerRef.current = null;
-    }
-  }
-
-  function hideGlossaryHoverInfoNow(): void {
-    cancelGlossaryHoverCloseTimer();
-    if (glossaryHoverTimerRef.current != null) {
-      window.clearTimeout(glossaryHoverTimerRef.current);
-      glossaryHoverTimerRef.current = null;
-    }
-    setShowGlossaryHoverInfo(false);
-    setGlossaryHoverKey(null);
-    setGlossaryHoverPanelPos(null);
-  }
-
-  function startGlossaryHoverInfoTimer(
-    event: ReactMouseEvent<HTMLElement> | ReactFocusEvent<HTMLElement>,
-    key: GlossaryKey
-  ): void {
-    cancelGlossaryHoverCloseTimer();
-    const rect = event.currentTarget.getBoundingClientRect();
-    setGlossaryHoverPanelPos(positionFixedTooltip(rect, STANDARD_GLOSSARY_TOOLTIP_LAYOUT));
-    const switchingHoverTarget = showGlossaryHoverInfo && glossaryHoverKey !== null && glossaryHoverKey !== key;
-    if (switchingHoverTarget) {
-      setShowGlossaryHoverInfo(false);
-    }
-    setGlossaryHoverKey(key);
-    if (glossaryHoverTimerRef.current != null) {
-      window.clearTimeout(glossaryHoverTimerRef.current);
-    }
-    if (event.type === "focus") {
-      setShowGlossaryHoverInfo(true);
-      glossaryHoverTimerRef.current = null;
-      return;
-    }
-    glossaryHoverTimerRef.current = window.setTimeout(() => {
-      setShowGlossaryHoverInfo(true);
-      glossaryHoverTimerRef.current = null;
-    }, GLOSSARY_TOOLTIP_OPEN_DELAY_MS);
-  }
-
-  function leaveGlossaryHoverInfo(): void {
-    cancelGlossaryHoverCloseTimer();
-    glossaryHoverCloseTimerRef.current = window.setTimeout(() => {
-      hideGlossaryHoverInfoNow();
-    }, GLOSSARY_TOOLTIP_CLOSE_DELAY_MS);
-  }
-
   function hasGlossaryHoverForTerm(term: string): boolean {
-    const normalized = normalizeTooltipTerm(term);
+    const normalized = term.trim().toLowerCase().replace(/\s+/g, " ");
     if (!normalized) return false;
     const cache = glossaryTermLookupCacheRef.current;
     const cached = cache.get(normalized);
     if (cached != null) return cached;
-    const found = Boolean(
-      resolveTooltipText({
-        terms: [term],
-        glossaryByName: tooltipGlossary
-      })
-    );
+    const found = termHasPowerKeywordTooltipBody(term, tooltipGlossary);
     cache.set(normalized, found);
     return found;
   }
@@ -654,10 +496,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           return (
             <span
               key={`${keyPrefix}-${idx}`}
-              onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `powerKeyword:${term}`)}
-              onFocus={(event) => startGlossaryHoverInfoTimer(event, `powerKeyword:${term}`)}
-              onMouseLeave={leaveGlossaryHoverInfo}
-              onBlur={leaveGlossaryHoverInfo}
+              onMouseEnter={(event) => glossaryTooltipUi.startHover(event, `powerKeyword:${term}`)}
+              onFocus={(event) => glossaryTooltipUi.startHover(event, `powerKeyword:${term}`)}
+              onMouseLeave={glossaryTooltipUi.leaveHover}
+              onBlur={glossaryTooltipUi.leaveHover}
               tabIndex={0}
               style={{
                 cursor: "help",
@@ -828,8 +670,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         >
           <label
             style={{ ...labelStyle, padding: "0.28rem 0.35rem", border: "1px solid var(--panel-border)", borderRadius: "0.3rem", backgroundColor: "var(--surface-1)" }}
-            onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "hp")}
-            onMouseLeave={leaveGlossaryHoverInfo}
+            onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "hp")}
+            onMouseLeave={glossaryTooltipUi.leaveHover}
           >
             Hit Points
             <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexWrap: "wrap" }}>
@@ -856,8 +698,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           </label>
           <label
             style={{ ...labelStyle, padding: "0.28rem 0.35rem", border: "1px solid var(--panel-border)", borderRadius: "0.3rem", backgroundColor: "var(--surface-0)" }}
-            onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "tempHp")}
-            onMouseLeave={leaveGlossaryHoverInfo}
+            onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "tempHp")}
+            onMouseLeave={glossaryTooltipUi.leaveHover}
           >
             Temp HP
             <input
@@ -878,8 +720,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           </label>
           <label
             style={{ ...labelStyle, padding: "0.28rem 0.35rem", border: "1px solid var(--panel-border)", borderRadius: "0.3rem", backgroundColor: "var(--surface-1)" }}
-            onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "surges")}
-            onMouseLeave={leaveGlossaryHoverInfo}
+            onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "surges")}
+            onMouseLeave={glossaryTooltipUi.leaveHover}
           >
             Healing Surges
             <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
@@ -907,8 +749,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           </label>
           <label
             style={{ ...labelStyle, padding: "0.28rem 0.35rem", border: "1px solid var(--panel-border)", borderRadius: "0.3rem", backgroundColor: "var(--surface-0)" }}
-            onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "deathSaves")}
-            onMouseLeave={leaveGlossaryHoverInfo}
+            onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "deathSaves")}
+            onMouseLeave={glossaryTooltipUi.leaveHover}
           >
             Death Saves
             <DeathSaveCheckboxes
@@ -943,8 +785,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           ].map((item, idx) => (
             <div key={item.key} style={{ display: "contents" }}>
               <span
-                onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, item.key)}
-                onMouseLeave={leaveGlossaryHoverInfo}
+                onMouseEnter={(event) => glossaryTooltipUi.startHover(event, item.key)}
+                onMouseLeave={glossaryTooltipUi.leaveHover}
                 style={{
                   padding: "0.16rem 0.35rem",
                   borderRadius: "0.25rem",
@@ -955,8 +797,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 {item.label}
               </span>
               <strong
-                onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, item.key)}
-                onMouseLeave={leaveGlossaryHoverInfo}
+                onMouseEnter={(event) => glossaryTooltipUi.startHover(event, item.key)}
+                onMouseLeave={glossaryTooltipUi.leaveHover}
                 style={{
                   padding: "0.16rem 0.35rem",
                   borderRadius: "0.25rem",
@@ -1036,8 +878,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           <div style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem" }}>
             {isBloodied && (
               <div
-                onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "bloodied")}
-                onMouseLeave={leaveGlossaryHoverInfo}
+                onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "bloodied")}
+                onMouseLeave={glossaryTooltipUi.leaveHover}
                 style={conditionBadgeStyle("bloodied")}
               >
                 {conditionDisplayLabel("Bloodied")}
@@ -1045,8 +887,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             )}
             {isDying && (
               <div
-                onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "dying")}
-                onMouseLeave={leaveGlossaryHoverInfo}
+                onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "dying")}
+                onMouseLeave={glossaryTooltipUi.leaveHover}
                 style={conditionBadgeStyle("dying")}
               >
                 {conditionDisplayLabel("Dying")}
@@ -1054,8 +896,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             )}
             {isDead && (
               <div
-                onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "dead")}
-                onMouseLeave={leaveGlossaryHoverInfo}
+                onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "dead")}
+                onMouseLeave={glossaryTooltipUi.leaveHover}
                 style={conditionBadgeStyle("dead")}
               >
                 {conditionDisplayLabel("Dead")}
@@ -1087,10 +929,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 }}
               >
                 <span
-                  onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `condition:${condition}`)}
-                  onFocus={(event) => startGlossaryHoverInfoTimer(event, `condition:${condition}`)}
-                  onMouseLeave={leaveGlossaryHoverInfo}
-                  onBlur={leaveGlossaryHoverInfo}
+                  onMouseEnter={(event) => glossaryTooltipUi.startHover(event, `condition:${condition}`)}
+                  onFocus={(event) => glossaryTooltipUi.startHover(event, `condition:${condition}`)}
+                  onMouseLeave={glossaryTooltipUi.leaveHover}
+                  onBlur={glossaryTooltipUi.leaveHover}
                   tabIndex={0}
                 >
                   {conditionDisplayLabel(condition)}
@@ -1132,8 +974,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           ].map((item, idx) => (
             <div key={item.key} style={{ display: "contents" }}>
               <span
-                onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, item.key)}
-                onMouseLeave={leaveGlossaryHoverInfo}
+                onMouseEnter={(event) => glossaryTooltipUi.startHover(event, item.key)}
+                onMouseLeave={glossaryTooltipUi.leaveHover}
                 style={{
                   padding: "0.16rem 0.35rem",
                   borderRadius: "0.25rem",
@@ -1144,8 +986,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 {item.label}
               </span>
               <strong
-                onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, item.key)}
-                onMouseLeave={leaveGlossaryHoverInfo}
+                onMouseEnter={(event) => glossaryTooltipUi.startHover(event, item.key)}
+                onMouseLeave={glossaryTooltipUi.leaveHover}
                 style={{
                   padding: "0.16rem 0.35rem",
                   borderRadius: "0.25rem",
@@ -1322,8 +1164,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   <div style={{ ...labelStyle, gridColumn: "span 3", gap: "0.12rem" }}>
                     Level
                     <div
-                      onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "level")}
-                      onMouseLeave={leaveGlossaryHoverInfo}
+                      onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "level")}
+                      onMouseLeave={glossaryTooltipUi.leaveHover}
                       style={{ border: "1px solid var(--panel-border)", backgroundColor: "var(--surface-0)", borderRadius: "0.32rem", padding: "0.24rem 0.45rem", lineHeight: 1.2, textAlign: "left", fontWeight: 800, color: "var(--text-primary)" }}
                     >
                       {sheet.level}
@@ -1334,10 +1176,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.5rem", backgroundColor: "var(--surface-0)" }}>
                 <h3
                   style={sectionTitleStyle}
-                  onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "abilityScores")}
-                  onMouseLeave={leaveGlossaryHoverInfo}
-                  onFocus={(event) => startGlossaryHoverInfoTimer(event, "abilityScores")}
-                  onBlur={leaveGlossaryHoverInfo}
+                  onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "abilityScores")}
+                  onMouseLeave={glossaryTooltipUi.leaveHover}
+                  onFocus={(event) => glossaryTooltipUi.startHover(event, "abilityScores")}
+                  onBlur={glossaryTooltipUi.leaveHover}
                   tabIndex={0}
                 >
                   Ability Scores
@@ -1346,10 +1188,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   {(["STR", "CON", "DEX", "INT", "WIS", "CHA"] as const).map((ab, idx) => (
                     <div
                       key={ab}
-                      onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `ability:${ab}`)}
-                      onMouseLeave={leaveGlossaryHoverInfo}
-                      onFocus={(event) => startGlossaryHoverInfoTimer(event, `ability:${ab}`)}
-                      onBlur={leaveGlossaryHoverInfo}
+                      onMouseEnter={(event) => glossaryTooltipUi.startHover(event, `ability:${ab}`)}
+                      onMouseLeave={glossaryTooltipUi.leaveHover}
+                      onFocus={(event) => glossaryTooltipUi.startHover(event, `ability:${ab}`)}
+                      onBlur={glossaryTooltipUi.leaveHover}
                       tabIndex={0}
                       style={{
                         display: "grid",
@@ -1435,10 +1277,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.5rem", backgroundColor: "var(--surface-0)" }}>
                 <h3
                   style={sectionTitleStyle}
-                  onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, "skills")}
-                  onMouseLeave={leaveGlossaryHoverInfo}
-                  onFocus={(event) => startGlossaryHoverInfoTimer(event, "skills")}
-                  onBlur={leaveGlossaryHoverInfo}
+                  onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "skills")}
+                  onMouseLeave={glossaryTooltipUi.leaveHover}
+                  onFocus={(event) => glossaryTooltipUi.startHover(event, "skills")}
+                  onBlur={glossaryTooltipUi.leaveHover}
                   tabIndex={0}
                 >
                   Skills
@@ -1458,10 +1300,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                       }}
                     >
                       <span
-                        onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `skill:${row.skillId}`)}
-                        onMouseLeave={leaveGlossaryHoverInfo}
-                        onFocus={(event) => startGlossaryHoverInfoTimer(event, `skill:${row.skillId}`)}
-                        onBlur={leaveGlossaryHoverInfo}
+                        onMouseEnter={(event) => glossaryTooltipUi.startHover(event, `skill:${row.skillId}`)}
+                        onMouseLeave={glossaryTooltipUi.leaveHover}
+                        onFocus={(event) => glossaryTooltipUi.startHover(event, `skill:${row.skillId}`)}
+                        onBlur={glossaryTooltipUi.leaveHover}
                         tabIndex={0}
                         style={{
                           color: "var(--text-primary)",
@@ -1496,10 +1338,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             <div key={bucket} style={{ ...sectionInsetStyle, gridColumn: "1 / -1" }}>
               <div style={panelStyle}>
                 <div
-                  onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `powerUsage:${bucket}`)}
-                  onMouseLeave={leaveGlossaryHoverInfo}
-                  onFocus={(event) => startGlossaryHoverInfoTimer(event, `powerUsage:${bucket}`)}
-                  onBlur={leaveGlossaryHoverInfo}
+                  onMouseEnter={(event) => glossaryTooltipUi.startHover(event, `powerUsage:${bucket}`)}
+                  onMouseLeave={glossaryTooltipUi.leaveHover}
+                  onFocus={(event) => glossaryTooltipUi.startHover(event, `powerUsage:${bucket}`)}
+                  onBlur={glossaryTooltipUi.leaveHover}
                   tabIndex={0}
                   style={{
                     fontWeight: 700,
@@ -1573,10 +1415,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem" }}>
                           <strong style={{ textDecoration: expended ? "line-through" : "none" }}>{power.name}</strong>
                           <span
-                            onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `powerUsage:${bucket}`)}
-                            onMouseLeave={leaveGlossaryHoverInfo}
-                            onFocus={(event) => startGlossaryHoverInfoTimer(event, `powerUsage:${bucket}`)}
-                            onBlur={leaveGlossaryHoverInfo}
+                            onMouseEnter={(event) => glossaryTooltipUi.startHover(event, `powerUsage:${bucket}`)}
+                            onMouseLeave={glossaryTooltipUi.leaveHover}
+                            onFocus={(event) => glossaryTooltipUi.startHover(event, `powerUsage:${bucket}`)}
+                            onBlur={glossaryTooltipUi.leaveHover}
                             tabIndex={0}
                             style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}
                           >
@@ -1622,10 +1464,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                                   }
                                   return (
                                     <span
-                                      onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `powerKeyword:${keyword}`)}
-                                      onFocus={(event) => startGlossaryHoverInfoTimer(event, `powerKeyword:${keyword}`)}
-                                      onMouseLeave={leaveGlossaryHoverInfo}
-                                      onBlur={leaveGlossaryHoverInfo}
+                                      onMouseEnter={(event) => glossaryTooltipUi.startHover(event, `powerKeyword:${keyword}`)}
+                                      onFocus={(event) => glossaryTooltipUi.startHover(event, `powerKeyword:${keyword}`)}
+                                      onMouseLeave={glossaryTooltipUi.leaveHover}
+                                      onBlur={glossaryTooltipUi.leaveHover}
                                       tabIndex={0}
                                       style={{
                                         color: "var(--text-primary)",
@@ -1650,10 +1492,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                                 <strong>Action:</strong>{" "}
                                 {hasGlossaryHoverForTerm(actionType) ? (
                                   <span
-                                    onMouseEnter={(event) => startGlossaryHoverInfoTimer(event, `powerKeyword:${actionType}`)}
-                                    onFocus={(event) => startGlossaryHoverInfoTimer(event, `powerKeyword:${actionType}`)}
-                                    onMouseLeave={leaveGlossaryHoverInfo}
-                                    onBlur={leaveGlossaryHoverInfo}
+                                    onMouseEnter={(event) => glossaryTooltipUi.startHover(event, `powerKeyword:${actionType}`)}
+                                    onFocus={(event) => glossaryTooltipUi.startHover(event, `powerKeyword:${actionType}`)}
+                                    onMouseLeave={glossaryTooltipUi.leaveHover}
+                                    onBlur={glossaryTooltipUi.leaveHover}
                                     tabIndex={0}
                                     style={{ cursor: "help", textDecoration: "underline dotted", textUnderlineOffset: "2px" }}
                                   >
@@ -1801,21 +1643,21 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               )}
             </div>
           )}
-          {showGlossaryHoverInfo && glossaryHoverKey && glossaryHoverPanelPos && (
+          {glossaryTooltipUi.showPanel && glossaryTooltipUi.hoverKey && glossaryTooltipUi.panelPos && (
             <div
               id={CHARACTER_SHEET_GLOSSARY_TOOLTIP_ID}
               role="tooltip"
-              onMouseEnter={cancelGlossaryHoverCloseTimer}
-              onMouseLeave={leaveGlossaryHoverInfo}
+              onMouseEnter={glossaryTooltipUi.cancelPendingClose}
+              onMouseLeave={glossaryTooltipUi.leaveHover}
               style={{
                 position: "fixed",
-                top: glossaryHoverPanelPos.top,
-                left: glossaryHoverPanelPos.left,
-                transform: glossaryHoverPanelPos.transform ?? "none",
+                top: glossaryTooltipUi.panelPos.top,
+                left: glossaryTooltipUi.panelPos.left,
+                transform: glossaryTooltipUi.panelPos.transform ?? "none",
                 ...STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE
               }}
             >
-              {glossaryContent(glossaryHoverKey)}
+              {glossaryContent(glossaryTooltipUi.hoverKey as GlossaryKey)}
             </div>
           )}
         </div>

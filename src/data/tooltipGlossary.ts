@@ -109,7 +109,7 @@ export function glossaryRowsToTooltipMap(rows: GlossaryTermRow[]): Record<string
       if (!byName[key]) byName[key] = text;
     }
   }
-  return byName;
+  return mergeBuiltinTooltipLookupMap(byName);
 }
 
 export async function loadTooltipGlossary(): Promise<Record<string, string>> {
@@ -119,14 +119,60 @@ export async function loadTooltipGlossary(): Promise<Record<string, string>> {
   return glossaryRowsToTooltipMap(rows);
 }
 
-/** Verb / noun phrases in monster Immunities vs canonical glossary condition names */
-const IMMUNITY_TERM_ALIASES: Record<string, readonly string[]> = {
-  slow: ["slowed"],
-  stun: ["stunned"],
-  dominate: ["dominated"],
-  stunning: ["stunned"],
-  petrification: ["petrified"]
+/**
+ * Verb-style / typo tokens mapped to canonical glossary **entry names** in `glossary_terms.json`.
+ * `mergeBuiltinTooltipLookupMap` copies the resolved definition to the alias key when the canonical
+ * name is present (so immunity lines and data typos resolve without expanding `candidateTerms`).
+ */
+const CONDITION_VERB_TO_CANONICAL_NAME: Record<string, string> = {
+  slow: "slowed",
+  stun: "stunned",
+  dominate: "dominated",
+  stunning: "stunned",
+  petrification: "petrified"
 };
+
+const TYPO_TO_CANONICAL_NAME: Record<string, string> = {
+  teleporation: "teleportation",
+  marial: "martial",
+  arcare: "arcane"
+};
+
+/**
+ * Augments a glossary map with built-in alias keys (immunity verbs, typos) pointing at the same
+ * tooltip text as the canonical entry when present.
+ */
+export function mergeBuiltinTooltipLookupMap(glossaryByName: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = { ...glossaryByName };
+  for (const [alias, canonName] of Object.entries(CONDITION_VERB_TO_CANONICAL_NAME)) {
+    const canonKey = normalizeTerm(canonName);
+    const text = out[canonKey];
+    if (!text) continue;
+    const aliasKey = normalizeTerm(alias);
+    if (!out[aliasKey]) out[aliasKey] = text;
+  }
+  for (const [typo, canonName] of Object.entries(TYPO_TO_CANONICAL_NAME)) {
+    const canonKey = normalizeTerm(canonName);
+    const text = out[canonKey];
+    if (!text) continue;
+    const typoKey = normalizeTerm(typo);
+    if (!out[typoKey]) out[typoKey] = text;
+  }
+  return out;
+}
+
+/** Splits attack-style lines (`Acrobatics (Dex) vs Reflex`) into separate lookup strings. */
+export function expandTooltipLookupTerms(rawTerm: string): string[] {
+  const term = rawTerm.trim();
+  if (!term) return [];
+  const attackVsMatch = term.match(/^(.+?)\s+vs\.?\s+(.+)$/i);
+  if (attackVsMatch) {
+    const left = attackVsMatch[1]?.trim();
+    const right = attackVsMatch[2]?.trim();
+    return [left, right].filter((part): part is string => Boolean(part));
+  }
+  return [term];
+}
 
 /**
  * Expands a displayed string into glossary lookup keys (`resolveTooltipText` tries them in order).
@@ -144,18 +190,6 @@ export function candidateTerms(input: string): string[] {
 
   if (/^knocked\s+prone$/i.test(trimmed)) {
     candidates.push("prone");
-  }
-
-  const normTrimmed = normalizeTerm(trimmed);
-  const immAliases = IMMUNITY_TERM_ALIASES[normTrimmed];
-  if (immAliases) {
-    candidates.push(...immAliases);
-  }
-  if (effectsSuffixMatch?.[1]) {
-    const fwAliases = IMMUNITY_TERM_ALIASES[normalizeTerm(effectsSuffixMatch[1])];
-    if (fwAliases) {
-      candidates.push(...fwAliases);
-    }
   }
 
   const withoutParens = trimmed.replace(/\s*\([^)]*\)\s*/g, " ").trim();
@@ -178,14 +212,9 @@ export function candidateTerms(input: string): string[] {
   if (trainedInMatch?.[1]) {
     candidates.push(trainedInMatch[1].trim());
   }
-  const typoAliases: Record<string, string> = {
-    teleporation: "teleportation",
-    marial: "martial",
-    arcare: "arcane"
-  };
   const normalized = normalizeTerm(trimmed);
-  const alias = typoAliases[normalized];
-  if (alias) candidates.push(alias);
+  const typoCanon = TYPO_TO_CANONICAL_NAME[normalized];
+  if (typoCanon) candidates.push(typoCanon);
   if (trimmed.endsWith("s") && trimmed.length > 1) {
     candidates.push(trimmed.slice(0, -1));
   }
@@ -217,9 +246,11 @@ export function resolveTooltipText(params: {
   terms: string[];
   glossaryByName: Record<string, string>;
 }): string | null {
-  for (const term of params.terms) {
+  const glossary = mergeBuiltinTooltipLookupMap(params.glossaryByName);
+  const expandedTerms = params.terms.flatMap((t) => expandTooltipLookupTerms(t));
+  for (const term of expandedTerms) {
     for (const candidate of candidateTerms(term)) {
-      const glossaryMatch = params.glossaryByName[normalizeTerm(candidate)];
+      const glossaryMatch = glossary[normalizeTerm(candidate)];
       if (glossaryMatch) return glossaryMatch;
     }
   }
