@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useState, type CSSProperties } fro
 import type { GlossaryTermRow } from "../../data/tooltipGlossary";
 import { displayTextForGlossaryRow, isNumberedRangeAlias, sanitizeGlossaryRows } from "../../data/tooltipGlossary";
 import { saveGlossaryRowsToStorage } from "../../data/glossaryStorage";
+import { GlossaryTooltipRichText } from "../builder/RulesRichText";
 
 type Props = {
   rows: GlossaryTermRow[];
@@ -129,6 +130,7 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
   }, [rows, selectedIndex]);
 
   const selected = selectedIndex != null && selectedIndex < rows.length ? rows[selectedIndex] : null;
+  const glossaryTooltipPreviewText = selected ? displayTextForGlossaryRow(selected) : "";
 
   useEffect(() => {
     if (!selected) {
@@ -430,7 +432,11 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
                 }}
               >
                 <div style={{ ...labelStyle, marginBottom: "0.35rem" }}>Tooltip preview (plain text)</div>
-                <div style={{ whiteSpace: "pre-wrap" }}>{displayTextForGlossaryRow(selected) || "(no definition or HTML text)"}</div>
+                {glossaryTooltipPreviewText ? (
+                  <GlossaryTooltipRichText text={glossaryTooltipPreviewText} />
+                ) : (
+                  <div>(no definition or HTML text)</div>
+                )}
               </div>
               <div>
                 <button type="button" onClick={handleDelete}>

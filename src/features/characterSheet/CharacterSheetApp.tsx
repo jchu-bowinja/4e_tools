@@ -10,12 +10,18 @@ import {
 import type { Armor, Implement, RulesIndex, Weapon } from "../../rules/models";
 import { computeSkillSheetRows } from "../../rules/skillCalculator";
 import { loadSavedCharacters, type SavedCharacterEntry } from "../builder/storage";
-import { RulesRichText } from "../builder/RulesRichText";
+import { GlossaryTooltipRichText, RulesRichText } from "../builder/RulesRichText";
 import { createDefaultCharacterSheetState } from "./defaultState";
 import type { CharacterSheetState, EquipmentSlot, InventoryItem } from "./model";
 import { canEquipItem, computeSheetDerivedData, groupCombatPowers, sheetStateFromBuild } from "./selectors";
 import { loadCharacterSheetState, saveCharacterSheetState } from "./storage";
-import { abilityTooltipResolveTerms, normalizeTooltipTerm, resolveTooltipText } from "../../data/tooltipGlossary";
+import {
+  abilityTooltipResolveTerms,
+  normalizeTooltipTerm,
+  resolveTooltipText,
+  tooltipTextForAbilityByCode,
+  tooltipTextForSkillById
+} from "../../data/tooltipGlossary";
 import { positionFixedTooltip } from "../../ui/glossaryTooltipPosition";
 import {
   GLOSSARY_TOOLTIP_CLOSE_DELAY_MS,
@@ -508,12 +514,16 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
 
   function glossaryContent(key: GlossaryKey): JSX.Element {
     let terms: string[] = [];
+    let abilityCodeForRules: AbilityCode | null = null;
+    let skillIdForRules: string | null = null;
     if (key.startsWith("ability:")) {
       const code = key.slice("ability:".length) as AbilityCode;
+      abilityCodeForRules = code;
       const lore = abilityLoreByCode.get(code);
       terms = abilityTooltipResolveTerms(code, lore?.name);
     } else if (key.startsWith("skill:")) {
       const skillId = key.slice("skill:".length);
+      skillIdForRules = skillId;
       const skill = skillById.get(skillId);
       terms = [skill?.name || ""];
     } else if (key.startsWith("condition:")) {
@@ -554,9 +564,15 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
       };
       terms = coreTerms[key];
     }
-    const resolved = resolveTooltipText({ terms: terms.filter(Boolean), glossaryByName: tooltipGlossary });
-    if (resolved) return <div style={{ whiteSpace: "pre-wrap" }}>{resolved}</div>;
-    return <div>No glossary entry found in `generated/glossary_terms.json`.</div>;
+    let resolved = resolveTooltipText({ terms: terms.filter(Boolean), glossaryByName: tooltipGlossary });
+    if (!resolved && abilityCodeForRules) {
+      resolved = tooltipTextForAbilityByCode(index, abilityCodeForRules);
+    }
+    if (!resolved && skillIdForRules) {
+      resolved = tooltipTextForSkillById(index, skillIdForRules);
+    }
+    if (resolved) return <GlossaryTooltipRichText text={resolved} />;
+    return <div>No description available.</div>;
   }
 
   function cancelGlossaryHoverCloseTimer(): void {

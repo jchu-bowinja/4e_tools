@@ -9,7 +9,7 @@ import {
   type MouseEvent as ReactMouseEvent
 } from "react";
 import type { RulesIndex } from "../../rules/models";
-import { resolveTooltipText } from "../../data/tooltipGlossary";
+import { resolveTooltipText, tooltipTextForAbilityByCode } from "../../data/tooltipGlossary";
 import { positionFixedTooltip } from "../../ui/glossaryTooltipPosition";
 import {
   GLOSSARY_TOOLTIP_CLOSE_DELAY_MS,
@@ -17,6 +17,7 @@ import {
   STANDARD_GLOSSARY_TOOLTIP_LAYOUT,
   STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE
 } from "../../ui/glossaryTooltip";
+import { GlossaryTooltipRichText } from "../builder/RulesRichText";
 import { findCaseInsensitiveMatches, scrollTextareaToMatch } from "../../ui/jsonSearch";
 import {
   loadMonsterEntry,
@@ -31,7 +32,10 @@ import {
   type MonsterTrait
 } from "./storage";
 import {
+  formatMonsterStatLabelForDisplay,
   isRenderableCardValue,
+  monsterAbilityAbbrevFromStatKey,
+  monsterStatGlossaryTermForKey,
   normalizeSemicolonWhitespace,
   normalizeTextForDupCompare,
   titleCaseWords
@@ -423,14 +427,6 @@ function formatLeadingPlusIfPositive(formatted: string): string {
   return formatted;
 }
 
-function formatStatLabel(label: string): string {
-  return label
-    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 function splitFailedEscapeAttemptSections(text: string): { mainText: string; failedEscapeTexts: string[] } {
   const raw = String(text || "").trim();
   if (!raw) return { mainText: "", failedEscapeTexts: [] };
@@ -510,11 +506,13 @@ function renderStatValue(
         {entries.map(([nestedKey, nestedValue]) => (
           <span key={nestedKey} style={{ whiteSpace: "nowrap" }}>
             <span
-              onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${formatStatLabel(nestedKey)}`)}
+              onMouseEnter={(event) =>
+                startGlossaryHover(event, `glossaryTerm:${monsterStatGlossaryTermForKey(nestedKey)}`)
+              }
               onMouseLeave={leaveGlossaryHover}
               style={{ ...glossaryLinkUnderline, marginRight: "0.3rem" }}
             >
-              {formatStatLabel(nestedKey)}
+              {formatMonsterStatLabelForDisplay(nestedKey)}
             </span>
             <strong style={statValueStrong}>{formatValue(nestedValue as string | number | boolean | undefined | null)}</strong>
           </span>
@@ -910,6 +908,41 @@ function renderGlossaryAwareText(
 }
 
 type MonsterGlossaryHoverKey = `powerKeyword:${string}` | `glossaryTerm:${string}` | `glossaryTerms:${string}`;
+
+function splitCommaListSegments(raw: string): string[] {
+  return String(raw ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+/**
+ * Build hover lookup key(s). Damage types often appear in glossary as "X damage".
+ * Sense names may be lowercased in JSON while glossary uses title case.
+ */
+function buildGlossaryHoverKeyForTerm(
+  term: string,
+  options?: { tryDamageTypeEntry?: boolean; tryTitleCaseVariant?: boolean }
+): MonsterGlossaryHoverKey {
+  const t = term.trim();
+  if (!t) return "glossaryTerm:";
+  const variants: string[] = [t];
+  if (options?.tryTitleCaseVariant) {
+    const titled = titleCaseWords(t).trim();
+    if (titled.length > 0 && titled.toLowerCase() !== t.toLowerCase()) variants.push(titled);
+  }
+  if (options?.tryDamageTypeEntry && !/\bdamage$/i.test(t)) variants.push(`${t} damage`);
+  const seenLower = new Set<string>();
+  const unique = variants.filter((v) => {
+    const k = v.trim().toLowerCase();
+    if (!k || seenLower.has(k)) return false;
+    seenLower.add(k);
+    return true;
+  });
+  if (unique.length === 1) return `glossaryTerm:${unique[0]}`;
+  return `glossaryTerms:${unique.map((v) => encodeURIComponent(v)).join("|")}`;
+}
+
 const MONSTER_GLOSSARY_TOOLTIP_ID = "monster-glossary-tooltip";
 
 export function MonsterEditorApp({
@@ -1179,6 +1212,10 @@ export function MonsterEditorApp({
   const glossaryResolutionCacheRef = useRef<Map<string, boolean>>(new Map());
 
   useEffect(() => {
+    glossaryResolutionCacheRef.current.clear();
+  }, [index, tooltipGlossary]);
+
+  useEffect(() => {
     setJsonSearchResultIdx(0);
   }, [jsonSearchQuery, rawJsonText]);
 
@@ -1197,6 +1234,23 @@ export function MonsterEditorApp({
     textarea.setSelectionRange(start, end);
     scrollTextareaToMatch(textarea, rawJsonText, start);
   }, [jsonSearchJumpTick, jsonSearchMatches, jsonSearchQuery, jsonSearchResultIdx, rawJsonText]);
+
+  function resolveMonsterTooltipBody(term: string): string | null {
+    const fromGlossary = resolveTooltipText({
+      terms: splitTooltipTerms(term),
+      glossaryByName: tooltipGlossary
+    });
+    if (fromGlossary) return fromGlossary;
+    const candidates = [...new Set([term, ...splitTooltipTerms(term)])];
+    for (const c of candidates) {
+      const code = monsterAbilityAbbrevFromStatKey(c);
+      if (code) {
+        const lore = tooltipTextForAbilityByCode(index, code);
+        if (lore) return lore;
+      }
+    }
+    return null;
+  }
 
   function monsterGlossaryContent(key: MonsterGlossaryHoverKey): JSX.Element {
     let terms: string[] = [];
@@ -1222,13 +1276,13 @@ export function MonsterEditorApp({
     }
     const uniqueTerms = [...new Set(terms.filter(Boolean))];
     const resolvedEntries = uniqueTerms
-      .map((term) => ({
-        term,
-        text: resolveTooltipText({ terms: [term], glossaryByName: tooltipGlossary })
-      }))
-      .filter((entry): entry is { term: string; text: string } => Boolean(entry.text));
+      .map((term) => {
+        const text = resolveMonsterTooltipBody(term);
+        return text ? { term, text } : null;
+      })
+      .filter((entry): entry is { term: string; text: string } => entry !== null);
     if (resolvedEntries.length === 1) {
-      return <div style={{ whiteSpace: "pre-wrap" }}>{resolvedEntries[0].text}</div>;
+      return <GlossaryTooltipRichText text={resolvedEntries[0].text} />;
     }
     if (resolvedEntries.length > 1) {
       return (
@@ -1236,13 +1290,13 @@ export function MonsterEditorApp({
           {resolvedEntries.map((entry) => (
             <div key={entry.term}>
               <div style={{ fontWeight: 700 }}>{entry.term}</div>
-              <div style={{ whiteSpace: "pre-wrap" }}>{entry.text}</div>
+              <GlossaryTooltipRichText text={entry.text} />
             </div>
           ))}
         </div>
       );
     }
-    return <div>No glossary entry found in `generated/glossary_terms.json`.</div>;
+    return <div>No description available.</div>;
   }
 
   const shouldHighlightGlossaryTerm = useCallback(
@@ -1251,12 +1305,12 @@ export function MonsterEditorApp({
       if (!normalized) return false;
       const cached = glossaryResolutionCacheRef.current.get(normalized);
       if (cached !== undefined) return cached;
-      const resolvedText = resolveTooltipText({ terms: splitTooltipTerms(term), glossaryByName: tooltipGlossary });
+      const resolvedText = resolveMonsterTooltipBody(term);
       const hasEntry = Boolean(resolvedText && resolvedText.trim().length > 0);
       glossaryResolutionCacheRef.current.set(normalized, hasEntry);
       return hasEntry;
     },
-    [tooltipGlossary]
+    [index, tooltipGlossary]
   );
 
   function cancelGlossaryHoverCloseTimer(): void {
@@ -1759,19 +1813,23 @@ export function MonsterEditorApp({
                       {(Array.isArray(activeMonster.immunities) && activeMonster.immunities.length > 0) ? (
                         <div style={centerFlowLineStyle}>
                           <strong style={centerFlowLabelStrongStyle}>Immunities:</strong>{" "}
-                          {activeMonster.immunities.map((immText, idx) => (
-                            <span key={`flow-imm-${idx}`}>
-                              {idx > 0 ? ", " : null}
-                              {renderGlossaryAwareText(
-                                String(immText ?? ""),
-                                commonDescriptiveGlossaryPhrases,
-                                startGlossaryHover,
-                                leaveGlossaryHover,
-                                `flow-imm-${idx}`,
-                                shouldHighlightGlossaryTerm
-                              )}
-                            </span>
-                          ))}
+                          {(() => {
+                            const segments: string[] = [];
+                            for (const imm of activeMonster.immunities ?? []) {
+                              segments.push(...splitCommaListSegments(String(imm ?? "")));
+                            }
+                            return segments.map((text, idx) => (
+                              <span key={`flow-imm-${idx}`}>
+                                {idx > 0 ? ", " : null}
+                                <span
+                                  {...glossaryHoverA11y(buildGlossaryHoverKeyForTerm(text))}
+                                  style={glossaryLinkUnderline}
+                                >
+                                  {text}
+                                </span>
+                              </span>
+                            ));
+                          })()}
                         </div>
                       ) : null}
                       {(Array.isArray(activeMonster.resistances) && activeMonster.resistances.length > 0) ? (
@@ -1789,7 +1847,10 @@ export function MonsterEditorApp({
                                 {idx > 0 ? ", " : null}
                                 {amountPart}
                                 {name ? (
-                                  <span {...glossaryHoverA11y(`glossaryTerm:${name}`)} style={glossaryLinkUnderline}>
+                                  <span
+                                    {...glossaryHoverA11y(buildGlossaryHoverKeyForTerm(name, { tryDamageTypeEntry: true }))}
+                                    style={glossaryLinkUnderline}
+                                  >
                                     {name}
                                   </span>
                                 ) : (
@@ -1825,7 +1886,10 @@ export function MonsterEditorApp({
                             {entries.map((entry, idx) => (
                               <span key={`flow-sense-${idx}-${entry.name}`}>
                                 {idx > 0 ? ", " : null}
-                                <span {...glossaryHoverA11y(`glossaryTerm:${entry.name}`)} style={glossaryLinkUnderline}>
+                                <span
+                                  {...glossaryHoverA11y(buildGlossaryHoverKeyForTerm(entry.name, { tryTitleCaseVariant: true }))}
+                                  style={glossaryLinkUnderline}
+                                >
                                   {entry.text}
                                 </span>
                               </span>
@@ -1859,7 +1923,7 @@ export function MonsterEditorApp({
                           })
                           .map(([label, block]) => (
                             <div key={label} style={statPanelStyle}>
-                              <h3 style={sectionTitleStyle}>{formatStatLabel(label)}</h3>
+                              <h3 style={sectionTitleStyle}>{formatMonsterStatLabelForDisplay(label)}</h3>
                               <div
                                 style={{
                                   marginTop: "0.4rem",
@@ -1889,7 +1953,9 @@ export function MonsterEditorApp({
                                           }}
                                         >
                                           <span
-                                            onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${formatStatLabel(k)}`)}
+                                            onMouseEnter={(event) =>
+                                              startGlossaryHover(event, `glossaryTerm:${monsterStatGlossaryTermForKey(k)}`)
+                                            }
                                             onMouseLeave={leaveGlossaryHover}
                                             style={{
                                               cursor: "help",
@@ -1899,7 +1965,7 @@ export function MonsterEditorApp({
                                               width: "fit-content"
                                             }}
                                           >
-                                            {formatStatLabel(k)}
+                                            {formatMonsterStatLabelForDisplay(k)}
                                           </span>
                                           {renderStatValue(v, startGlossaryHover, leaveGlossaryHover)}
                                         </div>

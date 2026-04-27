@@ -59,7 +59,7 @@ import { computeSkillSheetRows } from "../../rules/skillCalculator";
 import { multiclassFeatIds } from "../../rules/multiclassDetection";
 import { pruneStalePowerSelections } from "../../rules/powerSelections";
 import { summarizeImplementAttack, summarizeMainWeaponAttack } from "../../rules/weaponAttack";
-import { RulesRichText } from "./RulesRichText";
+import { GlossaryTooltipRichText, RulesRichText } from "./RulesRichText";
 import { NEUTRAL_PAGE_BG } from "../../ui/tokens";
 import { positionFixedTooltip } from "../../ui/glossaryTooltipPosition";
 import {
@@ -69,7 +69,13 @@ import {
   STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE
 } from "../../ui/glossaryTooltip";
 import { findCaseInsensitiveMatches, scrollTextareaToMatch } from "../../ui/jsonSearch";
-import { abilityTooltipResolveTerms, normalizeTooltipTerm, resolveTooltipText } from "../../data/tooltipGlossary";
+import {
+  abilityTooltipResolveTerms,
+  normalizeTooltipTerm,
+  resolveTooltipText,
+  tooltipTextForAbilityByCode,
+  tooltipTextForSkillById
+} from "../../data/tooltipGlossary";
 import {
   ensureSelectedEntityInFiltered,
   ensureSelectedFeatsInList,
@@ -1008,7 +1014,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         terms: [keyword, "Keyword"],
         glossaryByName: tooltipGlossary
       });
-      if (resolved) return <div style={{ whiteSpace: "pre-wrap" }}>{resolved}</div>;
+      if (resolved) return <GlossaryTooltipRichText text={resolved} />;
       return <div>No glossary entry found in `generated/glossary_terms.json`.</div>;
     }
     if (key.startsWith("powerUsage:")) {
@@ -1022,29 +1028,31 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         terms = ["Daily", "Daily Power"];
       }
       const resolved = resolveTooltipText({ terms, glossaryByName: tooltipGlossary });
-      if (resolved) return <div style={{ whiteSpace: "pre-wrap" }}>{resolved}</div>;
+      if (resolved) return <GlossaryTooltipRichText text={resolved} />;
       return <div>No glossary entry found in `generated/glossary_terms.json`.</div>;
     }
     if (key.startsWith("ability:")) {
       const code = key.slice("ability:".length) as BuilderAbilityCode;
       const entry = index.abilityScores.find((e) => e.abilityCode === code);
       const terms = abilityTooltipResolveTerms(code, entry?.name);
-      const resolved = resolveTooltipText({
+      let resolved = resolveTooltipText({
         terms,
         glossaryByName: tooltipGlossary
       });
-      if (resolved) return <div style={{ whiteSpace: "pre-wrap" }}>{resolved}</div>;
-      return <div>No glossary entry found in `generated/glossary_terms.json`.</div>;
+      if (!resolved) resolved = tooltipTextForAbilityByCode(index, code);
+      if (resolved) return <GlossaryTooltipRichText text={resolved} />;
+      return <div>No description available.</div>;
     }
     if (key.startsWith("skill:")) {
       const skillId = key.slice("skill:".length);
       const skill = skillById.get(skillId);
-      const resolved = resolveTooltipText({
+      let resolved = resolveTooltipText({
         terms: [skill?.name || ""].filter(Boolean),
         glossaryByName: tooltipGlossary
       });
-      if (resolved) return <div style={{ whiteSpace: "pre-wrap" }}>{resolved}</div>;
-      return <div>No glossary entry found in `generated/glossary_terms.json`.</div>;
+      if (!resolved) resolved = tooltipTextForSkillById(index, skillId);
+      if (resolved) return <GlossaryTooltipRichText text={resolved} />;
+      return <div>No description available.</div>;
     }
     const coreTerms: Record<
       Exclude<
@@ -1073,7 +1081,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       glossaryByName: tooltipGlossary
     });
     if (resolved) {
-      return <div style={{ whiteSpace: "pre-wrap" }}>{resolved}</div>;
+      return <GlossaryTooltipRichText text={resolved} />;
     }
     return <div>No glossary entry found in `generated/glossary_terms.json`.</div>;
   }
@@ -2970,7 +2978,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                             <td style={{ padding: "0.45rem 0.25rem 0.45rem 0", verticalAlign: "middle" }}>
                               <span {...glossaryHoverA11y(`ability:${ability}`)}>
                                 <span style={{ fontWeight: 600 }}>{ability}</span>
-                                <span style={{ display: "block", fontSize: "0.78rem", color: "var(--text-muted)", fontWeight: 400 }}>{getAbilityLabel(ability)}</span>
                               </span>
                             </td>
                             <td style={{ padding: "0.35rem 0.25rem", verticalAlign: "middle", textAlign: "center", width: "3.75rem" }}>
@@ -3042,7 +3049,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   return (
                     <div key={ability}>
                       <p style={{ margin: 0, fontWeight: 600, fontSize: "0.88rem" }}>
-                        {ability} — {getAbilityLabel(ability)}
+                        {ability}
                       </p>
                       <div style={{ margin: "0.25rem 0 0 0", fontSize: "0.82rem", color: "var(--text-secondary)" }}>
                         <RulesRichText text={lore} paragraphStyle={{ fontSize: "0.82rem", color: "var(--text-secondary)" }} listItemStyle={{ fontSize: "0.82rem", color: "var(--text-secondary)" }} />

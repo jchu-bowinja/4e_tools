@@ -53,6 +53,19 @@ export function parseRulesDescriptionText(text: string): Block[] {
   return [{ kind: "paragraph", text: t }];
 }
 
+/** Glossary hover panels and editor preview: ✦ / ★ become real bullet lists (see `parseRulesDescriptionText`). */
+export function GlossaryTooltipRichText(props: { text: string }): ReactNode {
+  const { text } = props;
+  return (
+    <RulesRichText
+      text={text}
+      paragraphStyle={{ lineHeight: 1.35 }}
+      listStyle={{ lineHeight: 1.35 }}
+      listItemStyle={{ lineHeight: 1.35 }}
+    />
+  );
+}
+
 export function RulesRichText(props: {
   text: string;
   paragraphStyle?: CSSProperties;
