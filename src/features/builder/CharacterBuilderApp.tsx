@@ -1006,11 +1006,10 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       const keyword = key.slice("powerKeyword:".length).trim();
       const resolved = resolveTooltipText({
         terms: [keyword, "Keyword"],
-        glossaryByName: tooltipGlossary,
-        index
+        glossaryByName: tooltipGlossary
       });
       if (resolved) return <div style={{ whiteSpace: "pre-wrap" }}>{resolved}</div>;
-      return <div>No glossary entry found in `generated/glossary_terms.json` or `generated/rules_index.json`.</div>;
+      return <div>No glossary entry found in `generated/glossary_terms.json`.</div>;
     }
     if (key.startsWith("powerUsage:")) {
       const usage = key.slice("powerUsage:".length).trim();
@@ -1022,9 +1021,9 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       } else if (usage === "daily") {
         terms = ["Daily", "Daily Power"];
       }
-      const resolved = resolveTooltipText({ terms, glossaryByName: tooltipGlossary, index });
+      const resolved = resolveTooltipText({ terms, glossaryByName: tooltipGlossary });
       if (resolved) return <div style={{ whiteSpace: "pre-wrap" }}>{resolved}</div>;
-      return <div>No glossary entry found in `generated/glossary_terms.json` or `generated/rules_index.json`.</div>;
+      return <div>No glossary entry found in `generated/glossary_terms.json`.</div>;
     }
     if (key.startsWith("ability:")) {
       const code = key.slice("ability:".length) as BuilderAbilityCode;
@@ -1032,22 +1031,20 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       const terms = abilityTooltipResolveTerms(code, entry?.name);
       const resolved = resolveTooltipText({
         terms,
-        glossaryByName: tooltipGlossary,
-        index
+        glossaryByName: tooltipGlossary
       });
       if (resolved) return <div style={{ whiteSpace: "pre-wrap" }}>{resolved}</div>;
-      return <div>No glossary entry found in `generated/glossary_terms.json` or `generated/rules_index.json`.</div>;
+      return <div>No glossary entry found in `generated/glossary_terms.json`.</div>;
     }
     if (key.startsWith("skill:")) {
       const skillId = key.slice("skill:".length);
       const skill = skillById.get(skillId);
       const resolved = resolveTooltipText({
         terms: [skill?.name || ""].filter(Boolean),
-        glossaryByName: tooltipGlossary,
-        index
+        glossaryByName: tooltipGlossary
       });
       if (resolved) return <div style={{ whiteSpace: "pre-wrap" }}>{resolved}</div>;
-      return <div>No glossary entry found in `generated/glossary_terms.json` or `generated/rules_index.json`.</div>;
+      return <div>No glossary entry found in `generated/glossary_terms.json`.</div>;
     }
     const coreTerms: Record<
       Exclude<
@@ -1073,13 +1070,12 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     };
     const resolved = resolveTooltipText({
       terms: coreTerms[key].filter(Boolean),
-      glossaryByName: tooltipGlossary,
-      index
+      glossaryByName: tooltipGlossary
     });
     if (resolved) {
       return <div style={{ whiteSpace: "pre-wrap" }}>{resolved}</div>;
     }
-    return <div>No glossary entry found in `generated/glossary_terms.json` or `generated/rules_index.json`.</div>;
+    return <div>No glossary entry found in `generated/glossary_terms.json`.</div>;
   }
 
   function cancelGlossaryHoverCloseTimer(): void {
@@ -1158,8 +1154,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     const found = Boolean(
       resolveTooltipText({
         terms: [term],
-        glossaryByName: tooltipGlossary,
-        index
+        glossaryByName: tooltipGlossary
       })
     );
     cache.set(normalized, found);
@@ -1226,7 +1221,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   }, [index, build.level, effectiveAbilityScores, autoGrantedSkillIds, build.trainedSkillIds, derived.armorCheckPenalty]);
 
   function powerKeywordTooltip(keyword: string): string | null {
-    return resolveTooltipText({ terms: [keyword, "Keyword"], glossaryByName: tooltipGlossary, index });
+    return resolveTooltipText({ terms: [keyword, "Keyword"], glossaryByName: tooltipGlossary });
   }
 
   const classWeaponProfText = useMemo(() => {

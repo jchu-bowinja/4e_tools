@@ -1,5 +1,3 @@
-import type { RulesIndex } from "../rules/models";
-
 /** One glossary entry as stored in `generated/glossary_terms.json`. */
 export interface GlossaryTermRow {
   id?: string;
@@ -119,55 +117,6 @@ export async function loadTooltipGlossary(): Promise<Record<string, string>> {
   return glossaryRowsToTooltipMap(rows);
 }
 
-function firstText(...values: Array<unknown>): string | null {
-  for (const value of values) {
-    if (typeof value === "string" && value.trim()) return value.trim();
-  }
-  return null;
-}
-
-function extractRulesEntityText(entity: { shortDescription?: string | null; body?: string | null; raw?: Record<string, unknown> }): string | null {
-  const raw = entity.raw || {};
-  return firstText(
-    entity.shortDescription,
-    entity.body,
-    raw.body,
-    raw.flavor,
-    raw["Short Description"],
-    raw["Description"],
-    raw["Rules Text"],
-    raw["Text"]
-  );
-}
-
-function fromRulesIndex(index: RulesIndex, term: string): string | null {
-  const normalized = normalizeTerm(term);
-  const collections: Array<Array<{ name?: string } & Record<string, unknown>>> = [
-    index.abilityScores,
-    index.skills,
-    index.races,
-    index.classes,
-    index.feats,
-    index.powers,
-    index.racialTraits,
-    index.themes,
-    index.paragonPaths,
-    index.epicDestinies,
-    index.languages,
-    index.armors,
-    index.weapons || [],
-    index.implements || [],
-    index.hybridClasses || []
-  ];
-  for (const collection of collections) {
-    const match = collection.find((item) => normalizeTerm(String(item.name || "")) === normalized);
-    if (!match) continue;
-    const text = extractRulesEntityText(match as { shortDescription?: string | null; body?: string | null; raw?: Record<string, unknown> });
-    if (text) return text;
-  }
-  return null;
-}
-
 function candidateTerms(input: string): string[] {
   const trimmed = input.trim();
   if (!trimmed) return [];
@@ -230,18 +179,11 @@ function candidateTerms(input: string): string[] {
 export function resolveTooltipText(params: {
   terms: string[];
   glossaryByName: Record<string, string>;
-  index: RulesIndex;
 }): string | null {
   for (const term of params.terms) {
     for (const candidate of candidateTerms(term)) {
       const glossaryMatch = params.glossaryByName[normalizeTerm(candidate)];
       if (glossaryMatch) return glossaryMatch;
-    }
-  }
-  for (const term of params.terms) {
-    for (const candidate of candidateTerms(term)) {
-      const indexMatch = fromRulesIndex(params.index, candidate);
-      if (indexMatch) return indexMatch;
     }
   }
   return null;

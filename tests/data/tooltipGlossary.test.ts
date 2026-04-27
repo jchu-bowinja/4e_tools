@@ -6,30 +6,6 @@ import {
   resolveTooltipText,
   sanitizeGlossaryRows
 } from "../../src/data/tooltipGlossary";
-import type { RulesIndex } from "../../src/rules/models";
-
-function emptyIndex(): RulesIndex {
-  return {
-    races: [],
-    classes: [],
-    feats: [],
-    powers: [],
-    skills: [],
-    languages: [],
-    armors: [],
-    abilityScores: [],
-    racialTraits: [],
-    themes: [],
-    paragonPaths: [],
-    epicDestinies: [],
-    hybridClasses: [],
-    weapons: [],
-    implements: [],
-    autoGrantedPowerIdsByClassId: {},
-    autoGrantedSkillTrainingNamesBySupportId: {},
-    classBuildOptionsByClassId: {}
-  };
-}
 
 describe("abilityTooltipResolveTerms", () => {
   it("orders full name and code before generic Ability Score", () => {
@@ -47,7 +23,7 @@ describe("abilityTooltipResolveTerms", () => {
       "ability score": "Generic singular body"
     };
     const terms = abilityTooltipResolveTerms("STR", "Strength");
-    expect(resolveTooltipText({ terms, glossaryByName, index: emptyIndex() })).toBe("STR-specific body");
+    expect(resolveTooltipText({ terms, glossaryByName })).toBe("STR-specific body");
   });
 });
 
@@ -57,8 +33,8 @@ describe("resolveTooltipText range normalization", () => {
       melee: "Melee glossary",
       ranged: "Ranged glossary"
     };
-    expect(resolveTooltipText({ terms: ["Melee 1"], glossaryByName, index: emptyIndex() })).toBe("Melee glossary");
-    expect(resolveTooltipText({ terms: ["Ranged 10"], glossaryByName, index: emptyIndex() })).toBe("Ranged glossary");
+    expect(resolveTooltipText({ terms: ["Melee 1"], glossaryByName })).toBe("Melee glossary");
+    expect(resolveTooltipText({ terms: ["Ranged 10"], glossaryByName })).toBe("Ranged glossary");
   });
 
   it("resolves Close burst/blast X to base glossary keys", () => {
@@ -66,36 +42,28 @@ describe("resolveTooltipText range normalization", () => {
       "close burst": "Close burst glossary",
       "close blast": "Close blast glossary"
     };
-    expect(resolveTooltipText({ terms: ["Close burst 2"], glossaryByName, index: emptyIndex() })).toBe("Close burst glossary");
-    expect(resolveTooltipText({ terms: ["Close blast 5"], glossaryByName, index: emptyIndex() })).toBe("Close blast glossary");
+    expect(resolveTooltipText({ terms: ["Close burst 2"], glossaryByName })).toBe("Close burst glossary");
+    expect(resolveTooltipText({ terms: ["Close blast 5"], glossaryByName })).toBe("Close blast glossary");
   });
 
   it("resolves Reach X to the Reach glossary key", () => {
     const glossaryByName = {
       reach: "Reach glossary"
     };
-    expect(resolveTooltipText({ terms: ["Reach 3"], glossaryByName, index: emptyIndex() })).toBe("Reach glossary");
+    expect(resolveTooltipText({ terms: ["Reach 3"], glossaryByName })).toBe("Reach glossary");
   });
 
-  it("resolves skill phrase variants to rules_index skill entries", () => {
-    const index = emptyIndex();
-    index.skills = [
-      {
-        id: "skill-acrobatics",
-        name: "Acrobatics",
-        keyAbility: "Dex",
-        body: "Balance and tumbling skill text.",
-        raw: {}
-      }
-    ];
-    const glossaryByName = {};
-    expect(resolveTooltipText({ terms: ["Acrobatics (Dex)"], glossaryByName, index })).toBe(
+  it("resolves skill phrase variants via glossary lookup keys", () => {
+    const glossaryByName = {
+      acrobatics: "Balance and tumbling skill text."
+    };
+    expect(resolveTooltipText({ terms: ["Acrobatics (Dex)"], glossaryByName })).toBe(
       "Balance and tumbling skill text."
     );
-    expect(resolveTooltipText({ terms: ["Acrobatics check"], glossaryByName, index })).toBe(
+    expect(resolveTooltipText({ terms: ["Acrobatics check"], glossaryByName })).toBe(
       "Balance and tumbling skill text."
     );
-    expect(resolveTooltipText({ terms: ["Acrobatics skill check"], glossaryByName, index })).toBe(
+    expect(resolveTooltipText({ terms: ["Acrobatics skill check"], glossaryByName })).toBe(
       "Balance and tumbling skill text."
     );
   });
@@ -167,10 +135,10 @@ describe("close blast / close burst with generated glossary aliases", () => {
     );
 
     const glossary = await loadTooltipGlossary();
-    expect(resolveTooltipText({ terms: ["Close blast 5"], glossaryByName: glossary, index: emptyIndex() })).toBe(
+    expect(resolveTooltipText({ terms: ["Close blast 5"], glossaryByName: glossary })).toBe(
       definitionText
     );
-    expect(resolveTooltipText({ terms: ["Close burst 3"], glossaryByName: glossary, index: emptyIndex() })).toBe(
+    expect(resolveTooltipText({ terms: ["Close burst 3"], glossaryByName: glossary })).toBe(
       definitionText
     );
   });

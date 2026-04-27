@@ -554,9 +554,9 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
       };
       terms = coreTerms[key];
     }
-    const resolved = resolveTooltipText({ terms: terms.filter(Boolean), glossaryByName: tooltipGlossary, index });
+    const resolved = resolveTooltipText({ terms: terms.filter(Boolean), glossaryByName: tooltipGlossary });
     if (resolved) return <div style={{ whiteSpace: "pre-wrap" }}>{resolved}</div>;
-    return <div>No glossary entry found in `generated/glossary_terms.json` or `generated/rules_index.json`.</div>;
+    return <div>No glossary entry found in `generated/glossary_terms.json`.</div>;
   }
 
   function cancelGlossaryHoverCloseTimer(): void {
@@ -619,8 +619,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     const found = Boolean(
       resolveTooltipText({
         terms: [term],
-        glossaryByName: tooltipGlossary,
-        index
+        glossaryByName: tooltipGlossary
       })
     );
     cache.set(normalized, found);
