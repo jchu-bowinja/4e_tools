@@ -37,7 +37,6 @@ import {
   titleCaseWords
 } from "./monsterTextUtils";
 import { buildMonsterPowerCardViewModel } from "./monsterPowerCardViewModel";
-import { MonsterStatBlockCard } from "./MonsterStatBlockCard";
 
 /** Matches CharacterSheetApp: panels, section titles, labels, and body scale. */
 const panelStyle: CSSProperties = {
@@ -412,6 +411,16 @@ function usageColorAccentCardStyle(bucket: MonsterPowerColorBucket): {
 function formatValue(value: string | number | boolean | undefined | null): string {
   if (value === undefined || value === null || value === "") return "-";
   return String(value);
+}
+
+/** Initiative / saving throws: show a leading + when the value is a positive number. */
+function formatLeadingPlusIfPositive(formatted: string): string {
+  if (formatted === "-") return "-";
+  const trimmed = formatted.trim();
+  if (/^[+-]/.test(trimmed)) return formatted;
+  const num = Number(trimmed.replace(/,/g, ""));
+  if (Number.isFinite(num) && num > 0) return `+${trimmed}`;
+  return formatted;
 }
 
 function formatStatLabel(label: string): string {
@@ -1485,17 +1494,28 @@ export function MonsterEditorApp({
               Select a monster to view its generated JSON data.
             </p>
           ) : (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "minmax(0, 1fr) minmax(300px, 400px)",
-                gap: "1rem",
-                alignItems: "start"
-              }}
-            >
-              <div style={{ minWidth: 0 }}>
+            <div style={{ minWidth: 0 }}>
               <div style={centerIdentityBlockStyle}>
-                <div style={centerIdentityTitleStyle}>{activeMonster.name}</div>
+                <div style={centerIdentityTitleStyle}>
+                  <span>{activeMonster.name}</span>
+                  {activeMonster.alignment?.name ? (
+                    <>
+                      {" "}
+                      <span
+                        {...glossaryHoverA11y(`glossaryTerm:${activeMonster.alignment.name}`)}
+                        style={{
+                          cursor: "help",
+                          borderBottom: "1px dotted var(--text-muted)",
+                          fontWeight: 700,
+                          letterSpacing: "0.02em",
+                          color: "var(--text-primary)"
+                        }}
+                      >
+                        ({activeMonster.alignment.name})
+                      </span>
+                    </>
+                  ) : null}
+                </div>
                 <div style={centerMetaLineStyle}>
                   <span
                     {...glossaryHoverA11y("glossaryTerm:Level")}
@@ -1603,12 +1623,38 @@ export function MonsterEditorApp({
                   const fortitude = pickDefense(["fortitude", "Fortitude"]);
                   const reflex = pickDefense(["reflex", "Reflex"]);
                   const will = pickDefense(["will", "Will"]);
+                  const regenerationRaw = activeMonster.regeneration;
+                  let regenerationVal: string | null = null;
+                  if (regenerationRaw !== undefined && regenerationRaw !== null && String(regenerationRaw).trim() !== "") {
+                    const numeric =
+                      typeof regenerationRaw === "number"
+                        ? regenerationRaw
+                        : Number(String(regenerationRaw).replace(/,/g, "").trim());
+                    const include =
+                      Number.isFinite(numeric) ? numeric !== 0 : true;
+                    if (include) {
+                      regenerationVal = formatValue(
+                        regenerationRaw as string | number | boolean | undefined | null
+                      );
+                    }
+                  }
                   const rows: Array<{ label: string; glossary: MonsterGlossaryHoverKey; val: string }> = [];
                   if (initiative !== "-") {
-                    rows.push({ label: "Initiative", glossary: "glossaryTerm:Initiative", val: initiative });
+                    rows.push({
+                      label: "Initiative",
+                      glossary: "glossaryTerm:Initiative",
+                      val: formatLeadingPlusIfPositive(initiative)
+                    });
                   }
                   if (hitPoints !== "-") {
                     rows.push({ label: "Hit Points", glossary: "glossaryTerm:Hit Points", val: hitPoints });
+                  }
+                  if (regenerationVal !== null) {
+                    rows.push({
+                      label: "Regeneration",
+                      glossary: "glossaryTerm:Regeneration",
+                      val: regenerationVal
+                    });
                   }
                   if (ac !== "-") rows.push({ label: "AC", glossary: "glossaryTerm:AC", val: ac });
                   if (fortitude !== "-") {
@@ -1620,7 +1666,11 @@ export function MonsterEditorApp({
                     rows.push({ label: "Action Points", glossary: "glossaryTerm:Action Points", val: actionPts });
                   }
                   if (saves !== "-") {
-                    rows.push({ label: "Saving Throws", glossary: "glossaryTerm:Saving Throws", val: saves });
+                    rows.push({
+                      label: "Saving Throws",
+                      glossary: "glossaryTerm:Saving Throws",
+                      val: formatLeadingPlusIfPositive(saves)
+                    });
                   }
                   if (rows.length === 0) return null;
                   return (
@@ -1751,6 +1801,38 @@ export function MonsterEditorApp({
                           })}
                         </div>
                       ) : null}
+                      {(() => {
+                        const entries =
+                          Array.isArray(activeMonster.senses) && activeMonster.senses.length > 0
+                            ? activeMonster.senses
+                                .map((sense) => {
+                                  const name = String(sense.name ?? "").trim();
+                                  if (!name) return null;
+                                  const displayName = name.charAt(0).toUpperCase() + name.slice(1);
+                                  const normalizedRange = String(sense.range ?? "").trim();
+                                  const text =
+                                    normalizedRange !== "" && normalizedRange !== "0"
+                                      ? `${displayName} ${normalizedRange}`
+                                      : displayName;
+                                  return { name, text };
+                                })
+                                .filter((e): e is { name: string; text: string } => e !== null)
+                            : [];
+                        if (entries.length === 0) return null;
+                        return (
+                          <div style={centerFlowLineStyle}>
+                            <strong style={centerFlowLabelStrongStyle}>Senses:</strong>{" "}
+                            {entries.map((entry, idx) => (
+                              <span key={`flow-sense-${idx}-${entry.name}`}>
+                                {idx > 0 ? ", " : null}
+                                <span {...glossaryHoverA11y(`glossaryTerm:${entry.name}`)} style={glossaryLinkUnderline}>
+                                  {entry.text}
+                                </span>
+                              </span>
+                            ))}
+                          </div>
+                        );
+                      })()}
                       {(Array.isArray(activeMonster.weaknesses) && activeMonster.weaknesses.length > 0) ? (
                         <div style={centerFlowLineStyle}>
                           <strong style={centerFlowLabelStrongStyle}>Vulnerabilities:</strong>{" "}
@@ -1825,6 +1907,36 @@ export function MonsterEditorApp({
                               </div>
                             </div>
                           ))}
+                        {Array.isArray(activeMonster.languages) && activeMonster.languages.length > 0 ? (
+                          <div style={statPanelStyle}>
+                            <h3 style={sectionTitleStyle}>Languages</h3>
+                            <div
+                              style={{
+                                marginTop: "0.4rem",
+                                fontSize: "0.8125rem",
+                                lineHeight: 1.45,
+                                color: "var(--text-secondary)"
+                              }}
+                            >
+                              {renderTagList(activeMonster.languages)}
+                            </div>
+                          </div>
+                        ) : null}
+                        {Array.isArray(activeMonster.sourceBooks) && activeMonster.sourceBooks.length > 0 ? (
+                          <div style={statPanelStyle}>
+                            <h3 style={sectionTitleStyle}>Sources</h3>
+                            <div
+                              style={{
+                                marginTop: "0.4rem",
+                                fontSize: "0.8125rem",
+                                lineHeight: 1.45,
+                                color: "var(--text-secondary)"
+                              }}
+                            >
+                              {activeMonster.sourceBooks.join(", ")}
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
                     </details>
                   </>
@@ -2129,79 +2241,6 @@ export function MonsterEditorApp({
                         </div>
                       </div>
                     ))}
-                  </div>
-                </div>
-              ) : null}
-
-              {Array.isArray(activeMonster.senses) && activeMonster.senses.length > 0 ? (
-                <div style={centerSubsectionPanelStyle}>
-                  <h3 style={sectionTitleStyle}>Senses</h3>
-                  <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.24rem" }}>
-                    {activeMonster.senses
-                      .map((sense) => {
-                        const name = String(sense.name ?? "").trim();
-                        const range = sense.range;
-                        if (!name) return "";
-                        const displayName = name.charAt(0).toUpperCase() + name.slice(1);
-                        const normalizedRange = String(range ?? "").trim();
-                        return normalizedRange !== "" && normalizedRange !== "0"
-                          ? `${displayName} ${normalizedRange}`
-                          : displayName;
-                      })
-                      .filter(Boolean)
-                      .map((line, idx) => (
-                        <div
-                          key={`sense-${idx}`}
-                          onMouseEnter={(event) =>
-                            startGlossaryHover(event, `glossaryTerm:${String(activeMonster.senses?.[idx]?.name ?? "Senses")}`)
-                          }
-                          onMouseLeave={leaveGlossaryHover}
-                          style={{ ...bodyPrimary, ...glossaryLinkUnderline, width: "fit-content" }}
-                        >
-                          <strong>{line}</strong>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              ) : null}
-
-              {(activeMonster.alignment?.name || isRenderableCardValue(activeMonster.description)) ? (
-                <div style={centerSubsectionPanelStyle}>
-                  <h3 style={sectionTitleStyle}>Details</h3>
-                  <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.3rem" }}>
-                    {activeMonster.alignment?.name ? (
-                      <div style={bodyPrimary}>
-                        <strong>Alignment:</strong> {activeMonster.alignment.name}
-                      </div>
-                    ) : null}
-                    <div style={bodyPrimary}>
-                      <strong>Languages:</strong> {renderTagList(activeMonster.languages)}
-                    </div>
-                    <div style={bodyPrimary}>
-                      <strong>Keywords:</strong> {renderTagList(activeMonster.keywords)}
-                    </div>
-                    {Array.isArray(activeMonster.sourceBooks) && activeMonster.sourceBooks.length > 0 ? (
-                      <div style={bodyPrimary}>
-                        <strong>Sources:</strong> {activeMonster.sourceBooks.join(", ")}
-                      </div>
-                    ) : null}
-                    {activeMonster.regeneration !== undefined && activeMonster.regeneration !== null && activeMonster.regeneration !== "" ? (
-                      <div style={bodyPrimary}>
-                        <strong>Regeneration:</strong> {String(activeMonster.regeneration)}
-                      </div>
-                    ) : null}
-                    {isRenderableCardValue(activeMonster.description) ? (
-                      <div style={{ ...richTextBodyPrimary.paragraphStyle, margin: "0.2rem 0 0 0", whiteSpace: "pre-wrap" }}>
-                        {renderGlossaryAwareText(
-                          String(activeMonster.description),
-                          commonDescriptiveGlossaryPhrases,
-                          startGlossaryHover,
-                          leaveGlossaryHover,
-                          "details-description",
-                          shouldHighlightGlossaryTerm
-                        )}
-                      </div>
-                    ) : null}
                   </div>
                 </div>
               ) : null}
@@ -2552,24 +2591,6 @@ export function MonsterEditorApp({
                 </div>
               </div>
               </div>
-              <div
-                style={{
-                  position: "sticky",
-                  top: "0.65rem",
-                  alignSelf: "start",
-                  maxHeight: "calc(100vh - 2rem)",
-                  overflowY: "auto",
-                  minWidth: 0
-                }}
-              >
-                <MonsterStatBlockCard
-                  monster={activeMonster}
-                  groupedPowers={groupedPowers}
-                  displayedTraits={displayedTraits}
-                  displayedAuras={displayedAuras}
-                />
-              </div>
-            </div>
           )}
         </div>
       </div>

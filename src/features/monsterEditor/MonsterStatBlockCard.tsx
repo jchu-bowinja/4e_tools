@@ -230,7 +230,10 @@ export function MonsterStatBlockCard(props: MonsterStatBlockCardProps): ReactEle
   return (
     <aside aria-label="Monster stat block" style={cardShell}>
       <div style={{ fontWeight: 700, fontSize: "0.88rem", letterSpacing: "0.02em" }}>
-        <span>{monster.name}</span>
+        <span>
+          {monster.name}
+          {monster.alignment?.name ? ` (${monster.alignment.name})` : ""}
+        </span>
         <span style={{ marginLeft: "0.65rem", fontWeight: 600 }}>
           Level {monster.level}
           {isRenderableCardValue(monster.groupRole) ? ` ${String(monster.groupRole).trim()}` : ""} {monster.role || ""}
