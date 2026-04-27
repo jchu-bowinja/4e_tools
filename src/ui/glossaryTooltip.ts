@@ -1,7 +1,8 @@
 import type { CSSProperties } from "react";
 
 export const GLOSSARY_TOOLTIP_OPEN_DELAY_MS = 1200;
-export const GLOSSARY_TOOLTIP_CLOSE_DELAY_MS = 400;
+/** Delay after leaving a trigger before hiding; allows moving onto the floating panel to scroll. */
+export const GLOSSARY_TOOLTIP_CLOSE_DELAY_MS = 900;
 
 export const STANDARD_GLOSSARY_TOOLTIP_LAYOUT = {
   panelWidth: 340,
