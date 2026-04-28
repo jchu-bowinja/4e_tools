@@ -17,7 +17,9 @@ import { findCaseInsensitiveMatches, scrollTextareaToMatch } from "../../ui/json
 import {
   loadMonsterEntry,
   loadMonsterIndex,
+  loadMonsterTemplates,
   type MonsterEntryFile,
+  type MonsterTemplateRecord,
   type MonsterIndexEntry,
   type MonsterPower,
   type MonsterPowerAttack,
@@ -26,6 +28,7 @@ import {
   type MonsterPowerOutcomeEntry,
   type MonsterTrait
 } from "./storage";
+import { parsePastedMonsterTemplateText } from "./pasteMonsterTemplateEtl";
 import {
   formatMonsterStatLabelForDisplay,
   isRenderableCardValue,
@@ -252,6 +255,51 @@ const microLabelInteractive: CSSProperties = {
 
 const MONSTER_SELECTED_ID_STORAGE_KEY = "monsterEditor.selectedId";
 
+const MONSTER_VIEWER_TAB_KEY = "monsterEditor.viewerTab";
+const MONSTER_SELECTED_TEMPLATE_IDX_STORAGE_KEY = "monsterEditor.selectedTemplateIdx";
+const MONSTER_CUSTOM_TEMPLATES_STORAGE_KEY = "monsterEditor.customMonsterTemplates";
+
+type MonsterViewerTab = "monsters" | "templates" | "createTemplate";
+
+function normalizeTemplateDedupeKey(t: Pick<MonsterTemplateRecord, "templateName" | "sourceBook">): string {
+  const name = String(t.templateName ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+  const book = String(t.sourceBook ?? "");
+  return `${name}\0${book}`;
+}
+
+function readCustomMonsterTemplates(): MonsterTemplateRecord[] {
+  try {
+    const raw = window.localStorage.getItem(MONSTER_CUSTOM_TEMPLATES_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as MonsterTemplateRecord[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeCustomMonsterTemplates(rows: MonsterTemplateRecord[]): void {
+  try {
+    window.localStorage.setItem(MONSTER_CUSTOM_TEMPLATES_STORAGE_KEY, JSON.stringify(rows));
+  } catch {
+    /* ignore */
+  }
+}
+
+function mergeServerAndCustomTemplates(
+  custom: MonsterTemplateRecord[],
+  server: MonsterTemplateRecord[]
+): MonsterTemplateRecord[] {
+  const customKeys = new Set(custom.map(normalizeTemplateDedupeKey));
+  const out = [...custom];
+  for (const s of server) {
+    if (!customKeys.has(normalizeTemplateDedupeKey(s))) out.push(s);
+  }
+  return out;
+}
+
 function readStoredSelectedMonsterId(): string {
   try {
     return window.localStorage.getItem(MONSTER_SELECTED_ID_STORAGE_KEY) ?? "";
@@ -269,6 +317,43 @@ function writeStoredSelectedMonsterId(id: string): void {
     }
   } catch {
     // Ignore storage failures and keep app behavior in-memory.
+  }
+}
+
+function readStoredViewerTab(): MonsterViewerTab {
+  try {
+    const stored = window.localStorage.getItem(MONSTER_VIEWER_TAB_KEY);
+    if (stored === "templates") return "templates";
+    if (stored === "createTemplate") return "createTemplate";
+    return "monsters";
+  } catch {
+    return "monsters";
+  }
+}
+
+function writeStoredViewerTab(tab: MonsterViewerTab): void {
+  try {
+    window.localStorage.setItem(MONSTER_VIEWER_TAB_KEY, tab);
+  } catch {
+    /* ignore */
+  }
+}
+
+function readStoredTemplateIdx(): number {
+  try {
+    const raw = window.localStorage.getItem(MONSTER_SELECTED_TEMPLATE_IDX_STORAGE_KEY);
+    const n = Number.parseInt(raw ?? "", 10);
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writeStoredTemplateIdx(idx: number): void {
+  try {
+    window.localStorage.setItem(MONSTER_SELECTED_TEMPLATE_IDX_STORAGE_KEY, String(idx));
+  } catch {
+    /* ignore */
   }
 }
 
@@ -1034,6 +1119,479 @@ function renderMonsterAttackLinePartWithRangeGlossary(
   );
 }
 
+function MonsterPowersPanels({
+  powers,
+  startGlossaryHover,
+  leaveGlossaryHover,
+  shouldHighlightGlossaryTerm
+}: {
+  powers: MonsterPower[];
+  startGlossaryHover: (event: ReactMouseEvent<HTMLElement>, key: MonsterGlossaryHoverKey) => void;
+  leaveGlossaryHover: () => void;
+  shouldHighlightGlossaryTerm: (term: string) => boolean;
+}): JSX.Element {
+  const groupedPowers = useMemo(() => {
+    const buckets: Record<MonsterPowerActionBucket, MonsterPower[]> = {
+      standard: [],
+      minor: [],
+      triggered: [],
+      other: []
+    };
+    for (const power of powers) {
+      buckets[classifyMonsterPowerUsageBucket(power.action, power.trigger)].push(power);
+    }
+    return buckets;
+  }, [powers]);
+
+  return (
+    <div
+      style={{
+        ...panelStyle,
+        borderColor: "var(--panel-border-strong)",
+        padding: "0.6rem 0.65rem",
+        marginBottom: "0.65rem"
+      }}
+    >
+      <h3 style={sectionTitleStyle}>Powers ({powers.length})</h3>
+      <div style={{ marginTop: "0.5rem", display: "grid", gap: "0.6rem" }}>
+        {powers.length === 0 ? <div style={metaMuted}>No powers parsed.</div> : null}
+        {(["standard", "minor", "triggered", "other"] as const).map((bucket) => {
+          const bucketPowers = groupedPowers[bucket];
+          if (bucketPowers.length === 0) return null;
+          return (
+            <div key={bucket} style={{ display: "grid", gap: "0.4rem" }}>
+              <div style={powerBucketHeaderStyle}>{usageBucketLabel(bucket)}</div>
+              <div style={{ display: "grid", gap: "0.45rem", gridTemplateColumns: "minmax(0, 1fr)", alignItems: "stretch" }}>
+                {bucketPowers.map((power, index) => {
+                  const colorBucket = classifyMonsterPowerColorBucket(power.usage);
+                  const accent = usageColorAccentCardStyle(colorBucket);
+                  const cardModel = buildMonsterPowerCardViewModel(power);
+                  return (
+                    <div
+                      key={`${bucket}-${power.name}-${index}`}
+                      style={{
+                        border: accent.border,
+                        borderLeft: accent.borderLeft,
+                        borderRadius: "8px",
+                        padding: "0.55rem 0.65rem",
+                        backgroundColor: accent.backgroundColor,
+                        boxShadow: `inset 0 0 0 1px ${usageColorAccentColor(colorBucket)}33`,
+                        height: "100%",
+                        boxSizing: "border-box",
+                        display: "flex",
+                        flexDirection: "column"
+                      }}
+                    >
+                      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: "0.35rem" }}>
+                        <strong>{power.name || `Power ${index + 1}`}</strong>
+                        {power.isBasic ? <span style={{ ...sheetTagPillStyle, cursor: "default" }}>Basic Attack</span> : null}
+                      </div>
+                      {cardModel.usagePrimaryParts.length > 0 ? (
+                        <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginTop: "0.12rem" }}>
+                          {cardModel.usagePrimaryParts.map((part, partIdx) => (
+                            <span key={`${power.name}-${index}-usage-${part}`}>
+                              <span
+                                onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${part}`)}
+                                onMouseLeave={leaveGlossaryHover}
+                                style={{
+                                  fontWeight: 700,
+                                  color: "var(--text-primary)",
+                                  cursor: "help",
+                                  borderBottom: "1px dotted var(--text-muted)",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.03em"
+                                }}
+                              >
+                                {part}
+                              </span>
+                              {partIdx < cardModel.usagePrimaryParts.length - 1 ? (
+                                <span style={{ color: "var(--text-muted)", margin: "0 0.1rem" }}>•</span>
+                              ) : null}
+                            </span>
+                          ))}
+                          {cardModel.usageDetailsLines.length > 0 ? (
+                            <span style={{ ...metaSecondary, fontWeight: 400 }}>
+                              {"("}
+                              {cardModel.usageDetailsLines.join(" ")}
+                              {")"}
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : null}
+                      {cardModel.attackLineParts.length > 0 ? (
+                        <div
+                          style={{
+                            fontSize: "0.8rem",
+                            color: "var(--text-secondary)",
+                            marginTop: "0.05rem",
+                            display: "flex",
+                            flexWrap: "wrap",
+                            gap: "0.22rem",
+                            alignItems: "center"
+                          }}
+                        >
+                          {cardModel.attackLineParts.map((part, partIdx) => (
+                            <span key={`${power.name}-${index}-attackline-${partIdx}`}>
+                              {renderMonsterAttackLinePartWithRangeGlossary(part, startGlossaryHover, leaveGlossaryHover)}
+                              {partIdx < cardModel.attackLineParts.length - 1 ? (
+                                <span style={{ color: "var(--text-muted)", margin: "0 0.1rem" }}>•</span>
+                              ) : null}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                      {cardModel.keywordTokens.length > 0 ? (
+                        <div style={{ ...bodySecondary, color: "var(--text-muted)", marginBottom: "0.25rem" }}>
+                          <strong>Keywords:</strong>{" "}
+                          {cardModel.keywordTokens.map((keyword, idx) => (
+                            <span key={`${power.name}-${index}-kw-${keyword}`}>
+                              <span
+                                onMouseEnter={(event) => startGlossaryHover(event, `powerKeyword:${keyword}`)}
+                                onMouseLeave={leaveGlossaryHover}
+                                style={{
+                                  color: "var(--text-primary)",
+                                  cursor: "help",
+                                  borderBottom: "1px dotted var(--text-muted)"
+                                }}
+                              >
+                                {keyword}
+                              </span>
+                              {idx < cardModel.keywordTokens.length - 1 ? <span> </span> : null}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                      <div style={{ marginTop: "0.22rem", display: "grid", gap: "0.14rem" }}>
+                        {cardModel.outcomeLines.map((line) => (
+                          <div
+                            key={`${power.name}-${index}-${line.label}-${line.text}`}
+                            style={{ fontSize: "0.8rem", color: "var(--text-primary)" }}
+                          >
+                            {(() => {
+                              const split = splitFailedEscapeAttemptSections(line.text);
+                              return (
+                                <>
+                                  {isRenderableCardValue(split.mainText) ? (
+                                    <div>
+                                      <strong>{line.label}:</strong>{" "}
+                                      {renderGlossaryAwareText(
+                                        split.mainText,
+                                        commonDescriptiveGlossaryPhrases,
+                                        startGlossaryHover,
+                                        leaveGlossaryHover,
+                                        `${power.name}-${index}-${line.label}-main`,
+                                        shouldHighlightGlossaryTerm
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <div>
+                                      <strong>{line.label}:</strong>{" "}
+                                      {renderGlossaryAwareText(
+                                        line.text,
+                                        commonDescriptiveGlossaryPhrases,
+                                        startGlossaryHover,
+                                        leaveGlossaryHover,
+                                        `${power.name}-${index}-${line.label}-fallback`,
+                                        shouldHighlightGlossaryTerm
+                                      )}
+                                    </div>
+                                  )}
+                                  {split.failedEscapeTexts.map((failedText) => (
+                                    <div key={`${power.name}-${index}-${line.label}-failed-${failedText}`} style={{ marginTop: "0.04rem" }}>
+                                      <strong>Failed Escape Attempt:</strong>{" "}
+                                      {renderGlossaryAwareText(
+                                        failedText,
+                                        commonDescriptiveGlossaryPhrases,
+                                        startGlossaryHover,
+                                        leaveGlossaryHover,
+                                        `${power.name}-${index}-${line.label}-failed`,
+                                        shouldHighlightGlossaryTerm
+                                      )}
+                                    </div>
+                                  ))}
+                                </>
+                              );
+                            })()}
+                          </div>
+                        ))}
+                      </div>
+                      {cardModel.secondaryAttacks.length > 0 ? (
+                        <div
+                          style={{
+                            marginTop: "0.28rem",
+                            marginLeft: "0.55rem",
+                            paddingLeft: "0.55rem",
+                            borderLeft: "2px solid var(--panel-border)"
+                          }}
+                        >
+                          {cardModel.secondaryAttacks.map((secondaryAttack, secondaryIndex) => (
+                            <div
+                              key={`${power.name}-${index}-secondary-${secondaryIndex}`}
+                              style={{ marginTop: secondaryIndex === 0 ? 0 : "0.3rem" }}
+                            >
+                              <div style={secondaryAttackTitleStyle}>{secondaryAttack.name}</div>
+                              {secondaryAttack.attackLineParts.length > 0 ? (
+                                <div
+                                  style={{
+                                    fontSize: "0.8rem",
+                                    color: "var(--text-secondary)",
+                                    marginTop: "0.05rem",
+                                    display: "flex",
+                                    flexWrap: "wrap",
+                                    gap: "0.22rem",
+                                    alignItems: "center"
+                                  }}
+                                >
+                                  {secondaryAttack.attackLineParts.map((part, partIdx) => (
+                                    <span key={`${power.name}-${index}-secondary-${secondaryIndex}-attackline-${partIdx}`}>
+                                      {renderMonsterAttackLinePartWithRangeGlossary(part, startGlossaryHover, leaveGlossaryHover)}
+                                      {partIdx < secondaryAttack.attackLineParts.length - 1 ? (
+                                        <span style={{ color: "var(--text-muted)", margin: "0 0.1rem" }}>•</span>
+                                      ) : null}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : null}
+                              <div style={{ marginTop: "0.15rem", display: "grid", gap: "0.14rem" }}>
+                                {secondaryAttack.outcomeLines.map((line) => (
+                                  <div
+                                    key={`${power.name}-${index}-secondary-${secondaryIndex}-${line.label}-${line.text}`}
+                                    style={{ fontSize: "0.8rem", color: "var(--text-primary)" }}
+                                  >
+                                    {(() => {
+                                      const split = splitFailedEscapeAttemptSections(line.text);
+                                      return (
+                                        <>
+                                          {isRenderableCardValue(split.mainText) ? (
+                                            <div>
+                                              <strong>{line.label}:</strong>{" "}
+                                              {renderGlossaryAwareText(
+                                                split.mainText,
+                                                commonDescriptiveGlossaryPhrases,
+                                                startGlossaryHover,
+                                                leaveGlossaryHover,
+                                                `${power.name}-${index}-secondary-${secondaryIndex}-${line.label}-main`,
+                                                shouldHighlightGlossaryTerm
+                                              )}
+                                            </div>
+                                          ) : (
+                                            <div>
+                                              <strong>{line.label}:</strong>{" "}
+                                              {renderGlossaryAwareText(
+                                                line.text,
+                                                commonDescriptiveGlossaryPhrases,
+                                                startGlossaryHover,
+                                                leaveGlossaryHover,
+                                                `${power.name}-${index}-secondary-${secondaryIndex}-${line.label}-fallback`,
+                                                shouldHighlightGlossaryTerm
+                                              )}
+                                            </div>
+                                          )}
+                                          {split.failedEscapeTexts.map((failedText) => (
+                                            <div
+                                              key={`${power.name}-${index}-secondary-${secondaryIndex}-${line.label}-failed-${failedText}`}
+                                              style={{ marginTop: "0.04rem" }}
+                                            >
+                                              <strong>Failed Escape Attempt:</strong>{" "}
+                                              {renderGlossaryAwareText(
+                                                failedText,
+                                                commonDescriptiveGlossaryPhrases,
+                                                startGlossaryHover,
+                                                leaveGlossaryHover,
+                                                `${power.name}-${index}-secondary-${secondaryIndex}-${line.label}-failed`,
+                                                shouldHighlightGlossaryTerm
+                                              )}
+                                            </div>
+                                          ))}
+                                        </>
+                                      );
+                                    })()}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                      {isRenderableCardValue(power.flavorText) ? (
+                        <div style={{ ...bodySecondary, marginBottom: "0.2rem", fontStyle: "italic" }}>
+                          {renderGlossaryAwareText(
+                            String(power.flavorText),
+                            commonDescriptiveGlossaryPhrases,
+                            startGlossaryHover,
+                            leaveGlossaryHover,
+                            `${power.name}-${index}-flavor`,
+                            shouldHighlightGlossaryTerm
+                          )}
+                        </div>
+                      ) : null}
+                      <div style={bodyPrimary}>
+                        {isRenderableCardValue(cardModel.descriptionText) ? (
+                          <div style={{ ...richTextBodyPrimary.paragraphStyle, margin: "0 0 0.35rem 0", whiteSpace: "pre-wrap" }}>
+                            {renderGlossaryAwareText(
+                              cardModel.descriptionText,
+                              commonDescriptiveGlossaryPhrases,
+                              startGlossaryHover,
+                              leaveGlossaryHover,
+                              `${power.name}-${index}-description`,
+                              shouldHighlightGlossaryTerm
+                            )}
+                          </div>
+                        ) : null}
+                      </div>
+                      {isRenderableCardValue(cardModel.ongoingText) ? (
+                        <div style={{ marginTop: "0.05rem", ...bodyPrimary }}>
+                          <strong>ONGOING:</strong>{" "}
+                          {renderGlossaryAwareText(
+                            cardModel.ongoingText,
+                            commonDescriptiveGlossaryPhrases,
+                            startGlossaryHover,
+                            leaveGlossaryHover,
+                            `${power.name}-${index}-ongoing`,
+                            shouldHighlightGlossaryTerm
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function MonsterTemplateFormattedView({
+  record,
+  glossaryKeyPrefix,
+  startGlossaryHover,
+  leaveGlossaryHover,
+  shouldHighlightGlossaryTerm
+}: {
+  record: MonsterTemplateRecord;
+  glossaryKeyPrefix: string;
+  startGlossaryHover: (event: ReactMouseEvent<HTMLElement>, key: MonsterGlossaryHoverKey) => void;
+  leaveGlossaryHover: () => void;
+  shouldHighlightGlossaryTerm: (term: string) => boolean;
+}): JSX.Element {
+  return (
+    <div style={{ minWidth: 0 }}>
+      <div style={centerIdentityBlockStyle}>
+        <div style={centerIdentityTitleStyle}>{record.templateName}</div>
+        <div style={centerMetaLineStyle}>
+          {(record.roleLine ?? record.role?.raw ?? "").trim() || "—"}
+          {record.isEliteTemplate ? (
+            <>
+              {" "}
+              <span style={sheetTagPillStyle}>Elite template</span>
+            </>
+          ) : null}
+        </div>
+        <div style={centerMetaLineStyle}>
+          <strong>Source:</strong> {record.sourceBook}
+        </div>
+      </div>
+
+      {record.prerequisite && String(record.prerequisite).trim() !== "" ? (
+        <div style={centerSubsectionPanelStyle}>
+          <h3 style={sectionTitleStyle}>Prerequisites</h3>
+          <div style={{ ...richTextBodyPrimary.paragraphStyle, whiteSpace: "pre-wrap" }}>
+            {renderGlossaryAwareText(
+              String(record.prerequisite),
+              commonDescriptiveGlossaryPhrases,
+              startGlossaryHover,
+              leaveGlossaryHover,
+              `${glossaryKeyPrefix}-prereq`,
+              shouldHighlightGlossaryTerm
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {isRenderableCardValue(record.description) ? (
+        <div style={centerSubsectionPanelStyle}>
+          <h3 style={sectionTitleStyle}>Description</h3>
+          <div style={{ ...richTextBodyPrimary.paragraphStyle, whiteSpace: "pre-wrap" }}>
+            {renderGlossaryAwareText(
+              String(record.description ?? ""),
+              commonDescriptiveGlossaryPhrases,
+              startGlossaryHover,
+              leaveGlossaryHover,
+              `${glossaryKeyPrefix}-desc`,
+              shouldHighlightGlossaryTerm
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {(record.statLines?.length ?? 0) > 0 ? (
+        <div style={centerSubsectionPanelStyle}>
+          <h3 style={sectionTitleStyle}>Stat adjustments</h3>
+          <ul style={{ margin: "0.25rem 0 0 0", paddingLeft: "1rem", ...bodyPrimary }}>
+            {record.statLines!.map((line, i) => (
+              <li key={`${glossaryKeyPrefix}-statline-${i}`} style={{ marginBottom: "0.22rem" }}>
+                {line}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {(record.auras ?? []).length > 0 ? (
+        <div style={centerSubsectionPanelStyle}>
+          <h3 style={sectionTitleStyle}>Auras</h3>
+          <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.35rem" }}>
+            {(record.auras ?? []).map((aura, idx) => (
+              <div key={`${glossaryKeyPrefix}-aura-${idx}`} style={bodyPrimary}>
+                <strong>{String(aura.name ?? "Aura").trim() || "Aura"}:</strong>{" "}
+                {renderGlossaryAwareText(
+                  String(aura.details ?? ""),
+                  commonDescriptiveGlossaryPhrases,
+                  startGlossaryHover,
+                  leaveGlossaryHover,
+                  `${glossaryKeyPrefix}-aura-${idx}`,
+                  shouldHighlightGlossaryTerm
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {(record.traits ?? []).length > 0 ? (
+        <div style={centerSubsectionPanelStyle}>
+          <h3 style={sectionTitleStyle}>Traits</h3>
+          <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.35rem" }}>
+            {(record.traits ?? []).map((trait, idx) => (
+              <div key={`${glossaryKeyPrefix}-trait-${idx}`} style={bodyPrimary}>
+                <strong>{String(trait.name ?? "Trait").trim() || "Trait"}:</strong>{" "}
+                {renderGlossaryAwareText(
+                  String(trait.details ?? ""),
+                  commonDescriptiveGlossaryPhrases,
+                  startGlossaryHover,
+                  leaveGlossaryHover,
+                  `${glossaryKeyPrefix}-trait-${idx}`,
+                  shouldHighlightGlossaryTerm
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      <MonsterPowersPanels
+        powers={record.powers ?? []}
+        startGlossaryHover={startGlossaryHover}
+        leaveGlossaryHover={leaveGlossaryHover}
+        shouldHighlightGlossaryTerm={shouldHighlightGlossaryTerm}
+      />
+    </div>
+  );
+}
+
 const MONSTER_GLOSSARY_TOOLTIP_ID = "monster-glossary-tooltip";
 
 export function MonsterEditorApp({
@@ -1053,6 +1611,19 @@ export function MonsterEditorApp({
   const [sortBy, setSortBy] = useState<"name" | "level">("level");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [message, setMessage] = useState<string>("Load monsters from generated JSON to begin.");
+  const [viewerTab, setViewerTab] = useState<MonsterViewerTab>(() => readStoredViewerTab());
+  const [templateRows, setTemplateRows] = useState<MonsterTemplateRecord[]>([]);
+  const [selectedTemplateIdx, setSelectedTemplateIdx] = useState<number>(() => readStoredTemplateIdx());
+  const [templateMessage, setTemplateMessage] = useState<string>(
+    "Load monster templates from generated JSON to begin."
+  );
+  const [templateNameQuery, setTemplateNameQuery] = useState<string>("");
+  const [templateSourceQuery, setTemplateSourceQuery] = useState<string>("");
+  const [serverTemplateRows, setServerTemplateRows] = useState<MonsterTemplateRecord[]>([]);
+  const [createPasteText, setCreatePasteText] = useState<string>("");
+  const [createNameHint, setCreateNameHint] = useState<string>("");
+  const [createDraftJson, setCreateDraftJson] = useState<string>("");
+  const [createImportMessage, setCreateImportMessage] = useState<string>("");
   const [isBusy, setIsBusy] = useState<boolean>(false);
   const [jsonSearchInput, setJsonSearchInput] = useState<string>("");
   const [jsonSearchQuery, setJsonSearchQuery] = useState<string>("");
@@ -1060,7 +1631,7 @@ export function MonsterEditorApp({
   const [jsonSearchJumpTick, setJsonSearchJumpTick] = useState<number>(0);
   const glossaryTooltipUi = useGlossaryTooltip({
     tooltipId: MONSTER_GLOSSARY_TOOLTIP_ID,
-    resetDeps: [selectedId]
+    resetDeps: [selectedId, viewerTab, selectedTemplateIdx]
   });
   const startGlossaryHover = glossaryTooltipUi.startHover;
   const leaveGlossaryHover = glossaryTooltipUi.leaveHover;
@@ -1088,6 +1659,31 @@ export function MonsterEditorApp({
   useEffect(() => {
     writeStoredSelectedMonsterId(selectedId);
   }, [selectedId]);
+
+  useEffect(() => {
+    writeStoredViewerTab(viewerTab);
+  }, [viewerTab]);
+
+  useEffect(() => {
+    writeStoredTemplateIdx(selectedTemplateIdx);
+  }, [selectedTemplateIdx]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const templates = await loadMonsterTemplates();
+        setServerTemplateRows(templates);
+        const merged = mergeServerAndCustomTemplates(readCustomMonsterTemplates(), templates);
+        setTemplateRows(merged);
+        setSelectedTemplateIdx((prev) => (merged.length === 0 ? 0 : Math.min(prev, merged.length - 1)));
+        setTemplateMessage(
+          `Loaded ${templates.length} server templates; ${readCustomMonsterTemplates().length} custom (local).`
+        );
+      } catch (error) {
+        setTemplateMessage(error instanceof Error ? error.message : "Could not load monster templates.");
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -1168,6 +1764,27 @@ export function MonsterEditorApp({
     });
   }, [indexRows, nameQuery, levelQuery, roleQuery, leaderFilter, sortBy, sortDir]);
 
+  const filteredTemplateIndexes = useMemo(() => {
+    const nameNeedle = templateNameQuery.trim().toLowerCase();
+    const bookNeedle = templateSourceQuery.trim().toLowerCase();
+    return templateRows
+      .map((row, idx) => ({ row, idx }))
+      .filter(({ row }) => {
+        if (nameNeedle && !String(row.templateName ?? "").toLowerCase().includes(nameNeedle)) {
+          return false;
+        }
+        if (bookNeedle && !String(row.sourceBook ?? "").toLowerCase().includes(bookNeedle)) {
+          return false;
+        }
+        return true;
+      });
+  }, [templateRows, templateNameQuery, templateSourceQuery]);
+
+  const selectedTemplateRecord = useMemo(() => {
+    if (templateRows.length === 0) return null;
+    return templateRows[selectedTemplateIdx] ?? null;
+  }, [templateRows, selectedTemplateIdx]);
+
   const roleOptions = useMemo(() => {
     const unique = new Set<string>();
     for (const row of indexRows) {
@@ -1176,20 +1793,6 @@ export function MonsterEditorApp({
     }
     return Array.from(unique).sort((a, b) => a.localeCompare(b));
   }, [indexRows]);
-
-  const groupedPowers = useMemo(() => {
-    const buckets: Record<MonsterPowerActionBucket, MonsterPower[]> = {
-      standard: [],
-      minor: [],
-      triggered: [],
-      other: []
-    };
-    if (!activeMonster) return buckets;
-    for (const power of activeMonster.powers) {
-      buckets[classifyMonsterPowerUsageBucket(power.action, power.trigger)].push(power);
-    }
-    return buckets;
-  }, [activeMonster]);
 
   const displayedAuras = useMemo(() => {
     if (!activeMonster || !Array.isArray(activeMonster.auras)) return [];
@@ -1247,7 +1850,21 @@ export function MonsterEditorApp({
     [displayedTraits]
   );
 
-  const rawJsonText = useMemo(() => JSON.stringify(activeMonster, null, 2), [activeMonster]);
+  const rawJsonText = useMemo(() => {
+    if (viewerTab === "createTemplate") {
+      const raw = createDraftJson.trim();
+      if (!raw) return "{}";
+      try {
+        return JSON.stringify(JSON.parse(raw), null, 2);
+      } catch {
+        return createDraftJson;
+      }
+    }
+    if (viewerTab === "templates") {
+      return JSON.stringify(selectedTemplateRecord ?? {}, null, 2);
+    }
+    return JSON.stringify(activeMonster, null, 2);
+  }, [viewerTab, selectedTemplateRecord, activeMonster, createDraftJson]);
   const jsonSearchMatches = useMemo(
     () => findCaseInsensitiveMatches(rawJsonText, jsonSearchQuery),
     [rawJsonText, jsonSearchQuery]
@@ -1314,6 +1931,29 @@ export function MonsterEditorApp({
     [index, tooltipGlossary]
   );
 
+  const createDraftTemplateRecord = useMemo((): MonsterTemplateRecord | null => {
+    if (viewerTab !== "createTemplate") return null;
+    const raw = createDraftJson.trim();
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as MonsterTemplateRecord;
+    } catch {
+      return null;
+    }
+  }, [viewerTab, createDraftJson]);
+
+  const createDraftJsonInvalid = useMemo(() => {
+    if (viewerTab !== "createTemplate") return false;
+    const raw = createDraftJson.trim();
+    if (!raw) return false;
+    try {
+      JSON.parse(raw);
+      return false;
+    } catch {
+      return true;
+    }
+  }, [viewerTab, createDraftJson]);
+
   return (
     <div
       style={{
@@ -1328,86 +1968,290 @@ export function MonsterEditorApp({
       }}
     >
       <h1 style={pageTitleStyle}>Monster Sheet</h1>
-      <p style={{ marginTop: 0, marginBottom: "0.5rem", color: "var(--text-muted)", fontSize: "0.8rem" }}>
-        JSON-backed viewer for `generated/monsters` artifacts with formatted blocks for identity, stats, powers, and parsed
-        sections.
-      </p>
 
-      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
+      <div
+        role="tablist"
+        aria-label="Viewer"
+        style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginBottom: "0.5rem", alignItems: "center" }}
+      >
         <button
           type="button"
-          onClick={() => {
-            setIsBusy(true);
-            void loadMonsterIndex()
-              .then((rows) => {
-                setIndexRows(rows);
-                if (rows.length > 0) {
-                  const preferredId = selectedId && rows.some((row) => row.id === selectedId) ? selectedId : rows[0].id;
-                  setSelectedId(preferredId);
-                } else {
-                  setSelectedId("");
-                }
-                setMessage(`Reloaded generated index (${rows.length} records).`);
-              })
-              .catch((error: unknown) => {
-                setMessage(error instanceof Error ? error.message : "Could not reload monster index.");
-              })
-              .finally(() => setIsBusy(false));
-          }}
-          disabled={isBusy}
+          role="tab"
+          aria-selected={viewerTab === "monsters"}
+          onClick={() => setViewerTab("monsters")}
+          disabled={viewerTab === "monsters"}
         >
-          Reload Generated Index
+          Monsters
         </button>
-        <input
-          value={nameQuery}
-          onChange={(event) => setNameQuery(event.target.value)}
-          placeholder="Name"
-          style={{ minWidth: 220, border: "1px solid var(--panel-border)", borderRadius: "0.28rem", padding: "0.22rem 0.3rem" }}
-        />
-        <input
-          value={levelQuery}
-          onChange={(event) => setLevelQuery(event.target.value)}
-          placeholder="Level (e.g. 7 or 5-8)"
-          style={{ minWidth: 200, border: "1px solid var(--panel-border)", borderRadius: "0.28rem", padding: "0.22rem 0.3rem" }}
-        />
-        <select
-          value={roleQuery}
-          onChange={(event) => setRoleQuery(event.target.value)}
-          style={{ minWidth: 180, border: "1px solid var(--panel-border)", borderRadius: "0.28rem", padding: "0.22rem 0.3rem" }}
+        <button
+          type="button"
+          role="tab"
+          aria-selected={viewerTab === "templates"}
+          onClick={() => setViewerTab("templates")}
+          disabled={viewerTab === "templates"}
         >
-          <option value="">All roles</option>
-          {roleOptions.map((role) => (
-            <option key={role} value={role}>
-              {role}
-            </option>
-          ))}
-        </select>
-        <select
-          value={leaderFilter}
-          onChange={(event) => setLeaderFilter(event.target.value as "both" | "leader" | "notLeader")}
-          style={{ minWidth: 150, border: "1px solid var(--panel-border)", borderRadius: "0.28rem", padding: "0.22rem 0.3rem" }}
+          Monster templates
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={viewerTab === "createTemplate"}
+          onClick={() => setViewerTab("createTemplate")}
+          disabled={viewerTab === "createTemplate"}
         >
-          <option value="both">-</option>
-          <option value="leader">Leader</option>
-          <option value="notLeader">Not leader</option>
-        </select>
-        <select
-          value={sortBy}
-          onChange={(event) => setSortBy(event.target.value as "name" | "level")}
-          style={{ minWidth: 140, border: "1px solid var(--panel-border)", borderRadius: "0.28rem", padding: "0.22rem 0.3rem" }}
-        >
-          <option value="name">Sort: Name</option>
-          <option value="level">Sort: Level</option>
-        </select>
-        <select
-          value={sortDir}
-          onChange={(event) => setSortDir(event.target.value as "asc" | "desc")}
-          style={{ minWidth: 140, border: "1px solid var(--panel-border)", borderRadius: "0.28rem", padding: "0.22rem 0.3rem" }}
-        >
-          <option value="asc">Ascending</option>
-          <option value="desc">Descending</option>
-        </select>
+          Create template
+        </button>
       </div>
+
+      <p style={{ marginTop: 0, marginBottom: "0.5rem", color: "var(--text-muted)", fontSize: "0.8rem" }}>
+        {viewerTab === "monsters" ? (
+          <>
+            JSON-backed viewer for <code style={{ fontSize: "0.92em" }}>generated/monsters</code> with formatted identity,
+            stats, powers, and parsed sections.
+          </>
+        ) : viewerTab === "templates" ? (
+          <>
+            Template overlays from{" "}
+            <code style={{ fontSize: "0.92em" }}>generated/monster_templates.json</code> (published PDF-derived text plus
+            structured stats and powers). Custom templates saved here live in{" "}
+            <code style={{ fontSize: "0.92em" }}>localStorage</code> only until you copy them into generated JSON.
+          </>
+        ) : (
+          <>
+            Paste raw OCR or PDF-extracted text for <strong>one</strong> monster template. Import runs the same mechanical
+            rules as <code style={{ fontSize: "0.92em" }}>extract_monster_templates_from_pdfs.py</code> (in dev, Python is
+            used when available; otherwise a built-in parser). Edit the JSON, then save it as a local custom template.
+          </>
+        )}
+      </p>
+
+      {viewerTab === "monsters" ? (
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
+          <button
+            type="button"
+            onClick={() => {
+              setIsBusy(true);
+              void loadMonsterIndex()
+                .then((rows) => {
+                  setIndexRows(rows);
+                  if (rows.length > 0) {
+                    const preferredId = selectedId && rows.some((row) => row.id === selectedId) ? selectedId : rows[0].id;
+                    setSelectedId(preferredId);
+                  } else {
+                    setSelectedId("");
+                  }
+                  setMessage(`Reloaded generated index (${rows.length} records).`);
+                })
+                .catch((error: unknown) => {
+                  setMessage(error instanceof Error ? error.message : "Could not reload monster index.");
+                })
+                .finally(() => setIsBusy(false));
+            }}
+            disabled={isBusy}
+          >
+            Reload monster index
+          </button>
+          <input
+            value={nameQuery}
+            onChange={(event) => setNameQuery(event.target.value)}
+            placeholder="Name"
+            style={{
+              minWidth: 220,
+              border: "1px solid var(--panel-border)",
+              borderRadius: "0.28rem",
+              padding: "0.22rem 0.3rem"
+            }}
+          />
+          <input
+            value={levelQuery}
+            onChange={(event) => setLevelQuery(event.target.value)}
+            placeholder="Level (e.g. 7 or 5-8)"
+            style={{
+              minWidth: 200,
+              border: "1px solid var(--panel-border)",
+              borderRadius: "0.28rem",
+              padding: "0.22rem 0.3rem"
+            }}
+          />
+          <select
+            value={roleQuery}
+            onChange={(event) => setRoleQuery(event.target.value)}
+            style={{
+              minWidth: 180,
+              border: "1px solid var(--panel-border)",
+              borderRadius: "0.28rem",
+              padding: "0.22rem 0.3rem"
+            }}
+          >
+            <option value="">All roles</option>
+            {roleOptions.map((role) => (
+              <option key={role} value={role}>
+                {role}
+              </option>
+            ))}
+          </select>
+          <select
+            value={leaderFilter}
+            onChange={(event) => setLeaderFilter(event.target.value as "both" | "leader" | "notLeader")}
+            style={{
+              minWidth: 150,
+              border: "1px solid var(--panel-border)",
+              borderRadius: "0.28rem",
+              padding: "0.22rem 0.3rem"
+            }}
+          >
+            <option value="both">-</option>
+            <option value="leader">Leader</option>
+            <option value="notLeader">Not leader</option>
+          </select>
+          <select
+            value={sortBy}
+            onChange={(event) => setSortBy(event.target.value as "name" | "level")}
+            style={{
+              minWidth: 140,
+              border: "1px solid var(--panel-border)",
+              borderRadius: "0.28rem",
+              padding: "0.22rem 0.3rem"
+            }}
+          >
+            <option value="name">Sort: Name</option>
+            <option value="level">Sort: Level</option>
+          </select>
+          <select
+            value={sortDir}
+            onChange={(event) => setSortDir(event.target.value as "asc" | "desc")}
+            style={{
+              minWidth: 140,
+              border: "1px solid var(--panel-border)",
+              borderRadius: "0.28rem",
+              padding: "0.22rem 0.3rem"
+            }}
+          >
+            <option value="asc">Ascending</option>
+            <option value="desc">Descending</option>
+          </select>
+        </div>
+      ) : viewerTab === "templates" ? (
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
+          <button
+            type="button"
+            onClick={() => {
+              setIsBusy(true);
+              void loadMonsterTemplates()
+                .then((rows) => {
+                  setServerTemplateRows(rows);
+                  const merged = mergeServerAndCustomTemplates(readCustomMonsterTemplates(), rows);
+                  setTemplateRows(merged);
+                  setSelectedTemplateIdx((prev) =>
+                    merged.length === 0 ? 0 : Math.min(prev, merged.length - 1)
+                  );
+                  setTemplateMessage(`Reloaded ${rows.length} server templates (${merged.length} total with custom).`);
+                })
+                .catch((error: unknown) => {
+                  setTemplateMessage(error instanceof Error ? error.message : "Could not reload monster templates.");
+                })
+                .finally(() => setIsBusy(false));
+            }}
+            disabled={isBusy}
+          >
+            Reload templates
+          </button>
+          <input
+            value={templateNameQuery}
+            onChange={(event) => setTemplateNameQuery(event.target.value)}
+            placeholder="Template name"
+            style={{
+              minWidth: 220,
+              border: "1px solid var(--panel-border)",
+              borderRadius: "0.28rem",
+              padding: "0.22rem 0.3rem"
+            }}
+          />
+          <input
+            value={templateSourceQuery}
+            onChange={(event) => setTemplateSourceQuery(event.target.value)}
+            placeholder="Source PDF (substring)"
+            style={{
+              minWidth: 240,
+              border: "1px solid var(--panel-border)",
+              borderRadius: "0.28rem",
+              padding: "0.22rem 0.3rem"
+            }}
+          />
+        </div>
+      ) : viewerTab === "createTemplate" ? (
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center", marginBottom: "0.75rem" }}>
+          <button
+            type="button"
+            disabled={isBusy || !createPasteText.trim()}
+            onClick={() => {
+              setIsBusy(true);
+              setCreateImportMessage("");
+              void parsePastedMonsterTemplateText(createPasteText, createNameHint)
+                .then((result) => {
+                  if (!result.ok) {
+                    setCreateImportMessage(result.error);
+                    return;
+                  }
+                  setCreateDraftJson(JSON.stringify(result.template, null, 2));
+                  setCreateImportMessage(
+                    "Imported. Review and edit the JSON panel below, then save to custom templates."
+                  );
+                })
+                .finally(() => setIsBusy(false));
+            }}
+          >
+            Import with ETL
+          </button>
+          <button
+            type="button"
+            disabled={isBusy || !createDraftJson.trim()}
+            onClick={() => {
+              let parsed: MonsterTemplateRecord;
+              try {
+                parsed = JSON.parse(createDraftJson) as MonsterTemplateRecord;
+              } catch {
+                setCreateImportMessage("Invalid JSON — fix the draft before saving.");
+                return;
+              }
+              if (!parsed.templateName?.trim()) {
+                setCreateImportMessage("Draft must include templateName.");
+                return;
+              }
+              if (parsed.powers != null && !Array.isArray(parsed.powers)) {
+                setCreateImportMessage("powers must be an array when present.");
+                return;
+              }
+              if (!Array.isArray(parsed.powers)) parsed.powers = [];
+              if (!parsed.sourceBook?.trim()) parsed.sourceBook = "(paste)";
+              const custom = readCustomMonsterTemplates();
+              const key = normalizeTemplateDedupeKey(parsed);
+              const nextCustom = [parsed, ...custom.filter((t) => normalizeTemplateDedupeKey(t) !== key)];
+              writeCustomMonsterTemplates(nextCustom);
+              const merged = mergeServerAndCustomTemplates(nextCustom, serverTemplateRows);
+              setTemplateRows(merged);
+              const idx = merged.findIndex((t) => normalizeTemplateDedupeKey(t) === key);
+              setSelectedTemplateIdx(idx >= 0 ? idx : 0);
+              setViewerTab("templates");
+              setTemplateMessage(`Saved custom template “${parsed.templateName}”.`);
+              setCreateImportMessage("");
+            }}
+          >
+            Save to custom templates
+          </button>
+          <input
+            value={createNameHint}
+            onChange={(event) => setCreateNameHint(event.target.value)}
+            placeholder="Template name hint (optional)"
+            style={{
+              minWidth: 200,
+              border: "1px solid var(--panel-border)",
+              borderRadius: "0.28rem",
+              padding: "0.22rem 0.3rem"
+            }}
+          />
+        </div>
+      ) : null}
 
       <div
         role="status"
@@ -1415,10 +2259,24 @@ export function MonsterEditorApp({
         style={{
           marginBottom: "0.75rem",
           fontSize: "0.8rem",
-          color: message.toLowerCase().includes("could not") ? "var(--status-danger)" : "var(--text-muted)"
+          color: (() => {
+            const line =
+              viewerTab === "monsters"
+                ? message
+                : viewerTab === "templates"
+                  ? templateMessage
+                  : createImportMessage;
+            return line.toLowerCase().includes("could not") || line.toLowerCase().includes("invalid")
+              ? "var(--status-danger)"
+              : "var(--text-muted)";
+          })()
         }}
       >
-        {message}
+        {viewerTab === "monsters"
+          ? message
+          : viewerTab === "templates"
+            ? templateMessage
+            : createImportMessage}
       </div>
 
       <div
@@ -1429,51 +2287,55 @@ export function MonsterEditorApp({
           minHeight: "65vh"
         }}
       >
-        <div
-          style={{
-            ...sheetPanel,
-            overflow: "hidden",
-            display: "grid",
-            gridTemplateRows: "auto 1fr",
-            minHeight: 0,
-            maxHeight: "97.5vh"
-          }}
-        >
-          <div style={indexColumnHeaderStyle}>Monsters ({filteredRows.length})</div>
-          <div style={{ minHeight: 0, overflow: "auto" }}>
-            {filteredRows.map((entry) => {
-              const selectedRow = selectedId === entry.id;
-              return (
-                <button
-                  key={entry.id}
-                  type="button"
-                  onClick={() => setSelectedId(entry.id)}
-                  style={{
-                    display: "block",
-                    width: "100%",
-                    textAlign: "left",
-                    border: "none",
-                    borderBottom: "1px solid var(--surface-2)",
-                    padding: "0.6rem 0.75rem",
-                    background: selectedRow ? "var(--surface-2)" : "var(--surface-0)",
-                    cursor: "pointer"
-                  }}
-                >
-                  <div style={{ fontWeight: 700 }}>{entry.name || entry.id}</div>
-                  {entry.level && (
-                    <div style={metaMuted}>
-                      Level {entry.level}
-                      {entry.role ? ` • ${entry.role}` : ""}
-                    </div>
-                  )}
-                  {entry.parseError && <div style={{ ...metaMuted, color: "var(--status-danger)" }}>Invalid XML</div>}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        {viewerTab === "monsters" ? (
+          <>
+            <div
+              style={{
+                ...sheetPanel,
+                overflow: "hidden",
+                display: "grid",
+                gridTemplateRows: "auto 1fr",
+                minHeight: 0,
+                maxHeight: "97.5vh"
+              }}
+            >
+              <div style={indexColumnHeaderStyle}>Monsters ({filteredRows.length})</div>
+              <div style={{ minHeight: 0, overflow: "auto" }}>
+                {filteredRows.map((entry) => {
+                  const selectedRow = selectedId === entry.id;
+                  return (
+                    <button
+                      key={entry.id}
+                      type="button"
+                      onClick={() => setSelectedId(entry.id)}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        textAlign: "left",
+                        border: "none",
+                        borderBottom: "1px solid var(--surface-2)",
+                        padding: "0.6rem 0.75rem",
+                        background: selectedRow ? "var(--surface-2)" : "var(--surface-0)",
+                        cursor: "pointer"
+                      }}
+                    >
+                      <div style={{ fontWeight: 700 }}>{entry.name || entry.id}</div>
+                      {entry.level && (
+                        <div style={metaMuted}>
+                          Level {entry.level}
+                          {entry.role ? ` • ${entry.role}` : ""}
+                        </div>
+                      )}
+                      {entry.parseError && (
+                        <div style={{ ...metaMuted, color: "var(--status-danger)" }}>Invalid XML</div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
-        <div style={{ ...sheetPanel, padding: "0.75rem" }}>
+            <div style={{ ...sheetPanel, padding: "0.75rem" }}>
           {!activeMonster ? (
             <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.8125rem", lineHeight: 1.45 }}>
               Select a monster to view its generated JSON data.
@@ -2352,298 +3214,150 @@ export function MonsterEditorApp({
                 );
               })()}
 
+              <MonsterPowersPanels
+                powers={activeMonster.powers}
+                startGlossaryHover={startGlossaryHover}
+                leaveGlossaryHover={leaveGlossaryHover}
+                shouldHighlightGlossaryTerm={shouldHighlightGlossaryTerm}
+              />
+
+            </div>
+          )}
+        </div>
+            </>
+          ) : viewerTab === "createTemplate" ? (
+            <>
               <div
                 style={{
-                  ...panelStyle,
-                  borderColor: "var(--panel-border-strong)",
-                  padding: "0.6rem 0.65rem",
-                  marginBottom: "0.65rem"
+                  ...sheetPanel,
+                  overflow: "hidden",
+                  display: "grid",
+                  gridTemplateRows: "auto 1fr",
+                  minHeight: 0,
+                  maxHeight: "97.5vh"
                 }}
               >
-                <h3 style={sectionTitleStyle}>Powers ({activeMonster.powers.length})</h3>
-                <div style={{ marginTop: "0.5rem", display: "grid", gap: "0.6rem" }}>
-                  {activeMonster.powers.length === 0 ? <div style={metaMuted}>No powers parsed.</div> : null}
-                  {(["standard", "minor", "triggered", "other"] as const).map((bucket) => {
-                    const bucketPowers = groupedPowers[bucket];
-                    if (bucketPowers.length === 0) return null;
+                <div style={indexColumnHeaderStyle}>Paste raw template block</div>
+                <div
+                  style={{
+                    minHeight: 0,
+                    overflow: "hidden",
+                    display: "flex",
+                    flexDirection: "column",
+                    padding: "0.65rem 0.75rem"
+                  }}
+                >
+                  <textarea
+                    value={createPasteText}
+                    onChange={(event) => setCreatePasteText(event.target.value)}
+                    placeholder="Paste OCR or extracted PDF text for a single monster template…"
+                    style={{
+                      flex: 1,
+                      minHeight: "12rem",
+                      width: "100%",
+                      boxSizing: "border-box",
+                      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+                      fontSize: "0.76rem",
+                      lineHeight: 1.4,
+                      padding: "0.55rem",
+                      borderRadius: "0.32rem",
+                      border: "1px solid var(--panel-border)",
+                      backgroundColor: "var(--surface-1)",
+                      color: "var(--text-primary)",
+                      resize: "vertical"
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ ...sheetPanel, padding: "0.75rem", minHeight: 0, overflow: "auto" }}>
+                {createDraftJsonInvalid ? (
+                  <p style={{ margin: 0, color: "var(--status-danger)", fontSize: "0.8125rem", lineHeight: 1.45 }}>
+                    Invalid JSON in the draft panel below — fix syntax to preview formatted stats.
+                  </p>
+                ) : createDraftTemplateRecord ? (
+                  <MonsterTemplateFormattedView
+                    record={createDraftTemplateRecord}
+                    glossaryKeyPrefix="create-draft"
+                    startGlossaryHover={startGlossaryHover}
+                    leaveGlossaryHover={leaveGlossaryHover}
+                    shouldHighlightGlossaryTerm={shouldHighlightGlossaryTerm}
+                  />
+                ) : (
+                  <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.8125rem", lineHeight: 1.45 }}>
+                    Use <strong>Import with ETL</strong> on pasted text, or edit the JSON draft below — a live preview of
+                    identity, stats, traits, and powers appears here.
+                  </p>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <div
+                style={{
+                  ...sheetPanel,
+                  overflow: "hidden",
+                  display: "grid",
+                  gridTemplateRows: "auto 1fr",
+                  minHeight: 0,
+                  maxHeight: "97.5vh"
+                }}
+              >
+                <div style={indexColumnHeaderStyle}>Templates ({filteredTemplateIndexes.length})</div>
+                <div style={{ minHeight: 0, overflow: "auto" }}>
+                  {filteredTemplateIndexes.map(({ row, idx }) => {
+                    const selectedRow = selectedTemplateIdx === idx;
                     return (
-                      <div key={bucket} style={{ display: "grid", gap: "0.4rem" }}>
-                        <div style={powerBucketHeaderStyle}>{usageBucketLabel(bucket)}</div>
-                        <div style={{ display: "grid", gap: "0.45rem", gridTemplateColumns: "minmax(0, 1fr)", alignItems: "stretch" }}>
-                          {bucketPowers.map((power, index) => {
-                            const colorBucket = classifyMonsterPowerColorBucket(power.usage);
-                            const accent = usageColorAccentCardStyle(colorBucket);
-                            const cardModel = buildMonsterPowerCardViewModel(power);
-                      return (
-                            <div
-                              key={`${bucket}-${power.name}-${index}`}
-                              style={{
-                                border: accent.border,
-                                borderLeft: accent.borderLeft,
-                                borderRadius: "8px",
-                                padding: "0.55rem 0.65rem",
-                                backgroundColor: accent.backgroundColor,
-                                boxShadow: `inset 0 0 0 1px ${usageColorAccentColor(colorBucket)}33`,
-                                height: "100%",
-                                boxSizing: "border-box",
-                                display: "flex",
-                                flexDirection: "column"
-                              }}
-                            >
-                          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: "0.35rem" }}>
-                            <strong>{power.name || `Power ${index + 1}`}</strong>
-                            {power.isBasic ? <span style={{ ...sheetTagPillStyle, cursor: "default" }}>Basic Attack</span> : null}
-                          </div>
-                          {cardModel.usagePrimaryParts.length > 0 ? (
-                            <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginTop: "0.12rem" }}>
-                              {cardModel.usagePrimaryParts.map((part, partIdx) => (
-                                <span key={`${power.name}-${index}-usage-${part}`}>
-                                  <span
-                                    onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${part}`)}
-                                    onMouseLeave={leaveGlossaryHover}
-                                    style={{
-                                      fontWeight: 700,
-                                      color: "var(--text-primary)",
-                                      cursor: "help",
-                                      borderBottom: "1px dotted var(--text-muted)",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.03em"
-                                    }}
-                                  >
-                                    {part}
-                                  </span>
-                                  {partIdx < cardModel.usagePrimaryParts.length - 1 ? (
-                                    <span style={{ color: "var(--text-muted)", margin: "0 0.1rem" }}>•</span>
-                                  ) : null}
-                                </span>
-                              ))}
-                              {cardModel.usageDetailsLines.length > 0 ? (
-                                <span style={{ ...metaSecondary, fontWeight: 400 }}>
-                                  {"("}
-                                  {cardModel.usageDetailsLines.join(" ")}
-                                  {")"}
-                                </span>
-                              ) : null}
-                            </div>
-                          ) : null}
-                          {cardModel.attackLineParts.length > 0 ? (
-                            <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginTop: "0.05rem", display: "flex", flexWrap: "wrap", gap: "0.22rem", alignItems: "center" }}>
-                              {cardModel.attackLineParts.map((part, partIdx) => (
-                                <span key={`${power.name}-${index}-attackline-${partIdx}`}>
-                                  {renderMonsterAttackLinePartWithRangeGlossary(part, startGlossaryHover, leaveGlossaryHover)}
-                                  {partIdx < cardModel.attackLineParts.length - 1 ? <span style={{ color: "var(--text-muted)", margin: "0 0.1rem" }}>•</span> : null}
-                                </span>
-                              ))}
-                            </div>
-                          ) : null}
-                            {cardModel.keywordTokens.length > 0 ? (
-                            <div style={{ ...bodySecondary, color: "var(--text-muted)", marginBottom: "0.25rem" }}>
-                              <strong>Keywords:</strong>{" "}
-                              {cardModel.keywordTokens.map((keyword, idx) => (
-                                <span key={`${power.name}-${index}-kw-${keyword}`}>
-                                  <span
-                                    onMouseEnter={(event) => startGlossaryHover(event, `powerKeyword:${keyword}`)}
-                                    onMouseLeave={leaveGlossaryHover}
-                                    style={{
-                                      color: "var(--text-primary)",
-                                      cursor: "help",
-                                      borderBottom: "1px dotted var(--text-muted)"
-                                    }}
-                                  >
-                                    {keyword}
-                                  </span>
-                                  {idx < cardModel.keywordTokens.length - 1 ? <span> </span> : null}
-                                </span>
-                              ))}
-                            </div>
-                          ) : null}
-                          <div style={{ marginTop: "0.22rem", display: "grid", gap: "0.14rem" }}>
-                            {cardModel.outcomeLines.map((line) => (
-                              <div key={`${power.name}-${index}-${line.label}-${line.text}`} style={{ fontSize: "0.8rem", color: "var(--text-primary)" }}>
-                                {(() => {
-                                  const split = splitFailedEscapeAttemptSections(line.text);
-                                  return (
-                                    <>
-                                      {isRenderableCardValue(split.mainText) ? (
-                                        <div>
-                                          <strong>{line.label}:</strong>{" "}
-                                          {renderGlossaryAwareText(
-                                            split.mainText,
-                                            commonDescriptiveGlossaryPhrases,
-                                            startGlossaryHover,
-                                            leaveGlossaryHover,
-                                            `${power.name}-${index}-${line.label}-main`,
-                                            shouldHighlightGlossaryTerm
-                                          )}
-                                        </div>
-                                      ) : (
-                                        <div>
-                                          <strong>{line.label}:</strong>{" "}
-                                          {renderGlossaryAwareText(
-                                            line.text,
-                                            commonDescriptiveGlossaryPhrases,
-                                            startGlossaryHover,
-                                            leaveGlossaryHover,
-                                            `${power.name}-${index}-${line.label}-fallback`,
-                                            shouldHighlightGlossaryTerm
-                                          )}
-                                        </div>
-                                      )}
-                                      {split.failedEscapeTexts.map((failedText) => (
-                                        <div key={`${power.name}-${index}-${line.label}-failed-${failedText}`} style={{ marginTop: "0.04rem" }}>
-                                          <strong>Failed Escape Attempt:</strong>{" "}
-                                          {renderGlossaryAwareText(
-                                            failedText,
-                                            commonDescriptiveGlossaryPhrases,
-                                            startGlossaryHover,
-                                            leaveGlossaryHover,
-                                            `${power.name}-${index}-${line.label}-failed`,
-                                            shouldHighlightGlossaryTerm
-                                          )}
-                                        </div>
-                                      ))}
-                                    </>
-                                  );
-                                })()}
-                              </div>
-                            ))}
-                          </div>
-                          {cardModel.secondaryAttacks.length > 0 ? (
-                            <div
-                              style={{
-                                marginTop: "0.28rem",
-                                marginLeft: "0.55rem",
-                                paddingLeft: "0.55rem",
-                                borderLeft: "2px solid var(--panel-border)"
-                              }}
-                            >
-                              {cardModel.secondaryAttacks.map((secondaryAttack, secondaryIndex) => (
-                                <div key={`${power.name}-${index}-secondary-${secondaryIndex}`} style={{ marginTop: secondaryIndex === 0 ? 0 : "0.3rem" }}>
-                                  <div style={secondaryAttackTitleStyle}>{secondaryAttack.name}</div>
-                                  {secondaryAttack.attackLineParts.length > 0 ? (
-                                    <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginTop: "0.05rem", display: "flex", flexWrap: "wrap", gap: "0.22rem", alignItems: "center" }}>
-                                      {secondaryAttack.attackLineParts.map((part, partIdx) => (
-                                        <span key={`${power.name}-${index}-secondary-${secondaryIndex}-attackline-${partIdx}`}>
-                                          {renderMonsterAttackLinePartWithRangeGlossary(part, startGlossaryHover, leaveGlossaryHover)}
-                                          {partIdx < secondaryAttack.attackLineParts.length - 1 ? (
-                                            <span style={{ color: "var(--text-muted)", margin: "0 0.1rem" }}>•</span>
-                                          ) : null}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  ) : null}
-                                  <div style={{ marginTop: "0.15rem", display: "grid", gap: "0.14rem" }}>
-                                    {secondaryAttack.outcomeLines.map((line) => (
-                                      <div key={`${power.name}-${index}-secondary-${secondaryIndex}-${line.label}-${line.text}`} style={{ fontSize: "0.8rem", color: "var(--text-primary)" }}>
-                                        {(() => {
-                                          const split = splitFailedEscapeAttemptSections(line.text);
-                                          return (
-                                            <>
-                                              {isRenderableCardValue(split.mainText) ? (
-                                                <div>
-                                                  <strong>{line.label}:</strong>{" "}
-                                                  {renderGlossaryAwareText(
-                                                    split.mainText,
-                                                    commonDescriptiveGlossaryPhrases,
-                                                    startGlossaryHover,
-                                                    leaveGlossaryHover,
-                                                    `${power.name}-${index}-secondary-${secondaryIndex}-${line.label}-main`,
-                                                    shouldHighlightGlossaryTerm
-                                                  )}
-                                                </div>
-                                              ) : (
-                                                <div>
-                                                  <strong>{line.label}:</strong>{" "}
-                                                  {renderGlossaryAwareText(
-                                                    line.text,
-                                                    commonDescriptiveGlossaryPhrases,
-                                                    startGlossaryHover,
-                                                    leaveGlossaryHover,
-                                                    `${power.name}-${index}-secondary-${secondaryIndex}-${line.label}-fallback`,
-                                                    shouldHighlightGlossaryTerm
-                                                  )}
-                                                </div>
-                                              )}
-                                              {split.failedEscapeTexts.map((failedText) => (
-                                                <div key={`${power.name}-${index}-secondary-${secondaryIndex}-${line.label}-failed-${failedText}`} style={{ marginTop: "0.04rem" }}>
-                                                  <strong>Failed Escape Attempt:</strong>{" "}
-                                                  {renderGlossaryAwareText(
-                                                    failedText,
-                                                    commonDescriptiveGlossaryPhrases,
-                                                    startGlossaryHover,
-                                                    leaveGlossaryHover,
-                                                    `${power.name}-${index}-secondary-${secondaryIndex}-${line.label}-failed`,
-                                                    shouldHighlightGlossaryTerm
-                                                  )}
-                                                </div>
-                                              ))}
-                                            </>
-                                          );
-                                        })()}
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : null}
-                          {isRenderableCardValue(power.flavorText) ? (
-                            <div style={{ ...bodySecondary, marginBottom: "0.2rem", fontStyle: "italic" }}>
-                              {renderGlossaryAwareText(
-                                String(power.flavorText),
-                                commonDescriptiveGlossaryPhrases,
-                                startGlossaryHover,
-                                leaveGlossaryHover,
-                                `${power.name}-${index}-flavor`,
-                                shouldHighlightGlossaryTerm
-                              )}
-                            </div>
-                          ) : null}
-                          <div style={bodyPrimary}>
-                            {isRenderableCardValue(cardModel.descriptionText) ? (
-                              <div style={{ ...richTextBodyPrimary.paragraphStyle, margin: "0 0 0.35rem 0", whiteSpace: "pre-wrap" }}>
-                                {renderGlossaryAwareText(
-                                  cardModel.descriptionText,
-                                  commonDescriptiveGlossaryPhrases,
-                                  startGlossaryHover,
-                                  leaveGlossaryHover,
-                                  `${power.name}-${index}-description`,
-                                  shouldHighlightGlossaryTerm
-                                )}
-                              </div>
-                            ) : null}
-                          </div>
-                          {isRenderableCardValue(cardModel.ongoingText) ? (
-                            <div style={{ marginTop: "0.05rem", ...bodyPrimary }}>
-                              <strong>ONGOING:</strong>{" "}
-                              {renderGlossaryAwareText(
-                                cardModel.ongoingText,
-                                commonDescriptiveGlossaryPhrases,
-                                startGlossaryHover,
-                                leaveGlossaryHover,
-                                `${power.name}-${index}-ongoing`,
-                                shouldHighlightGlossaryTerm
-                              )}
-                            </div>
-                          ) : null}
-                            </div>
-                      );
-                          })}
+                      <button
+                        key={`${row.templateName}-${idx}`}
+                        type="button"
+                        onClick={() => setSelectedTemplateIdx(idx)}
+                        style={{
+                          display: "block",
+                          width: "100%",
+                          textAlign: "left",
+                          border: "none",
+                          borderBottom: "1px solid var(--surface-2)",
+                          padding: "0.6rem 0.75rem",
+                          background: selectedRow ? "var(--surface-2)" : "var(--surface-0)",
+                          cursor: "pointer"
+                        }}
+                      >
+                        <div style={{ fontWeight: 700 }}>{row.templateName}</div>
+                        <div style={metaMuted}>{row.roleLine ?? row.role?.raw ?? ""}</div>
+                        <div style={{ ...metaMuted, fontSize: "0.72rem", marginTop: "0.12rem", lineHeight: 1.35 }}>
+                          {row.sourceBook ?? ""}
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
               </div>
+
+              <div style={{ ...sheetPanel, padding: "0.75rem" }}>
+                {!selectedTemplateRecord ? (
+                  <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.8125rem", lineHeight: 1.45 }}>
+                    Select a template from the generated index, or run the extractor to build{" "}
+                    <code style={{ fontSize: "0.92em" }}>generated/monster_templates.json</code>.
+                  </p>
+                ) : (
+                  <MonsterTemplateFormattedView
+                    record={selectedTemplateRecord}
+                    glossaryKeyPrefix="template-index"
+                    startGlossaryHover={startGlossaryHover}
+                    leaveGlossaryHover={leaveGlossaryHover}
+                    shouldHighlightGlossaryTerm={shouldHighlightGlossaryTerm}
+                  />
+                )}
               </div>
+            </>
           )}
-        </div>
       </div>
 
       <div style={{ marginTop: "0.85rem", ...panelStyle, padding: "0.55rem" }}>
         <details>
           <summary style={jsonSummaryStyle}>
-            JSON
+            {viewerTab === "createTemplate" ? "Template draft (JSON)" : "JSON"}
           </summary>
           <div style={{ marginTop: "0.5rem", display: "flex", flexWrap: "wrap", gap: "0.35rem", alignItems: "center" }}>
             <input
@@ -2714,8 +3428,13 @@ export function MonsterEditorApp({
           </div>
           <textarea
             ref={jsonTextareaRef}
-            value={rawJsonText}
-            readOnly
+            value={viewerTab === "createTemplate" ? createDraftJson : rawJsonText}
+            readOnly={viewerTab !== "createTemplate"}
+            onChange={
+              viewerTab === "createTemplate"
+                ? (event) => setCreateDraftJson(event.target.value)
+                : undefined
+            }
             style={{
               margin: "0.55rem 0 0 0",
               padding: "0.55rem",

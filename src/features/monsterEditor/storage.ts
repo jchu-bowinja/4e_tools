@@ -143,3 +143,52 @@ export async function loadMonsterEntry(id: string): Promise<MonsterEntryFile> {
   }
   return (await response.json()) as MonsterEntryFile;
 }
+
+/** PDF-extracted monster template overlay (.generated/monster_templates.json`). */
+export interface MonsterTemplateRole {
+  raw?: string;
+  templateLabel?: string;
+  tier?: string;
+  combatRole?: string;
+}
+
+export interface MonsterTemplateRecord {
+  templateName: string;
+  sourceBook: string;
+  pageStart?: number;
+  pageEnd?: number;
+  description?: string;
+  prerequisite?: string;
+  roleLine?: string;
+  role?: MonsterTemplateRole;
+  isEliteTemplate?: boolean;
+  statLines?: string[];
+  stats?: Record<string, unknown>;
+  auras?: MonsterTrait[];
+  traits?: MonsterTrait[];
+  powers: MonsterPower[];
+  /** Present on ETL / paste-import rows */
+  rawText?: string;
+  powersText?: string[];
+  uncategorizedAbilities?: MonsterPower[];
+  extractionWarnings?: string[];
+  extractionMethod?: string;
+  relatedFlavorText?: unknown[];
+}
+
+interface MonsterTemplatesPayload {
+  meta: Record<string, unknown>;
+  templates: MonsterTemplateRecord[];
+}
+
+export async function loadMonsterTemplates(): Promise<MonsterTemplateRecord[]> {
+  const response = await fetch("/generated/monster_templates.json");
+  if (!response.ok) {
+    throw new Error("Could not load generated/monster_templates.json. Generate templates JSON first.");
+  }
+  const data = (await response.json()) as MonsterTemplatesPayload;
+  if (!Array.isArray(data.templates)) {
+    throw new Error("Invalid generated/monster_templates.json format.");
+  }
+  return data.templates;
+}
