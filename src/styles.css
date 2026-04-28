@@ -27,6 +27,9 @@
   --power-accent-daily-bar: #111827;
   --power-accent-daily-bg: #f3f4f6;
   --power-accent-daily-border: #94a3b8;
+  --power-accent-move-bar: #0369a1;
+  --power-accent-move-bg: #f0f9ff;
+  --power-accent-move-border: #7dd3fc;
   --power-expended-opacity: 0.8;
   --table-stripe-even: var(--surface-1);
   --table-stripe-odd: var(--surface-0);
@@ -206,6 +209,9 @@ textarea:hover {
   --power-accent-daily-bar: #cbd5e1;
   --power-accent-daily-bg: #192130;
   --power-accent-daily-border: #334155;
+  --power-accent-move-bar: #7dd3fc;
+  --power-accent-move-bg: #0c1824;
+  --power-accent-move-border: #1e4976;
   --power-expended-opacity: 0.92;
   --table-stripe-even: #302518;
   --table-stripe-odd: #241c13;

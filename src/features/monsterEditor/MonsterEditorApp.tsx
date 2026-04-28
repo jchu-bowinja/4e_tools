@@ -401,11 +401,12 @@ const statEmptyPlaceholder: CSSProperties = { fontWeight: 700, fontSize: "0.8rem
 
 const outcomeEntryTitleStyle: CSSProperties = { fontSize: "0.78rem", fontWeight: 700, color: "var(--text-primary)" };
 
-type MonsterPowerActionBucket = "standard" | "minor" | "triggered" | "other";
+type MonsterPowerActionBucket = "standard" | "move" | "minor" | "triggered" | "other";
 type MonsterPowerColorBucket = "atWill" | "encounter" | "daily" | "other";
 
 function usageAccentColor(bucket: MonsterPowerActionBucket): string {
   if (bucket === "standard") return "var(--power-accent-atwill-bar)";
+  if (bucket === "move") return "var(--power-accent-move-bar)";
   if (bucket === "minor") return "var(--power-accent-encounter-bar)";
   if (bucket === "triggered") return "var(--power-accent-daily-bar)";
   return "var(--text-secondary)";
@@ -421,6 +422,13 @@ function usageAccentCardStyle(bucket: MonsterPowerActionBucket): {
       border: "1px solid var(--power-accent-atwill-border)",
       borderLeft: "6px solid var(--power-accent-atwill-bar)",
       backgroundColor: "var(--power-accent-atwill-bg)"
+    };
+  }
+  if (bucket === "move") {
+    return {
+      border: "1px solid var(--power-accent-move-border)",
+      borderLeft: "6px solid var(--power-accent-move-bar)",
+      backgroundColor: "var(--power-accent-move-bg)"
     };
   }
   if (bucket === "minor") {
@@ -450,12 +458,14 @@ function classifyMonsterPowerUsageBucket(action: string | undefined, trigger: st
   const hasTrigger = Boolean(normalizedTrigger.trim()) && normalizedTrigger.trim() !== "none";
   if (hasTrigger || /immediate|interrupt|reaction|opportunity/.test(normalizedAction)) return "triggered";
   if (normalizedAction.includes("standard")) return "standard";
+  if (/\bmove\b/.test(normalizedAction)) return "move";
   if (normalizedAction.includes("minor")) return "minor";
   return "other";
 }
 
 function usageBucketLabel(bucket: MonsterPowerActionBucket): string {
   if (bucket === "standard") return "Standard Action";
+  if (bucket === "move") return "Move Action";
   if (bucket === "minor") return "Minor Action";
   if (bucket === "triggered") return "Triggered Actions";
   return "Other";
@@ -1133,6 +1143,7 @@ function MonsterPowersPanels({
   const groupedPowers = useMemo(() => {
     const buckets: Record<MonsterPowerActionBucket, MonsterPower[]> = {
       standard: [],
+      move: [],
       minor: [],
       triggered: [],
       other: []
@@ -1155,7 +1166,7 @@ function MonsterPowersPanels({
       <h3 style={sectionTitleStyle}>Powers ({powers.length})</h3>
       <div style={{ marginTop: "0.5rem", display: "grid", gap: "0.6rem" }}>
         {powers.length === 0 ? <div style={metaMuted}>No powers parsed.</div> : null}
-        {(["standard", "minor", "triggered", "other"] as const).map((bucket) => {
+        {(["standard", "move", "minor", "triggered", "other"] as const).map((bucket) => {
           const bucketPowers = groupedPowers[bucket];
           if (bucketPowers.length === 0) return null;
           return (
@@ -2223,7 +2234,7 @@ export function MonsterEditorApp({
                 return;
               }
               if (!Array.isArray(parsed.powers)) parsed.powers = [];
-              if (!parsed.sourceBook?.trim()) parsed.sourceBook = "(paste)";
+              if (!parsed.sourceBook?.trim()) parsed.sourceBook = "manual import";
               const custom = readCustomMonsterTemplates();
               const key = normalizeTemplateDedupeKey(parsed);
               const nextCustom = [parsed, ...custom.filter((t) => normalizeTemplateDedupeKey(t) !== key)];
