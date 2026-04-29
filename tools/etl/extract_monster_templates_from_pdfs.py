@@ -8,6 +8,8 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 from pypdf import PdfReader
 
+from outcome_subconditions import enrich_powers_subconditions
+
 
 PAGE_NUMBER_RE = re.compile(r"^\s*\d+\s*$")
 TEMPLATE_REF_RE = re.compile(r"\b([A-Z][A-Za-z' -]{2,})\s*\(\s*template\s*\)", re.IGNORECASE)
@@ -389,7 +391,7 @@ def _looks_like_power_name(line: str) -> bool:
     if re.match(r"^vs\.\s*", clean, re.IGNORECASE):
         return False
     if re.match(
-        r"^(Failed\s+Saving\s+Throw|Aftereffect|Aftereffect:|Additional\s+Effect):",
+        r"^(First Failed Saving Throw|Second Failed Saving Throw|Each Failed Saving Throw|Failed\s+Saving\s+Throw|Aftereffect|Aftereffect:|Additional\s+Effect):",
         clean,
         re.IGNORECASE,
     ):
@@ -1802,6 +1804,7 @@ def _mechanical_parse_template_block_lines(block_lines: List[str], template_name
                 power_lines.append(line)
 
     parsed_powers = _parse_powers(power_lines[:120])
+    enrich_powers_subconditions(parsed_powers)
 
     buckets = _bucket_template_abilities(parsed_powers)
 

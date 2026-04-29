@@ -63,12 +63,21 @@ function appendNestedOutcomeLines(
   for (const failedSave of failedSaveLines) {
     lines.push({ label: "FAILED SAVE", text: failedSave });
   }
-  const nestedAttackLines =
-    outcome.nestedAttackDescriptions
-      ?.map((entry) => normalizeSemicolonWhitespace(String(entry || "").trim()))
-      .filter((text) => isRenderableCardValue(text)) ?? [];
-  for (const nestedAttack of nestedAttackLines) {
-    lines.push({ label: "NESTED ATTACK", text: nestedAttack });
+  const nestedRaw = outcome.nestedAttackDescriptions;
+  if (nestedRaw?.length) {
+    for (const entry of nestedRaw) {
+      if (typeof entry === "string") {
+        const text = normalizeSemicolonWhitespace(entry.trim());
+        if (isRenderableCardValue(text)) lines.push({ label: "NESTED ATTACK", text });
+        continue;
+      }
+      const mini = entry as MonsterPowerOutcome;
+      const head = normalizeSemicolonWhitespace(String(mini.description || "").trim());
+      if (isRenderableCardValue(head)) {
+        lines.push({ label: "NESTED ATTACK", text: head });
+      }
+      appendNestedOutcomeLines(lines, { ...mini, description: undefined, nestedAttackDescriptions: undefined });
+    }
   }
 }
 
@@ -114,12 +123,25 @@ function renderCompactOutcomeLines(
   return lines;
 }
 
+/** Stop ongoing snippet before inline subconditions (same phrases as outcome splitters). */
+const ONGOING_STOP_BEFORE_SUBCONDITION = /\.\s+(?=(?:First Failed Saving Throw|Second Failed Saving Throw|Third Failed Saving Throw|Each Failed Saving Throw|Failed Saving Throw|Aftereffect|Additional Effect|Sustain Standard|Sustain Minor|Sustain Move|Sustain Free)\s*:)/i;
+const ONGOING_STOP_SEMICOLON = /[;]\s+(?=(?:First Failed Saving Throw|Second Failed Saving Throw|Third Failed Saving Throw|Each Failed Saving Throw|Failed Saving Throw|Aftereffect|Additional Effect|Sustain Standard|Sustain Minor|Sustain Move|Sustain Free)\s*:)/i;
+
+function clipOngoingTailAtSubconditions(tail: string): string {
+  let t = tail.trim();
+  const m = ONGOING_STOP_BEFORE_SUBCONDITION.exec(t) ?? ONGOING_STOP_SEMICOLON.exec(t);
+  if (m && m.index !== undefined) {
+    t = t.slice(0, m.index).trim();
+  }
+  return t;
+}
+
 function extractOngoingText(description: string | undefined): string {
   if (!isRenderableCardValue(description)) return "";
   const desc = String(description).trim();
   const ongoingMatch = desc.match(/\bongoing\b[:\s-]*(.*)$/i);
   if (!isRenderableCardValue(ongoingMatch?.[1])) return "";
-  return String(ongoingMatch?.[1]).trim();
+  return clipOngoingTailAtSubconditions(String(ongoingMatch?.[1]));
 }
 
 export type MonsterPowerCardViewModel = {

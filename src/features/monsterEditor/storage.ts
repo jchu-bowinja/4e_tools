@@ -68,7 +68,8 @@ export interface MonsterPowerOutcomeEntry {
 export interface MonsterPowerOutcome {
   description?: string;
   damage?: MonsterPowerDamage;
-  nestedAttackDescriptions?: string[];
+  /** Per-ray or variant lines; each item may be plain prose or a structured mini-outcome after ETL split. */
+  nestedAttackDescriptions?: Array<string | MonsterPowerOutcome>;
   aftereffects?: MonsterPowerOutcomeEntry[];
   sustains?: MonsterPowerOutcomeEntry[];
   failedSavingThrows?: MonsterPowerOutcomeEntry[];

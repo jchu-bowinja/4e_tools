@@ -107,7 +107,12 @@ function looksLikePowerName(line: string): boolean {
     return false;
   if (/^\(whichever/i.test(clean)) return false;
   if (/^vs\.\s*/i.test(clean)) return false;
-  if (/^(Failed\s+Saving\s+Throw|Aftereffect|Aftereffect:|Additional\s+Effect):/i.test(clean)) return false;
+  if (
+    /^(First Failed Saving Throw|Second Failed Saving Throw|Each Failed Saving Throw|Failed\s+Saving\s+Throw|Aftereffect|Aftereffect:|Additional\s+Effect):/i.test(
+      clean
+    )
+  )
+    return false;
   if (clean[0] && clean[0].toLowerCase() === clean[0] && /[a-z]/i.test(clean[0])) return false;
   const nameProbe = headBeforeParen
     ? headBeforeParen[1].trim()
@@ -1197,6 +1202,18 @@ function looksLikeSimpleAbilityHeader(line: string): boolean {
   return looksLikePowerName(t);
 }
 
+/** Matches the short-title branch of `looksLikeSimpleAbilityHeader` (ability name line without aura text). */
+function isLoneShortTitleAbilityNameLine(line: string): boolean {
+  const t = line.trim();
+  if (!t || /\baura\s+\d+\b/i.test(t)) return false;
+  return /^[A-Z][A-Za-z' -]{2,50}$/.test(t) && t.split(/\s+/).length <= 8;
+}
+
+/** Next-line aura lead in book layout: ` Aura 10; allies …` (name on previous line). */
+function isAuraOnlyLeadContinuationLine(line: string): boolean {
+  return /^\s*aura\s+\d+\b/i.test(line.trim());
+}
+
 function splitSimpleAbilityBlocks(lines: string[]): string[][] {
   const blocks: string[][] = [];
   let current: string[] = [];
@@ -1216,6 +1233,15 @@ function splitSimpleAbilityBlocks(lines: string[]): string[][] {
       continue;
     }
     if (looksLikeSimpleAbilityHeader(line)) {
+      /** Death Knight–style: `Marshal Undead` then ` Aura 10; …` — one aura, not trait + aura. */
+      if (
+        current.length === 1 &&
+        isLoneShortTitleAbilityNameLine(current[0] ?? "") &&
+        isAuraOnlyLeadContinuationLine(line)
+      ) {
+        current.push(line);
+        continue;
+      }
       if (current.length) blocks.push(current);
       current = [line];
       continue;

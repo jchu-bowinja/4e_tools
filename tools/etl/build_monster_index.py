@@ -5,6 +5,8 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from outcome_subconditions import enrich_powers_subconditions
+
 
 def _safe_id(path_value: str) -> str:
     slug = path_value.lower().replace("\\", "/").replace(".monster", "")
@@ -1018,6 +1020,7 @@ def _extract_powers(root: ET.Element) -> List[Dict[str, Any]]:
                     "attacks": attacks,
                 }
             )
+    enrich_powers_subconditions(powers)
     return powers
 
 

@@ -434,6 +434,33 @@ Hit Points +8 per level + Constitution score (controller) or +6 per level + Cons
     expect(hp?.default).toBeUndefined();
   });
 
+  it("merges name + following Aura N line into one aura (Death Knight Marshal Undead layout)", () => {
+    const block = `Death Knight Elite Soldier (Leader)
+(undead) XP Elite
+Senses Darkvision
+Defenses +2 AC; +4 Fortitude; +2 Will
+Immune disease, poison
+Resist 10 necrotic at 11th level, 15 necrotic at 21st level
+Vulnerable 10 radiant
+Saving Throws +2
+Action Point 1
+Hit Points +8 per level + Constitution score
+POWERS
+Marshal Undead
+ Aura 10; lower-level undead allies in the aura gain a +2
+bonus to their attack rolls.
+Soul Weapon ✦ Necrotic, Weapon
+ When attacking with its melee weapon, the death knight
+deals an additional 5 necrotic damage to its target.`;
+    const r = parsePastedMonsterTemplateTextLocal(block, "Death Knight");
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const marshal = r.template.auras?.find((a) => a.name.toLowerCase().includes("marshal"));
+    expect(marshal).toBeDefined();
+    expect(r.template.traits?.some((t) => t.name.toLowerCase().includes("marshal"))).toBe(false);
+    expect(String(marshal?.details ?? "")).toMatch(/lower-level undead|\+2/);
+  });
+
   it("keeps one aura when effect text says 'in the aura' on the next line (Demonic Acolyte layout)", () => {
     const block = `Demonic Acolyte Elite Controller (Leader)
 Humanoid or magical beast (demon) XP Elite

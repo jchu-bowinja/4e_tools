@@ -1,4 +1,5 @@
 import type { MonsterPower, MonsterPowerAttack } from "./storage";
+import { enrichMonsterPowerOutcomes } from "./monsterOutcomeSubconditions";
 
 const VS_RE = /(level\s*\+\s*\d+|[+-]?\d+)\s+vs\.?\s*(AC|Fortitude|Reflex|Will)/i;
 const DAMAGE_RE = /(?:\d+d\d+(?:\s*[+-]\s*\d+)?(?:\s+\w+)?)/gi;
@@ -73,7 +74,7 @@ export function normalizeMonsterPowerShape(power: MonsterPower): MonsterPower {
       : inferDamageExpressions(description);
   const inferredType = String(power.type ?? "").trim() || inferTypeFromRange(range) || "";
 
-  return {
+  return enrichMonsterPowerOutcomes({
     ...power,
     name,
     usage,
@@ -86,5 +87,5 @@ export function normalizeMonsterPowerShape(power: MonsterPower): MonsterPower {
     keywords: keywordTokens.join(", "),
     damageExpressions,
     attacks
-  };
+  });
 }
