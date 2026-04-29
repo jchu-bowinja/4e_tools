@@ -353,6 +353,13 @@ function mergeServerAndCustomTemplates(
   return out;
 }
 
+/** True when this row matches an entry in local custom storage (deletable); server-only rows are false. */
+function isStoredCustomTemplate(record: MonsterTemplateRecord | null): boolean {
+  if (!record?.templateName?.trim()) return false;
+  const key = normalizeTemplateDedupeKey(record);
+  return readCustomMonsterTemplates().some((c) => normalizeTemplateDedupeKey(c) === key);
+}
+
 function readStoredSelectedMonsterId(): string {
   try {
     return window.localStorage.getItem(MONSTER_SELECTED_ID_STORAGE_KEY) ?? "";
@@ -2300,7 +2307,7 @@ export function MonsterEditorApp({
           </select>
         </div>
       ) : viewerTab === "templates" ? (
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.75rem", alignItems: "center" }}>
           <button
             type="button"
             onClick={() => {
@@ -2323,6 +2330,45 @@ export function MonsterEditorApp({
             disabled={isBusy}
           >
             Reload templates
+          </button>
+          <button
+            type="button"
+            disabled={isBusy || !isStoredCustomTemplate(selectedTemplateRecord)}
+            title={
+              !selectedTemplateRecord
+                ? "Select a template first"
+                : isStoredCustomTemplate(selectedTemplateRecord)
+                  ? "Remove this entry from local custom templates (browser storage)"
+                  : "Generated templates cannot be deleted here — only local custom saves"
+            }
+            onClick={() => {
+              const record = selectedTemplateRecord;
+              if (!record || !isStoredCustomTemplate(record)) return;
+              const key = normalizeTemplateDedupeKey(record);
+              const label = String(record.templateName ?? "").trim() || "template";
+              if (
+                !window.confirm(
+                  `Remove custom template “${label}” from this browser’s saved templates? This does not change generated JSON files.`
+                )
+              ) {
+                return;
+              }
+              const nextCustom = readCustomMonsterTemplates().filter((t) => normalizeTemplateDedupeKey(t) !== key);
+              writeCustomMonsterTemplates(nextCustom);
+              const merged = mergeServerAndCustomTemplates(nextCustom, serverTemplateRows);
+              setTemplateRows(merged);
+              const replacedIdx = merged.findIndex((t) => normalizeTemplateDedupeKey(t) === key);
+              if (replacedIdx >= 0) {
+                setSelectedTemplateIdx(replacedIdx);
+              } else if (merged.length === 0) {
+                setSelectedTemplateIdx(0);
+              } else {
+                setSelectedTemplateIdx((prev) => Math.min(prev, merged.length - 1));
+              }
+              setTemplateMessage(`Removed custom template “${label}”.`);
+            }}
+          >
+            Delete custom template
           </button>
           <input
             value={templateNameQuery}
