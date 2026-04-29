@@ -553,6 +553,37 @@ Saving Throws +2`;
     expect(hp?.variants?.[1]?.when?.role).toBe("artillery");
   });
 
+  it("classifies Battle Champion headerless abilities as traits (dice/flank/critical prose, no action or usage)", () => {
+    const block = `Battle Champion Elite Soldier (Leader)
+Humanoid XP Elite
+Defenses +2 AC; +2 Fortitude
+Saving Throws +2
+Action Point 1
+Hit Points +8 per level + Constitution score
+POWERS
+Battle Lord Tactics
+ The battle champion and its allies deal an extra 1d6
+damage against enemies that the battle champion flanks.
+Increase this extra damage to 2d6 at 11th level and to
+3d6 at 21st level.
+Battle Talent
+ The battle champion can score critical hits on attack rolls
+of natural 19 and 20.
+Inspiring Assault
+ Whenever it scores a critical hit, the battle champion and
+all allies within 5 squares of it regain hit points equal to
+one-half the battle champion's level.`;
+    const r = parsePastedMonsterTemplateTextLocal(block, "Battle Champion");
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const names = (r.template.traits ?? []).map((t) => t.name);
+    expect(names.some((n) => /Battle Lord Tactics/i.test(n))).toBe(true);
+    expect(names.some((n) => /Battle Talent/i.test(n))).toBe(true);
+    expect(names.some((n) => /Inspiring Assault/i.test(n))).toBe(true);
+    expect(r.template.powers?.length ?? 0).toBe(0);
+    expect(r.validation.errors).toEqual([]);
+  });
+
   it("classifies Bodyguard Indomitable Presence as a trait (no header usage/action; ‘whenever’ in prose)", () => {
     const block = `Bodyguard Elite Soldier
 Humanoid XP Elite

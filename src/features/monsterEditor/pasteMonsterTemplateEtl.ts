@@ -343,7 +343,15 @@ function normalizePowerToMonsterShape(name: string, text: string, leadKeywords?:
               ? "Area"
               : "";
   }
-  let usage = "At-Will";
+
+  let action = "";
+  const actionMatch = header.match(
+    /\((standard|minor|move|free|immediate interrupt|immediate reaction|immediate)\b/i
+  );
+  if (actionMatch) action = actionMatch[1].replace(/\b\w/g, (c) => c.toUpperCase());
+
+  /** Book powers carry usage + action in the header; bare template traits do not — avoid defaulting to at-will. */
+  let usage = "";
   let usageDetails = "";
   if (/recharge/i.test(header)) {
     usage = "Recharge";
@@ -352,12 +360,8 @@ function normalizePowerToMonsterShape(name: string, text: string, leadKeywords?:
     if (!usageDetails) usageDetails = parseRechargeDetails(`${name.trim()}\n${text.trim()}`);
   } else if (/encounter/i.test(header)) usage = "Encounter";
   else if (/daily/i.test(header)) usage = "Daily";
-
-  let action = "";
-  const actionMatch = header.match(
-    /\((standard|minor|move|free|immediate interrupt|immediate reaction|immediate)\b/i
-  );
-  if (actionMatch) action = actionMatch[1].replace(/\b\w/g, (c) => c.toUpperCase());
+  else if (/\bat-will\b/i.test(header)) usage = "At-Will";
+  else if (actionMatch) usage = "At-Will";
 
   let keywordsBlob = "";
   /** Keywords after ✦ on the header (e.g. traits: `✦ Necrotic`) — merged into template trait/aura keywords. */
@@ -1071,27 +1075,29 @@ function isAuraAbility(entry: MonsterPower): boolean {
   return name.includes("aura") || desc.startsWith("aura ") || abilityRange.startsWith("aura ");
 }
 
+/** Attack/range lines from the stat block — not passive template traits. */
+function hasStructuredAttackBlock(entry: MonsterPower): boolean {
+  const attacks = entry.attacks ?? [];
+  if (attacks.length > 0) return true;
+  const t = (entry.type ?? "").trim();
+  if (t && !/^trait$/i.test(t)) {
+    const tl = t.toLowerCase();
+    if (/^(melee|ranged|close|area)\b/i.test(tl)) return true;
+  }
+  const r = (entry.range ?? "").trim();
+  if (r) {
+    const rl = r.toLowerCase();
+    if (/^(melee|ranged|close|area burst|close burst|close blast|area wall|aura)\b/i.test(rl)) return true;
+  }
+  return false;
+}
+
 function isTraitAbility(entry: MonsterPower): boolean {
+  if (hasStructuredAttackBlock(entry)) return false;
   const action = (entry.action ?? "").trim();
   const usage = (entry.usage ?? "").trim().toLowerCase();
-  const attackType = (entry.type ?? "").trim();
-  const attackRange = (entry.range ?? "").trim();
-  const attacks = entry.attacks ?? [];
-  const description = (entry.description ?? "").toLowerCase();
-  const damageExprs = entry.damageExpressions ?? [];
-  if (action) return false;
-  if (usage === "encounter" || usage === "daily") return false;
-  if (attackType || attackRange || attacks.length) return false;
-  if (/recharge/i.test(description)) return false;
-  if (damageExprs.length) return false;
-  // Do not use a bare `\bwhenever\b` match here — passive traits often use it (e.g. fighter-style
-  // marks: "whenever a marked enemy shifts"). Triggered powers usually have an action header or Melee/Ranged line.
-  if (
-    /\b(regain .* hit points?|scores? a critical|\d+d\d+|\d+\s+squares? of| flank(s|ed|ing)?\b|\bnatural\s+(19|20)\b|\bcritical hit\b)/i.test(
-      description
-    )
-  )
-    return false;
+  if (usage === "encounter" || usage === "daily" || usage === "recharge") return false;
+  if (usage === "at-will" && action) return false;
   return true;
 }
 
@@ -1139,18 +1145,7 @@ function bucketTemplateAbilities(entries: MonsterPower[]): {
       traits.push(toMonsterTraitShape(entry));
       continue;
     }
-    if (
-      entry.action ||
-      (entry.usage ?? "").toLowerCase() !== "at-will" ||
-      entry.type ||
-      entry.range ||
-      (entry.attacks?.length ?? 0) > 0
-    ) {
-      powers.push(entry);
-      continue;
-    }
     powers.push(entry);
-    uncategorized.push(entry);
   }
   return { auras, traits, powers, uncategorized };
 }
