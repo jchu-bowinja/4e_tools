@@ -28,7 +28,11 @@ import {
   type MonsterPowerOutcomeEntry,
   type MonsterTrait
 } from "./storage";
-import { parsePastedMonsterTemplateText } from "./pasteMonsterTemplateEtl";
+import {
+  parsePastedMonsterTemplateText,
+  type MonsterTemplateImportValidation,
+  validateMonsterTemplateImport
+} from "./pasteMonsterTemplateEtl";
 import {
   formatMonsterStatLabelForDisplay,
   isRenderableCardValue,
@@ -109,6 +113,28 @@ const templateJsonCollapsibleSummaryStyle: CSSProperties = {
   textTransform: "uppercase",
   color: "var(--text-muted)"
 };
+
+const warningPanelStyle: CSSProperties = {
+  marginBottom: "0.75rem",
+  border: "1px solid var(--status-warning)",
+  backgroundColor: "var(--surface-0)",
+  borderRadius: 8,
+  padding: "0.6rem 0.75rem"
+};
+
+const errorPanelStyle: CSSProperties = {
+  marginBottom: "0.75rem",
+  border: "1px solid var(--status-danger)",
+  backgroundColor: "var(--surface-0)",
+  borderRadius: 8,
+  padding: "0.6rem 0.75rem"
+};
+
+function mapImportParseErrorToMessage(errorCode: string): string {
+  if (errorCode === "emptyInput") return "No paste text was provided.";
+  if (errorCode === "couldNotInferTemplateName") return "Could not infer a template name from the pasted text.";
+  return errorCode;
+}
 
 function TemplateJsonCollapsible({
   summaryLabel,
@@ -1780,6 +1806,7 @@ export function MonsterEditorApp({
   const [createNameHint, setCreateNameHint] = useState<string>("");
   const [createDraftJson, setCreateDraftJson] = useState<string>("");
   const [createImportMessage, setCreateImportMessage] = useState<string>("");
+  const [createImportValidation, setCreateImportValidation] = useState<MonsterTemplateImportValidation | null>(null);
   const [isBusy, setIsBusy] = useState<boolean>(false);
   const [jsonSearchInput, setJsonSearchInput] = useState<string>("");
   const [jsonSearchQuery, setJsonSearchQuery] = useState<string>("");
@@ -2111,6 +2138,16 @@ export function MonsterEditorApp({
     }
   }, [viewerTab, createDraftJson]);
 
+  const createDraftValidation = useMemo<MonsterTemplateImportValidation>(() => {
+    if (viewerTab !== "createTemplate") return { errors: [], warnings: [] };
+    const raw = createDraftJson.trim();
+    if (!raw) return { errors: [], warnings: [] };
+    if (createDraftJsonInvalid || !createDraftTemplateRecord) {
+      return { errors: ["Draft JSON is invalid."], warnings: [] };
+    }
+    return validateMonsterTemplateImport(createDraftTemplateRecord);
+  }, [viewerTab, createDraftJson, createDraftJsonInvalid, createDraftTemplateRecord]);
+
   const insertCreatePasteMarker = useCallback((marker: "[ABILITY]" | "[ABILITYEND]") => {
     const el = createPasteTextareaRef.current;
     if (!el) {
@@ -2428,16 +2465,26 @@ export function MonsterEditorApp({
             onClick={() => {
               setIsBusy(true);
               setCreateImportMessage("");
+              setCreateImportValidation(null);
               void parsePastedMonsterTemplateText(createPasteText, createNameHint)
                 .then((result) => {
                   if (!result.ok) {
-                    setCreateImportMessage(result.error);
+                    const mappedError = mapImportParseErrorToMessage(result.error);
+                    setCreateImportMessage(mappedError);
+                    setCreateImportValidation({ errors: [mappedError], warnings: [] });
                     return;
                   }
                   setCreateDraftJson(JSON.stringify(result.template, null, 2));
-                  setCreateImportMessage(
-                    "Imported. Review and edit the JSON panel below, then save to custom templates."
-                  );
+                  setCreateImportValidation(result.validation);
+                  if (result.validation.errors.length > 0) {
+                    setCreateImportMessage("Imported with issues. Fix import errors before saving.");
+                  } else if (result.validation.warnings.length > 0) {
+                    setCreateImportMessage(`Imported with ${result.validation.warnings.length} warning(s). Review before saving.`);
+                  } else {
+                    setCreateImportMessage(
+                      "Imported. Review and edit the JSON panel below, then save to custom templates."
+                    );
+                  }
                 })
                 .finally(() => setIsBusy(false));
             }}
@@ -2446,8 +2493,12 @@ export function MonsterEditorApp({
           </button>
           <button
             type="button"
-            disabled={isBusy || !createDraftJson.trim()}
+            disabled={isBusy || !createDraftJson.trim() || createDraftValidation.errors.length > 0}
             onClick={() => {
+              if (createDraftValidation.errors.length > 0) {
+                setCreateImportMessage("Fix import issues before saving.");
+                return;
+              }
               let parsed: MonsterTemplateRecord;
               try {
                 parsed = JSON.parse(createDraftJson) as MonsterTemplateRecord;
@@ -2507,7 +2558,9 @@ export function MonsterEditorApp({
                 : viewerTab === "templates"
                   ? templateMessage
                   : createImportMessage;
-            return line.toLowerCase().includes("could not") || line.toLowerCase().includes("invalid")
+            return line.toLowerCase().includes("could not") ||
+              line.toLowerCase().includes("invalid") ||
+              line.toLowerCase().includes("issues")
               ? "var(--status-danger)"
               : "var(--text-muted)";
           })()
@@ -2519,6 +2572,31 @@ export function MonsterEditorApp({
             ? templateMessage
             : createImportMessage}
       </div>
+      {viewerTab === "createTemplate" && createImportValidation && createImportValidation.errors.length > 0 && (
+        <div style={errorPanelStyle}>
+          <strong style={{ fontSize: "0.85rem", color: "var(--status-danger)" }}>Import issues</strong>
+          <ul style={{ margin: "0.35rem 0 0 1rem", color: "var(--status-danger)", fontSize: "0.85rem" }}>
+            {createImportValidation.errors.map((error) => (
+              <li key={error}>{error}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {viewerTab === "createTemplate" && createImportValidation && createImportValidation.warnings.length > 0 && (
+        <div style={warningPanelStyle}>
+          <strong style={{ fontSize: "0.85rem", color: "var(--status-warning)" }}>Import warnings</strong>
+          <ul style={{ margin: "0.35rem 0 0 1rem", color: "var(--status-warning)", fontSize: "0.85rem" }}>
+            {createImportValidation.warnings.map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {viewerTab === "createTemplate" && createDraftValidation.errors.length > 0 && (
+        <div style={{ marginTop: "-0.35rem", marginBottom: "0.75rem", color: "var(--status-danger)", fontSize: "0.8rem" }}>
+          Save is disabled until blocking import issues are fixed.
+        </div>
+      )}
 
       <div
         style={{

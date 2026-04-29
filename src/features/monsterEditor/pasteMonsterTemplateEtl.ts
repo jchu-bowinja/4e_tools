@@ -15,8 +15,13 @@ import type {
 } from "./storage";
 
 export type ParsePasteResult =
-  | { ok: true; template: MonsterTemplateRecord }
+  | { ok: true; template: MonsterTemplateRecord; validation: MonsterTemplateImportValidation }
   | { ok: false; error: string };
+
+export type MonsterTemplateImportValidation = {
+  errors: string[];
+  warnings: string[];
+};
 
 const PAGE_NUMBER_RE = /^\s*\d+\s*$/;
 const ROLE_LINE_RE =
@@ -1368,6 +1373,59 @@ function parseSimpleTemplateSections(lines: string[]) {
   };
 }
 
+function summarizeAbilityNames(entries: MonsterPower[], limit = 3): string {
+  const labels = entries
+    .map((entry) => String(entry.name ?? "").trim())
+    .filter(Boolean)
+    .slice(0, limit);
+  if (labels.length === 0) return "";
+  if (entries.length > labels.length) return `${labels.join(", ")}, ...`;
+  return labels.join(", ");
+}
+
+export function validateMonsterTemplateImport(template: MonsterTemplateRecord): MonsterTemplateImportValidation {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  if (!String(template.templateName ?? "").trim()) {
+    errors.push("Template name is missing.");
+  }
+
+  if (!Array.isArray(template.powers)) {
+    errors.push("Powers must be an array.");
+  } else if (template.powers.length === 0) {
+    errors.push("No powers were parsed from the imported text.");
+  }
+
+  const unparsedStats = Array.isArray(template.stats?.unparsedStatLines) ? template.stats.unparsedStatLines : [];
+  if (unparsedStats.length > 0) {
+    warnings.push(`${unparsedStats.length} stat line(s) could not be parsed.`);
+  }
+  const longFragments = unparsedStats.filter((line) => String(line).trim().length >= 120);
+  if (longFragments.length > 0) {
+    warnings.push(`${longFragments.length} unparsed stat fragment(s) are unusually long; check OCR line breaks.`);
+  }
+
+  const uncategorized = Array.isArray(template.uncategorizedAbilities) ? template.uncategorizedAbilities : [];
+  if (uncategorized.length > 0) {
+    const names = summarizeAbilityNames(uncategorized);
+    warnings.push(
+      names
+        ? `${uncategorized.length} ability block(s) were only partially categorized (${names}).`
+        : `${uncategorized.length} ability block(s) were only partially categorized.`
+    );
+  }
+
+  const hasOtherStats =
+    !!template.stats &&
+    Object.keys(template.stats).some((key) => key !== "unparsedStatLines");
+  if (hasOtherStats && !String(template.roleLine ?? "").trim()) {
+    warnings.push("Role line is missing, so role/tier metadata may be incomplete.");
+  }
+
+  return { errors, warnings };
+}
+
 export function parsePastedMonsterTemplateTextLocal(rawText: string, templateNameHint?: string): ParsePasteResult {
   const lines = toLines(rawText);
   if (!lines.length) return { ok: false, error: "emptyInput" };
@@ -1377,7 +1435,8 @@ export function parsePastedMonsterTemplateTextLocal(rawText: string, templateNam
 
   const mechanical = parseSimpleTemplateSections(lines);
   const template = buildTemplateRow(name, mechanical);
-  return { ok: true, template };
+  const validation = validateMonsterTemplateImport(template);
+  return { ok: true, template, validation };
 }
 
 export async function parsePastedMonsterTemplateText(
