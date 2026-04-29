@@ -46,6 +46,12 @@ import {
 } from "./monsterTextUtils";
 import { buildMonsterPowerCardViewModel } from "./monsterPowerCardViewModel";
 import { normalizeMonsterPowerShape } from "./monsterPowerNormalize";
+import {
+  buildMonsterTemplatesExportFile,
+  normalizeImportedTemplateRecord,
+  parseMonsterTemplatesImportJson,
+  stringifyMonsterTemplatesJsonFile
+} from "./monsterTemplatesJsonFile";
 
 /** Matches CharacterSheetApp: panels, section titles, labels, and body scale. */
 const panelStyle: CSSProperties = {
@@ -1822,6 +1828,7 @@ export function MonsterEditorApp({
   const leaveGlossaryHover = glossaryTooltipUi.leaveHover;
   const jsonTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const createPasteTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const customTemplatesJsonFileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -1979,6 +1986,55 @@ export function MonsterEditorApp({
     if (templateRows.length === 0) return null;
     return templateRows[selectedTemplateIdx] ?? null;
   }, [templateRows, selectedTemplateIdx]);
+
+  const importCustomTemplatesJsonText = useCallback(
+    (text: string) => {
+      const parsed = parseMonsterTemplatesImportJson(text);
+      if (!parsed.ok) {
+        setTemplateMessage(parsed.error);
+        return;
+      }
+      const normalized = parsed.templates.map((t) => normalizeImportedTemplateRecord(t));
+      const skipped: string[] = [];
+      const okRows: MonsterTemplateRecord[] = [];
+      for (let i = 0; i < normalized.length; i++) {
+        const row = normalized[i];
+        const v = validateMonsterTemplateImport(row);
+        if (v.errors.length > 0) {
+          const label = String(row.templateName ?? "").trim() || `#${i + 1}`;
+          skipped.push(`${label}: ${v.errors.join("; ")}`);
+          continue;
+        }
+        okRows.push(row);
+      }
+      if (okRows.length === 0) {
+        setTemplateMessage(
+          skipped.length > 0
+            ? `Could not import any templates. ${skipped.slice(0, 6).join(" · ")}${skipped.length > 6 ? "…" : ""}`
+            : "Nothing to import."
+        );
+        return;
+      }
+      let nextCustom = readCustomMonsterTemplates();
+      for (const t of [...okRows].reverse()) {
+        const key = normalizeTemplateDedupeKey(t);
+        nextCustom = [t, ...nextCustom.filter((x) => normalizeTemplateDedupeKey(x) !== key)];
+      }
+      writeCustomMonsterTemplates(nextCustom);
+      const merged = mergeServerAndCustomTemplates(nextCustom, serverTemplateRows);
+      setTemplateRows(merged);
+      const firstImported = okRows[0];
+      const firstKey = normalizeTemplateDedupeKey(firstImported);
+      const idx = merged.findIndex((t) => normalizeTemplateDedupeKey(t) === firstKey);
+      setSelectedTemplateIdx(idx >= 0 ? idx : 0);
+      const skipMsg =
+        skipped.length > 0
+          ? ` Skipped ${skipped.length}: ${skipped.slice(0, 2).join(" · ")}${skipped.length > 2 ? "…" : ""}`
+          : "";
+      setTemplateMessage(`Imported ${okRows.length} custom template(s).${skipMsg}`);
+    },
+    [serverTemplateRows]
+  );
 
   const roleOptions = useMemo(() => {
     const unique = new Set<string>();
@@ -2256,7 +2312,13 @@ export function MonsterEditorApp({
             Template overlays from{" "}
             <code style={{ fontSize: "0.92em" }}>generated/monster_templates.json</code> (published PDF-derived text plus
             structured stats and powers). Custom templates saved here live in{" "}
-            <code style={{ fontSize: "0.92em" }}>localStorage</code> only until you copy them into generated JSON.
+            <code style={{ fontSize: "0.92em" }}>localStorage</code> only until you copy them into generated JSON.{" "}
+            <strong>Export Templates</strong> saves the full list shown here (generated{" "}
+            <code style={{ fontSize: "0.92em" }}>monster_templates.json</code> plus browser-saved customs when loaded).{" "}
+            <strong>Copy template</strong> copies JSON for the template selected in the list;{" "}
+            <strong>Import templates</strong> / <strong>Import from clipboard</strong> accepts one template, an array, or the{" "}
+            <code style={{ fontSize: "0.92em" }}>{`{ meta, templates }`}</code> bundle (same as generated{" "}
+            <code style={{ fontSize: "0.92em" }}>monster_templates.json</code>).
           </>
         ) : (
           <>
@@ -2418,6 +2480,101 @@ export function MonsterEditorApp({
             disabled={isBusy}
           >
             Reload templates
+          </button>
+          <button
+            type="button"
+            disabled={isBusy || templateRows.length === 0}
+            title={
+              templateRows.length === 0
+                ? "No templates loaded — reload or fix generated/monster_templates.json"
+                : "Export { meta, templates } to a file (loaded generated templates plus local customs)"
+            }
+            onClick={() => {
+              const rows = templateRows;
+              if (rows.length === 0) return;
+              const file = buildMonsterTemplatesExportFile(rows);
+              const text = stringifyMonsterTemplatesJsonFile(file);
+              const blob = new Blob([text], { type: "application/json;charset=utf-8" });
+              const url = URL.createObjectURL(blob);
+              try {
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `monster_templates_export_${new Date().toISOString().slice(0, 10)}.json`;
+                a.rel = "noopener";
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+              } finally {
+                URL.revokeObjectURL(url);
+              }
+              setTemplateMessage(
+                `Exported ${rows.length} template(s) as JSON (meta + templates, like monster_templates.json).`
+              );
+            }}
+          >
+            Export Templates
+          </button>
+          <button
+            type="button"
+            disabled={isBusy || !selectedTemplateRecord}
+            title={
+              !selectedTemplateRecord
+                ? "Select a template in the list first"
+                : "Copy this template record as pretty-printed JSON"
+            }
+            onClick={() => {
+              const record = selectedTemplateRecord;
+              if (!record) return;
+              if (!navigator.clipboard?.writeText) {
+                alert("Clipboard API unavailable in this browser.");
+                return;
+              }
+              const text = `${JSON.stringify(record, null, 2)}\n`;
+              void navigator.clipboard.writeText(text);
+              const label = String(record.templateName ?? "").trim() || "template";
+              setTemplateMessage(`Copied “${label}” as JSON.`);
+            }}
+          >
+            Copy template
+          </button>
+          <input
+            ref={customTemplatesJsonFileInputRef}
+            type="file"
+            accept=".json,application/json"
+            aria-label="Import templates from a JSON file"
+            style={{ display: "none" }}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (!file) return;
+              void file.text().then(importCustomTemplatesJsonText, () => {
+                setTemplateMessage("Could not read file.");
+              });
+            }}
+          />
+          <button
+            type="button"
+            disabled={isBusy}
+            title="Choose a .json file: one template object, an array of templates, or { meta, templates }"
+            onClick={() => customTemplatesJsonFileInputRef.current?.click()}
+          >
+            Import templates
+          </button>
+          <button
+            type="button"
+            disabled={isBusy}
+            title="Import JSON from the clipboard (same formats as file import)"
+            onClick={() => {
+              if (!navigator.clipboard?.readText) {
+                alert("Clipboard read is unavailable in this browser.");
+                return;
+              }
+              void navigator.clipboard.readText().then(importCustomTemplatesJsonText, () => {
+                setTemplateMessage("Could not read clipboard.");
+              });
+            }}
+          >
+            Import from clipboard
           </button>
           <button
             type="button"
