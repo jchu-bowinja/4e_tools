@@ -249,10 +249,18 @@ interface MonsterTemplatesPayload {
 
 export async function loadMonsterTemplates(): Promise<MonsterTemplateRecord[]> {
   const response = await fetch("/generated/monster_templates.json");
-  if (!response.ok) {
+  const body = await response.text();
+  const trimmed = body.trimStart();
+  // Missing asset: dev servers often return SPA index.html with 200, which is not JSON.
+  if (!response.ok || trimmed.startsWith("<")) {
     throw new Error("Could not load generated/monster_templates.json. Generate templates JSON first.");
   }
-  const data = (await response.json()) as MonsterTemplatesPayload;
+  let data: MonsterTemplatesPayload;
+  try {
+    data = JSON.parse(body) as MonsterTemplatesPayload;
+  } catch {
+    throw new Error("Could not load generated/monster_templates.json. Generate templates JSON first.");
+  }
   if (!Array.isArray(data.templates)) {
     throw new Error("Invalid generated/monster_templates.json format.");
   }
