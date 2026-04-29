@@ -939,15 +939,56 @@ function renderAttackOutcome(
       {damageSummary ? <div style={captionMuted}>{damageSummary}</div> : null}
       {outcome.nestedAttackDescriptions?.length ? (
         <div style={{ ...bodySecondary, marginTop: "0.15rem" }}>
-          {outcome.nestedAttackDescriptions.map((text, idx) => (
-            <div key={`${label}-nested-${idx}`}>
-              {renderGlossaryAwareText(
-                text,
-                commonDescriptiveGlossaryPhrases,
-                startGlossaryHover,
-                leaveGlossaryHover,
-                `${label}-nested-${idx}`,
-                shouldHighlightTerm
+          {outcome.nestedAttackDescriptions.map((textOrMini, idx) => (
+            <div key={`${label}-nested-${idx}`} style={{ marginTop: idx ? "0.35rem" : undefined }}>
+              {typeof textOrMini === "string" ? (
+                renderGlossaryAwareText(
+                  textOrMini,
+                  commonDescriptiveGlossaryPhrases,
+                  startGlossaryHover,
+                  leaveGlossaryHover,
+                  `${label}-nested-${idx}`,
+                  shouldHighlightTerm
+                )
+              ) : (
+                <>
+                  {textOrMini.description ? (
+                    <div style={{ ...richTextBodyPrimary.paragraphStyle, whiteSpace: "pre-wrap" }}>
+                      {renderGlossaryAwareText(
+                        textOrMini.description,
+                        commonDescriptiveGlossaryPhrases,
+                        startGlossaryHover,
+                        leaveGlossaryHover,
+                        `${label}-nested-${idx}-desc`,
+                        shouldHighlightTerm
+                      )}
+                    </div>
+                  ) : null}
+                  {textOrMini.aftereffects?.length ? (
+                    <div style={{ marginTop: "0.18rem" }}>
+                      <div style={microLabelStyle}>Aftereffects</div>
+                      {textOrMini.aftereffects.map((entry, j) =>
+                        renderOutcomeEntry(entry, j, "Aftereffect", startGlossaryHover, leaveGlossaryHover, shouldHighlightTerm)
+                      )}
+                    </div>
+                  ) : null}
+                  {textOrMini.sustains?.length ? (
+                    <div style={{ marginTop: "0.18rem" }}>
+                      <div style={microLabelStyle}>Sustains</div>
+                      {textOrMini.sustains.map((entry, j) =>
+                        renderOutcomeEntry(entry, j, "Sustain", startGlossaryHover, leaveGlossaryHover, shouldHighlightTerm)
+                      )}
+                    </div>
+                  ) : null}
+                  {textOrMini.failedSavingThrows?.length ? (
+                    <div style={{ marginTop: "0.18rem" }}>
+                      <div style={microLabelStyle}>Failed Saving Throws</div>
+                      {textOrMini.failedSavingThrows.map((entry, j) =>
+                        renderOutcomeEntry(entry, j, "Failed Save", startGlossaryHover, leaveGlossaryHover, shouldHighlightTerm)
+                      )}
+                    </div>
+                  ) : null}
+                </>
               )}
             </div>
           ))}
@@ -1243,7 +1284,7 @@ function MonsterPowersPanels({
   startGlossaryHover: (event: ReactMouseEvent<HTMLElement>, key: MonsterGlossaryHoverKey) => void;
   leaveGlossaryHover: () => void;
   shouldHighlightGlossaryTerm: (term: string) => boolean;
-  /** When set (e.g. create-template tab), render JSON for each power below the card body. */
+  /** Render collapsible JSON for each power below the card body (template preview; parent defaults on). */
   showJson?: boolean;
 }): JSX.Element {
   const groupedPowers = useMemo(() => {
@@ -1590,14 +1631,14 @@ function MonsterTemplateFormattedView({
   startGlossaryHover,
   leaveGlossaryHover,
   shouldHighlightGlossaryTerm,
-  showAbilityJson
+  showAbilityJson = true
 }: {
   record: MonsterTemplateRecord;
   glossaryKeyPrefix: string;
   startGlossaryHover: (event: ReactMouseEvent<HTMLElement>, key: MonsterGlossaryHoverKey) => void;
   leaveGlossaryHover: () => void;
   shouldHighlightGlossaryTerm: (term: string) => boolean;
-  /** Create-template preview: show JSON for each aura, trait, and power. */
+  /** Collapsible JSON under each aura, trait, and power. Default true; pass false to hide. */
   showAbilityJson?: boolean;
 }): JSX.Element {
   return (
@@ -3848,7 +3889,6 @@ export function MonsterEditorApp({
                     startGlossaryHover={startGlossaryHover}
                     leaveGlossaryHover={leaveGlossaryHover}
                     shouldHighlightGlossaryTerm={shouldHighlightGlossaryTerm}
-                    showAbilityJson
                   />
                 ) : (
                   <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.8125rem", lineHeight: 1.45 }}>
