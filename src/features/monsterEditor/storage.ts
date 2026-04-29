@@ -229,13 +229,38 @@ export interface MonsterTemplatePasteStatsOptionB {
   unparsedStatLines?: string[];
 }
 
+/** Ability scores referenced in template prerequisites (minAbility leaves). */
+export type MonsterTemplateAbilityKey = "str" | "dex" | "con" | "int" | "wis" | "cha";
+
+/**
+ * Flat prerequisite rules (readable JSON). All stated conditions are AND’d together.
+ * Creature-type filters: use `typeOr` when the book lists alternatives (OR); use `typeAnd` for a single conjunction of tags (AND).
+ */
+export type MonsterTemplatePrerequisite = {
+  /** @deprecated Legacy saves only; prefer an empty object `{}` for no prerequisite. */
+  none?: boolean;
+  minLevel?: number;
+  abilities?: Partial<Record<MonsterTemplateAbilityKey, number>>;
+  /** "Living creature" / must not be undead for this requirement */
+  living?: boolean;
+  /** Undead-only */
+  undead?: boolean;
+  /** Flat OR list: each string is one alternative (e.g. `"humanoid"`, `"magical beast"`). Shared “living” is `living`, not repeated here. */
+  typeOr?: string[];
+  /** Flat AND list: each string must match (multi-word phrases as one string). */
+  typeAnd?: string[];
+};
+
 export interface MonsterTemplateRecord {
   templateName: string;
   sourceBook: string;
   pageStart?: number;
   pageEnd?: number;
   description?: string;
+  /** Original book line; optional when structured prerequisite is set. */
   prerequisite?: string;
+  /** Flat structured prerequisite; canonical for validation and tooling. */
+  prerequisiteExpr?: MonsterTemplatePrerequisite;
   roleLine?: string;
   role?: MonsterTemplateRole;
   isEliteTemplate?: boolean;

@@ -58,6 +58,7 @@ import {
   computeTemplateApplicationDelta,
   type TemplateApplicationDelta
 } from "./applyMonsterTemplate";
+import { migrateKindFieldsToType, parseMonsterTemplatePrerequisite } from "./templatePrerequisiteCriteria";
 
 /** Matches CharacterSheetApp: panels, section titles, labels, and body scale. */
 const panelStyle: CSSProperties = {
@@ -338,6 +339,13 @@ function mergeTemplatePrerequisiteSnippet(base: MonsterTemplateRecord, parsed: u
   const p = parsed as Record<string, unknown>;
   const next: MonsterTemplateRecord = { ...base };
   if ("prerequisite" in p) next.prerequisite = p.prerequisite == null ? undefined : String(p.prerequisite);
+  if ("prerequisiteExpr" in p && p.prerequisiteExpr != null && typeof p.prerequisiteExpr === "object") {
+    next.prerequisiteExpr = migrateKindFieldsToType(p.prerequisiteExpr) as MonsterTemplateRecord["prerequisiteExpr"];
+  } else if (next.prerequisite?.trim()) {
+    next.prerequisiteExpr = parseMonsterTemplatePrerequisite(next.prerequisite).data;
+  } else if ("prerequisite" in p) {
+    next.prerequisiteExpr = {};
+  }
   return next;
 }
 const bodySecondary: CSSProperties = { fontSize: "0.8rem", color: "var(--text-secondary)" };
@@ -1899,7 +1907,10 @@ function MonsterTemplateFormattedView({
           {liveSnippetEditing && onTemplateSnippetCommit ? (
             <TemplateJsonSnippetEditor
               summaryLabel="JSON"
-              value={{ prerequisite: record.prerequisite ?? "" }}
+              value={{
+                prerequisite: record.prerequisite ?? "",
+                prerequisiteExpr: record.prerequisiteExpr ?? {}
+              }}
               onValidCommit={(parsed) => onTemplateSnippetCommit((base) => mergeTemplatePrerequisiteSnippet(base, parsed))}
             />
           ) : null}

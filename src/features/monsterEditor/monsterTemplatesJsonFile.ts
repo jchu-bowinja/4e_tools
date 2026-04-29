@@ -1,4 +1,11 @@
-import type { MonsterTemplateRecord } from "./storage";
+import type { MonsterTemplateRecord, MonsterTemplatePrerequisite } from "./storage";
+import {
+  flattenLegacyPrerequisiteAst,
+  isLegacyPrerequisiteAst,
+  legacyPrerequisiteCriteriaToFlat,
+  migrateKindFieldsToType,
+  parseMonsterTemplatePrerequisite
+} from "./templatePrerequisiteCriteria";
 
 /**
  * Top-level shape of `generated/monster_templates.json` — `loadMonsterTemplates()` reads `templates` only;
@@ -109,9 +116,28 @@ export function parseMonsterTemplatesImportJson(text: string): ParseMonsterTempl
 export function normalizeImportedTemplateRecord(record: MonsterTemplateRecord): MonsterTemplateRecord {
   const sourceBook = String(record.sourceBook ?? "").trim() || "manual import";
   const powers = Array.isArray(record.powers) ? record.powers : [];
+  const prerequisite = record.prerequisite?.trim();
+  const legacyCrit = (record as MonsterTemplateRecord & { prerequisiteCriteria?: unknown }).prerequisiteCriteria;
+
+  let prerequisiteExpr: MonsterTemplatePrerequisite | undefined = migrateKindFieldsToType(
+    record.prerequisiteExpr as unknown
+  ) as MonsterTemplatePrerequisite | undefined;
+  if (prerequisiteExpr != null && isLegacyPrerequisiteAst(prerequisiteExpr)) {
+    prerequisiteExpr = flattenLegacyPrerequisiteAst(prerequisiteExpr) ?? undefined;
+  }
+  if (prerequisiteExpr === undefined) {
+    prerequisiteExpr = legacyPrerequisiteCriteriaToFlat(legacyCrit);
+  }
+  if (prerequisiteExpr === undefined && prerequisite) {
+    prerequisiteExpr = parseMonsterTemplatePrerequisite(prerequisite).data;
+  }
+  const { prerequisiteCriteria: _dropLegacy, ...rest } = record as MonsterTemplateRecord & {
+    prerequisiteCriteria?: unknown;
+  };
   return {
-    ...record,
+    ...rest,
     sourceBook,
-    powers
+    powers,
+    prerequisiteExpr
   };
 }

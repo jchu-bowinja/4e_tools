@@ -15,6 +15,7 @@ import type {
   MonsterTrait
 } from "./storage";
 import { normalizeMonsterPowerShape } from "./monsterPowerNormalize";
+import { parseMonsterTemplatePrerequisite } from "./templatePrerequisiteCriteria";
 
 export type ParsePasteResult =
   | { ok: true; template: MonsterTemplateRecord; validation: MonsterTemplateImportValidation }
@@ -1195,6 +1196,7 @@ function buildTemplateRow(
     pageEnd: 0,
     description,
     prerequisite: prereq || undefined,
+    prerequisiteExpr: prereq.trim() ? parseMonsterTemplatePrerequisite(prereq).data : undefined,
     roleLine: roleLineStr || undefined,
     role: parseRoleLine(roleLineStr),
     isEliteTemplate: isElite,

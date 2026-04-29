@@ -65,4 +65,12 @@ describe("parseMonsterTemplatesImportJson", () => {
     expect(Array.isArray(n.powers)).toBe(true);
     expect(n.powers).toHaveLength(0);
   });
+
+  it("derives prerequisiteExpr from prerequisite when absent", () => {
+    const n = normalizeImportedTemplateRecord({
+      ...minimalTemplate("Z"),
+      prerequisite: "Humanoid, level 11"
+    });
+    expect(n.prerequisiteExpr).toEqual({ minLevel: 11, typeAnd: ["humanoid"] });
+  });
 });
