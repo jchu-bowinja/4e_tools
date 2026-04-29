@@ -434,6 +434,29 @@ Hit Points +8 per level + Constitution score (controller) or +6 per level + Cons
     expect(hp?.default).toBeUndefined();
   });
 
+  it("merges ✦ keyword spill across lines into one power (Unholy Flames: Fire, / Necrotic)", () => {
+    const block = `Death Knight Elite Soldier (Leader)
+(undead) XP Elite
+Hit Points +8 per level + Constitution score
+POWERS
+C Unholy Flames (standard; recharge ⚄ ⚅) ✦ Fire,
+Necrotic
+ Close burst 2; level +2 vs. Reflex; 6d8 + Constitution
+modifier necrotic and fire damage to living creatures;
+undead creatures within the burst (including the death
+knight) deal an extra 2d6 fire damage with melee attacks
+until the end of the death knight's next turn.`;
+    const r = parsePastedMonsterTemplateTextLocal(block, "Death Knight");
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const u = r.template.powers.find((p) => /unholy flames/i.test(p.name));
+    expect(u).toBeDefined();
+    const desc = `${u?.name} ${u?.description ?? ""} ${u?.keywords ?? ""}`.toLowerCase();
+    expect(desc).toContain("close burst");
+    expect(desc).toContain("2d6");
+    expect(r.template.powers.filter((p) => /^necrotic$/i.test(String(p.name).trim())).length).toBe(0);
+  });
+
   it("merges name + following Aura N line into one aura (Death Knight Marshal Undead layout)", () => {
     const block = `Death Knight Elite Soldier (Leader)
 (undead) XP Elite

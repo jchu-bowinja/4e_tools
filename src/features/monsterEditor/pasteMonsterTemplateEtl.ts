@@ -595,6 +595,26 @@ const KNOWN_SKILLS = [
 const DAMAGE_TYPES = ["acid", "cold", "fire", "force", "lightning", "necrotic", "poison", "psychic", "radiant", "thunder"];
 const TIER_LEVELS = [1, 11, 21] as const;
 
+const FLARE_OR_STAR_RE = /(?:✦|[\u2726\u2727\u2605])/u;
+const KEYWORD_SPILL_LINE_RE = /^[A-Za-z][A-Za-z ,/+-]{1,40}$/;
+
+/**
+ * Book layout splits keywords after ✦ across lines: `✦ Fire,` + `Necrotic`, or `✦ Fire` + `Necrotic`.
+ * Without this, `Necrotic` alone matches the short-title header rule and starts a bogus ability.
+ */
+function isLikelyFlareKeywordContinuation(prevLine: string, line: string): boolean {
+  const prev = prevLine.trim();
+  const next = line.trim();
+  if (!FLARE_OR_STAR_RE.test(prev)) return false;
+  if (!KEYWORD_SPILL_LINE_RE.test(next) || next.split(/\s+/).length > 3) return false;
+  if (/(?:✦|[\u2726\u2727\u2605])\s*$/u.test(prev) || /,\s*$/.test(prev)) return true;
+  const one = next.split(/\s+/).length === 1;
+  if (!one) return false;
+  const w = next.toLowerCase();
+  if (DAMAGE_TYPES.includes(w) || w === "weapon" || w === "implement") return true;
+  return false;
+}
+
 function parseSkillsLineEntries(rawLine: string): MonsterTemplatePasteSkillEntryOptionB[] {
   const out: MonsterTemplatePasteSkillEntryOptionB[] = [];
   const seen = new Set<string>();
@@ -1217,18 +1237,10 @@ function isAuraOnlyLeadContinuationLine(line: string): boolean {
 function splitSimpleAbilityBlocks(lines: string[]): string[][] {
   const blocks: string[][] = [];
   let current: string[] = [];
-  const trailingFlareRe = /(?:✦|[\u2726\u2727\u2605])\s*$/u;
-  const keywordOnlyRe = /^[A-Za-z][A-Za-z ,/+-]{1,40}$/;
   for (const raw of lines) {
     const line = raw.trim();
     if (!line) continue;
-    if (
-      current.length > 0 &&
-      current.length === 1 &&
-      trailingFlareRe.test(current[0] ?? "") &&
-      keywordOnlyRe.test(line) &&
-      line.split(/\s+/).length <= 3
-    ) {
+    if (current.length > 0 && isLikelyFlareKeywordContinuation(current[current.length - 1] ?? "", line)) {
       current.push(line);
       continue;
     }
