@@ -1859,14 +1859,23 @@ export function MonsterEditorApp({
       try {
         const templates = await loadMonsterTemplates();
         setServerTemplateRows(templates);
-        const merged = mergeServerAndCustomTemplates(readCustomMonsterTemplates(), templates);
+        const custom = readCustomMonsterTemplates();
+        const merged = mergeServerAndCustomTemplates(custom, templates);
         setTemplateRows(merged);
         setSelectedTemplateIdx((prev) => (merged.length === 0 ? 0 : Math.min(prev, merged.length - 1)));
-        setTemplateMessage(
-          `Loaded ${templates.length} server templates; ${readCustomMonsterTemplates().length} custom (local).`
-        );
+        setTemplateMessage(`Loaded ${templates.length} server templates; ${custom.length} custom (local).`);
       } catch (error) {
-        setTemplateMessage(error instanceof Error ? error.message : "Could not load monster templates.");
+        const custom = readCustomMonsterTemplates();
+        const merged = mergeServerAndCustomTemplates(custom, []);
+        setServerTemplateRows([]);
+        setTemplateRows(merged);
+        setSelectedTemplateIdx((prev) => (merged.length === 0 ? 0 : Math.min(prev, merged.length - 1)));
+        const errMsg = error instanceof Error ? error.message : "Could not load monster templates.";
+        setTemplateMessage(
+          merged.length > 0
+            ? `${errMsg} Showing ${custom.length} custom template(s) from local storage (no generated JSON).`
+            : errMsg
+        );
       }
     })();
   }, []);
@@ -2389,7 +2398,20 @@ export function MonsterEditorApp({
                   setTemplateMessage(`Reloaded ${rows.length} server templates (${merged.length} total with custom).`);
                 })
                 .catch((error: unknown) => {
-                  setTemplateMessage(error instanceof Error ? error.message : "Could not reload monster templates.");
+                  const custom = readCustomMonsterTemplates();
+                  const merged = mergeServerAndCustomTemplates(custom, serverTemplateRows);
+                  setTemplateRows(merged);
+                  setSelectedTemplateIdx((prev) =>
+                    merged.length === 0 ? 0 : Math.min(prev, merged.length - 1)
+                  );
+                  const errMsg = error instanceof Error ? error.message : "Could not reload monster templates.";
+                  setTemplateMessage(
+                    merged.length > 0
+                      ? serverTemplateRows.length > 0
+                        ? `${errMsg} Kept previous server list in memory; ${custom.length} custom from storage.`
+                        : `${errMsg} Showing ${custom.length} custom template(s) from local storage.`
+                      : errMsg
+                  );
                 })
                 .finally(() => setIsBusy(false));
             }}
