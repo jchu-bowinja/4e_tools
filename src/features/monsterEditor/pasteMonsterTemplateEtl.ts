@@ -20,8 +20,9 @@ const ROLE_LINE_RE =
 const ROLE_LINE_ELITE_ANCHOR_RE =
   /^(.+?)\s+Elite\s+(Soldier|Brute|Controller|Skirmisher|Artillery|Lurker)\b/i;
 const HEADER_TITLE_RE = /^[A-Z][A-Za-z' -]{2,}$/;
+/** `Hit Points` only when a formula follows — avoids matching body text like "hit points. An affected…". */
 const STAT_LINE_RE =
-  /^(Prerequisite:|Defenses\s*\+|Saving Throws|Action Points?|Hit Points|Resist|Immune|Vulnerable|Senses)\b/i;
+  /^(Prerequisite:|Defenses\s*\+|Saving Throws|Action Points?|Hit Points\b(?=\s*[+\d-])|Resist|Immune|Vulnerable|Senses)\b/i;
 const SECTION_MARKER_RE =
   /^(POWERS|TRAITS|STANDARD\s*A\s*CTIONS|MOVE\s*A\s*CTIONS|MINOR\s*A\s*CTIONS|MAJOR\s*A\s*CTIONS)\b/i;
 
@@ -43,14 +44,19 @@ function expandBlockLinesForTemplateParsing(lines: string[]): string[] {
   function splitOne(chunk: string): string[] {
     chunk = chunk.trim();
     if (!chunk) return [];
-    if (chunk.length > 90 && /\bHit Points\b/i.test(chunk)) {
-      const parts = chunk.split(/\s+(?=Hit Points\b)/i);
+    // Stat block continuation only — not narrative "(when … reduced to 0 hit points or fewer)".
+    if (chunk.length > 90 && /\bHit Points\b(?=\s*[+\d-])/i.test(chunk)) {
+      const parts = chunk.split(/\s+(?=Hit Points\b(?=\s*[+\d-]))/i);
       if (parts.length === 2) return [...splitOne(parts[0]), ...splitOne(parts[1])];
     }
     const m = chunk.match(
       /^(.+?\bElite\s+(?:Soldier|Brute|Controller|Skirmisher|Artillery|Lurker))\s+(Humanoid\s+XP\s+(?:Elite|Standard|Solo|Minion))\s+(.+)$/i
     );
     if (m) return [m[1].trim(), m[2].trim(), ...splitOne(m[3].trim())];
+    const mBeast = chunk.match(
+      /^(.+?\bElite\s+(?:Soldier|Brute|Controller|Skirmisher|Artillery|Lurker))\s+(Humanoid(?:\s+or\s+magical\s+beast)?\s+XP\s+(?:Elite|Standard|Solo|Minion))\s+(.+)$/i
+    );
+    if (mBeast) return [mBeast[1].trim(), mBeast[2].trim(), ...splitOne(mBeast[3].trim())];
     if (chunk.length > 100 && /\bWhenever\b/i.test(chunk)) {
       const wm = chunk.search(/\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,5}\s+Whenever\b/i);
       if (wm > 0) {
@@ -213,14 +219,17 @@ function isTemplateTailMarker(line: string): boolean {
 }
 
 function looksLikePowerName(line: string): boolean {
-  let clean = line.replace(/^[~✦.\s]+/, "").trim();
+  let clean = line.replace(/^[~✦\u2726\u2727\u2605.\s]+/u, "").trim();
   if (STAT_LINE_RE.test(clean)) return false;
   if (ROLE_LINE_ELITE_ANCHOR_RE.test(clean) || ROLE_LINE_RE.test(clean.trim())) return false;
   if (/^Level\s+\d+\s*:/i.test(clean)) return false;
-  if (/^Humanoid\s+XP\s+(?:Elite|Standard|Solo|Minion)\b/i.test(clean)) return false;
+  if (/^Humanoid(?:\s+or\s+magical\s+beast)?\s+XP\s+(?:Elite|Standard|Solo|Minion)\b/i.test(clean))
+    return false;
+  if (/^Keywords?\s/i.test(clean)) return false;
   if (/^[CMRA]\s+[A-Za-z]/i.test(clean)) return true;
   const headBeforeParen = clean.match(/^([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,6})\s*\(/);
-  if (clean.length > 80 && !headBeforeParen) return false;
+  // Long headers like "Death's Release (when …) ✦ Necrotic" fail the Title Title ( probe but are valid.
+  if (clean.length > 80 && !headBeforeParen && !/(?:✦|[\u2726\u2727\u2605])/u.test(clean)) return false;
   if (!clean) return false;
   if (!headBeforeParen && /[.;,]$/.test(clean)) return false;
   if (/^(✦|Aura|Effect:|Attack:|Hit:|Miss:)/.test(clean)) return false;
@@ -264,23 +273,118 @@ function looksLikePowerName(line: string): boolean {
   return true;
 }
 
+/** Join wrapped defense rows (e.g. "… against" / "charm and fear effects") before parsing. */
+function mergeStatLineContinuations(lines: string[]): string[] {
+  const merged: string[] = [];
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (
+      merged.length > 0 &&
+      /^Defenses\b/i.test(merged[merged.length - 1]!) &&
+      !STAT_LINE_RE.test(line) &&
+      !looksLikePowerName(line)
+    ) {
+      merged[merged.length - 1] = `${merged[merged.length - 1]} ${line}`;
+      continue;
+    }
+    merged.push(line);
+  }
+  return merged;
+}
+
 function extractDamageExpressions(text: string): string[] {
   const re = /\b\d+d\d+(?:\s*\+\s*[^;,.]+)?/gi;
   return text.match(re) ?? [];
 }
 
+function titleCaseKeywordToken(s: string): string {
+  const t = s.trim();
+  if (!t) return "";
+  return t
+    .split(/\s+/)
+    .map((w) => (w.length ? w[0]!.toUpperCase() + w.slice(1).toLowerCase() : w))
+    .join(" ");
+}
+
+/** Lines like `Keyword fear` / `Keywords Cold, Fire` apply to the next aura or trait in the block. */
+function parseKeywordDirectiveLine(line: string): string[] {
+  const t = line.trim();
+  if (!/^Keywords?\s/i.test(t)) return [];
+  const m = t.match(/^Keywords?\s*:?\s*(.+)$/i);
+  if (!m?.[1]) return [];
+  return m[1]
+    .split(/\s*,\s*|\s+and\s+/i)
+    .map((x) => titleCaseKeywordToken(x))
+    .filter(Boolean);
+}
+
+const PAREN_TRAIT_KEYWORD_SKIP =
+  /\brecharge\b|\bstandard\b|\bminor\b|\bmove\b|\bfree\b|\bencounter\b|\bdaily\b|\bimmediate\b|\breaction\b/i;
+
+/** Parenthetical labels on auras/traits, e.g. `Fear of Worms (Fear) aura 3` → Fear. Skips action headers like `(move; recharge …)`. */
+function extractParentheticalTraitKeywords(headerLine: string): string[] {
+  const out: string[] = [];
+  const re = /\(([^)]+)\)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(headerLine)) !== null) {
+    const inner = m[1].trim();
+    if (!inner || inner.length > 55) continue;
+    if (inner.includes(";")) continue;
+    if (PAREN_TRAIT_KEYWORD_SKIP.test(inner)) continue;
+    for (const part of inner.split(/\s*,\s*/)) {
+      const tok = titleCaseKeywordToken(part);
+      if (tok) out.push(tok);
+    }
+  }
+  return [...new Set(out)];
+}
+
+function mergeTraitKeywordLists(...groups: (string[] | undefined)[]): string[] {
+  const s = new Set<string>();
+  for (const g of groups) {
+    for (const x of g ?? []) {
+      const t = titleCaseKeywordToken(String(x));
+      if (t) s.add(t);
+    }
+  }
+  return [...s].sort((a, b) => a.localeCompare(b));
+}
+
+/**
+ * D&D 4e recharge line lists one or more d6 face symbols (⚀…⚅ = 1…6). The roll succeeds if the
+ * die shows **any** listed face; we store the **lowest** face as `usageDetails` (e.g. ⚄ ⚅ → `"5"`,
+ * ⚅ alone → `"6"`), matching "recharge 5–6" / "recharge 6" shorthand.
+ */
 function parseRechargeDetails(text: string): string {
-  const dieMap: Record<string, number> = { "⚀": 1, "⚁": 2, "⚂": 3, "⚃": 4, "⚄": 5, "⚅": 6 };
+  // Unicode dice (U+2680–U+2685); strip VS-16 (U+FE0F) so "⚄️" still matches.
+  const s = String(text ?? "")
+    .normalize("NFC")
+    .replace(/\uFE0F/g, "");
   const values: number[] = [];
-  for (const [sym, v] of Object.entries(dieMap)) if (text.includes(sym)) values.push(v);
+  for (const ch of s) {
+    const cp = ch.codePointAt(0);
+    if (cp !== undefined && cp >= 0x2680 && cp <= 0x2685) values.push(cp - 0x2680 + 1);
+  }
   if (values.length) return String(Math.min(...values));
-  const m = text.match(/recharge\s+(\d+)/i);
+  const m = s.match(/recharge\s+(\d+)/i);
   return m ? m[1] : "";
 }
 
-function normalizePowerToMonsterShape(name: string, text: string): MonsterPower {
-  let header = name.trim();
+function normalizePowerToMonsterShape(name: string, text: string, leadKeywords?: string[]): MonsterPower {
+  const rawTitleLine = name.trim();
+  let header = rawTitleLine;
   let body = text.trim();
+  // Newline/OCR: "Clever Escape" on one line and "(move; recharge ⚄ ⚅)" on the next — merge into header for usage/recharge.
+  const leadParen = /^\s*\(([^)]*)\)/.exec(body);
+  if (
+    leadParen &&
+    !/\brecharge\b|\bencounter\b|\bdaily\b/i.test(header) &&
+    /\brecharge\b|\bencounter\b|\bdaily\b/i.test(leadParen[0])
+  ) {
+    header = `${header} ${leadParen[0].trim()}`;
+    body = body.slice(leadParen[0].length).trim();
+  }
   let actionType = "";
   const actionPrefix = header.match(/^([CMRA])\s+(.+)$/i);
   if (actionPrefix) {
@@ -301,7 +405,9 @@ function normalizePowerToMonsterShape(name: string, text: string): MonsterPower 
   let usageDetails = "";
   if (/recharge/i.test(header)) {
     usage = "Recharge";
-    usageDetails = parseRechargeDetails(header);
+    usageDetails = parseRechargeDetails(`${header}\n${body}`);
+    if (!usageDetails) usageDetails = parseRechargeDetails(header);
+    if (!usageDetails) usageDetails = parseRechargeDetails(`${name.trim()}\n${text.trim()}`);
   } else if (/encounter/i.test(header)) usage = "Encounter";
   else if (/daily/i.test(header)) usage = "Daily";
 
@@ -312,8 +418,17 @@ function normalizePowerToMonsterShape(name: string, text: string): MonsterPower 
   if (actionMatch) action = actionMatch[1].replace(/\b\w/g, (c) => c.toUpperCase());
 
   let keywordsBlob = "";
-  const kwMatch = header.match(/✦\s*(.+)$/);
-  if (kwMatch) keywordsBlob = kwMatch[1].trim().replace(/,$/, "");
+  /** Keywords after ✦ on the header (e.g. traits: `✦ Necrotic`) — merged into template trait/aura keywords. */
+  let flareTraitKeywordTokens: string[] = [];
+  const kwMatch = header.match(/(?:✦|[\u2726\u2727\u2605])\s*(.+)$/u);
+  if (kwMatch) {
+    const flareRaw = kwMatch[1].trim().replace(/,$/, "");
+    flareTraitKeywordTokens = flareRaw
+      .split(",")
+      .map((k) => titleCaseKeywordToken(k.trim()))
+      .filter(Boolean);
+    keywordsBlob = flareRaw;
+  }
   let bodyForParse = body;
   if (keywordsBlob && bodyForParse) {
     const semi = bodyForParse.split(";");
@@ -373,9 +488,15 @@ function normalizePowerToMonsterShape(name: string, text: string): MonsterPower 
 
   const damageExpressions = extractDamageExpressions(bodyForParse);
   let cleanName = header.replace(/\s*\(.*$/, "").trim();
-  cleanName = cleanName.replace(/\s*✦.*$/, "").trim();
-  cleanName = cleanName.replace(/^[~.\s✦]+/, "").trim();
+  cleanName = cleanName.replace(/\s*(?:✦|[\u2726\u2727\u2605]).*$/u, "").trim();
+  cleanName = cleanName.replace(/^[~.\s✦\u2726\u2727\u2605]+/u, "").trim();
   cleanName = cleanName.replace(/\s{2,}/g, " ").replace(/[-;:,\s]+$/g, "").trim();
+
+  const traitTemplateKeywords = mergeTraitKeywordLists(
+    leadKeywords,
+    extractParentheticalTraitKeywords(rawTitleLine),
+    flareTraitKeywordTokens.length ? flareTraitKeywordTokens : undefined
+  );
 
   return {
     name: cleanName || header,
@@ -394,7 +515,8 @@ function normalizePowerToMonsterShape(name: string, text: string): MonsterPower 
     range: atkRange,
     description: bodyForParse,
     damageExpressions,
-    attacks: attacks.length ? attacks : undefined
+    attacks: attacks.length ? attacks : undefined,
+    ...(traitTemplateKeywords.length ? { traitTemplateKeywords } : {})
   };
 }
 
@@ -424,18 +546,27 @@ function splitActionPrefixedPowerLines(lines: string[]): string[] {
 function parsePowers(powerLines: string[]): MonsterPower[] {
   const lines = splitActionPrefixedPowerLines(powerLines);
   const powers: MonsterPower[] = [];
+  let pendingDirectiveKeywords: string[] = [];
   let currentName = "";
   let currentText: string[] = [];
+  let currentLeadKeywords: string[] = [];
   for (const line of lines) {
+    const dirKw = parseKeywordDirectiveLine(line);
+    if (dirKw.length > 0) {
+      pendingDirectiveKeywords.push(...dirKw);
+      continue;
+    }
     if (looksLikePowerName(line)) {
-      if (currentName) powers.push(normalizePowerToMonsterShape(currentName, currentText.join(" ")));
+      if (currentName) powers.push(normalizePowerToMonsterShape(currentName, currentText.join(" "), currentLeadKeywords));
       currentName = line.trim();
       currentText = [];
+      currentLeadKeywords = [...pendingDirectiveKeywords];
+      pendingDirectiveKeywords = [];
       continue;
     }
     if (currentName) currentText.push(line.trim());
   }
-  if (currentName) powers.push(normalizePowerToMonsterShape(currentName, currentText.join(" ")));
+  if (currentName) powers.push(normalizePowerToMonsterShape(currentName, currentText.join(" "), currentLeadKeywords));
   return powers.filter((p) => p.name);
 }
 
@@ -446,11 +577,19 @@ function parseRoleLine(roleLine: string): MonsterTemplateRecord["role"] {
     /^(.+?)\s+(Minion|Standard|Elite|Solo)\s+(Soldier|Brute|Controller|Skirmisher|Artillery|Lurker)\s*(?:\(([^)]+)\))?$/i
   );
   if (!m) return { raw: text };
+  const tagsRaw = m[4]?.trim();
+  const tags = tagsRaw
+    ? tagsRaw
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean)
+    : [];
   return {
     raw: text,
     templateLabel: m[1].trim(),
     tier: m[2].replace(/\b\w/g, (c) => c.toUpperCase()),
-    combatRole: m[3].replace(/\b\w/g, (c) => c.toUpperCase())
+    combatRole: m[3].replace(/\b\w/g, (c) => c.toUpperCase()),
+    ...(tags.length ? { tags } : {})
   };
 }
 
@@ -475,6 +614,19 @@ function extractTemplateDescription(rawText: string, roleLine: string, isElite: 
   const msections = /\b(MOVE\s*ACTIONS|STANDARD\s*ACTIONS|MINOR\s*ACTIONS)\b/i.exec(raw);
   if (msections) return raw.slice(0, msections.index).trim();
   return raw.trim();
+}
+
+/** Remove prerequisite clause from prose once it is stored in `prerequisite`. */
+function stripPrerequisiteFromDescription(description: string, prerequisite: string): string {
+  let d = description.trim();
+  if (!d) return d;
+  d = d.replace(/\bPrerequisite:\s*[^\n]+/gi, "").trim();
+  const p = prerequisite?.trim();
+  if (p) {
+    const escaped = p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    d = d.replace(new RegExp(`\\s*Prerequisite:\\s*${escaped}\\s*`, "gi"), "").trim();
+  }
+  return d.replace(/\s{2,}/g, " ").trim();
 }
 
 function coerceIntFromText(text: string): number | undefined {
@@ -517,6 +669,8 @@ function parseStatLines(statLines: string[]): Record<string, unknown> {
     }
 
     if (lower.startsWith("defenses") || compact.startsWith("defenses")) {
+      const defenseForAll = rawLineTrim.replace(/^defenses\s*/i, "");
+      const allDef = defenseForAll.match(/\+(\d+)\s+to\s+all\s+defenses\s+against\s+(.+?)(?=;|$)/i);
       let defenseTail = line.replace(/^defenses\s*/i, "");
       defenseTail = defenseTail.replace(/;/g, ",");
       defenseTail = defenseTail.replace(/([A-Za-z])\+([0-9])/g, "$1 +$2");
@@ -528,6 +682,11 @@ function parseStatLines(statLines: string[]): Record<string, unknown> {
       }
       for (const m of defenseTail.matchAll(/\+?\s*(-?\d+)\s*(AC|Fortitude|Reflex|Will)\b/gi)) {
         defenses[m[2].toUpperCase()] = Number.parseInt(m[1], 10);
+        localFound = true;
+      }
+      if (allDef) {
+        const phrase = allDef[2].trim().replace(/\.$/, "").trim();
+        defenses[`to all defenses against ${phrase}`] = Number.parseInt(allDef[1], 10);
         localFound = true;
       }
       parsed = localFound;
@@ -619,11 +778,15 @@ function parseTraitRange(entry: MonsterPower): number {
 }
 
 function toMonsterTraitShape(entry: MonsterPower): MonsterTrait {
+  const fromLead = entry.traitTemplateKeywords ?? [];
+  const fromName = extractParentheticalTraitKeywords(entry.name ?? "");
+  const keywords = mergeTraitKeywordLists(fromLead, fromName);
   return {
     name: entry.name.trim(),
     details: (entry.description ?? "").trim(),
     range: parseTraitRange(entry),
-    type: "Trait"
+    type: "Trait",
+    ...(keywords.length ? { keywords } : {})
   };
 }
 
@@ -701,6 +864,16 @@ function mechanicalParseTemplateBlockLines(blockLines: string[], templateName: s
           seenStatCore = true;
         }
       }
+      if (
+        statLines.length > 0 &&
+        /^Defenses\b/i.test(statLines[statLines.length - 1]!) &&
+        !STAT_LINE_RE.test(line) &&
+        !looksLikePowerName(line)
+      ) {
+        statLines[statLines.length - 1] = `${statLines[statLines.length - 1]} ${line}`;
+        seenStatCore = true;
+        continue;
+      }
       if (STAT_LINE_RE.test(line)) {
         statLines.push(line);
         seenStatCore = true;
@@ -744,18 +917,24 @@ function buildTemplateRow(
   const roleLineStr = parsed.roleLine;
   const rawTextStr = parsed.rawText;
   const isElite = inferTemplateIsElite(roleLineStr, rawTextStr);
+  const prereq = parsed.prerequisite || "";
+  const mergedStatLines = mergeStatLineContinuations(parsed.statLines);
+  const descriptionBase = extractTemplateDescription(rawTextStr, roleLineStr, isElite);
+  const description = prereq
+    ? stripPrerequisiteFromDescription(descriptionBase, prereq)
+    : descriptionBase.replace(/\bPrerequisite:\s*[^\n]+/gi, "").trim();
   return {
     templateName: titleCase(name),
-    sourceBook: "(paste)",
+    sourceBook: "manual import",
     pageStart: 0,
     pageEnd: 0,
-    description: extractTemplateDescription(rawTextStr, roleLineStr, isElite),
-    prerequisite: parsed.prerequisite || undefined,
+    description,
+    prerequisite: prereq || undefined,
     roleLine: roleLineStr || undefined,
     role: parseRoleLine(roleLineStr),
     isEliteTemplate: isElite,
-    statLines: parsed.statLines.length ? parsed.statLines : undefined,
-    stats: parseStatLines(parsed.statLines) as MonsterTemplateRecord["stats"],
+    statLines: mergedStatLines.length ? mergedStatLines : undefined,
+    stats: parseStatLines(mergedStatLines) as MonsterTemplateRecord["stats"],
     auras: parsed.auras.length ? parsed.auras : undefined,
     traits: parsed.traits.length ? parsed.traits : undefined,
     powers: parsed.powers,

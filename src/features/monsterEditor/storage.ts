@@ -40,6 +40,8 @@ export interface MonsterPower {
   description: string;
   damageExpressions?: string[];
   attacks?: MonsterPowerAttack[];
+  /** Set by template paste ETL: "Keyword fear" line + (Fear) in name for auras/traits */
+  traitTemplateKeywords?: string[];
 }
 
 export interface MonsterPowerDamage {
@@ -150,6 +152,7 @@ export interface MonsterTemplateRole {
   templateLabel?: string;
   tier?: string;
   combatRole?: string;
+  tags?: string[];
 }
 
 export interface MonsterTemplateRecord {

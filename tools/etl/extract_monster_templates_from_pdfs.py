@@ -1,6 +1,7 @@
 import argparse
 import json
 import re
+import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -27,7 +28,7 @@ MONSTER_STATBLOCK_HEADER_RE = re.compile(
 )
 HEADER_TITLE_RE = re.compile(r"^[A-Z][A-Za-z' -]{2,}$")
 STAT_LINE_RE = re.compile(
-    r"^(Prerequisite:|Defenses\s*\+|Saving Throws|Action Points?|Hit Points|Resist|Immune|Vulnerable|Senses)\b",
+    r"^(Prerequisite:|Defenses\s*\+|Saving Throws|Action Points?|Hit Points\b(?=\s*[+\d-])|Resist|Immune|Vulnerable|Senses)\b",
     re.IGNORECASE,
 )
 SECTION_MARKER_RE = re.compile(
@@ -47,9 +48,9 @@ def _expand_block_lines_for_template_parsing(lines: List[str]) -> List[str]:
         chunk = chunk.strip()
         if not chunk:
             return []
-        # Long fused blocks: narrative/aura paragraph then "Hit Points ...".
-        if len(chunk) > 90 and re.search(r"\bHit Points\b", chunk, re.I):
-            parts = re.split(r"\s+(?=Hit Points\b)", chunk, maxsplit=1, flags=re.I)
+        # Long fused blocks: narrative/aura paragraph then "Hit Points +…" — not "(when … 0 hit points or fewer)".
+        if len(chunk) > 90 and re.search(r"\bHit Points\b(?=\s*[+\d-])", chunk, re.I):
+            parts = re.split(r"\s+(?=Hit Points\b(?=\s*[+\d-]))", chunk, maxsplit=1, flags=re.I)
             if len(parts) == 2:
                 return split_one(parts[0]) + split_one(parts[1])
         # "Chaos Warrior Elite Brute Humanoid XP Elite Destructive Wake aura 5; ..."
@@ -61,6 +62,14 @@ def _expand_block_lines_for_template_parsing(lines: List[str]) -> List[str]:
         )
         if m:
             return [m.group(1).strip(), m.group(2).strip()] + split_one(m.group(3).strip())
+        m2 = re.match(
+            r"^(.+?\bElite\s+(?:Soldier|Brute|Controller|Skirmisher|Artillery|Lurker))\s+"
+            r"(Humanoid(?:\s+or\s+magical\s+beast)?\s+XP\s+(?:Elite|Standard|Solo|Minion))\s+(.+)$",
+            chunk,
+            re.I,
+        )
+        if m2:
+            return [m2.group(1).strip(), m2.group(2).strip()] + split_one(m2.group(3).strip())
         # "... Action Points 1 Devastating Assault Whenever a chaos warrior hits..."
         if len(chunk) > 100 and re.search(r"\bWhenever\b", chunk, re.I):
             wm = re.search(
@@ -333,7 +342,7 @@ def _line_mentions_template_name(line: str, template_name: str) -> bool:
 
 
 def _looks_like_power_name(line: str) -> bool:
-    clean = re.sub(r"^[~✦.\s]+", "", line.strip()).strip()
+    clean = re.sub(r"^[~\u2726\u2727\u2605✦.\s]+", "", line.strip()).strip()
     if STAT_LINE_RE.search(clean):
         return False
     # Elite template role lines ("Name Elite Brute") are never ability titles.
@@ -343,7 +352,13 @@ def _looks_like_power_name(line: str) -> bool:
     if re.match(r"^Level\s+\d+\s*:", clean, re.IGNORECASE):
         return False
     # Stat block boilerplate between role line and mechanics (DMG / DMG2 templates).
-    if re.match(r"^Humanoid\s+XP\s+(?:Elite|Standard|Solo|Minion)\b", clean, re.IGNORECASE):
+    if re.match(
+        r"^Humanoid(?:\s+or\s+magical\s+beast)?\s+XP\s+(?:Elite|Standard|Solo|Minion)\b",
+        clean,
+        re.IGNORECASE,
+    ):
+        return False
+    if re.match(r"^Keywords?\s", clean, re.IGNORECASE):
         return False
     # Action-prefixed powers use C/M/R/A only — avoid "A Creeping Rot" matching as A + C.
     if re.match(r"^[CMRA]\s+[A-Za-z]", clean):
@@ -353,7 +368,7 @@ def _looks_like_power_name(line: str) -> bool:
         r"^([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,6})\s*\(",
         clean,
     )
-    if len(clean) > 80 and not head_before_paren:
+    if len(clean) > 80 and not head_before_paren and not re.search(r"(?:✦|[\u2726\u2727\u2605])", clean):
         return False
     if not clean:
         return False
@@ -415,26 +430,101 @@ def _extract_damage_expressions(text: str) -> List[str]:
 
 
 def _parse_recharge_details(text: str) -> str:
-    die_symbol_to_value = {
-        "⚀": 1,
-        "⚁": 2,
-        "⚂": 3,
-        "⚃": 4,
-        "⚄": 5,
-        "⚅": 6,
-    }
-    values = [value for symbol, value in die_symbol_to_value.items() if symbol in text]
+    """Lowest die face among Unicode dice (⚀…⚅) next to *recharge* — 4e recharge threshold."""
+    # U+2680–U+2685 dice; strip VS-16 (U+FE0F) for emoji-presentation forms.
+    normalized = unicodedata.normalize("NFC", text or "").replace("\ufe0f", "")
+    values: List[int] = []
+    for ch in normalized:
+        o = ord(ch)
+        if 0x2680 <= o <= 0x2685:
+            values.append(o - 0x2680 + 1)
     if values:
         return str(min(values))
-    match = re.search(r"recharge\s+(\d+)", text, flags=re.IGNORECASE)
+    match = re.search(r"recharge\s+(\d+)", normalized, flags=re.IGNORECASE)
     if match:
         return match.group(1)
     return ""
 
 
-def _normalize_power_to_monster_shape(name: str, text: str) -> Dict[str, Any]:
-    header = name.strip()
+def _title_case_keyword_token(s: str) -> str:
+    s = str(s or "").strip()
+    if not s:
+        return ""
+    parts: List[str] = []
+    for w in s.split():
+        if not w:
+            continue
+        parts.append(w[:1].upper() + w[1:].lower() if len(w) > 1 else w.upper())
+    return " ".join(parts)
+
+
+def _parse_keyword_directive_line(line: str) -> List[str]:
+    t = line.strip()
+    if not re.match(r"^Keywords?\s", t, flags=re.IGNORECASE):
+        return []
+    m = re.match(r"^Keywords?\s*:?\s*(.+)$", t, flags=re.IGNORECASE)
+    if not m:
+        return []
+    tail = m.group(1).strip()
+    if not tail:
+        return []
+    out: List[str] = []
+    for p in re.split(r",\s*|\s+and\s+", tail, flags=re.IGNORECASE):
+        tok = _title_case_keyword_token(p.strip())
+        if tok:
+            out.append(tok)
+    return out
+
+
+_PAREN_TRAIT_KEYWORD_SKIP_RE = re.compile(
+    r"\brecharge\b|\bstandard\b|\bminor\b|\bmove\b|\bfree\b|\bencounter\b|\bdaily\b|\bimmediate\b|\breaction\b",
+    re.IGNORECASE,
+)
+
+
+def _extract_parenthetical_trait_keywords(header_line: str) -> List[str]:
+    out: List[str] = []
+    for m in re.finditer(r"\(([^)]+)\)", header_line):
+        inner = m.group(1).strip()
+        if not inner or len(inner) > 55:
+            continue
+        if ";" in inner:
+            continue
+        if _PAREN_TRAIT_KEYWORD_SKIP_RE.search(inner):
+            continue
+        for part in re.split(r"\s*,\s*", inner):
+            tok = _title_case_keyword_token(part.strip())
+            if tok:
+                out.append(tok)
+    return sorted(set(out))
+
+
+def _merge_trait_keyword_lists(*groups: Optional[List[str]]) -> List[str]:
+    s: Set[str] = set()
+    for g in groups:
+        if not g:
+            continue
+        for x in g:
+            tok = _title_case_keyword_token(str(x))
+            if tok:
+                s.add(tok)
+    return sorted(s)
+
+
+def _normalize_power_to_monster_shape(
+    name: str, text: str, lead_keywords: Optional[List[str]] = None
+) -> Dict[str, Any]:
+    raw_title_line = name.strip()
+    header = raw_title_line
     body = text.strip()
+    lead_m = re.match(r"^\s*(\([^)]*\))", body)
+    if lead_m and not re.search(
+        r"\brecharge\b|\bencounter\b|\bdaily\b", header, flags=re.IGNORECASE
+    ):
+        paren = lead_m.group(1)
+        if re.search(r"\brecharge\b|\bencounter\b|\bdaily\b", paren, flags=re.IGNORECASE):
+            header = f"{header} {paren.strip()}"
+            body = body[lead_m.end() :].strip()
     action_type = ""
 
     action_prefix_match = re.match(r"^([CMRA])\s+(.+)$", header, flags=re.IGNORECASE)
@@ -452,7 +542,11 @@ def _normalize_power_to_monster_shape(name: str, text: str) -> Dict[str, Any]:
     usage_details = ""
     if re.search(r"\brecharge\b", header, flags=re.IGNORECASE):
         usage = "Recharge"
-        usage_details = _parse_recharge_details(header)
+        usage_details = _parse_recharge_details(header + "\n" + body)
+        if not usage_details:
+            usage_details = _parse_recharge_details(header)
+        if not usage_details:
+            usage_details = _parse_recharge_details(name.strip() + "\n" + text.strip())
     elif re.search(r"\bencounter\b", header, flags=re.IGNORECASE):
         usage = "Encounter"
     elif re.search(r"\bdaily\b", header, flags=re.IGNORECASE):
@@ -468,9 +562,14 @@ def _normalize_power_to_monster_shape(name: str, text: str) -> Dict[str, Any]:
         action = action_match.group(1).title()
 
     keywords_blob = ""
-    kw_match = re.search(r"✦\s*(.+)$", header)
+    flare_trait_tokens: List[str] = []
+    kw_match = re.search(r"(?:✦|[\u2726\u2727\u2605])\s*(.+)$", header)
     if kw_match:
-        keywords_blob = kw_match.group(1).strip().rstrip(",")
+        flare_raw = kw_match.group(1).strip().rstrip(",")
+        flare_trait_tokens = [
+            _title_case_keyword_token(k.strip()) for k in flare_raw.split(",") if k.strip()
+        ]
+        keywords_blob = flare_raw
     body_for_parse = body
     if keywords_blob and body_for_parse:
         first_chunk = body_for_parse.split(";", 1)[0]
@@ -522,11 +621,17 @@ def _normalize_power_to_monster_shape(name: str, text: str) -> Dict[str, Any]:
 
     damage_expressions = _extract_damage_expressions(body_for_parse)
     clean_name = re.sub(r"\s*\(.*$", "", header).strip()
-    clean_name = re.sub(r"\s*✦.*$", "", clean_name).strip()
-    clean_name = re.sub(r"^[~.\s✦]+", "", clean_name).strip()
+    clean_name = re.sub(r"\s*(?:✦|[\u2726\u2727\u2605]).*$", "", clean_name).strip()
+    clean_name = re.sub(r"^[~.\s\u2726\u2727\u2605✦]+", "", clean_name).strip()
     clean_name = re.sub(r"\s{2,}", " ", clean_name).strip(" -;:,")
 
-    return {
+    trait_kw = _merge_trait_keyword_lists(
+        lead_keywords,
+        _extract_parenthetical_trait_keywords(raw_title_line),
+        flare_trait_tokens if flare_trait_tokens else None,
+    )
+
+    payload: Dict[str, Any] = {
         "name": clean_name or header,
         "actionType": action_type,
         "usage": usage,
@@ -546,6 +651,9 @@ def _normalize_power_to_monster_shape(name: str, text: str) -> Dict[str, Any]:
         "damageExpressions": damage_expressions,
         "attacks": attacks,
     }
+    if trait_kw:
+        payload["traitTemplateKeywords"] = trait_kw
+    return payload
 
 
 def _parse_powers(power_lines: List[str]) -> List[Dict[str, Any]]:
@@ -574,19 +682,39 @@ def _parse_powers(power_lines: List[str]) -> List[Dict[str, Any]]:
 
     power_lines = split_action_prefixed_power_lines(power_lines)
     powers: List[Dict[str, Any]] = []
+    pending_directive_keywords: List[str] = []
     current_name = ""
     current_text: List[str] = []
+    current_lead_keywords: List[str] = []
     for line in power_lines:
+        dir_kw = _parse_keyword_directive_line(line)
+        if dir_kw:
+            pending_directive_keywords.extend(dir_kw)
+            continue
         if _looks_like_power_name(line):
             if current_name:
-                powers.append(_normalize_power_to_monster_shape(current_name, " ".join(current_text).strip()))
+                powers.append(
+                    _normalize_power_to_monster_shape(
+                        current_name,
+                        " ".join(current_text).strip(),
+                        current_lead_keywords or None,
+                    )
+                )
             current_name = line.strip()
             current_text = []
+            current_lead_keywords = list(pending_directive_keywords)
+            pending_directive_keywords = []
             continue
         if current_name:
             current_text.append(line.strip())
     if current_name:
-        powers.append(_normalize_power_to_monster_shape(current_name, " ".join(current_text).strip()))
+        powers.append(
+            _normalize_power_to_monster_shape(
+                current_name,
+                " ".join(current_text).strip(),
+                current_lead_keywords or None,
+            )
+        )
     return [p for p in powers if p.get("name")]
 
 
@@ -702,6 +830,35 @@ def _merge_damage_tier_entries(entries: List[Dict[str, List[int]]]) -> List[Dict
     return [{key: vals} for key, vals in merged.items()]
 
 
+def _strip_prerequisite_from_description(description: str, prerequisite: str) -> str:
+    d = str(description or "").strip()
+    if not d:
+        return d
+    d = re.sub(r"\bPrerequisite:\s*[^\n]+", "", d, flags=re.IGNORECASE).strip()
+    p = str(prerequisite or "").strip()
+    if p:
+        d = re.sub(re.escape(f"Prerequisite: {p}"), "", d, flags=re.IGNORECASE).strip()
+    return re.sub(r"\s{2,}", " ", d).strip()
+
+
+def _merge_stat_line_continuations(stat_lines: List[str]) -> List[str]:
+    merged: List[str] = []
+    for raw in stat_lines or []:
+        line = str(raw or "").strip()
+        if not line:
+            continue
+        if (
+            merged
+            and re.match(r"^Defenses\b", merged[-1], flags=re.IGNORECASE)
+            and not STAT_LINE_RE.match(line)
+            and not _looks_like_power_name(line)
+        ):
+            merged[-1] = f"{merged[-1]} {line}"
+            continue
+        merged.append(line)
+    return merged
+
+
 def _extract_template_description(raw_text: str, role_line: str, is_elite: bool) -> str:
     """Prose before the mechanical stat block: Elite templates start after roleLine; non-elite (e.g. Neverwinter) often at TRAITS."""
 
@@ -762,6 +919,13 @@ def _parse_stat_lines(stat_lines: List[str]) -> Dict[str, Any]:
             continue
 
         if lower.startswith("defenses") or compact.startswith("defenses"):
+            # "to all defenses against …" must be read before single-letter space collapse (which would destroy the phrase).
+            defense_for_all = re.sub(r"^defenses\s*", "", raw_line, flags=re.IGNORECASE)
+            m_all = re.search(
+                r"\+(\d+)\s+to\s+all\s+defenses\s+against\s+(.+?)(?=;|$)",
+                defense_for_all,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
             defense_tail = re.sub(r"^defenses\s*", "", line, flags=re.IGNORECASE)
             # OCR sometimes collapses spaces/punctuation in defense lines.
             defense_tail = defense_tail.replace(";", ",")
@@ -780,8 +944,12 @@ def _parse_stat_lines(stat_lines: List[str]) -> Dict[str, Any]:
                 value = int(m.group(1))
                 defenses[key] = value
                 local_found = True
-            if "all defenses" in defense_tail.lower():
-                defense_notes.append(defense_tail.strip())
+            if m_all:
+                phrase = m_all.group(2).strip().rstrip(".").strip()
+                defenses[f"to all defenses against {phrase}"] = int(m_all.group(1))
+                local_found = True
+            if "all defenses" in defense_for_all.lower() and not m_all:
+                defense_notes.append(defense_for_all.strip())
             parsed = local_found or bool(defense_notes)
             if parsed:
                 continue
@@ -927,18 +1095,25 @@ def _build_template_row(
     role_line_str = str(parsed.get("roleLine", "") or "")
     raw_text_str = str(parsed.get("rawText", "") or "")
     is_elite = _infer_template_is_elite(role_line_str, raw_text_str)
+    prereq = str(parsed.get("prerequisite", "") or "").strip()
+    stat_lines_merged = _merge_stat_line_continuations(list(parsed.get("statLines") or []))
+    desc_base = _extract_template_description(raw_text_str, role_line_str, is_elite)
+    if prereq:
+        description = _strip_prerequisite_from_description(desc_base, prereq)
+    else:
+        description = re.sub(r"\bPrerequisite:\s*[^\n]+", "", desc_base, flags=re.IGNORECASE).strip()
     return {
         "templateName": _title_case(name),
         "sourceBook": pdf_name,
         "pageStart": page_start,
         "pageEnd": page_start,
-        "description": _extract_template_description(raw_text_str, role_line_str, is_elite),
+        "description": description,
         "prerequisite": parsed.get("prerequisite", ""),
         "roleLine": parsed.get("roleLine", ""),
         "role": _parse_role_line(role_line_str),
         "isEliteTemplate": is_elite,
-        "statLines": parsed.get("statLines", []),
-        "stats": _parse_stat_lines(parsed.get("statLines", [])),
+        "statLines": stat_lines_merged,
+        "stats": _parse_stat_lines(stat_lines_merged),
         "auras": parsed.get("auras", []),
         "traits": parsed.get("traits", []),
         "powers": parsed.get("powers", []),
@@ -1240,12 +1415,21 @@ def _parse_trait_range(entry: Dict[str, Any]) -> int:
 
 
 def _to_monster_trait_shape(entry: Dict[str, Any]) -> Dict[str, Any]:
-    return {
+    from_lead = [str(x).strip() for x in (entry.get("traitTemplateKeywords") or []) if str(x).strip()]
+    from_name = _extract_parenthetical_trait_keywords(str(entry.get("name") or ""))
+    merged_kw = _merge_trait_keyword_lists(
+        from_lead if from_lead else None,
+        from_name if from_name else None,
+    )
+    row: Dict[str, Any] = {
         "name": str(entry.get("name") or "").strip(),
         "details": str(entry.get("description") or "").strip(),
         "range": _parse_trait_range(entry),
         "type": "Trait",
     }
+    if merged_kw:
+        row["keywords"] = merged_kw
+    return row
 
 
 def _bucket_template_abilities(entries: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
@@ -1582,6 +1766,15 @@ def _mechanical_parse_template_block_lines(block_lines: List[str], template_name
                 if not role_line:
                     role_line = line
                     seen_stat_core = True
+            if (
+                stat_lines
+                and re.match(r"^Defenses\b", stat_lines[-1], flags=re.IGNORECASE)
+                and not STAT_LINE_RE.match(line)
+                and not _looks_like_power_name(line)
+            ):
+                stat_lines[-1] = f"{stat_lines[-1]} {line}"
+                seen_stat_core = True
+                continue
             if STAT_LINE_RE.search(line):
                 stat_lines.append(line)
                 seen_stat_core = True
@@ -1662,12 +1855,12 @@ def parse_pasted_monster_template(raw_text: str, template_name_hint: Optional[st
     parsed = _mechanical_parse_template_block_lines(block_lines, name)
     row = _build_template_row(
         name=name,
-        pdf_name="(paste)",
+        pdf_name="manual import",
         page_start=0,
         parsed=parsed,
         extraction_method="paste",
     )
-    row["sourceBook"] = "(paste)"
+    row["sourceBook"] = "manual import"
     _add_extraction_warnings(row)
     return {"ok": True, "template": row}
 

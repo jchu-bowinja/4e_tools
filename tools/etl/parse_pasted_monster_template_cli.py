@@ -15,8 +15,19 @@ from extract_monster_templates_from_pdfs import parse_pasted_monster_template  #
 
 
 def main() -> None:
+    # Node/Vite writes UTF-8 JSON response with Unicode; Windows stdout cp1252 fails on dice chars.
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
+
     hint = sys.argv[1].strip() if len(sys.argv) > 1 and sys.argv[1].strip() else None
-    raw = sys.stdin.read()
+    # Piped stdin must be read as UTF-8 bytes; locale TextIOWrapper can mangle recharge dice (U+2684…).
+    if sys.stdin.isatty():
+        raw = sys.stdin.read()
+    else:
+        raw = sys.stdin.buffer.read().decode("utf-8")
     out = parse_pasted_monster_template(raw, hint)
     sys.stdout.write(json.dumps(out, ensure_ascii=False, indent=2) + "\n")
 

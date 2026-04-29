@@ -37,7 +37,9 @@ function parseMonsterTemplatePastePlugin(): import("vite").Plugin {
           if (hint) args.push(hint);
           const proc = spawn("python", args, {
             cwd: projectRoot,
-            windowsHide: true
+            windowsHide: true,
+            // Windows: avoid Python stdin/stdout locale (cp1252) mangling Unicode dice in pipes.
+            env: { ...process.env, PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8" }
           });
           let stdout = "";
           let stderr = "";

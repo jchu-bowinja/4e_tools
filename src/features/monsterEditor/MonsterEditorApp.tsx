@@ -1555,19 +1555,41 @@ function MonsterTemplateFormattedView({
         <div style={centerSubsectionPanelStyle}>
           <h3 style={sectionTitleStyle}>Auras</h3>
           <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.35rem" }}>
-            {(record.auras ?? []).map((aura, idx) => (
-              <div key={`${glossaryKeyPrefix}-aura-${idx}`} style={bodyPrimary}>
-                <strong>{String(aura.name ?? "Aura").trim() || "Aura"}:</strong>{" "}
-                {renderGlossaryAwareText(
-                  String(aura.details ?? ""),
-                  commonDescriptiveGlossaryPhrases,
-                  startGlossaryHover,
-                  leaveGlossaryHover,
-                  `${glossaryKeyPrefix}-aura-${idx}`,
-                  shouldHighlightGlossaryTerm
-                )}
-              </div>
-            ))}
+            {(record.auras ?? []).map((aura, idx) => {
+              const auraName = String(aura.name ?? "Aura").trim() || "Aura";
+              const auraBadges = renderTraitMetaBadges(aura);
+              return (
+                <div key={`${glossaryKeyPrefix}-aura-${idx}`} style={bodyPrimary}>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      alignItems: "center",
+                      gap: "0.35rem",
+                      marginBottom: "0.18rem"
+                    }}
+                  >
+                    <strong>{auraName}:</strong>
+                    {auraBadges.map((badge) => (
+                      <span
+                        key={`${glossaryKeyPrefix}-aura-${idx}-tag-${badge}`}
+                        style={{ ...sheetTagPillStyle, cursor: "default" }}
+                      >
+                        {badge}
+                      </span>
+                    ))}
+                  </div>
+                  {renderGlossaryAwareText(
+                    String(aura.details ?? ""),
+                    commonDescriptiveGlossaryPhrases,
+                    startGlossaryHover,
+                    leaveGlossaryHover,
+                    `${glossaryKeyPrefix}-aura-${idx}`,
+                    shouldHighlightGlossaryTerm
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       ) : null}
@@ -1576,19 +1598,41 @@ function MonsterTemplateFormattedView({
         <div style={centerSubsectionPanelStyle}>
           <h3 style={sectionTitleStyle}>Traits</h3>
           <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.35rem" }}>
-            {(record.traits ?? []).map((trait, idx) => (
-              <div key={`${glossaryKeyPrefix}-trait-${idx}`} style={bodyPrimary}>
-                <strong>{String(trait.name ?? "Trait").trim() || "Trait"}:</strong>{" "}
-                {renderGlossaryAwareText(
-                  String(trait.details ?? ""),
-                  commonDescriptiveGlossaryPhrases,
-                  startGlossaryHover,
-                  leaveGlossaryHover,
-                  `${glossaryKeyPrefix}-trait-${idx}`,
-                  shouldHighlightGlossaryTerm
-                )}
-              </div>
-            ))}
+            {(record.traits ?? []).map((trait, idx) => {
+              const traitName = String(trait.name ?? "Trait").trim() || "Trait";
+              const traitBadges = renderTraitMetaBadges(trait);
+              return (
+                <div key={`${glossaryKeyPrefix}-trait-${idx}`} style={bodyPrimary}>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      alignItems: "center",
+                      gap: "0.35rem",
+                      marginBottom: "0.18rem"
+                    }}
+                  >
+                    <strong>{traitName}:</strong>
+                    {traitBadges.map((badge) => (
+                      <span
+                        key={`${glossaryKeyPrefix}-trait-${idx}-tag-${badge}`}
+                        style={{ ...sheetTagPillStyle, cursor: "default" }}
+                      >
+                        {badge}
+                      </span>
+                    ))}
+                  </div>
+                  {renderGlossaryAwareText(
+                    String(trait.details ?? ""),
+                    commonDescriptiveGlossaryPhrases,
+                    startGlossaryHover,
+                    leaveGlossaryHover,
+                    `${glossaryKeyPrefix}-trait-${idx}`,
+                    shouldHighlightGlossaryTerm
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       ) : null}
@@ -2212,7 +2256,7 @@ export function MonsterEditorApp({
                 .finally(() => setIsBusy(false));
             }}
           >
-            Import with ETL
+            Import monster template
           </button>
           <button
             type="button"
@@ -3296,7 +3340,7 @@ export function MonsterEditorApp({
                   />
                 ) : (
                   <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.8125rem", lineHeight: 1.45 }}>
-                    Use <strong>Import with ETL</strong> on pasted text, or edit the JSON draft below — a live preview of
+                    Use <strong>Import monster template</strong> on pasted text, or edit the JSON draft below — a live preview of
                     identity, stats, traits, and powers appears here.
                   </p>
                 )}
