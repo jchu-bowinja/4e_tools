@@ -155,6 +155,66 @@ export interface MonsterTemplateRole {
   tags?: string[];
 }
 
+/** Paste / create-template extraction: tier-aware, source-line–aware stat bundle (Option B). */
+export interface MonsterTemplatePasteHitPointsOptionB {
+  default?: { perLevel?: number; addConstitution?: boolean };
+  variants?: Array<{
+    when?: { role?: string };
+    perLevel?: number;
+    addConstitution?: boolean;
+    sourceLine?: string;
+  }>;
+  sourceLines?: string[];
+}
+
+export interface MonsterTemplatePasteScalarStatOptionB {
+  value: number;
+  sourceLine?: string;
+  notes?: string[];
+}
+
+export interface MonsterTemplatePasteSpeedOptionB {
+  raw: string;
+  sourceLine?: string;
+}
+
+export interface MonsterTemplatePasteSkillEntryOptionB {
+  skill: string;
+  value: number;
+  trained: boolean;
+  sourceLine?: string;
+}
+
+export type MonsterTemplatePasteResistanceKindOptionB = "typed" | "keyword" | "variable";
+
+export interface MonsterTemplatePasteResistanceEntryOptionB {
+  kind: MonsterTemplatePasteResistanceKindOptionB;
+  type?: string;
+  /** Tier breakpoints (heroic / paragon / epic). */
+  tiers?: Record<string, number>;
+  /**
+   * For `kind: "variable"` (player-chosen damage types): parenthetical rider per tier from the book,
+   * e.g. `{ "1": "choose one type", "11": "choose two types", "21": "choose three types" }`.
+   */
+  tierRiders?: Record<string, string>;
+  sourceLine?: string;
+}
+
+export interface MonsterTemplatePasteStatsOptionB {
+  hitPoints?: MonsterTemplatePasteHitPointsOptionB;
+  defenses?: Record<string, number>;
+  savingThrows?: MonsterTemplatePasteScalarStatOptionB;
+  actionPoints?: MonsterTemplatePasteScalarStatOptionB;
+  initiative?: MonsterTemplatePasteScalarStatOptionB;
+  speed?: MonsterTemplatePasteSpeedOptionB;
+  skills?: { entries: MonsterTemplatePasteSkillEntryOptionB[] };
+  immunities?: string[];
+  resistances?: { entries: MonsterTemplatePasteResistanceEntryOptionB[] };
+  vulnerabilities?: { entries: MonsterTemplatePasteResistanceEntryOptionB[] };
+  regeneration?: number;
+  unparsedStatLines?: string[];
+}
+
 export interface MonsterTemplateRecord {
   templateName: string;
   sourceBook: string;
@@ -166,6 +226,7 @@ export interface MonsterTemplateRecord {
   role?: MonsterTemplateRole;
   isEliteTemplate?: boolean;
   statLines?: string[];
+  /** Prefer `MonsterTemplatePasteStatsOptionB` when `extractionMethod` is `paste-ts`. */
   stats?: Record<string, unknown>;
   auras?: MonsterTrait[];
   traits?: MonsterTrait[];

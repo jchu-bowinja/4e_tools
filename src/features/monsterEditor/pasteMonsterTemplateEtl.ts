@@ -5,26 +5,38 @@
  */
 /// <reference types="vite/client" />
 
-import type { MonsterPower, MonsterTemplateRecord, MonsterTrait } from "./storage";
+import type {
+  MonsterPower,
+  MonsterTemplatePasteResistanceEntryOptionB,
+  MonsterTemplatePasteSkillEntryOptionB,
+  MonsterTemplatePasteStatsOptionB,
+  MonsterTemplateRecord,
+  MonsterTrait
+} from "./storage";
 
 export type ParsePasteResult =
   | { ok: true; template: MonsterTemplateRecord }
   | { ok: false; error: string };
 
 const PAGE_NUMBER_RE = /^\s*\d+\s*$/;
-const TEMPLATE_REF_RE = /\b([A-Z][A-Za-z' -]{2,})\s*\(\s*template\s*\)/gi;
-const TEMPLATE_IS_A_RE = /["']?([A-Za-z][A-Za-z' -]{2,})["']?\s+is a template/gi;
-const TEMPLATE_HEADING_RE = /^\s*([A-Za-z][A-Za-z' -]{2,})\s+Template\s*$/i;
 const ROLE_LINE_RE =
   /^([A-Za-z][A-Za-z' -]{2,})\s+Elite\s+(Soldier|Brute|Controller|Skirmisher|Artillery|Lurker)\s*$/i;
 const ROLE_LINE_ELITE_ANCHOR_RE =
   /^(.+?)\s+Elite\s+(Soldier|Brute|Controller|Skirmisher|Artillery|Lurker)\b/i;
-const HEADER_TITLE_RE = /^[A-Z][A-Za-z' -]{2,}$/;
 /** `Hit Points` only when a formula follows — avoids matching body text like "hit points. An affected…". */
 const STAT_LINE_RE =
-  /^(Prerequisite:|Defenses\s*\+|Saving Throws|Action Points?|Hit Points\b(?=\s*[+\d-])|Resist|Immune|Vulnerable|Senses)\b/i;
+  /^(Prerequisite:|Defenses\b|Saving Throws|Action Points?|(?:Hit Points|HP)\b(?=\s*[+\d-])|Resist|Immune|Vulnerable|Senses|Speed|Initiative|Skills)\b/i;
 const SECTION_MARKER_RE =
   /^(POWERS|TRAITS|STANDARD\s*A\s*CTIONS|MOVE\s*A\s*CTIONS|MINOR\s*A\s*CTIONS|MAJOR\s*A\s*CTIONS)\b/i;
+/** Explicit paste scaffold: start a block; repeat between abilities (closes prior + opens next). */
+const ABILITY_BLOCK_START_RE = /^\s*\[ABILITY\]\s*$/i;
+/** Explicit paste scaffold: end the current block without starting another (next block needs `[ABILITY]`). */
+const ABILITY_BLOCK_END_RE = /^\s*\[ABILITYEND\]\s*$/i;
+
+function isExplicitAbilityMarkerLine(line: string): boolean {
+  const t = line.trim();
+  return ABILITY_BLOCK_START_RE.test(t) || ABILITY_BLOCK_END_RE.test(t);
+}
 
 function normalizeLine(line: string): string {
   return line.replace(/\u2019/g, "'").replace(/\s+/g, " ").trim();
@@ -40,72 +52,6 @@ function toLines(text: string): string[] {
   return lines.filter((x) => !isNoise(x));
 }
 
-function expandBlockLinesForTemplateParsing(lines: string[]): string[] {
-  function splitOne(chunk: string): string[] {
-    chunk = chunk.trim();
-    if (!chunk) return [];
-    // Stat block continuation only — not narrative "(when … reduced to 0 hit points or fewer)".
-    if (chunk.length > 90 && /\bHit Points\b(?=\s*[+\d-])/i.test(chunk)) {
-      const parts = chunk.split(/\s+(?=Hit Points\b(?=\s*[+\d-]))/i);
-      if (parts.length === 2) return [...splitOne(parts[0]), ...splitOne(parts[1])];
-    }
-    const m = chunk.match(
-      /^(.+?\bElite\s+(?:Soldier|Brute|Controller|Skirmisher|Artillery|Lurker))\s+(Humanoid\s+XP\s+(?:Elite|Standard|Solo|Minion))\s+(.+)$/i
-    );
-    if (m) return [m[1].trim(), m[2].trim(), ...splitOne(m[3].trim())];
-    const mBeast = chunk.match(
-      /^(.+?\bElite\s+(?:Soldier|Brute|Controller|Skirmisher|Artillery|Lurker))\s+(Humanoid(?:\s+or\s+magical\s+beast)?\s+XP\s+(?:Elite|Standard|Solo|Minion))\s+(.+)$/i
-    );
-    if (mBeast) return [mBeast[1].trim(), mBeast[2].trim(), ...splitOne(mBeast[3].trim())];
-    if (chunk.length > 100 && /\bWhenever\b/i.test(chunk)) {
-      const wm = chunk.search(/\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,5}\s+Whenever\b/i);
-      if (wm > 0) {
-        const prefix = chunk.slice(0, wm).trim();
-        const rest = chunk.slice(wm).trim();
-        return [...splitOne(prefix), ...splitOne(rest)];
-      }
-    }
-    if (chunk.includes("~") && chunk.length > 80) {
-      const idx = chunk.indexOf("~");
-      if (idx > 30) {
-        const left = chunk.slice(0, idx).trimEnd();
-        const right = chunk.slice(idx).trim();
-        if (right.startsWith("~") && right.length > 5) return [left, ...splitOne(right)];
-      }
-    }
-    if (
-      chunk.length > 80 &&
-      /\(standard;\s*encounter\)/i.test(chunk) &&
-      !chunk.trimStart().startsWith("~")
-    ) {
-      const enc = chunk.split(/(?=[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,6}\s*\(standard;\s*encounter\))/i);
-      if (enc.length === 2 && enc[1].trim()) return [...splitOne(enc[0].trim()), ...splitOne(enc[1].trim())];
-    }
-    const am = chunk.match(/^(.+?)\s+(aura\s+\d+\s*;\s*.+)$/i);
-    if (am) {
-      const head = am[1].trim();
-      const tail = am[2].trim();
-      if (
-        head.split(/\s+/).length <= 6 &&
-        head.length <= 72 &&
-        !head.toLowerCase().startsWith("resist") &&
-        !head.toLowerCase().startsWith("immune") &&
-        !head.toLowerCase().startsWith("vulnerable")
-      ) {
-        return [head, tail];
-      }
-    }
-    return [chunk];
-  }
-  const out: string[] = [];
-  for (const line of lines) out.push(...splitOne(line));
-  return out;
-}
-
-function normalizeName(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, "");
-}
-
 function titleCase(name: string): string {
   return name
     .split(/\s+/)
@@ -113,117 +59,22 @@ function titleCase(name: string): string {
     .join(" ");
 }
 
-function isPlausibleTemplateName(name: string): boolean {
-  const clean = name.trim();
-  if (!clean) return false;
-  const words = clean.split(/\s+/);
-  if (words.length > 5) return false;
-  const allowSingle = new Set([
-    "Lich",
-    "Shade",
-    "Shades",
-    "Wererat",
-    "Werewolf",
-    "Demagogue",
-    "Devastator",
-    "Feyborn",
-    "Bodyguard"
-  ]);
-  if (words.length === 1 && clean.length >= 11 && !allowSingle.has(titleCase(clean))) return false;
-  return true;
-}
-
-function extractCandidateNames(lines: string[]): Set<string> {
-  const out = new Set<string>();
-  for (const line of lines) {
-    for (const m of line.matchAll(TEMPLATE_REF_RE)) {
-      const candidate = m[1].trim();
-      if (isPlausibleTemplateName(candidate)) out.add(candidate);
-    }
-    for (const m of line.matchAll(TEMPLATE_IS_A_RE)) {
-      const candidate = m[1].trim();
-      if (isPlausibleTemplateName(candidate)) out.add(candidate);
-    }
-    const headingMatch = line.match(TEMPLATE_HEADING_RE);
-    if (headingMatch && isPlausibleTemplateName(headingMatch[1].trim())) out.add(headingMatch[1].trim());
-    const roleMatch = line.trim().match(ROLE_LINE_RE);
-    if (roleMatch && isPlausibleTemplateName(roleMatch[1].trim())) out.add(roleMatch[1].trim());
-  }
-  for (const [, name] of scanEliteRoleAnchors(lines)) out.add(name);
-  for (let idx = 0; idx < lines.length; idx++) {
-    if (lines[idx].toLowerCase() === "shades") {
-      const near = lines.slice(idx, idx + 8).join(" ").toLowerCase();
-      if (near.includes("to create a shade")) out.add("Shades");
-    }
-  }
-  return out;
-}
-
-function scanEliteRoleAnchors(lines: string[]): [number, string][] {
-  const out: [number, string][] = [];
-  for (let idx = 0; idx < lines.length; idx++) {
-    const m = lines[idx].trim().match(ROLE_LINE_ELITE_ANCHOR_RE);
-    if (!m) continue;
-    const raw = m[1].trim();
-    const name = raw ? titleCase(raw) : "";
-    if (name.length >= 3) out.push([idx, name]);
-  }
-  return out;
-}
-
-function isHeaderish(line: string): boolean {
-  if (line.split(/\s+/).length > 5) return false;
-  return HEADER_TITLE_RE.test(line);
-}
-
-function lineMentionsTemplateName(line: string, templateName: string): boolean {
-  const target = normalizeName(templateName);
-  if (!target) return false;
-  return normalizeName(line).includes(target);
-}
-
-function findHeaderIndex(lines: string[], templateName: string): number | null {
-  const target = normalizeName(templateName);
-  const templateHeadingNorm = normalizeName(`${templateName} Template`);
-  for (let idx = 0; idx < lines.length; idx++) {
-    if (normalizeName(lines[idx]) === target) return idx;
-  }
-  for (let idx = 0; idx < lines.length; idx++) {
-    if (normalizeName(lines[idx]) === templateHeadingNorm) return idx;
-  }
-  for (let idx = 0; idx < lines.length; idx++) {
-    const lineNorm = normalizeName(lines[idx]);
-    if (target && lineNorm.startsWith(target) && lineNorm.includes("elite")) return idx;
-  }
-  for (let idx = 0; idx < lines.length; idx++) {
-    const n = normalizeName(lines[idx]);
-    if (target && n.includes(target) && isHeaderish(lines[idx]) && lines[idx].toLowerCase().includes("template"))
-      return idx;
-  }
-  return null;
-}
-
-function isTemplateTailMarker(line: string): boolean {
-  const upper = line.toUpperCase();
-  return (
-    upper.includes("MONSTER ABILITIES") ||
-    upper.startsWith("DUPLICA") ||
-    upper.startsWith("CUSTOMIZING MONSTERS") ||
-    upper.startsWith("CHAPTER ") ||
-    upper.includes(" FACTIONS AND FOES") ||
-    upper.startsWith("SONS OF ALAGONDAR") ||
-    line.startsWith("4E_DMG_") ||
-    line.startsWith("4E_") ||
-    line.includes("_Ch")
-  );
+/** Wrapped resist/vuln lines: `At 11th level, 15 (choose…)` — not a power name. */
+function looksLikeTieredDefenseContinuation(line: string): boolean {
+  return /^\s*at\s+\d+(?:st|nd|rd|th)?\s*level\b/i.test(line.trim());
 }
 
 function looksLikePowerName(line: string): boolean {
   let clean = line.replace(/^[~✦\u2726\u2727\u2605.\s]+/u, "").trim();
+  if (looksLikeTieredDefenseContinuation(clean)) return false;
   if (STAT_LINE_RE.test(clean)) return false;
   if (ROLE_LINE_ELITE_ANCHOR_RE.test(clean) || ROLE_LINE_RE.test(clean.trim())) return false;
   if (/^Level\s+\d+\s*:/i.test(clean)) return false;
-  if (/^Humanoid(?:\s+or\s+magical\s+beast)?\s+XP\s+(?:Elite|Standard|Solo|Minion)\b/i.test(clean))
+  if (
+    /^Humanoid(?:\s+or\s+magical\s+beast)?(?:\s*\([^)]*\))?\s+XP\s+(?:Elite|Standard|Solo|Minion)\b/i.test(
+      clean
+    )
+  )
     return false;
   if (/^Keywords?\s/i.test(clean)) return false;
   if (/^[CMRA]\s+[A-Za-z]/i.test(clean)) return true;
@@ -273,20 +124,70 @@ function looksLikePowerName(line: string): boolean {
   return true;
 }
 
+/** Second line of a wrapped Hit Points row (e.g. Lich: `… or` then `+6 per level …`). */
+function looksLikeHitPointsFormulaContinuation(line: string): boolean {
+  const t = line.trim();
+  return /^\s*or\s+/i.test(t) || /^\+\d+\s+per\s+level\b/i.test(t);
+}
+
 /** Join wrapped defense rows (e.g. "… against" / "charm and fear effects") before parsing. */
 function mergeStatLineContinuations(lines: string[]): string[] {
   const merged: string[] = [];
   for (const raw of lines) {
     const line = raw.trim();
     if (!line) continue;
-    if (
-      merged.length > 0 &&
-      /^Defenses\b/i.test(merged[merged.length - 1]!) &&
-      !STAT_LINE_RE.test(line) &&
-      !looksLikePowerName(line)
-    ) {
-      merged[merged.length - 1] = `${merged[merged.length - 1]} ${line}`;
-      continue;
+    if (merged.length > 0) {
+      const prev = merged[merged.length - 1]!;
+      if (
+        /^Defenses\b/i.test(prev) &&
+        !STAT_LINE_RE.test(line) &&
+        !looksLikePowerName(line)
+      ) {
+        merged[merged.length - 1] = `${prev} ${line}`;
+        continue;
+      }
+      /** Wrapped "Resist … at 11th level, …" / choose-type resistance continues on the next line. */
+      if (
+        /^Resist\b/i.test(prev) &&
+        !STAT_LINE_RE.test(line) &&
+        !looksLikePowerName(line)
+      ) {
+        merged[merged.length - 1] = `${prev} ${line}`;
+        continue;
+      }
+      if (
+        /^Vulnerable\b/i.test(prev) &&
+        !STAT_LINE_RE.test(line) &&
+        !looksLikePowerName(line)
+      ) {
+        merged[merged.length - 1] = `${prev} ${line}`;
+        continue;
+      }
+      /** `At 11th level, …` wrapped after `Resist 5 … (choose two types)` — merge even if title-case misfires. */
+      if (
+        /^Resist\b/i.test(prev) &&
+        looksLikeTieredDefenseContinuation(line)
+      ) {
+        merged[merged.length - 1] = `${prev} ${line}`;
+        continue;
+      }
+      if (
+        /^Vulnerable\b/i.test(prev) &&
+        looksLikeTieredDefenseContinuation(line)
+      ) {
+        merged[merged.length - 1] = `${prev} ${line}`;
+        continue;
+      }
+      /** Book layout often breaks "… (controller) or" and puts the second HP formula on the next line. */
+      if (
+        /^(?:hit\s*points?|hp)\b/i.test(prev) &&
+        (/\s+or\s*$/i.test(prev) || /^\s*or\s+/i.test(line)) &&
+        !STAT_LINE_RE.test(line) &&
+        (looksLikeHitPointsFormulaContinuation(line) || !looksLikePowerName(line))
+      ) {
+        merged[merged.length - 1] = `${prev} ${line}`;
+        continue;
+      }
     }
     merged.push(line);
   }
@@ -375,6 +276,26 @@ function normalizePowerToMonsterShape(name: string, text: string, leadKeywords?:
   const rawTitleLine = name.trim();
   let header = rawTitleLine;
   let body = text.trim();
+
+  // Preserve inline aura lead text: "Fear of Worms (Fear) aura 3; any living creature that"
+  // should keep "any living creature that" as part of details, not lose it from the header.
+  const semicolonMatch = header.match(/^(.*?\baura\s+\d+\b)\s*;\s*(.+)$/i);
+  if (semicolonMatch) {
+    header = semicolonMatch[1].trim();
+    body = `${semicolonMatch[2].trim()} ${body}`.trim();
+  }
+
+  // Preserve regeneration rider parenthetical as details while keeping concise trait name.
+  // Example: "Regeneration 10 (if ...," + next wrapped line should keep "(if ...)" in details.
+  const regenParenMatch =
+    header.match(/^(Regeneration\s+\d+)\s*:?\s*\((.+)\)\s*$/i) ??
+    header.match(/^(Regeneration\s+\d+)\s*:?\s*\((.+)$/i);
+  if (regenParenMatch) {
+    header = regenParenMatch[1].trim();
+    body = `${regenParenMatch[2].trim()} ${body}`.trim();
+    if (!body.includes("(")) body = body.replace(/\)\s*$/, "");
+  }
+
   // Newline/OCR: "Clever Escape" on one line and "(move; recharge ⚄ ⚅)" on the next — merge into header for usage/recharge.
   const leadParen = /^\s*\(([^)]*)\)/.exec(body);
   if (
@@ -430,6 +351,22 @@ function normalizePowerToMonsterShape(name: string, text: string, leadKeywords?:
     keywordsBlob = flareRaw;
   }
   let bodyForParse = body;
+  // OCR/paste sometimes puts the keyword on the next line:
+  // "Step Through ... ✦" + "Teleportation" + "The shadow spirit ..."
+  if (!keywordsBlob && /(?:✦|[\u2726\u2727\u2605])\s*$/u.test(header)) {
+    const nextLineKeyword = bodyForParse.match(/^([A-Za-z][A-Za-z ,/+-]{1,40})\s+(?=[A-Z(])/);
+    if (nextLineKeyword) {
+      const kw = nextLineKeyword[1].trim().replace(/,$/, "");
+      if (/^[A-Za-z][A-Za-z ,/+-]{1,40}$/.test(kw) && kw.split(/\s+/).length <= 3) {
+        keywordsBlob = kw;
+        flareTraitKeywordTokens = kw
+          .split(",")
+          .map((k) => titleCaseKeywordToken(k.trim()))
+          .filter(Boolean);
+        bodyForParse = bodyForParse.slice(nextLineKeyword[0].length).trim();
+      }
+    }
+  }
   if (keywordsBlob && bodyForParse) {
     const semi = bodyForParse.split(";");
     if (semi.length > 1) {
@@ -599,23 +536,6 @@ function inferTemplateIsElite(roleLine: string, rawText: string): boolean {
   return false;
 }
 
-function extractTemplateDescription(rawText: string, roleLine: string, isElite: boolean): string {
-  const raw = rawText.trim();
-  if (!raw) return "";
-  const rl = roleLine.trim();
-  if (isElite && rl) {
-    const idx = raw.indexOf(rl);
-    if (idx >= 0) return raw.slice(0, idx).trim();
-  }
-  const mtraits = /\bTRAITS\b/i.exec(raw);
-  if (mtraits) return raw.slice(0, mtraits.index).trim();
-  const mpowers = /\bPOWERS\b/i.exec(raw);
-  if (mpowers) return raw.slice(0, mpowers.index).trim();
-  const msections = /\b(MOVE\s*ACTIONS|STANDARD\s*ACTIONS|MINOR\s*ACTIONS)\b/i.exec(raw);
-  if (msections) return raw.slice(0, msections.index).trim();
-  return raw.trim();
-}
-
 /** Remove prerequisite clause from prose once it is stored in `prerequisite`. */
 function stripPrerequisiteFromDescription(description: string, prerequisite: string): string {
   let d = description.trim();
@@ -634,6 +554,114 @@ function coerceIntFromText(text: string): number | undefined {
   return m ? Number.parseInt(m[0], 10) : undefined;
 }
 
+const KNOWN_SKILLS = [
+  "Acrobatics",
+  "Arcana",
+  "Athletics",
+  "Bluff",
+  "Diplomacy",
+  "Dungeoneering",
+  "Endurance",
+  "Heal",
+  "History",
+  "Insight",
+  "Intimidate",
+  "Nature",
+  "Perception",
+  "Religion",
+  "Stealth",
+  "Streetwise",
+  "Thievery"
+];
+const DAMAGE_TYPES = ["acid", "cold", "fire", "force", "lightning", "necrotic", "poison", "psychic", "radiant", "thunder"];
+const TIER_LEVELS = [1, 11, 21] as const;
+
+function parseSkillsLineEntries(rawLine: string): MonsterTemplatePasteSkillEntryOptionB[] {
+  const out: MonsterTemplatePasteSkillEntryOptionB[] = [];
+  const seen = new Set<string>();
+  const lowerKnown = new Map(KNOWN_SKILLS.map((s) => [s.toLowerCase(), s]));
+  const tail = rawLine.replace(/^skills?\s*/i, "").trim();
+  if (!tail) return out;
+  const sourceLine = rawLine.trim();
+
+  const addSkill = (name: string, value: number, trained: boolean) => {
+    const key = name.toLowerCase();
+    if (!lowerKnown.has(key) || seen.has(key)) return;
+    seen.add(key);
+    out.push({ skill: key, value, trained, sourceLine });
+  };
+
+  for (const m of tail.matchAll(/\b([A-Za-z][A-Za-z' -]{1,30}?)\s*([+-]\d+)\b/g)) {
+    const skillName = m[1].trim().toLowerCase();
+    const v = Number.parseInt(m[2], 10);
+    if (Number.isFinite(v)) addSkill(skillName, v, false);
+  }
+  for (const m of tail.matchAll(/(?:^|[;,]\s*|\s)([+-]\d+)\s*([A-Za-z][A-Za-z' -]{1,30})\b/g)) {
+    const skillName = m[2].trim().toLowerCase();
+    const v = Number.parseInt(m[1], 10);
+    if (Number.isFinite(v)) addSkill(skillName, v, false);
+  }
+
+  if (/\btrain(?:ing|ed)?\b/i.test(tail)) {
+    for (const [lowerName] of lowerKnown) {
+      if (new RegExp(`\\b${lowerName}\\b`, "i").test(tail)) addSkill(lowerName, 0, true);
+    }
+  }
+
+  return out;
+}
+
+function parseTieredValueEntries(tail: string): Record<string, number[]> {
+  const byType = new Map<string, Array<{ level?: number; value: number }>>();
+  const typeAlt = DAMAGE_TYPES.join("|");
+  const re = new RegExp(`(\\d+)\\s*(${typeAlt})(?:\\s+at\\s+(\\d+)(?:st|nd|rd|th)?\\s*level)?`, "gi");
+  for (const m of tail.matchAll(re)) {
+    const v = Number.parseInt(m[1], 10);
+    const type = m[2].toLowerCase();
+    const level = m[3] ? Number.parseInt(m[3], 10) : undefined;
+    if (!Number.isFinite(v)) continue;
+    const arr = byType.get(type) ?? [];
+    arr.push({ level, value: v });
+    byType.set(type, arr);
+  }
+
+  const out: Record<string, number[]> = {};
+  for (const [type, entries] of byType.entries()) {
+    const leveled = entries.filter((e) => e.level !== undefined).sort((a, b) => (a.level! - b.level!));
+    const unLeveled = entries.filter((e) => e.level === undefined);
+    if (leveled.length === 0) {
+      const base = unLeveled[0]?.value;
+      if (base !== undefined) out[type] = [base, base, base];
+      continue;
+    }
+    const withBaseline = [...leveled];
+    if (unLeveled.length > 0) withBaseline.unshift({ level: 1, value: unLeveled[0].value });
+    const vals: number[] = [];
+    for (const tier of TIER_LEVELS) {
+      let chosen = withBaseline[0]!.value;
+      for (const e of withBaseline) {
+        if ((e.level ?? 1) <= tier) chosen = e.value;
+      }
+      vals.push(chosen);
+    }
+    out[type] = vals;
+  }
+  return out;
+}
+
+function parseResistanceKeywords(tail: string): string[] {
+  const out: string[] = [];
+  for (const raw of tail.split(",")) {
+    const t = raw.trim().toLowerCase();
+    if (!t) continue;
+    if (/\d/.test(t)) continue;
+    if (/\bat\b|\blevel\b/.test(t)) continue;
+    if (!/^[a-z][a-z -]+$/.test(t)) continue;
+    if (!out.includes(t)) out.push(t);
+  }
+  return out;
+}
+
 function parseHitPointsFormula(formula: string): Record<string, unknown> {
   const parsed: Record<string, unknown> = {};
   const text = formula.trim();
@@ -649,10 +677,119 @@ function parseHitPointsFormula(formula: string): Record<string, unknown> {
   return parsed;
 }
 
-/** Subset of Python `_parse_stat_lines` — covers common template stat rows. */
-function parseStatLines(statLines: string[]): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
+const HP_ROLE_SUFFIX_RE =
+  /\(\s*(controller|artillery|lurker|soldier|brute|skirmisher)\s*\)\s*$/i;
+
+function parseHitPointsStatOptionB(rawLineTrim: string): MonsterTemplatePasteStatsOptionB["hitPoints"] | null {
+  const hpFormulaMatch = rawLineTrim.match(/^(?:hit\s*points?|hp)\s*(.*)$/i);
+  if (!hpFormulaMatch) return null;
+  const fullTail = hpFormulaMatch[1].trim();
+  if (!fullTail) return null;
+  const sourceLines = [rawLineTrim];
+  /** Allow trailing ` or` (same line as first option) as well as ` or ` between options. */
+  const segments = fullTail
+    .split(/\s+or(?:\s+|$)/gi)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const variants: NonNullable<MonsterTemplatePasteStatsOptionB["hitPoints"]>["variants"] = [];
+  let defaultEntry: { perLevel?: number; addConstitution?: boolean } | undefined;
+
+  for (const seg of segments) {
+    const rm = seg.match(HP_ROLE_SUFFIX_RE);
+    const formula = rm ? seg.slice(0, rm.index).trim() : seg;
+    const p = parseHitPointsFormula(formula);
+    const perLevel = p.per_level as number | undefined;
+    const addConstitution = !!p.add_constitution;
+    if (rm) {
+      variants.push({
+        when: { role: rm[1].toLowerCase() },
+        perLevel,
+        addConstitution,
+        sourceLine: seg
+      });
+    } else {
+      defaultEntry = { perLevel, addConstitution };
+    }
+  }
+
+  const hasMeaningfulDefault =
+    !!defaultEntry && (defaultEntry.perLevel !== undefined || !!defaultEntry.addConstitution);
+  const hasVariants = (variants?.length ?? 0) > 0;
+  if (!hasMeaningfulDefault && !hasVariants) return null;
+
+  return {
+    ...(hasMeaningfulDefault && defaultEntry ? { default: defaultEntry } : {}),
+    ...(hasVariants ? { variants } : {}),
+    sourceLines
+  };
+}
+
+function tierMapToResistanceEntries(
+  rec: Record<string, number[]>,
+  sourceLine: string
+): MonsterTemplatePasteResistanceEntryOptionB[] {
+  const out: MonsterTemplatePasteResistanceEntryOptionB[] = [];
+  for (const [type, arr] of Object.entries(rec)) {
+    if (arr.length === 3) {
+      out.push({
+        kind: "typed",
+        type,
+        tiers: { "1": arr[0], "11": arr[1], "21": arr[2] },
+        sourceLine
+      });
+    } else if (arr.length === 0) {
+      out.push({ kind: "keyword", type, sourceLine });
+    }
+  }
+  return out;
+}
+
+/**
+ * Player-chosen resistance types by tier, e.g.
+ * `5 (choose one type) at 1st level, 10 (choose two types) at 11th level, 15 (choose three types) at 21st level`.
+ */
+function parseVariableChoiceResistanceEntry(
+  tail: string,
+  sourceLine: string
+): MonsterTemplatePasteResistanceEntryOptionB | null {
+  if (!/\(\s*choose\b/i.test(tail)) return null;
+  const re =
+    /\b(\d+)\s*\(\s*([^)]+)\)\s+at\s+(\d+)(?:st|nd|rd|th)?\s*level\b/gi;
+  const matches = [...tail.matchAll(re)];
+  if (matches.length === 0) return null;
+  const tiers: Record<string, number> = {};
+  const tierRiders: Record<string, string> = {};
+  for (const m of matches) {
+    const amount = Number.parseInt(m[1], 10);
+    const rider = m[2].trim().replace(/\s+/g, " ");
+    const lvl = Number.parseInt(m[3], 10);
+    const tierKey = lvl >= 21 ? "21" : lvl >= 11 ? "11" : "1";
+    if (!Number.isFinite(amount)) continue;
+    tiers[tierKey] = amount;
+    tierRiders[tierKey] = rider;
+  }
+  if (Object.keys(tiers).length === 0) return null;
+  return {
+    kind: "variable",
+    tiers,
+    tierRiders,
+    sourceLine
+  };
+}
+
+function parseSpeedLine(rawLine: string): string {
+  const tail = rawLine.replace(/^speed\s*/i, "").trim();
+  return tail.replace(/\s{2,}/g, " ");
+}
+
+/** Subset of Python `_parse_stat_lines` — covers common template stat rows (Option B: tiers + source lines). */
+function parseStatLines(statLines: string[]): MonsterTemplatePasteStatsOptionB {
+  const result: MonsterTemplatePasteStatsOptionB = {};
   const defenses: Record<string, number> = {};
+  const immunities: string[] = [];
+  const skillEntries: MonsterTemplatePasteSkillEntryOptionB[] = [];
+  const resistEntries: MonsterTemplatePasteResistanceEntryOptionB[] = [];
+  const vulnEntries: MonsterTemplatePasteResistanceEntryOptionB[] = [];
   const unparsed: string[] = [];
 
   for (const rawLine of statLines) {
@@ -696,12 +833,12 @@ function parseStatLines(statLines: string[]): Record<string, unknown> {
     if (lower.startsWith("saving throws") || compact.startsWith("savingthrows")) {
       const v = coerceIntFromText(line);
       if (v !== undefined) {
-        result.savingThrows = v;
+        const notes =
+          line.includes(";") && line.split(";", 2)[1]?.trim()
+            ? [line.split(";", 2)[1]!.trim()]
+            : undefined;
+        result.savingThrows = { value: v, sourceLine: rawLineTrim, ...(notes?.length ? { notes } : {}) };
         parsed = true;
-        if (line.includes(";")) {
-          const tail = line.split(";", 2)[1]?.trim();
-          if (tail) result.savingThrowNotes = [tail];
-        }
         continue;
       }
     }
@@ -714,25 +851,109 @@ function parseStatLines(statLines: string[]): Record<string, unknown> {
     ) {
       const v = coerceIntFromText(line);
       if (v !== undefined) {
-        result.actionPoints = v;
+        result.actionPoints = { value: v, sourceLine: rawLineTrim };
         parsed = true;
         continue;
       }
     }
 
-    if (lower.startsWith("hit points") || compact.startsWith("hitpoints")) {
-      const hpFormulaMatch = line.match(/^hit\s*points?\s*(.*)$/i);
-      const hpFormula = hpFormulaMatch ? hpFormulaMatch[1].trim() : line;
-      const hitPoints = parseHitPointsFormula(hpFormula);
-      if (Object.keys(hitPoints).length) result.hitPoints = hitPoints;
-      parsed = true;
-      continue;
+    if (
+      lower.startsWith("hit points") ||
+      compact.startsWith("hitpoints") ||
+      lower.startsWith("hp ") ||
+      compact.startsWith("hp")
+    ) {
+      const hp = parseHitPointsStatOptionB(rawLineTrim);
+      if (hp && (hp.default || (hp.variants && hp.variants.length))) {
+        result.hitPoints = hp;
+        parsed = true;
+        continue;
+      }
+    }
+
+    if (lower.startsWith("immune") || compact.startsWith("immune")) {
+      const immuneMatch = line.match(/^immune\s*(.*)$/i);
+      const value = immuneMatch?.[1]?.trim() ?? "";
+      if (value) {
+        immunities.push(...value.split(/[;,]/).map((x) => x.trim()).filter(Boolean));
+        parsed = true;
+        continue;
+      }
+    }
+
+    if (lower.startsWith("initiative") || compact.startsWith("initiative")) {
+      const v = coerceIntFromText(line);
+      if (v !== undefined) {
+        result.initiative = { value: v, sourceLine: rawLineTrim };
+        parsed = true;
+        continue;
+      }
+    }
+
+    if (lower.startsWith("speed") || compact.startsWith("speed")) {
+      const speedText = parseSpeedLine(rawLineTrim);
+      if (speedText) {
+        result.speed = { raw: speedText, sourceLine: rawLineTrim };
+        parsed = true;
+        continue;
+      }
+    }
+
+    if (lower.startsWith("skills") || compact.startsWith("skills")) {
+      const parsedSkills = parseSkillsLineEntries(rawLineTrim);
+      if (parsedSkills.length > 0) {
+        skillEntries.push(...parsedSkills);
+        parsed = true;
+        continue;
+      }
+    }
+
+    if (lower.startsWith("resist") || compact.startsWith("resist")) {
+      const tail = rawLineTrim.replace(/^resist\s*/i, "").trim();
+      const variableEntry = parseVariableChoiceResistanceEntry(tail, rawLineTrim);
+      if (variableEntry) {
+        resistEntries.push(variableEntry);
+        parsed = true;
+        continue;
+      }
+      const typed = parseTieredValueEntries(tail);
+      const rec: Record<string, number[]> = {};
+      for (const [k, v] of Object.entries(typed)) rec[k] = v;
+      for (const kw of parseResistanceKeywords(tail)) rec[kw] = [];
+      if (Object.keys(typed).length > 0 || parseResistanceKeywords(tail).length > 0) {
+        resistEntries.push(...tierMapToResistanceEntries(rec, rawLineTrim));
+        parsed = true;
+        continue;
+      }
+    }
+
+    if (lower.startsWith("vulnerable") || compact.startsWith("vulnerable")) {
+      const tail = rawLineTrim.replace(/^vulnerable\s*/i, "").trim();
+      const variableEntry = parseVariableChoiceResistanceEntry(tail, rawLineTrim);
+      if (variableEntry) {
+        vulnEntries.push(variableEntry);
+        parsed = true;
+        continue;
+      }
+      const typed = parseTieredValueEntries(tail);
+      const rec: Record<string, number[]> = {};
+      for (const [k, v] of Object.entries(typed)) rec[k] = v;
+      for (const kw of parseResistanceKeywords(tail)) rec[kw] = [];
+      if (Object.keys(typed).length > 0 || parseResistanceKeywords(tail).length > 0) {
+        vulnEntries.push(...tierMapToResistanceEntries(rec, rawLineTrim));
+        parsed = true;
+        continue;
+      }
     }
 
     if (!parsed) unparsed.push(line);
   }
 
   if (Object.keys(defenses).length) result.defenses = defenses;
+  if (immunities.length) result.immunities = immunities;
+  if (skillEntries.length) result.skills = { entries: skillEntries };
+  if (resistEntries.length) result.resistances = { entries: resistEntries };
+  if (vulnEntries.length) result.vulnerabilities = { entries: vulnEntries };
   if (unparsed.length) result.unparsedStatLines = unparsed;
   return result;
 }
@@ -781,8 +1002,9 @@ function toMonsterTraitShape(entry: MonsterPower): MonsterTrait {
   const fromLead = entry.traitTemplateKeywords ?? [];
   const fromName = extractParentheticalTraitKeywords(entry.name ?? "");
   const keywords = mergeTraitKeywordLists(fromLead, fromName);
+  const normalizedName = entry.name.trim().replace(/[:\s]+$/g, "");
   return {
-    name: entry.name.trim(),
+    name: normalizedName,
     details: (entry.description ?? "").trim(),
     range: parseTraitRange(entry),
     type: "Trait",
@@ -825,104 +1047,40 @@ function bucketTemplateAbilities(entries: MonsterPower[]): {
   return { auras, traits, powers, uncategorized };
 }
 
-function mechanicalParseTemplateBlockLines(blockLines: string[], templateName: string): {
-  prerequisite: string;
-  roleLine: string;
-  statLines: string[];
-  powersText: string[];
-  powers: MonsterPower[];
-  auras: MonsterTrait[];
-  traits: MonsterTrait[];
-  uncategorizedAbilities: MonsterPower[];
-  rawText: string;
-} {
-  let prerequisite = "";
-  let roleLine = "";
-  const statLines: string[] = [];
-  const powerLines: string[] = [];
-  let inPowers = false;
-  let seenStatCore = false;
-
-  for (const origLine of blockLines) {
-    const fusedMatch = origLine.match(/^(Action\s*Points?\s*\d+)\s+(.+)$/i);
-    const candidateLines = fusedMatch
-      ? [fusedMatch[1].trim(), fusedMatch[2].trim()]
-      : [origLine];
-
-    for (let line of candidateLines) {
-      if (!line) continue;
-      if (line.toLowerCase().startsWith("prerequisite:")) prerequisite = line.split(":", 2)[1].trim();
-      if (
-        ROLE_LINE_RE.test(line.trim()) ||
-        ROLE_LINE_ELITE_ANCHOR_RE.test(line.trim()) ||
-        (line.includes("Elite") &&
-          /Soldier|Brute|Controller|Skirmisher|Artillery|Lurker/.test(line) &&
-          lineMentionsTemplateName(line, templateName))
-      ) {
-        if (!roleLine) {
-          roleLine = line;
-          seenStatCore = true;
-        }
-      }
-      if (
-        statLines.length > 0 &&
-        /^Defenses\b/i.test(statLines[statLines.length - 1]!) &&
-        !STAT_LINE_RE.test(line) &&
-        !looksLikePowerName(line)
-      ) {
-        statLines[statLines.length - 1] = `${statLines[statLines.length - 1]} ${line}`;
-        seenStatCore = true;
-        continue;
-      }
-      if (STAT_LINE_RE.test(line)) {
-        statLines.push(line);
-        seenStatCore = true;
-      }
-      if (line.toLowerCase().startsWith("skills ")) break;
-      if (SECTION_MARKER_RE.test(line)) {
-        inPowers = true;
-        continue;
-      }
-      if (!inPowers && seenStatCore && looksLikePowerName(line)) inPowers = true;
-      if (inPowers && isTemplateTailMarker(line)) break;
-      if (inPowers && STAT_LINE_RE.test(line)) continue;
-      if (inPowers && /^Level\s+\d+\s*:/i.test(line.trim())) {
-        statLines.push(line);
-        continue;
-      }
-      if (inPowers && line) powerLines.push(line);
-    }
-  }
-
-  const parsedPowers = parsePowers(powerLines.slice(0, 120));
-  const buckets = bucketTemplateAbilities(parsedPowers);
-
-  return {
-    prerequisite,
-    roleLine,
-    statLines,
-    powersText: powerLines.slice(0, 120),
-    powers: buckets.powers,
-    auras: buckets.auras,
-    traits: buckets.traits,
-    uncategorizedAbilities: buckets.uncategorized,
-    rawText: blockLines.join(" ").slice(0, 8000)
-  };
-}
-
 function buildTemplateRow(
   name: string,
-  parsed: ReturnType<typeof mechanicalParseTemplateBlockLines>
+  parsed: {
+    prerequisite: string;
+    roleLine: string;
+    statLines: string[];
+    powersText: string[];
+    powers: MonsterPower[];
+    auras: MonsterTrait[];
+    traits: MonsterTrait[];
+    uncategorizedAbilities: MonsterPower[];
+    rawText: string;
+    description?: string;
+  }
 ): MonsterTemplateRecord {
   const roleLineStr = parsed.roleLine;
   const rawTextStr = parsed.rawText;
   const isElite = inferTemplateIsElite(roleLineStr, rawTextStr);
   const prereq = parsed.prerequisite || "";
   const mergedStatLines = mergeStatLineContinuations(parsed.statLines);
-  const descriptionBase = extractTemplateDescription(rawTextStr, roleLineStr, isElite);
+  const descriptionBase = (parsed.description ?? "").trim();
   const description = prereq
     ? stripPrerequisiteFromDescription(descriptionBase, prereq)
     : descriptionBase.replace(/\bPrerequisite:\s*[^\n]+/gi, "").trim();
+  const parsedStats = parseStatLines(mergedStatLines) as MonsterTemplateRecord["stats"] & { regeneration?: number };
+  if (parsed.traits.length > 0) {
+    for (const t of parsed.traits) {
+      const m = String(t.name ?? "").match(/^Regeneration\s+(\d+)\b/i);
+      if (m) {
+        parsedStats.regeneration = Number.parseInt(m[1], 10);
+        break;
+      }
+    }
+  }
   return {
     templateName: titleCase(name),
     sourceBook: "manual import",
@@ -934,7 +1092,7 @@ function buildTemplateRow(
     role: parseRoleLine(roleLineStr),
     isEliteTemplate: isElite,
     statLines: mergedStatLines.length ? mergedStatLines : undefined,
-    stats: parseStatLines(mergedStatLines) as MonsterTemplateRecord["stats"],
+    stats: parsedStats,
     auras: parsed.auras.length ? parsed.auras : undefined,
     traits: parsed.traits.length ? parsed.traits : undefined,
     powers: parsed.powers,
@@ -947,54 +1105,267 @@ function buildTemplateRow(
   };
 }
 
+const UI_SCAFFOLD_LINE_RE = /^(statblock with|and multiple powers)/i;
+
+function isScaffoldLine(line: string): boolean {
+  const t = line.trim();
+  if (!t) return true;
+  if (UI_SCAFFOLD_LINE_RE.test(t)) return true;
+  return false;
+}
+
+function inferTemplateNameFromSimpleSections(lines: string[], hint?: string): string | undefined {
+  if (hint?.trim()) return titleCase(hint.trim());
+  for (const line of lines) {
+    const t = line.trim();
+    if (!t || isScaffoldLine(t)) continue;
+    if (isExplicitAbilityMarkerLine(t)) continue;
+    if (/^prerequisites?:/i.test(t)) continue;
+    if (ROLE_LINE_ELITE_ANCHOR_RE.test(t) || ROLE_LINE_RE.test(t)) continue;
+    if (STAT_LINE_RE.test(t)) continue;
+    return titleCase(t);
+  }
+  return undefined;
+}
+
+/** Split on `[ABILITY]` (starts a new block; closes the previous) and `[ABILITYEND]` (closes only). */
+function splitExplicitAbilityBlocks(lines: string[]): string[][] {
+  const blocks: string[][] = [];
+  let current: string[] = [];
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (ABILITY_BLOCK_START_RE.test(line)) {
+      if (current.length) blocks.push(current);
+      current = [];
+      continue;
+    }
+    if (ABILITY_BLOCK_END_RE.test(line)) {
+      if (current.length) blocks.push(current);
+      current = [];
+      continue;
+    }
+    current.push(line);
+  }
+  if (current.length) blocks.push(current);
+  return blocks;
+}
+
+function looksLikeSimpleAbilityHeader(line: string): boolean {
+  const t = line.trim();
+  if (!t) return false;
+  if (looksLikeTieredDefenseContinuation(t)) return false;
+  if (looksLikeHitPointsFormulaContinuation(t)) return false;
+  if (STAT_LINE_RE.test(t)) return false;
+  /** Aura rider text ("Allies in the aura gain …") — not a separate ability name. */
+  if (/\b(?:in|within)\s+the\s+aura\b/i.test(t) && !/\baura\s+\d+\b/i.test(t)) return false;
+  if (/^Regeneration\b/i.test(t)) return true;
+  if (/^Keywords?\s/i.test(t)) return false;
+  if (/^[CMRA]\s+[A-Za-z]/i.test(t)) return true;
+  if (/^(?:[CMRA]\s+)?[A-Z][A-Za-z' -]{1,80}\([^)]*\)/.test(t)) return true;
+  if (/\((standard|minor|move|free|immediate|recharge|encounter|daily)\b/i.test(t)) return true;
+  if (/\baura\s+\d+\b/i.test(t)) return true;
+  if (/(?:✦|[\u2726\u2727\u2605])/.test(t)) return true;
+  /** Short title-case names only (avoids wrapped aura prose matching as a "header"). */
+  if (/^[A-Z][A-Za-z' -]{2,50}$/.test(t) && t.split(/\s+/).length <= 8) return true;
+  return looksLikePowerName(t);
+}
+
+function splitSimpleAbilityBlocks(lines: string[]): string[][] {
+  const blocks: string[][] = [];
+  let current: string[] = [];
+  const trailingFlareRe = /(?:✦|[\u2726\u2727\u2605])\s*$/u;
+  const keywordOnlyRe = /^[A-Za-z][A-Za-z ,/+-]{1,40}$/;
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (
+      current.length > 0 &&
+      current.length === 1 &&
+      trailingFlareRe.test(current[0] ?? "") &&
+      keywordOnlyRe.test(line) &&
+      line.split(/\s+/).length <= 3
+    ) {
+      current.push(line);
+      continue;
+    }
+    if (looksLikeSimpleAbilityHeader(line)) {
+      if (current.length) blocks.push(current);
+      current = [line];
+      continue;
+    }
+    if (current.length) current.push(line);
+  }
+  if (current.length) blocks.push(current);
+  return blocks;
+}
+
+/** Join `at 11th level, 15 (choose…)` to previous `Resist` / `Vulnerable` when OCR breaks the line. */
+function mergeTierDefenseIntoPrevStatLine(statLines: string[], line: string): boolean {
+  if (statLines.length === 0) return false;
+  const prev = statLines[statLines.length - 1] ?? "";
+  if (!/^Resist\b/i.test(prev) && !/^Vulnerable\b/i.test(prev)) return false;
+  if (!looksLikeTieredDefenseContinuation(line)) return false;
+  statLines[statLines.length - 1] = `${prev} ${line.trim()}`.trim();
+  return true;
+}
+
+function parseSimpleTemplateSections(lines: string[]) {
+  const cleaned = lines.map((x) => x.trim()).filter((x) => x.length > 0 && !isScaffoldLine(x));
+  let roleLine = "";
+  let roleIdx = -1;
+  let prereqStartIdx = -1;
+  for (let i = 0; i < cleaned.length; i++) {
+    const line = cleaned[i];
+    if (prereqStartIdx < 0 && /^prerequisites?:/i.test(line)) prereqStartIdx = i;
+    if (!roleLine && (ROLE_LINE_ELITE_ANCHOR_RE.test(line) || ROLE_LINE_RE.test(line))) {
+      roleLine = line;
+      roleIdx = i;
+    }
+  }
+
+  const descriptionLines: string[] = [];
+  const prerequisiteLines: string[] = [];
+  if (prereqStartIdx >= 0) {
+    const prereqEnd = roleIdx > prereqStartIdx ? roleIdx : cleaned.length;
+    prerequisiteLines.push(...cleaned.slice(prereqStartIdx, prereqEnd));
+    descriptionLines.push(...cleaned.slice(0, prereqStartIdx));
+  } else if (roleIdx >= 0) {
+    descriptionLines.push(...cleaned.slice(0, roleIdx));
+  } else {
+    descriptionLines.push(...cleaned);
+  }
+
+  let prerequisite = "";
+  if (prerequisiteLines.length > 0) {
+    const [first, ...rest] = prerequisiteLines;
+    const firstTail = first.replace(/^prerequisites?\s*:\s*/i, "").trim();
+    prerequisite = [firstTail, ...rest].join(" ").replace(/\s{2,}/g, " ").trim();
+  }
+
+  const statLines: string[] = [];
+  const abilityRaw: string[] = [];
+  let inAbilitySection = false;
+
+  for (let i = 0; i < cleaned.length; i++) {
+    const line = cleaned[i];
+    if (line === roleLine) continue;
+    if (prereqStartIdx >= 0 && i >= prereqStartIdx && (roleIdx < 0 || i < roleIdx)) continue;
+    if (roleIdx >= 0 && i < roleIdx) continue;
+    if (
+      roleIdx >= 0 &&
+      !inAbilitySection &&
+      statLines.length === 0 &&
+      /^Humanoid(?:\s+or\s+magical\s+beast)?(?:\s*\([^)]*\))?\s+XP\s+(?:Elite|Standard|Solo|Minion)\b/i.test(
+        line
+      )
+    ) {
+      continue;
+    }
+    if (roleIdx >= 0 && SECTION_MARKER_RE.test(line)) {
+      inAbilitySection = true;
+      continue;
+    }
+    if (roleIdx >= 0 && !inAbilitySection && (STAT_LINE_RE.test(line) || statLines.length > 0)) {
+      if (STAT_LINE_RE.test(line)) {
+        statLines.push(line);
+        continue;
+      }
+      if (mergeTierDefenseIntoPrevStatLine(statLines, line)) {
+        continue;
+      }
+      if (
+        !looksLikeSimpleAbilityHeader(line) &&
+        !isExplicitAbilityMarkerLine(line) &&
+        !SECTION_MARKER_RE.test(line)
+      ) {
+        statLines[statLines.length - 1] = `${statLines[statLines.length - 1]} ${line}`.trim();
+        continue;
+      }
+      inAbilitySection = true;
+      abilityRaw.push(line);
+      continue;
+    }
+    // Some blocks place stat lines (e.g. Skills) after ability text; still capture them.
+    if (roleIdx >= 0 && STAT_LINE_RE.test(line)) {
+      statLines.push(line);
+      continue;
+    }
+    if (roleIdx >= 0) {
+      if (
+        statLines.length === 0 &&
+        !looksLikeSimpleAbilityHeader(line) &&
+        !isExplicitAbilityMarkerLine(line)
+      ) {
+        continue;
+      }
+      inAbilitySection = true;
+      abilityRaw.push(line);
+    }
+  }
+
+  const powersText = abilityRaw.slice();
+  const hasExplicitMarkers = abilityRaw.some((line) => isExplicitAbilityMarkerLine(line));
+  const numberedBlocks = hasExplicitMarkers ? splitExplicitAbilityBlocks(abilityRaw) : [];
+  const parsedEntries: MonsterPower[] =
+    numberedBlocks.length > 0
+      ? numberedBlocks
+          .map((block) => {
+            const [head, ...tail] = block;
+            const entry = normalizePowerToMonsterShape(head ?? "", tail.join(" ").trim());
+            return entry;
+          })
+          .filter((p) => p.name)
+      : splitSimpleAbilityBlocks(abilityRaw)
+          .map((block) => {
+            const [head, ...tail] = block;
+            return normalizePowerToMonsterShape(head ?? "", tail.join(" ").trim());
+          })
+          .filter((p) => p.name);
+  const buckets = bucketTemplateAbilities(parsedEntries);
+
+  const firstDescLine = descriptionLines[0]?.trim() ?? "";
+  const roleTemplateLabel = roleLine
+    .replace(/\s+Elite\s+(Soldier|Brute|Controller|Skirmisher|Artillery|Lurker)\b.*$/i, "")
+    .trim();
+  if (
+    firstDescLine &&
+    roleTemplateLabel &&
+    firstDescLine.toLowerCase() === roleTemplateLabel.toLowerCase()
+  ) {
+    descriptionLines.shift();
+  }
+
+  return {
+    prerequisite,
+    roleLine,
+    statLines,
+    powersText,
+    powers: buckets.powers,
+    auras: buckets.auras,
+    traits: buckets.traits,
+    uncategorizedAbilities: buckets.uncategorized,
+    rawText: cleaned.join(" ").slice(0, 8000),
+    description: descriptionLines.join(" ").replace(/\s{2,}/g, " ").trim()
+  };
+}
+
 export function parsePastedMonsterTemplateTextLocal(rawText: string, templateNameHint?: string): ParsePasteResult {
   const lines = toLines(rawText);
   if (!lines.length) return { ok: false, error: "emptyInput" };
 
-  const names = extractCandidateNames(lines);
-  let name: string | undefined;
-  if (templateNameHint?.trim()) name = titleCase(templateNameHint.trim());
-  else if (names.size) name = [...names].sort((a, b) => b.length - a.length)[0];
-  else {
-    const anchors = scanEliteRoleAnchors(lines);
-    if (anchors.length) name = anchors[0][1];
-    else {
-      const hm = lines[0].trim().match(TEMPLATE_HEADING_RE);
-      if (hm) name = titleCase(hm[1].trim());
-    }
-  }
+  const name = inferTemplateNameFromSimpleSections(lines, templateNameHint);
   if (!name) return { ok: false, error: "couldNotInferTemplateName" };
 
-  const headerIdx = findHeaderIndex(lines, name) ?? 0;
-  const tail = lines.slice(headerIdx, headerIdx + 220);
-  const blockLines = expandBlockLinesForTemplateParsing(tail);
-  const mechanical = mechanicalParseTemplateBlockLines(blockLines, name);
+  const mechanical = parseSimpleTemplateSections(lines);
   const template = buildTemplateRow(name, mechanical);
   return { ok: true, template };
 }
 
-/**
- * Dev server can expose POST `/api/parse-monster-template-paste` (Python ETL).
- * Falls back to `parsePastedMonsterTemplateTextLocal` when unavailable.
- */
 export async function parsePastedMonsterTemplateText(
   rawText: string,
   templateNameHint?: string
 ): Promise<ParsePasteResult> {
-  if (import.meta.env.DEV) {
-    try {
-      const r = await fetch("/api/parse-monster-template-paste", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: rawText, templateNameHint: templateNameHint?.trim() || undefined })
-      });
-      if (r.ok) {
-        const data = (await r.json()) as ParsePasteResult | { ok: boolean; template?: MonsterTemplateRecord; error?: string };
-        if (data && typeof data === "object" && "ok" in data) return data as ParsePasteResult;
-      }
-    } catch {
-      /* use local */
-    }
-  }
+  // Always use the local, section-based parser for paste imports.
   return parsePastedMonsterTemplateTextLocal(rawText, templateNameHint);
 }

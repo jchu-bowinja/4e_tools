@@ -81,6 +81,59 @@ const pageTitleStyle: CSSProperties = {
 };
 
 const bodyPrimary: CSSProperties = { fontSize: "0.8rem", color: "var(--text-primary)" };
+
+/** Compact JSON under each aura/trait/power in create-template preview. */
+const templateAbilityJsonPreStyle: CSSProperties = {
+  margin: "0.35rem 0 0 0",
+  padding: "0.45rem 0.5rem",
+  borderRadius: 6,
+  background: "rgba(0,0,0,0.06)",
+  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+  fontSize: "0.72rem",
+  lineHeight: 1.45,
+  whiteSpace: "pre-wrap",
+  wordBreak: "break-word",
+  overflowX: "auto",
+  color: "var(--text-secondary)"
+};
+
+const templateJsonCollapsibleDetailsStyle: CSSProperties = {
+  marginTop: "0.4rem"
+};
+
+const templateJsonCollapsibleSummaryStyle: CSSProperties = {
+  cursor: "pointer",
+  fontSize: "0.72rem",
+  fontWeight: 700,
+  letterSpacing: "0.06em",
+  textTransform: "uppercase",
+  color: "var(--text-muted)"
+};
+
+function TemplateJsonCollapsible({
+  summaryLabel,
+  value,
+  preExtraStyle
+}: {
+  summaryLabel: string;
+  value: unknown;
+  /** e.g. maxHeight for large blobs like full `stats` */
+  preExtraStyle?: CSSProperties;
+}): JSX.Element {
+  return (
+    <details className="template-json-collapsible" style={templateJsonCollapsibleDetailsStyle}>
+      <summary className="template-json-collapsible-summary" style={templateJsonCollapsibleSummaryStyle}>
+        <span className="template-json-collapsible-arrow" aria-hidden>
+          ▶
+        </span>
+        {summaryLabel}
+      </summary>
+      <pre style={{ ...templateAbilityJsonPreStyle, marginTop: "0.35rem", ...preExtraStyle }}>
+        {JSON.stringify(value, null, 2)}
+      </pre>
+    </details>
+  );
+}
 const bodySecondary: CSSProperties = { fontSize: "0.8rem", color: "var(--text-secondary)" };
 const metaMuted: CSSProperties = { fontSize: "0.78rem", color: "var(--text-muted)" };
 const metaSecondary: CSSProperties = { fontSize: "0.78rem", color: "var(--text-secondary)" };
@@ -401,13 +454,14 @@ const statEmptyPlaceholder: CSSProperties = { fontWeight: 700, fontSize: "0.8rem
 
 const outcomeEntryTitleStyle: CSSProperties = { fontSize: "0.78rem", fontWeight: 700, color: "var(--text-primary)" };
 
-type MonsterPowerActionBucket = "standard" | "move" | "minor" | "triggered" | "other";
+type MonsterPowerActionBucket = "standard" | "move" | "minor" | "free" | "triggered" | "other";
 type MonsterPowerColorBucket = "atWill" | "encounter" | "daily" | "other";
 
 function usageAccentColor(bucket: MonsterPowerActionBucket): string {
   if (bucket === "standard") return "var(--power-accent-atwill-bar)";
   if (bucket === "move") return "var(--power-accent-move-bar)";
   if (bucket === "minor") return "var(--power-accent-encounter-bar)";
+  if (bucket === "free") return "var(--power-accent-free-bar)";
   if (bucket === "triggered") return "var(--power-accent-daily-bar)";
   return "var(--text-secondary)";
 }
@@ -438,6 +492,13 @@ function usageAccentCardStyle(bucket: MonsterPowerActionBucket): {
       backgroundColor: "var(--power-accent-encounter-bg)"
     };
   }
+  if (bucket === "free") {
+    return {
+      border: "1px solid var(--power-accent-free-border)",
+      borderLeft: "6px solid var(--power-accent-free-bar)",
+      backgroundColor: "var(--power-accent-free-bg)"
+    };
+  }
   if (bucket === "triggered") {
     return {
       border: "1px solid var(--power-accent-daily-border)",
@@ -460,6 +521,7 @@ function classifyMonsterPowerUsageBucket(action: string | undefined, trigger: st
   if (normalizedAction.includes("standard")) return "standard";
   if (/\bmove\b/.test(normalizedAction)) return "move";
   if (normalizedAction.includes("minor")) return "minor";
+  if (normalizedAction.includes("free")) return "free";
   return "other";
 }
 
@@ -467,6 +529,7 @@ function usageBucketLabel(bucket: MonsterPowerActionBucket): string {
   if (bucket === "standard") return "Standard Action";
   if (bucket === "move") return "Move Action";
   if (bucket === "minor") return "Minor Action";
+  if (bucket === "free") return "Free Action";
   if (bucket === "triggered") return "Triggered Actions";
   return "Other";
 }
@@ -1133,18 +1196,22 @@ function MonsterPowersPanels({
   powers,
   startGlossaryHover,
   leaveGlossaryHover,
-  shouldHighlightGlossaryTerm
+  shouldHighlightGlossaryTerm,
+  showJson
 }: {
   powers: MonsterPower[];
   startGlossaryHover: (event: ReactMouseEvent<HTMLElement>, key: MonsterGlossaryHoverKey) => void;
   leaveGlossaryHover: () => void;
   shouldHighlightGlossaryTerm: (term: string) => boolean;
+  /** When set (e.g. create-template tab), render JSON for each power below the card body. */
+  showJson?: boolean;
 }): JSX.Element {
   const groupedPowers = useMemo(() => {
     const buckets: Record<MonsterPowerActionBucket, MonsterPower[]> = {
       standard: [],
       move: [],
       minor: [],
+      free: [],
       triggered: [],
       other: []
     };
@@ -1166,7 +1233,7 @@ function MonsterPowersPanels({
       <h3 style={sectionTitleStyle}>Powers ({powers.length})</h3>
       <div style={{ marginTop: "0.5rem", display: "grid", gap: "0.6rem" }}>
         {powers.length === 0 ? <div style={metaMuted}>No powers parsed.</div> : null}
-        {(["standard", "move", "minor", "triggered", "other"] as const).map((bucket) => {
+        {(["standard", "move", "minor", "free", "triggered", "other"] as const).map((bucket) => {
           const bucketPowers = groupedPowers[bucket];
           if (bucketPowers.length === 0) return null;
           return (
@@ -1463,6 +1530,7 @@ function MonsterPowersPanels({
                           )}
                         </div>
                       ) : null}
+                      {showJson ? <TemplateJsonCollapsible summaryLabel="JSON" value={power} /> : null}
                     </div>
                   );
                 })}
@@ -1480,13 +1548,16 @@ function MonsterTemplateFormattedView({
   glossaryKeyPrefix,
   startGlossaryHover,
   leaveGlossaryHover,
-  shouldHighlightGlossaryTerm
+  shouldHighlightGlossaryTerm,
+  showAbilityJson
 }: {
   record: MonsterTemplateRecord;
   glossaryKeyPrefix: string;
   startGlossaryHover: (event: ReactMouseEvent<HTMLElement>, key: MonsterGlossaryHoverKey) => void;
   leaveGlossaryHover: () => void;
   shouldHighlightGlossaryTerm: (term: string) => boolean;
+  /** Create-template preview: show JSON for each aura, trait, and power. */
+  showAbilityJson?: boolean;
 }): JSX.Element {
   return (
     <div style={{ minWidth: 0 }}>
@@ -1538,16 +1609,32 @@ function MonsterTemplateFormattedView({
         </div>
       ) : null}
 
-      {(record.statLines?.length ?? 0) > 0 ? (
+      {(record.statLines?.length ?? 0) > 0 ||
+      (record.stats && Object.keys(record.stats).length > 0) ? (
         <div style={centerSubsectionPanelStyle}>
           <h3 style={sectionTitleStyle}>Stat adjustments</h3>
-          <ul style={{ margin: "0.25rem 0 0 0", paddingLeft: "1rem", ...bodyPrimary }}>
-            {record.statLines!.map((line, i) => (
-              <li key={`${glossaryKeyPrefix}-statline-${i}`} style={{ marginBottom: "0.22rem" }}>
-                {line}
-              </li>
-            ))}
-          </ul>
+          {(record.statLines?.length ?? 0) > 0 ? (
+            <ul style={{ margin: "0.25rem 0 0 0", paddingLeft: "1rem", ...bodyPrimary }}>
+              {record.statLines!.map((line, i) => (
+                <li key={`${glossaryKeyPrefix}-statline-${i}`} style={{ marginBottom: "0.22rem" }}>
+                  {line}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {record.stats && Object.keys(record.stats).length > 0 ? (
+            <TemplateJsonCollapsible
+              summaryLabel="JSON"
+              value={record.stats}
+              preExtraStyle={{
+                maxHeight: "min(40vh, 22rem)",
+                overflowY: "auto",
+                background: "rgba(0,0,0,0.04)",
+                fontSize: "0.82rem",
+                color: "var(--text-primary)"
+              }}
+            />
+          ) : null}
         </div>
       ) : null}
 
@@ -1587,6 +1674,9 @@ function MonsterTemplateFormattedView({
                     `${glossaryKeyPrefix}-aura-${idx}`,
                     shouldHighlightGlossaryTerm
                   )}
+                  {showAbilityJson ? (
+                    <TemplateJsonCollapsible summaryLabel="JSON" value={aura} />
+                  ) : null}
                 </div>
               );
             })}
@@ -1630,6 +1720,9 @@ function MonsterTemplateFormattedView({
                     `${glossaryKeyPrefix}-trait-${idx}`,
                     shouldHighlightGlossaryTerm
                   )}
+                  {showAbilityJson ? (
+                    <TemplateJsonCollapsible summaryLabel="JSON" value={trait} />
+                  ) : null}
                 </div>
               );
             })}
@@ -1642,6 +1735,7 @@ function MonsterTemplateFormattedView({
         startGlossaryHover={startGlossaryHover}
         leaveGlossaryHover={leaveGlossaryHover}
         shouldHighlightGlossaryTerm={shouldHighlightGlossaryTerm}
+        showJson={showAbilityJson}
       />
     </div>
   );
@@ -1691,6 +1785,7 @@ export function MonsterEditorApp({
   const startGlossaryHover = glossaryTooltipUi.startHover;
   const leaveGlossaryHover = glossaryTooltipUi.leaveHover;
   const jsonTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const createPasteTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -2008,6 +2103,24 @@ export function MonsterEditorApp({
       return true;
     }
   }, [viewerTab, createDraftJson]);
+
+  const insertCreatePasteMarker = useCallback((marker: "[ABILITY]" | "[ABILITYEND]") => {
+    const el = createPasteTextareaRef.current;
+    if (!el) {
+      setCreatePasteText((prev) => prev + marker);
+      return;
+    }
+    const value = el.value;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const next = value.slice(0, start) + marker + value.slice(end);
+    const caret = start + marker.length;
+    setCreatePasteText(next);
+    window.setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(caret, caret);
+    }, 0);
+  }, []);
 
   return (
     <div
@@ -3303,6 +3416,7 @@ export function MonsterEditorApp({
                   }}
                 >
                   <textarea
+                    ref={createPasteTextareaRef}
                     value={createPasteText}
                     onChange={(event) => setCreatePasteText(event.target.value)}
                     placeholder="Paste OCR or extracted PDF text for a single monster template…"
@@ -3322,6 +3436,53 @@ export function MonsterEditorApp({
                       resize: "vertical"
                     }}
                   />
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: "0.35rem",
+                      alignItems: "center",
+                      marginTop: "0.4rem"
+                    }}
+                  >
+                    <span style={{ ...microLabelStyle, marginRight: "0.1rem" }}>Insert at cursor</span>
+                    <button
+                      type="button"
+                      onClick={() => insertCreatePasteMarker("[ABILITY]")}
+                      style={{
+                        fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+                        fontSize: "0.72rem",
+                        padding: "0.2rem 0.45rem",
+                        borderRadius: "0.28rem",
+                        border: "1px solid var(--panel-border)",
+                        backgroundColor: "var(--surface-0)",
+                        color: "var(--text-primary)",
+                        cursor: "pointer"
+                      }}
+                    >
+                      [ABILITY]
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => insertCreatePasteMarker("[ABILITYEND]")}
+                      style={{
+                        fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+                        fontSize: "0.72rem",
+                        padding: "0.2rem 0.45rem",
+                        borderRadius: "0.28rem",
+                        border: "1px solid var(--panel-border)",
+                        backgroundColor: "var(--surface-0)",
+                        color: "var(--text-primary)",
+                        cursor: "pointer"
+                      }}
+                    >
+                      [ABILITYEND]
+                    </button>
+                  </div>
+                  <p style={{ margin: "0.45rem 0 0", color: "var(--text-muted)", fontSize: "0.74rem", lineHeight: 1.35 }}>
+                    Optional: <code>[ABILITY]</code> starts an ability block(power, trait or aura);{" "}
+                    <code>[ABILITYEND]</code> ends an ability block for better parsing.
+                  </p>
                 </div>
               </div>
 
@@ -3337,11 +3498,13 @@ export function MonsterEditorApp({
                     startGlossaryHover={startGlossaryHover}
                     leaveGlossaryHover={leaveGlossaryHover}
                     shouldHighlightGlossaryTerm={shouldHighlightGlossaryTerm}
+                    showAbilityJson
                   />
                 ) : (
                   <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.8125rem", lineHeight: 1.45 }}>
                     Use <strong>Import monster template</strong> on pasted text, or edit the JSON draft below — a live preview of
-                    identity, stats, traits, and powers appears here.
+                    identity, stats, traits, and powers appears here. For cleaner splitting, use <code>[ABILITY]</code> /{" "}
+                    <code>[ABILITYEND]</code> on their own lines as described above.
                   </p>
                 )}
               </div>

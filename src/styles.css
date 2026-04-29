@@ -30,6 +30,9 @@
   --power-accent-move-bar: #0369a1;
   --power-accent-move-bg: #f0f9ff;
   --power-accent-move-border: #7dd3fc;
+  --power-accent-free-bar: #7c3aed;
+  --power-accent-free-bg: #f5f3ff;
+  --power-accent-free-border: #c4b5fd;
   --power-expended-opacity: 0.8;
   --table-stripe-even: var(--surface-1);
   --table-stripe-odd: var(--surface-0);
@@ -212,6 +215,9 @@ textarea:hover {
   --power-accent-move-bar: #7dd3fc;
   --power-accent-move-bg: #0c1824;
   --power-accent-move-border: #1e4976;
+  --power-accent-free-bar: #c4b5fd;
+  --power-accent-free-bg: #1f1633;
+  --power-accent-free-border: #4c3f77;
   --power-expended-opacity: 0.92;
   --table-stripe-even: #302518;
   --table-stripe-odd: #241c13;
@@ -260,6 +266,36 @@ textarea:hover {
     width: 1.15rem;
     height: 1.15rem;
   }
+}
+
+/* Create-template: JSON <details> disclosure arrow (▶ → ▼ when open) */
+.template-json-collapsible > .template-json-collapsible-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  list-style: none;
+}
+
+.template-json-collapsible > .template-json-collapsible-summary::-webkit-details-marker {
+  display: none;
+}
+
+.template-json-collapsible > .template-json-collapsible-summary::marker {
+  content: "";
+}
+
+.template-json-collapsible-arrow {
+  display: inline-block;
+  flex-shrink: 0;
+  font-size: 0.55rem;
+  line-height: 1;
+  color: var(--text-muted);
+  transition: transform 0.15s ease;
+  transform: rotate(0deg);
+}
+
+.template-json-collapsible[open] .template-json-collapsible-arrow {
+  transform: rotate(90deg);
 }
 
 @media (prefers-reduced-motion: reduce) {
