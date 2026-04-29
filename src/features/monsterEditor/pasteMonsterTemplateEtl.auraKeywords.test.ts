@@ -472,5 +472,44 @@ Saving Throws +2`;
     expect(hp?.variants?.[0]?.when?.role).toBe("controller");
     expect(hp?.variants?.[1]?.when?.role).toBe("artillery");
   });
+
+  it("classifies Bodyguard Indomitable Presence as a trait (no header usage/action; ‘whenever’ in prose)", () => {
+    const block = `Bodyguard Elite Soldier
+Humanoid XP Elite
+Defenses +2 AC; +2 Fortitude, +1 Reflex, +1 Will
+Saving Throws +2
+Action Point 1
+Hit Points +8 per level + Constitution score
+POWERS
+[ABILITY]
+Indomitable Presence
+ Every time a bodyguard attacks an enemy, whether the
+attack hits or misses, it marks that target. The mark lasts
+until the end of the bodyguard's next turn. When a target
+is marked, it takes a –2 penalty to attack rolls if the attack
+doesn't include the bodyguard as a target. A creature
+can be subject to only one mark at a time. A new mark
+supersedes a mark that was already in place.
+ In addition, whenever a marked enemy that is
+adjacent to the bodyguard shifts or makes an attack that
+does not include the bodyguard, the bodyguard can make
+a basic melee attack against that enemy as an immediate
+interrupt.
+[ABILITY]
+Shieldbearer
+ Allies adjacent to the bodyguard gain a +2 power bonus to
+AC.
+[ABILITYEND]`;
+    const r = parsePastedMonsterTemplateTextLocal(block, "Bodyguard");
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const indom = r.template.traits?.find((t) => t.name.includes("Indomitable"));
+    expect(indom).toBeDefined();
+    expect(r.template.powers?.some((p) => p.name.includes("Indomitable"))).toBe(false);
+    expect(r.template.uncategorizedAbilities?.some((p) => p.name.includes("Indomitable"))).toBeFalsy();
+    const shield = r.template.traits?.find((t) => t.name.includes("Shieldbearer"));
+    expect(shield).toBeDefined();
+    expect(r.validation.errors).toEqual([]);
+  });
 });
 

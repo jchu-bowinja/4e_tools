@@ -1002,8 +1002,10 @@ function isTraitAbility(entry: MonsterPower): boolean {
   if (attackType || attackRange || attacks.length) return false;
   if (/recharge/i.test(description)) return false;
   if (damageExprs.length) return false;
+  // Do not use a bare `\bwhenever\b` match here — passive traits often use it (e.g. fighter-style
+  // marks: "whenever a marked enemy shifts"). Triggered powers usually have an action header or Melee/Ranged line.
   if (
-    /\b(regain .* hit points?|scores? a critical|\d+d\d+|\d+\s+squares? of| flank(s|ed|ing)?\b|\bnatural\s+(19|20)\b|\bcritical hit\b|whenever\b)/i.test(
+    /\b(regain .* hit points?|scores? a critical|\d+d\d+|\d+\s+squares? of| flank(s|ed|ing)?\b|\bnatural\s+(19|20)\b|\bcritical hit\b)/i.test(
       description
     )
   )
@@ -1395,7 +1397,11 @@ export function validateMonsterTemplateImport(template: MonsterTemplateRecord): 
   if (!Array.isArray(template.powers)) {
     errors.push("Powers must be an array.");
   } else if (template.powers.length === 0) {
-    errors.push("No powers were parsed from the imported text.");
+    const hasTraits = Array.isArray(template.traits) && template.traits.length > 0;
+    const hasAuras = Array.isArray(template.auras) && template.auras.length > 0;
+    if (!hasTraits && !hasAuras) {
+      errors.push("No powers were parsed from the imported text.");
+    }
   }
 
   const unparsedStats = Array.isArray(template.stats?.unparsedStatLines) ? template.stats.unparsedStatLines : [];
