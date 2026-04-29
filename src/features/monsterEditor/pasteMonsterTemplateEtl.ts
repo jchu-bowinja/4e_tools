@@ -13,6 +13,7 @@ import type {
   MonsterTemplateRecord,
   MonsterTrait
 } from "./storage";
+import { normalizeMonsterPowerShape } from "./monsterPowerNormalize";
 
 export type ParsePasteResult =
   | { ok: true; template: MonsterTemplateRecord; validation: MonsterTemplateImportValidation }
@@ -448,7 +449,7 @@ function normalizePowerToMonsterShape(name: string, text: string, leadKeywords?:
     flareTraitKeywordTokens.length ? flareTraitKeywordTokens : undefined
   );
 
-  return {
+  return normalizeMonsterPowerShape({
     name: cleanName || header,
     usage,
     usageDetails: usageDetails || undefined,
@@ -467,7 +468,7 @@ function normalizePowerToMonsterShape(name: string, text: string, leadKeywords?:
     damageExpressions,
     attacks: attacks.length ? attacks : undefined,
     ...(traitTemplateKeywords.length ? { traitTemplateKeywords } : {})
-  };
+  });
 }
 
 function splitActionPrefixedPowerLines(lines: string[]): string[] {

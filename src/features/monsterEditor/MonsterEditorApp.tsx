@@ -45,6 +45,7 @@ import {
   titleCaseWords
 } from "./monsterTextUtils";
 import { buildMonsterPowerCardViewModel } from "./monsterPowerCardViewModel";
+import { normalizeMonsterPowerShape } from "./monsterPowerNormalize";
 
 /** Matches CharacterSheetApp: panels, section titles, labels, and body scale. */
 const panelStyle: CSSProperties = {
@@ -1240,6 +1241,7 @@ function MonsterPowersPanels({
   showJson?: boolean;
 }): JSX.Element {
   const groupedPowers = useMemo(() => {
+    const normalized = powers.map((power) => normalizeMonsterPowerShape(power));
     const buckets: Record<MonsterPowerActionBucket, MonsterPower[]> = {
       standard: [],
       move: [],
@@ -1248,7 +1250,7 @@ function MonsterPowersPanels({
       triggered: [],
       other: []
     };
-    for (const power of powers) {
+    for (const power of normalized) {
       buckets[classifyMonsterPowerUsageBucket(power.action, power.trigger)].push(power);
     }
     return buckets;
