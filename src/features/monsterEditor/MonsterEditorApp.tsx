@@ -2124,8 +2124,27 @@ export function MonsterEditorApp({
     const caret = start + marker.length;
     setCreatePasteText(next);
     window.setTimeout(() => {
-      el.focus();
+      el.focus({ preventScroll: true });
       el.setSelectionRange(caret, caret);
+    }, 0);
+  }, []);
+
+  /** Joins wrapped OCR within the textarea selection; line-oriented parsing stays intact outside the selection. */
+  const stripLineBreaksInCreatePasteSelection = useCallback(() => {
+    const el = createPasteTextareaRef.current;
+    if (!el) return;
+    const value = el.value;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    if (start === end) return;
+    const segment = value.slice(start, end);
+    const replaced = segment.replace(/\r\n|\r|\n/g, " ").replace(/[ \t]+/g, " ");
+    const next = value.slice(0, start) + replaced + value.slice(end);
+    setCreatePasteText(next);
+    const selEnd = start + replaced.length;
+    window.setTimeout(() => {
+      el.focus({ preventScroll: true });
+      el.setSelectionRange(start, selEnd);
     }, 0);
   }, []);
 
@@ -2193,9 +2212,17 @@ export function MonsterEditorApp({
           </>
         ) : (
           <>
-            Paste raw OCR or PDF-extracted text for <strong>one</strong> monster template. Import runs the same mechanical
-            rules as <code style={{ fontSize: "0.92em" }}>extract_monster_templates_from_pdfs.py</code> (in dev, Python is
-            used when available; otherwise a built-in parser). Edit the JSON, then save it as a local custom template.
+            Paste raw text for one monster template.  Import and review the result. Edit the JSON, then save it as a local custom
+            template.
+            <span style={{ display: "block", marginTop: "0.35rem" }}>
+              <strong>Tip:</strong> If OCR split a long resistance, vulnerability, or other stat across several lines, delete those
+              line breaks so it reads as one line—this helps the importer recognize stat boundaries.
+            </span>
+            <span style={{ display: "block", marginTop: "0.35rem" }}>
+              Optional: wrap an ability (power, trait, or aura) by putting <code style={{ fontSize: "0.92em" }}>[ABILITY]</code>{" "}
+              on its own line right before the block and <code style={{ fontSize: "0.92em" }}>[ABILITYEND]</code> on its own line
+              right after—those lines fence the block so parsing stays aligned.
+            </span>
           </>
         )}
       </p>
@@ -3491,9 +3518,9 @@ export function MonsterEditorApp({
                       marginTop: "0.4rem"
                     }}
                   >
-                    <span style={{ ...microLabelStyle, marginRight: "0.1rem" }}>Insert at cursor</span>
                     <button
                       type="button"
+                      onMouseDown={(e) => e.preventDefault()}
                       onClick={() => insertCreatePasteMarker("[ABILITY]")}
                       style={{
                         fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
@@ -3510,6 +3537,7 @@ export function MonsterEditorApp({
                     </button>
                     <button
                       type="button"
+                      onMouseDown={(e) => e.preventDefault()}
                       onClick={() => insertCreatePasteMarker("[ABILITYEND]")}
                       style={{
                         fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
@@ -3524,11 +3552,28 @@ export function MonsterEditorApp({
                     >
                       [ABILITYEND]
                     </button>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      title="Replace line breaks with spaces in the selected text. Select the wrapped lines first (e.g. a stat split across OCR lines)."
+                      aria-label="Strip line breaks in selection"
+                      onClick={() => stripLineBreaksInCreatePasteSelection()}
+                      disabled={!createPasteText.trim()}
+                      style={{
+                        marginLeft: "0.25rem",
+                        fontSize: "0.72rem",
+                        padding: "0.2rem 0.45rem",
+                        borderRadius: "0.28rem",
+                        border: "1px solid var(--panel-border)",
+                        backgroundColor: "var(--surface-0)",
+                        color: "var(--text-primary)",
+                        cursor: createPasteText.trim() ? "pointer" : "not-allowed",
+                        opacity: createPasteText.trim() ? 1 : 0.55
+                      }}
+                    >
+                      Strip line breaks
+                    </button>
                   </div>
-                  <p style={{ margin: "0.45rem 0 0", color: "var(--text-muted)", fontSize: "0.74rem", lineHeight: 1.35 }}>
-                    Optional: <code>[ABILITY]</code> starts an ability block(power, trait or aura);{" "}
-                    <code>[ABILITYEND]</code> ends an ability block for better parsing.
-                  </p>
                 </div>
               </div>
 
@@ -3549,8 +3594,8 @@ export function MonsterEditorApp({
                 ) : (
                   <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.8125rem", lineHeight: 1.45 }}>
                     Use <strong>Import monster template</strong> on pasted text, or edit the JSON draft below — a live preview of
-                    identity, stats, traits, and powers appears here. For cleaner splitting, use <code>[ABILITY]</code> /{" "}
-                    <code>[ABILITYEND]</code> on their own lines as described above.
+                    identity, stats, traits, and powers appears here. For cleaner splitting, wrap each ability with{" "}
+                    <code>[ABILITY]</code> / <code>[ABILITYEND]</code> as described above.
                   </p>
                 )}
               </div>

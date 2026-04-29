@@ -26,6 +26,14 @@ const ROLE_LINE_ELITE_ANCHOR_RE =
 /** `Hit Points` only when a formula follows — avoids matching body text like "hit points. An affected…". */
 const STAT_LINE_RE =
   /^(Prerequisite:|Defenses\b|Saving Throws|Action Points?|(?:Hit Points|HP)\b(?=\s*[+\d-])|Resist|Immune|Vulnerable|Senses|Speed|Initiative|Skills)\b/i;
+
+/** True when `line` opens a template stat row. */
+function isTemplateStatLineStart(line: string): boolean {
+  const t = line.trim();
+  if (/^senses(?=$|\s|[A-Za-z(])/i.test(t)) return true;
+  return STAT_LINE_RE.test(t);
+}
+
 const SECTION_MARKER_RE =
   /^(POWERS|TRAITS|STANDARD\s*A\s*CTIONS|MOVE\s*A\s*CTIONS|MINOR\s*A\s*CTIONS|MAJOR\s*A\s*CTIONS)\b/i;
 /** Explicit paste scaffold: start a block; repeat between abilities (closes prior + opens next). */
@@ -67,7 +75,7 @@ function looksLikeTieredDefenseContinuation(line: string): boolean {
 function looksLikePowerName(line: string): boolean {
   let clean = line.replace(/^[~✦\u2726\u2727\u2605.\s]+/u, "").trim();
   if (looksLikeTieredDefenseContinuation(clean)) return false;
-  if (STAT_LINE_RE.test(clean)) return false;
+  if (isTemplateStatLineStart(clean)) return false;
   if (ROLE_LINE_ELITE_ANCHOR_RE.test(clean) || ROLE_LINE_RE.test(clean.trim())) return false;
   if (/^Level\s+\d+\s*:/i.test(clean)) return false;
   if (
@@ -140,7 +148,7 @@ function mergeStatLineContinuations(lines: string[]): string[] {
       const prev = merged[merged.length - 1]!;
       if (
         /^Defenses\b/i.test(prev) &&
-        !STAT_LINE_RE.test(line) &&
+        !isTemplateStatLineStart(line) &&
         !looksLikePowerName(line)
       ) {
         merged[merged.length - 1] = `${prev} ${line}`;
@@ -149,7 +157,7 @@ function mergeStatLineContinuations(lines: string[]): string[] {
       /** Wrapped "Resist … at 11th level, …" / choose-type resistance continues on the next line. */
       if (
         /^Resist\b/i.test(prev) &&
-        !STAT_LINE_RE.test(line) &&
+        !isTemplateStatLineStart(line) &&
         !looksLikePowerName(line)
       ) {
         merged[merged.length - 1] = `${prev} ${line}`;
@@ -157,7 +165,7 @@ function mergeStatLineContinuations(lines: string[]): string[] {
       }
       if (
         /^Vulnerable\b/i.test(prev) &&
-        !STAT_LINE_RE.test(line) &&
+        !isTemplateStatLineStart(line) &&
         !looksLikePowerName(line)
       ) {
         merged[merged.length - 1] = `${prev} ${line}`;
@@ -182,7 +190,7 @@ function mergeStatLineContinuations(lines: string[]): string[] {
       if (
         /^(?:hit\s*points?|hp)\b/i.test(prev) &&
         (/\s+or\s*$/i.test(prev) || /^\s*or\s+/i.test(line)) &&
-        !STAT_LINE_RE.test(line) &&
+        !isTemplateStatLineStart(line) &&
         (looksLikeHitPointsFormulaContinuation(line) || !looksLikePowerName(line))
       ) {
         merged[merged.length - 1] = `${prev} ${line}`;
@@ -795,6 +803,16 @@ function parseStatLines(statLines: string[]): MonsterTemplatePasteStatsOptionB {
   for (const rawLine of statLines) {
     const rawLineTrim = rawLine.trim();
     if (!rawLineTrim) continue;
+
+    /** Parse before letter-space collapse so `Senses Darkvision` is not turned into `SensesDarkvision`. */
+    if (/^senses\b/i.test(rawLineTrim)) {
+      const tail = rawLineTrim.replace(/^senses\s*/i, "").trim();
+      if (tail) {
+        result.senses = { raw: tail, sourceLine: rawLineTrim };
+        continue;
+      }
+    }
+
     let line = rawLineTrim.replace(/([A-Za-z])\s+([A-Za-z])/g, "$1$2");
     const lower = line.toLowerCase();
     const compact = lower.replace(/\s+/g, "");
@@ -1122,7 +1140,7 @@ function inferTemplateNameFromSimpleSections(lines: string[], hint?: string): st
     if (isExplicitAbilityMarkerLine(t)) continue;
     if (/^prerequisites?:/i.test(t)) continue;
     if (ROLE_LINE_ELITE_ANCHOR_RE.test(t) || ROLE_LINE_RE.test(t)) continue;
-    if (STAT_LINE_RE.test(t)) continue;
+    if (isTemplateStatLineStart(t)) continue;
     return titleCase(t);
   }
   return undefined;
@@ -1156,7 +1174,7 @@ function looksLikeSimpleAbilityHeader(line: string): boolean {
   if (!t) return false;
   if (looksLikeTieredDefenseContinuation(t)) return false;
   if (looksLikeHitPointsFormulaContinuation(t)) return false;
-  if (STAT_LINE_RE.test(t)) return false;
+  if (isTemplateStatLineStart(t)) return false;
   /** Aura rider text ("Allies in the aura gain …") — not a separate ability name. */
   if (/\b(?:in|within)\s+the\s+aura\b/i.test(t) && !/\baura\s+\d+\b/i.test(t)) return false;
   if (/^Regeneration\b/i.test(t)) return true;
@@ -1266,8 +1284,8 @@ function parseSimpleTemplateSections(lines: string[]) {
       inAbilitySection = true;
       continue;
     }
-    if (roleIdx >= 0 && !inAbilitySection && (STAT_LINE_RE.test(line) || statLines.length > 0)) {
-      if (STAT_LINE_RE.test(line)) {
+    if (roleIdx >= 0 && !inAbilitySection && (isTemplateStatLineStart(line) || statLines.length > 0)) {
+      if (isTemplateStatLineStart(line)) {
         statLines.push(line);
         continue;
       }
@@ -1287,7 +1305,7 @@ function parseSimpleTemplateSections(lines: string[]) {
       continue;
     }
     // Some blocks place stat lines (e.g. Skills) after ability text; still capture them.
-    if (roleIdx >= 0 && STAT_LINE_RE.test(line)) {
+    if (roleIdx >= 0 && isTemplateStatLineStart(line)) {
       statLines.push(line);
       continue;
     }
@@ -1369,3 +1387,4 @@ export async function parsePastedMonsterTemplateText(
   // Always use the local, section-based parser for paste imports.
   return parsePastedMonsterTemplateTextLocal(rawText, templateNameHint);
 }
+

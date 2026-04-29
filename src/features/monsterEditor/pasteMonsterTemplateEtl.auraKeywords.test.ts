@@ -286,6 +286,21 @@ Speed fly 8 (hover)`,
     expect(stats?.speed?.raw).toBe("fly 8 (hover)");
   });
 
+  it("parses Senses stat lines", () => {
+    const r = parsePastedMonsterTemplateTextLocal(
+      `Test Elite Soldier
+Humanoid XP Elite
+Senses Darkvision
+Hit Points +8 per level + Constitution score`,
+      "Test"
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const stats = r.template.stats as { senses?: { raw: string }; unparsedStatLines?: string[] } | undefined;
+    expect(stats?.senses?.raw).toBe("Darkvision");
+    expect(stats?.unparsedStatLines).toBeUndefined();
+  });
+
   it("parses resist and vulnerable lines into tier arrays", () => {
     const r = parsePastedMonsterTemplateTextLocal(
       `Shadow Spirit Elite Lurker
@@ -458,3 +473,4 @@ Saving Throws +2`;
     expect(hp?.variants?.[1]?.when?.role).toBe("artillery");
   });
 });
+
