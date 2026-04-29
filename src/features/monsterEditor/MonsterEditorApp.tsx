@@ -99,6 +99,15 @@ const pageTitleStyle: CSSProperties = {
 
 const bodyPrimary: CSSProperties = { fontSize: "0.8rem", color: "var(--text-primary)" };
 
+/** Alternating row backgrounds for template stat lines, auras, and traits (matches monster sheet table stripes). */
+function monsterTemplateEntryStripeStyle(idx: number): CSSProperties {
+  return {
+    padding: "0.22rem 0.35rem",
+    borderRadius: "0.25rem",
+    backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)"
+  };
+}
+
 /** Compact JSON under each aura/trait/power in create-template preview. */
 const templateAbilityJsonPreStyle: CSSProperties = {
   margin: "0.35rem 0 0 0",
@@ -172,6 +181,164 @@ function TemplateJsonCollapsible({
       </pre>
     </details>
   );
+}
+
+const templateJsonSnippetTextareaStyle: CSSProperties = {
+  ...templateAbilityJsonPreStyle,
+  marginTop: "0.35rem",
+  width: "100%",
+  minHeight: "6.5rem",
+  maxHeight: "min(45vh, 28rem)",
+  resize: "vertical",
+  boxSizing: "border-box",
+  border: "1px solid var(--panel-border)",
+  color: "var(--text-primary)",
+  outline: "none"
+};
+
+/** Editable JSON under template preview sections; debounced valid commits update the draft. */
+function TemplateJsonSnippetEditor({
+  summaryLabel,
+  value,
+  onValidCommit,
+  preExtraStyle,
+  textareaStyle
+}: {
+  summaryLabel: string;
+  value: unknown;
+  onValidCommit: (parsed: unknown) => void;
+  preExtraStyle?: CSSProperties;
+  textareaStyle?: CSSProperties;
+}): JSX.Element {
+  const canonical = useMemo(() => JSON.stringify(value, null, 2), [value]);
+  const [text, setText] = useState(canonical);
+  const [parseError, setParseError] = useState<string | null>(null);
+  const taRef = useRef<HTMLTextAreaElement | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (taRef.current === document.activeElement) return;
+    setText(canonical);
+    setParseError(null);
+  }, [canonical]);
+
+  const flushCommit = useCallback(
+    (raw: string) => {
+      try {
+        const parsed = JSON.parse(raw);
+        setParseError(null);
+        onValidCommit(parsed);
+      } catch (e) {
+        setParseError(e instanceof Error ? e.message : "Invalid JSON");
+      }
+    },
+    [onValidCommit]
+  );
+
+  const scheduleCommit = useCallback(
+    (raw: string) => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        debounceRef.current = null;
+        try {
+          const parsed = JSON.parse(raw);
+          setParseError(null);
+          onValidCommit(parsed);
+        } catch (e) {
+          setParseError(e instanceof Error ? e.message : "Invalid JSON");
+        }
+      }, 280);
+    },
+    [onValidCommit]
+  );
+
+  useEffect(
+    () => () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    },
+    []
+  );
+
+  return (
+    <details className="template-json-collapsible" style={templateJsonCollapsibleDetailsStyle}>
+      <summary className="template-json-collapsible-summary" style={templateJsonCollapsibleSummaryStyle}>
+        <span className="template-json-collapsible-arrow" aria-hidden>
+          ▶
+        </span>
+        {summaryLabel}
+      </summary>
+      <textarea
+        ref={taRef}
+        spellCheck={false}
+        value={text}
+        onChange={(event) => {
+          const v = event.target.value;
+          setText(v);
+          scheduleCommit(v);
+        }}
+        onBlur={() => {
+          if (debounceRef.current) {
+            clearTimeout(debounceRef.current);
+            debounceRef.current = null;
+          }
+          flushCommit(text);
+        }}
+        style={{
+          ...templateJsonSnippetTextareaStyle,
+          ...preExtraStyle,
+          ...textareaStyle,
+          borderColor: parseError ? "var(--status-danger)" : "var(--panel-border)"
+        }}
+        aria-invalid={parseError ? true : undefined}
+      />
+      {parseError ? (
+        <div style={{ marginTop: "0.25rem", fontSize: "0.72rem", color: "var(--status-danger)" }}>{parseError}</div>
+      ) : null}
+    </details>
+  );
+}
+
+function templateIdentitySnippet(record: MonsterTemplateRecord): Record<string, unknown> {
+  const o: Record<string, unknown> = {
+    templateName: record.templateName,
+    sourceBook: record.sourceBook
+  };
+  if (record.roleLine !== undefined) o.roleLine = record.roleLine;
+  if (record.role !== undefined) o.role = record.role;
+  if (record.isEliteTemplate !== undefined) o.isEliteTemplate = record.isEliteTemplate;
+  if (record.pageStart !== undefined) o.pageStart = record.pageStart;
+  if (record.pageEnd !== undefined) o.pageEnd = record.pageEnd;
+  return o;
+}
+
+function mergeTemplateIdentitySnippet(base: MonsterTemplateRecord, parsed: unknown): MonsterTemplateRecord {
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return base;
+  const p = parsed as Record<string, unknown>;
+  const next: MonsterTemplateRecord = { ...base };
+  if ("templateName" in p) next.templateName = String(p.templateName ?? "");
+  if ("sourceBook" in p) next.sourceBook = String(p.sourceBook ?? "");
+  if ("roleLine" in p) next.roleLine = p.roleLine == null ? undefined : String(p.roleLine);
+  if ("role" in p) next.role = p.role as MonsterTemplateRecord["role"];
+  if ("isEliteTemplate" in p) next.isEliteTemplate = Boolean(p.isEliteTemplate);
+  if ("pageStart" in p) next.pageStart = typeof p.pageStart === "number" ? p.pageStart : undefined;
+  if ("pageEnd" in p) next.pageEnd = typeof p.pageEnd === "number" ? p.pageEnd : undefined;
+  return next;
+}
+
+function mergeTemplateDescriptionSnippet(base: MonsterTemplateRecord, parsed: unknown): MonsterTemplateRecord {
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return base;
+  const p = parsed as Record<string, unknown>;
+  const next: MonsterTemplateRecord = { ...base };
+  if ("description" in p) next.description = p.description == null ? undefined : String(p.description);
+  return next;
+}
+
+function mergeTemplatePrerequisiteSnippet(base: MonsterTemplateRecord, parsed: unknown): MonsterTemplateRecord {
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return base;
+  const p = parsed as Record<string, unknown>;
+  const next: MonsterTemplateRecord = { ...base };
+  if ("prerequisite" in p) next.prerequisite = p.prerequisite == null ? undefined : String(p.prerequisite);
+  return next;
 }
 const bodySecondary: CSSProperties = { fontSize: "0.8rem", color: "var(--text-secondary)" };
 const metaMuted: CSSProperties = { fontSize: "0.78rem", color: "var(--text-muted)" };
@@ -1293,7 +1460,9 @@ function MonsterPowersPanels({
   startGlossaryHover,
   leaveGlossaryHover,
   shouldHighlightGlossaryTerm,
-  showJson
+  showJson,
+  livePowerJsonEditing,
+  onPowerJsonCommit
 }: {
   powers: MonsterPower[];
   startGlossaryHover: (event: ReactMouseEvent<HTMLElement>, key: MonsterGlossaryHoverKey) => void;
@@ -1301,10 +1470,13 @@ function MonsterPowersPanels({
   shouldHighlightGlossaryTerm: (term: string) => boolean;
   /** Render collapsible JSON for each power below the card body (template preview; parent defaults on). */
   showJson?: boolean;
+  /** When set, JSON under each power is a live editor that commits by power index. */
+  livePowerJsonEditing?: boolean;
+  onPowerJsonCommit?: (powerIndex: number, parsed: unknown) => void;
 }): JSX.Element {
   const groupedPowers = useMemo(() => {
     const normalized = powers.map((power) => normalizeMonsterPowerShape(power));
-    const buckets: Record<MonsterPowerActionBucket, MonsterPower[]> = {
+    const buckets: Record<MonsterPowerActionBucket, Array<{ power: MonsterPower; sourceIndex: number }>> = {
       standard: [],
       move: [],
       minor: [],
@@ -1312,8 +1484,9 @@ function MonsterPowersPanels({
       triggered: [],
       other: []
     };
-    for (const power of normalized) {
-      buckets[classifyMonsterPowerUsageBucket(power.action, power.trigger)].push(power);
+    for (let i = 0; i < normalized.length; i++) {
+      const power = normalized[i];
+      buckets[classifyMonsterPowerUsageBucket(power.action, power.trigger)].push({ power, sourceIndex: i });
     }
     return buckets;
   }, [powers]);
@@ -1337,13 +1510,14 @@ function MonsterPowersPanels({
             <div key={bucket} style={{ display: "grid", gap: "0.4rem" }}>
               <div style={powerBucketHeaderStyle}>{usageBucketLabel(bucket)}</div>
               <div style={{ display: "grid", gap: "0.45rem", gridTemplateColumns: "minmax(0, 1fr)", alignItems: "stretch" }}>
-                {bucketPowers.map((power, index) => {
+                {bucketPowers.map(({ power, sourceIndex }, index) => {
                   const colorBucket = classifyMonsterPowerColorBucket(power.usage);
                   const accent = usageColorAccentCardStyle(colorBucket);
                   const cardModel = buildMonsterPowerCardViewModel(power);
+                  const rawPower = powers[sourceIndex] ?? power;
                   return (
                     <div
-                      key={`${bucket}-${power.name}-${index}`}
+                      key={`${bucket}-${power.name}-${sourceIndex}-${index}`}
                       style={{
                         border: accent.border,
                         borderLeft: accent.borderLeft,
@@ -1627,7 +1801,17 @@ function MonsterPowersPanels({
                           )}
                         </div>
                       ) : null}
-                      {showJson ? <TemplateJsonCollapsible summaryLabel="JSON" value={power} /> : null}
+                      {showJson ? (
+                        livePowerJsonEditing && onPowerJsonCommit ? (
+                          <TemplateJsonSnippetEditor
+                            summaryLabel="JSON"
+                            value={rawPower}
+                            onValidCommit={(parsed) => onPowerJsonCommit(sourceIndex, parsed)}
+                          />
+                        ) : (
+                          <TemplateJsonCollapsible summaryLabel="JSON" value={rawPower} />
+                        )
+                      ) : null}
                     </div>
                   );
                 })}
@@ -1646,7 +1830,9 @@ function MonsterTemplateFormattedView({
   startGlossaryHover,
   leaveGlossaryHover,
   shouldHighlightGlossaryTerm,
-  showAbilityJson = true
+  showAbilityJson = true,
+  liveSnippetEditing = false,
+  onTemplateSnippetCommit
 }: {
   record: MonsterTemplateRecord;
   glossaryKeyPrefix: string;
@@ -1655,6 +1841,9 @@ function MonsterTemplateFormattedView({
   shouldHighlightGlossaryTerm: (term: string) => boolean;
   /** Collapsible JSON under each aura, trait, and power. Default true; pass false to hide. */
   showAbilityJson?: boolean;
+  /** Live JSON editors for snippets (create-template draft only). */
+  liveSnippetEditing?: boolean;
+  onTemplateSnippetCommit?: (recipe: (base: MonsterTemplateRecord) => MonsterTemplateRecord) => void;
 }): JSX.Element {
   const statAdjustmentLines = useMemo(() => {
     const mechanical = formatMonsterTemplateStatAdjustmentLines(
@@ -1682,62 +1871,114 @@ function MonsterTemplateFormattedView({
         </div>
       </div>
 
-      {record.prerequisite && String(record.prerequisite).trim() !== "" ? (
+      {liveSnippetEditing && onTemplateSnippetCommit ? (
+        <TemplateJsonSnippetEditor
+          summaryLabel="JSON (name & source)"
+          value={templateIdentitySnippet(record)}
+          onValidCommit={(parsed) => onTemplateSnippetCommit((base) => mergeTemplateIdentitySnippet(base, parsed))}
+        />
+      ) : null}
+
+      {(record.prerequisite && String(record.prerequisite).trim() !== "") || (liveSnippetEditing && onTemplateSnippetCommit) ? (
         <div style={centerSubsectionPanelStyle}>
           <h3 style={sectionTitleStyle}>Prerequisites</h3>
-          <div style={{ ...richTextBodyPrimary.paragraphStyle, whiteSpace: "pre-wrap" }}>
-            {renderGlossaryAwareText(
-              String(record.prerequisite),
-              commonDescriptiveGlossaryPhrases,
-              startGlossaryHover,
-              leaveGlossaryHover,
-              `${glossaryKeyPrefix}-prereq`,
-              shouldHighlightGlossaryTerm
-            )}
-          </div>
+          {record.prerequisite && String(record.prerequisite).trim() !== "" ? (
+            <div style={{ ...richTextBodyPrimary.paragraphStyle, whiteSpace: "pre-wrap" }}>
+              {renderGlossaryAwareText(
+                String(record.prerequisite),
+                commonDescriptiveGlossaryPhrases,
+                startGlossaryHover,
+                leaveGlossaryHover,
+                `${glossaryKeyPrefix}-prereq`,
+                shouldHighlightGlossaryTerm
+              )}
+            </div>
+          ) : liveSnippetEditing && onTemplateSnippetCommit ? (
+            <div style={metaMuted}>No prerequisite text.</div>
+          ) : null}
+          {liveSnippetEditing && onTemplateSnippetCommit ? (
+            <TemplateJsonSnippetEditor
+              summaryLabel="JSON"
+              value={{ prerequisite: record.prerequisite ?? "" }}
+              onValidCommit={(parsed) => onTemplateSnippetCommit((base) => mergeTemplatePrerequisiteSnippet(base, parsed))}
+            />
+          ) : null}
         </div>
       ) : null}
 
-      {isRenderableCardValue(record.description) ? (
+      {isRenderableCardValue(record.description) || (liveSnippetEditing && onTemplateSnippetCommit) ? (
         <div style={centerSubsectionPanelStyle}>
           <h3 style={sectionTitleStyle}>Description</h3>
-          <div style={{ ...richTextBodyPrimary.paragraphStyle, whiteSpace: "pre-wrap" }}>
-            {renderGlossaryAwareText(
-              String(record.description ?? ""),
-              commonDescriptiveGlossaryPhrases,
-              startGlossaryHover,
-              leaveGlossaryHover,
-              `${glossaryKeyPrefix}-desc`,
-              shouldHighlightGlossaryTerm
-            )}
-          </div>
+          {isRenderableCardValue(record.description) ? (
+            <div style={{ ...richTextBodyPrimary.paragraphStyle, whiteSpace: "pre-wrap" }}>
+              {renderGlossaryAwareText(
+                String(record.description ?? ""),
+                commonDescriptiveGlossaryPhrases,
+                startGlossaryHover,
+                leaveGlossaryHover,
+                `${glossaryKeyPrefix}-desc`,
+                shouldHighlightGlossaryTerm
+              )}
+            </div>
+          ) : liveSnippetEditing && onTemplateSnippetCommit ? (
+            <div style={metaMuted}>No description text.</div>
+          ) : null}
+          {liveSnippetEditing && onTemplateSnippetCommit ? (
+            <TemplateJsonSnippetEditor
+              summaryLabel="JSON"
+              value={{ description: record.description ?? "" }}
+              onValidCommit={(parsed) => onTemplateSnippetCommit((base) => mergeTemplateDescriptionSnippet(base, parsed))}
+            />
+          ) : null}
         </div>
       ) : null}
 
-      {statAdjustmentLines.length > 0 || (record.stats && Object.keys(record.stats).length > 0) ? (
+      {statAdjustmentLines.length > 0 ||
+      (record.stats && Object.keys(record.stats).length > 0) ||
+      (liveSnippetEditing && onTemplateSnippetCommit) ? (
         <div style={centerSubsectionPanelStyle}>
           <h3 style={sectionTitleStyle}>Stat adjustments</h3>
           {statAdjustmentLines.length > 0 ? (
-            <ul style={{ margin: "0.25rem 0 0 0", paddingLeft: "1rem", ...bodyPrimary }}>
+            <div style={{ marginTop: "0.25rem", display: "grid", gap: "0.2rem" }}>
               {statAdjustmentLines.map((line, i) => (
-                <li key={`${glossaryKeyPrefix}-statline-${i}`} style={{ marginBottom: "0.22rem" }}>
+                <div key={`${glossaryKeyPrefix}-statline-${i}`} style={{ ...bodyPrimary, ...monsterTemplateEntryStripeStyle(i) }}>
                   {line}
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           ) : null}
-          {record.stats && Object.keys(record.stats).length > 0 ? (
-            <TemplateJsonCollapsible
-              summaryLabel="JSON"
-              value={record.stats}
-              preExtraStyle={{
-                maxHeight: "min(40vh, 22rem)",
-                overflowY: "auto",
-                background: "rgba(0,0,0,0.04)",
-                fontSize: "0.82rem",
-                color: "var(--text-primary)"
-              }}
-            />
+          {(record.stats && Object.keys(record.stats).length > 0) || (liveSnippetEditing && onTemplateSnippetCommit) ? (
+            liveSnippetEditing && onTemplateSnippetCommit ? (
+              <TemplateJsonSnippetEditor
+                summaryLabel="JSON"
+                value={record.stats ?? {}}
+                onValidCommit={(parsed) =>
+                  onTemplateSnippetCommit((base) => {
+                    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return base;
+                    return { ...base, stats: parsed as Record<string, unknown> };
+                  })
+                }
+                preExtraStyle={{
+                  maxHeight: "min(40vh, 22rem)",
+                  overflowY: "auto",
+                  background: "rgba(0,0,0,0.04)",
+                  fontSize: "0.82rem",
+                  color: "var(--text-primary)"
+                }}
+              />
+            ) : (
+              <TemplateJsonCollapsible
+                summaryLabel="JSON"
+                value={record.stats}
+                preExtraStyle={{
+                  maxHeight: "min(40vh, 22rem)",
+                  overflowY: "auto",
+                  background: "rgba(0,0,0,0.04)",
+                  fontSize: "0.82rem",
+                  color: "var(--text-primary)"
+                }}
+              />
+            )
           ) : null}
         </div>
       ) : null}
@@ -1745,12 +1986,12 @@ function MonsterTemplateFormattedView({
       {(record.auras ?? []).length > 0 ? (
         <div style={centerSubsectionPanelStyle}>
           <h3 style={sectionTitleStyle}>Auras</h3>
-          <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.35rem" }}>
+          <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.2rem" }}>
             {(record.auras ?? []).map((aura, idx) => {
               const auraName = String(aura.name ?? "Aura").trim() || "Aura";
               const auraBadges = renderTraitMetaBadges(aura);
               return (
-                <div key={`${glossaryKeyPrefix}-aura-${idx}`} style={bodyPrimary}>
+                <div key={`${glossaryKeyPrefix}-aura-${idx}`} style={{ ...bodyPrimary, ...monsterTemplateEntryStripeStyle(idx) }}>
                   <div
                     style={{
                       display: "flex",
@@ -1779,7 +2020,22 @@ function MonsterTemplateFormattedView({
                     shouldHighlightGlossaryTerm
                   )}
                   {showAbilityJson ? (
-                    <TemplateJsonCollapsible summaryLabel="JSON" value={aura} />
+                    liveSnippetEditing && onTemplateSnippetCommit ? (
+                      <TemplateJsonSnippetEditor
+                        summaryLabel="JSON"
+                        value={aura}
+                        onValidCommit={(parsed) =>
+                          onTemplateSnippetCommit((base) => {
+                            if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return base;
+                            const auras = [...(base.auras ?? [])];
+                            auras[idx] = parsed as MonsterTrait;
+                            return { ...base, auras };
+                          })
+                        }
+                      />
+                    ) : (
+                      <TemplateJsonCollapsible summaryLabel="JSON" value={aura} />
+                    )
                   ) : null}
                 </div>
               );
@@ -1791,12 +2047,12 @@ function MonsterTemplateFormattedView({
       {(record.traits ?? []).length > 0 ? (
         <div style={centerSubsectionPanelStyle}>
           <h3 style={sectionTitleStyle}>Traits</h3>
-          <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.35rem" }}>
+          <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.2rem" }}>
             {(record.traits ?? []).map((trait, idx) => {
               const traitName = String(trait.name ?? "Trait").trim() || "Trait";
               const traitBadges = renderTraitMetaBadges(trait);
               return (
-                <div key={`${glossaryKeyPrefix}-trait-${idx}`} style={bodyPrimary}>
+                <div key={`${glossaryKeyPrefix}-trait-${idx}`} style={{ ...bodyPrimary, ...monsterTemplateEntryStripeStyle(idx) }}>
                   <div
                     style={{
                       display: "flex",
@@ -1825,7 +2081,22 @@ function MonsterTemplateFormattedView({
                     shouldHighlightGlossaryTerm
                   )}
                   {showAbilityJson ? (
-                    <TemplateJsonCollapsible summaryLabel="JSON" value={trait} />
+                    liveSnippetEditing && onTemplateSnippetCommit ? (
+                      <TemplateJsonSnippetEditor
+                        summaryLabel="JSON"
+                        value={trait}
+                        onValidCommit={(parsed) =>
+                          onTemplateSnippetCommit((base) => {
+                            if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return base;
+                            const traits = [...(base.traits ?? [])];
+                            traits[idx] = parsed as MonsterTrait;
+                            return { ...base, traits };
+                          })
+                        }
+                      />
+                    ) : (
+                      <TemplateJsonCollapsible summaryLabel="JSON" value={trait} />
+                    )
                   ) : null}
                 </div>
               );
@@ -1840,6 +2111,18 @@ function MonsterTemplateFormattedView({
         leaveGlossaryHover={leaveGlossaryHover}
         shouldHighlightGlossaryTerm={shouldHighlightGlossaryTerm}
         showJson={showAbilityJson}
+        livePowerJsonEditing={Boolean(liveSnippetEditing && onTemplateSnippetCommit)}
+        onPowerJsonCommit={
+          liveSnippetEditing && onTemplateSnippetCommit
+            ? (powerIndex, parsed) =>
+                onTemplateSnippetCommit((base) => {
+                  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return base;
+                  const powers = [...(base.powers ?? [])];
+                  powers[powerIndex] = parsed as MonsterPower;
+                  return { ...base, powers };
+                })
+            : undefined
+        }
       />
     </div>
   );
@@ -2302,6 +2585,19 @@ export function MonsterEditorApp({
     }
     return validateMonsterTemplateImport(createDraftTemplateRecord);
   }, [viewerTab, createDraftJson, createDraftJsonInvalid, createDraftTemplateRecord]);
+
+  const commitCreateDraftTemplatePatch = useCallback((recipe: (base: MonsterTemplateRecord) => MonsterTemplateRecord) => {
+    setCreateDraftJson((prev) => {
+      const raw = prev.trim();
+      if (!raw) return prev;
+      try {
+        const base = JSON.parse(raw) as MonsterTemplateRecord;
+        return JSON.stringify(recipe(base), null, 2);
+      } catch {
+        return prev;
+      }
+    });
+  }, []);
 
   const insertCreatePasteMarker = useCallback((marker: "[ABILITY]" | "[ABILITYEND]") => {
     const el = createPasteTextareaRef.current;
@@ -4009,6 +4305,8 @@ export function MonsterEditorApp({
                     startGlossaryHover={startGlossaryHover}
                     leaveGlossaryHover={leaveGlossaryHover}
                     shouldHighlightGlossaryTerm={shouldHighlightGlossaryTerm}
+                    liveSnippetEditing
+                    onTemplateSnippetCommit={commitCreateDraftTemplatePatch}
                   />
                 ) : (
                   <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.8125rem", lineHeight: 1.45 }}>
