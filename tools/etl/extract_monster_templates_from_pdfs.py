@@ -832,6 +832,42 @@ def _merge_damage_tier_entries(entries: List[Dict[str, List[int]]]) -> List[Dict
     return [{key: vals} for key, vals in merged.items()]
 
 
+def _parse_resist_base_plus_half_level(tail: str) -> Optional[Dict[str, Any]]:
+    """`Resist 5 + 1/2 level necrotic` → typed entry with baseAmount + plusHalfLevel."""
+    t = re.sub(r"\s+", " ", str(tail or "").strip())
+    if not t:
+        return None
+    dmg_alt = "|".join(_DAMAGE_TYPES)
+    m = re.match(
+        rf"^(\d+)\s*\+\s*(?:(?:1\s*/\s*2)|½|half)\s+level\s+({dmg_alt})\s*$",
+        t,
+        flags=re.IGNORECASE,
+    )
+    if not m:
+        return None
+    return {
+        "kind": "typed",
+        "type": m.group(2).lower(),
+        "baseAmount": int(m.group(1)),
+        "plusHalfLevel": True,
+    }
+
+
+def _damage_tier_merged_to_option_b_entries(merged: List[Dict[str, List[int]]]) -> List[Dict[str, Any]]:
+    """Legacy tier merge shape → same entry shape as paste ETL Option B."""
+    out: List[Dict[str, Any]] = []
+    for chunk in merged:
+        for dmg_type, vals in chunk.items():
+            if not vals:
+                continue
+            if len(vals) >= 3:
+                a, b, c = vals[0], vals[1], vals[2]
+            else:
+                a = b = c = vals[0]
+            out.append({"kind": "typed", "type": dmg_type, "tiers": {"1": a, "11": b, "21": c}})
+    return out
+
+
 def _strip_prerequisite_from_description(description: str, prerequisite: str) -> str:
     d = str(description or "").strip()
     if not d:
@@ -893,6 +929,17 @@ def _extract_template_description(raw_text: str, role_line: str, is_elite: bool)
     return raw.strip()
 
 
+def _parse_sense_segment(segment: str) -> Optional[Dict[str, Any]]:
+    """One sense token after `Senses …`; trailing digits are range (default 0)."""
+    s = segment.strip()
+    if not s:
+        return None
+    m = re.match(r"^(.+?)\s+(\d+)\s*$", s)
+    if m:
+        return {"name": m.group(1).strip(), "range": int(m.group(2))}
+    return {"name": s, "range": 0}
+
+
 def _parse_stat_lines(stat_lines: List[str]) -> Dict[str, Any]:
     result: Dict[str, Any] = {}
     defenses: Dict[str, int] = {}
@@ -900,9 +947,11 @@ def _parse_stat_lines(stat_lines: List[str]) -> Dict[str, Any]:
     immunities: List[str] = []
     resistances_parts: List[Dict[str, List[int]]] = []
     resistance_notes: List[str] = []
+    resistance_option_b: List[Dict[str, Any]] = []
     vulnerabilities_parts: List[Dict[str, List[int]]] = []
     vulnerability_notes: List[str] = []
-    senses: List[str] = []
+    vulnerability_option_b: List[Dict[str, Any]] = []
+    senses: List[Dict[str, Any]] = []
     unparsed_stat_lines: List[str] = []
 
     for raw in stat_lines:
@@ -915,6 +964,21 @@ def _parse_stat_lines(stat_lines: List[str]) -> Dict[str, Any]:
         raw_lower = raw_line.lower()
         raw_compact = re.sub(r"\s+", "", raw_lower)
         parsed = False
+
+        # Before letter-collapse, parse `Senses Darkvision` etc. (collapse turns `Senses D…` into `SensesD…`).
+        if re.match(r"^senses\b", raw_line, flags=re.IGNORECASE):
+            sense_match = re.match(r"^senses\s*(.*)$", raw_line, flags=re.IGNORECASE)
+            value = sense_match.group(1).strip() if sense_match else ""
+            if value:
+                for segment in re.split(r"[;,]", value):
+                    seg = segment.strip()
+                    if not seg:
+                        continue
+                    parsed_seg = _parse_sense_segment(seg)
+                    if parsed_seg:
+                        senses.append(parsed_seg)
+                parsed = True
+                continue
 
         if lower.startswith("prerequisite:") or compact.startswith("prerequisite:"):
             parsed = True
@@ -989,14 +1053,6 @@ def _parse_stat_lines(stat_lines: List[str]) -> Dict[str, Any]:
             parsed = True
             continue
 
-        if lower.startswith("senses") or compact.startswith("senses"):
-            sense_match = re.match(r"^senses\s*(.*)$", line, flags=re.IGNORECASE)
-            value = sense_match.group(1).strip() if sense_match else ""
-            if value:
-                senses.extend([x.strip() for x in re.split(r"[;,]", value) if x.strip()])
-                parsed = True
-                continue
-
         if lower.startswith("immune") or compact.startswith("immune"):
             immune_match = re.match(r"^immune\s*(.*)$", line, flags=re.IGNORECASE)
             value = immune_match.group(1).strip() if immune_match else ""
@@ -1010,11 +1066,17 @@ def _parse_stat_lines(stat_lines: List[str]) -> Dict[str, Any]:
             resist_match = re.match(r"^resist\s*(.*)$", raw_line, flags=re.IGNORECASE)
             value = resist_match.group(1).strip() if resist_match else ""
             if value:
-                structured, ok = _parse_damage_type_tiers(value)
-                if ok:
-                    resistances_parts.extend(structured)
+                hl = _parse_resist_base_plus_half_level(value)
+                if hl:
+                    hl = dict(hl)
+                    hl["sourceLine"] = raw_line
+                    resistance_option_b.append(hl)
                 else:
-                    resistance_notes.append(value)
+                    structured, ok = _parse_damage_type_tiers(value)
+                    if ok:
+                        resistances_parts.extend(structured)
+                    else:
+                        resistance_notes.append(value)
                 parsed = True
                 continue
 
@@ -1023,11 +1085,17 @@ def _parse_stat_lines(stat_lines: List[str]) -> Dict[str, Any]:
             vuln_match = re.match(r"^vulnerable\s*(.*)$", raw_line, flags=re.IGNORECASE)
             value = vuln_match.group(1).strip() if vuln_match else ""
             if value:
-                structured, ok = _parse_damage_type_tiers(value)
-                if ok:
-                    vulnerabilities_parts.extend(structured)
+                hl = _parse_resist_base_plus_half_level(value)
+                if hl:
+                    hl = dict(hl)
+                    hl["sourceLine"] = raw_line
+                    vulnerability_option_b.append(hl)
                 else:
-                    vulnerability_notes.append(value)
+                    structured, ok = _parse_damage_type_tiers(value)
+                    if ok:
+                        vulnerabilities_parts.extend(structured)
+                    else:
+                        vulnerability_notes.append(value)
                 parsed = True
                 continue
 
@@ -1042,11 +1110,25 @@ def _parse_stat_lines(stat_lines: List[str]) -> Dict[str, Any]:
         result["senses"] = senses
     if immunities:
         result["immunities"] = immunities
-    if resistances_parts:
+    if resistance_option_b and resistances_parts:
+        merged_tier = _merge_damage_tier_entries(resistances_parts)
+        result["resistances"] = {
+            "entries": resistance_option_b + _damage_tier_merged_to_option_b_entries(merged_tier)
+        }
+    elif resistance_option_b:
+        result["resistances"] = {"entries": resistance_option_b}
+    elif resistances_parts:
         result["resistances"] = _merge_damage_tier_entries(resistances_parts)
     if resistance_notes:
         result["resistanceNotes"] = resistance_notes
-    if vulnerabilities_parts:
+    if vulnerability_option_b and vulnerabilities_parts:
+        merged_v = _merge_damage_tier_entries(vulnerabilities_parts)
+        result["vulnerabilities"] = {
+            "entries": vulnerability_option_b + _damage_tier_merged_to_option_b_entries(merged_v)
+        }
+    elif vulnerability_option_b:
+        result["vulnerabilities"] = {"entries": vulnerability_option_b}
+    elif vulnerabilities_parts:
         result["vulnerabilities"] = _merge_damage_tier_entries(vulnerabilities_parts)
     if vulnerability_notes:
         result["vulnerabilityNotes"] = vulnerability_notes

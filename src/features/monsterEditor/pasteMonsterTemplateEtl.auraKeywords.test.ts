@@ -296,8 +296,11 @@ Hit Points +8 per level + Constitution score`,
     );
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    const stats = r.template.stats as { senses?: { raw: string }; unparsedStatLines?: string[] } | undefined;
-    expect(stats?.senses?.raw).toBe("Darkvision");
+    const stats = r.template.stats as {
+      senses?: Array<{ name: string; range: number }>;
+      unparsedStatLines?: string[];
+    } | undefined;
+    expect(stats?.senses).toEqual([{ name: "Darkvision", range: 0 }]);
     expect(stats?.unparsedStatLines).toBeUndefined();
   });
 
@@ -414,6 +417,33 @@ Resist 5 radiant, 5 necrotic at 1st level, 10 necrotic at 11th level`,
       { kind: "typed", type: "radiant", tiers: { "1": 5, "11": 5, "21": 5 }, sourceLine: expect.any(String) },
       { kind: "typed", type: "necrotic", tiers: { "1": 5, "11": 10, "21": 10 }, sourceLine: expect.any(String) }
     ]);
+  });
+
+  it("parses Resist base + 1/2 level (lich-style necrotic)", () => {
+    const r = parsePastedMonsterTemplateTextLocal(
+      `Lich Elite Controller
+Undead XP Elite
+Hit Points +8 per level + Constitution score
+Resist 5 + 1/2 level necrotic`,
+      "Lich"
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const stats = r.template.stats as {
+      resistances?: {
+        entries: Array<{ kind: string; type?: string; baseAmount?: number; plusHalfLevel?: boolean }>;
+      };
+    } | undefined;
+    expect(stats?.resistances?.entries).toEqual([
+      {
+        kind: "typed",
+        type: "necrotic",
+        baseAmount: 5,
+        plusHalfLevel: true,
+        sourceLine: expect.stringMatching(/^Resist\b/i)
+      }
+    ]);
+    expect(stats?.resistances?.entries?.[0]?.sourceLine).toContain("1/2 level");
   });
 
   it("parses Hit Points with role-specific formulas into default + variants", () => {

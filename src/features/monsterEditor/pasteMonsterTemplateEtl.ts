@@ -9,6 +9,7 @@ import type {
   MonsterPower,
   MonsterTemplatePasteResistanceEntryOptionB,
   MonsterTemplatePasteSkillEntryOptionB,
+  MonsterTemplatePasteSenseEntryOptionB,
   MonsterTemplatePasteStatsOptionB,
   MonsterTemplateRecord,
   MonsterTrait
@@ -787,6 +788,33 @@ function tierMapToResistanceEntries(
  * Player-chosen resistance types by tier, e.g.
  * `5 (choose one type) at 1st level, 10 (choose two types) at 11th level, 15 (choose three types) at 21st level`.
  */
+/**
+ * `Resist 5 + 1/2 level necrotic` / `Vulnerable 10 + ½ level fire` style scaling.
+ */
+function parseBasePlusHalfLevelResistanceEntry(
+  tail: string,
+  sourceLine: string
+): MonsterTemplatePasteResistanceEntryOptionB | null {
+  const t = tail.trim().replace(/\s+/g, " ");
+  const typeAlt = DAMAGE_TYPES.join("|");
+  const re = new RegExp(
+    `^(\\d+)\\s*\\+\\s*(?:(?:1\\s*/\\s*2)|½|half)\\s+level\\s+(${typeAlt})\\s*$`,
+    "i"
+  );
+  const m = t.match(re);
+  if (!m) return null;
+  const base = Number.parseInt(m[1], 10);
+  const dmg = m[2].toLowerCase();
+  if (!Number.isFinite(base)) return null;
+  return {
+    kind: "typed",
+    type: dmg,
+    baseAmount: base,
+    plusHalfLevel: true,
+    sourceLine
+  };
+}
+
 function parseVariableChoiceResistanceEntry(
   tail: string,
   sourceLine: string
@@ -821,6 +849,22 @@ function parseSpeedLine(rawLine: string): string {
   return tail.replace(/\s{2,}/g, " ");
 }
 
+/** `Senses Darkvision` or `Senses tremorsense 5, low-light vision` */
+function parseSensesStatTailToEntries(tail: string): MonsterTemplatePasteSenseEntryOptionB[] {
+  const entries: MonsterTemplatePasteSenseEntryOptionB[] = [];
+  for (const segment of tail.split(/[;,]/)) {
+    const seg = segment.trim();
+    if (!seg) continue;
+    const m = seg.match(/^(.+?)\s+(\d+)\s*$/);
+    if (m) {
+      entries.push({ name: m[1].trim(), range: Number.parseInt(m[2], 10) });
+    } else {
+      entries.push({ name: seg, range: 0 });
+    }
+  }
+  return entries;
+}
+
 /** Subset of Python `_parse_stat_lines` — covers common template stat rows (Option B: tiers + source lines). */
 function parseStatLines(statLines: string[]): MonsterTemplatePasteStatsOptionB {
   const result: MonsterTemplatePasteStatsOptionB = {};
@@ -839,7 +883,7 @@ function parseStatLines(statLines: string[]): MonsterTemplatePasteStatsOptionB {
     if (/^senses\b/i.test(rawLineTrim)) {
       const tail = rawLineTrim.replace(/^senses\s*/i, "").trim();
       if (tail) {
-        result.senses = { raw: tail, sourceLine: rawLineTrim };
+        result.senses = parseSensesStatTailToEntries(tail);
         continue;
       }
     }
@@ -965,6 +1009,12 @@ function parseStatLines(statLines: string[]): MonsterTemplatePasteStatsOptionB {
         parsed = true;
         continue;
       }
+      const halfLevelEntry = parseBasePlusHalfLevelResistanceEntry(tail, rawLineTrim);
+      if (halfLevelEntry) {
+        resistEntries.push(halfLevelEntry);
+        parsed = true;
+        continue;
+      }
       const typed = parseTieredValueEntries(tail);
       const rec: Record<string, number[]> = {};
       for (const [k, v] of Object.entries(typed)) rec[k] = v;
@@ -981,6 +1031,12 @@ function parseStatLines(statLines: string[]): MonsterTemplatePasteStatsOptionB {
       const variableEntry = parseVariableChoiceResistanceEntry(tail, rawLineTrim);
       if (variableEntry) {
         vulnEntries.push(variableEntry);
+        parsed = true;
+        continue;
+      }
+      const halfLevelEntry = parseBasePlusHalfLevelResistanceEntry(tail, rawLineTrim);
+      if (halfLevelEntry) {
+        vulnEntries.push(halfLevelEntry);
         parsed = true;
         continue;
       }

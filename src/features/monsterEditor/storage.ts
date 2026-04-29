@@ -191,6 +191,9 @@ export type MonsterTemplatePasteResistanceKindOptionB = "typed" | "keyword" | "v
 export interface MonsterTemplatePasteResistanceEntryOptionB {
   kind: MonsterTemplatePasteResistanceKindOptionB;
   type?: string;
+  /** Resist = baseAmount + floor(level/2) for this damage type (e.g. lich “Resist 5 + 1/2 level necrotic”). */
+  baseAmount?: number;
+  plusHalfLevel?: boolean;
   /** Tier breakpoints (heroic / paragon / epic). */
   tiers?: Record<string, number>;
   /**
@@ -201,6 +204,11 @@ export interface MonsterTemplatePasteResistanceEntryOptionB {
   sourceLine?: string;
 }
 
+export interface MonsterTemplatePasteSenseEntryOptionB {
+  name: string;
+  range: number;
+}
+
 export interface MonsterTemplatePasteStatsOptionB {
   hitPoints?: MonsterTemplatePasteHitPointsOptionB;
   defenses?: Record<string, number>;
@@ -209,8 +217,11 @@ export interface MonsterTemplatePasteStatsOptionB {
   initiative?: MonsterTemplatePasteScalarStatOptionB;
   speed?: MonsterTemplatePasteSpeedOptionB;
   skills?: { entries: MonsterTemplatePasteSkillEntryOptionB[] };
-  /** Parsed from a stat line such as `Senses darkvision` or OCR-glued `SensesDarkvision`. */
-  senses?: { raw: string; sourceLine?: string };
+  /**
+   * Parsed from stat lines such as `Senses Darkvision` → `{ name: "Darkvision", range: 0 }`,
+   * or `Senses tremorsense 5`. Split on `,` / `;`; trailing number is range when present.
+   */
+  senses?: MonsterTemplatePasteSenseEntryOptionB[];
   immunities?: string[];
   resistances?: { entries: MonsterTemplatePasteResistanceEntryOptionB[] };
   vulnerabilities?: { entries: MonsterTemplatePasteResistanceEntryOptionB[] };

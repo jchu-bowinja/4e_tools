@@ -52,6 +52,12 @@ import {
   parseMonsterTemplatesImportJson,
   stringifyMonsterTemplatesJsonFile
 } from "./monsterTemplatesJsonFile";
+import { formatMonsterTemplateStatAdjustmentLines } from "./monsterTemplateStatsDisplay";
+import {
+  applyMonsterTemplateToEntry,
+  computeTemplateApplicationDelta,
+  type TemplateApplicationDelta
+} from "./applyMonsterTemplate";
 
 /** Matches CharacterSheetApp: panels, section titles, labels, and body scale. */
 const panelStyle: CSSProperties = {
@@ -384,6 +390,15 @@ function mergeServerAndCustomTemplates(
     if (!customKeys.has(normalizeTemplateDedupeKey(s))) out.push(s);
   }
   return out;
+}
+
+/** Trait range line in the sheet (omit empty or numeric 0 placeholders). */
+function shouldShowTraitRangeLabel(rangeValue: unknown): boolean {
+  if (rangeValue === undefined || rangeValue === null) return false;
+  const s = String(rangeValue).trim();
+  if (!s) return false;
+  const n = typeof rangeValue === "number" ? rangeValue : Number(s);
+  return !(typeof n === "number" && Number.isFinite(n) && n === 0);
 }
 
 /** True when this row matches an entry in local custom storage (deletable); server-only rows are false. */
@@ -1641,6 +1656,14 @@ function MonsterTemplateFormattedView({
   /** Collapsible JSON under each aura, trait, and power. Default true; pass false to hide. */
   showAbilityJson?: boolean;
 }): JSX.Element {
+  const statAdjustmentLines = useMemo(() => {
+    const mechanical = formatMonsterTemplateStatAdjustmentLines(
+      record.stats as Record<string, unknown> | undefined
+    );
+    if (mechanical !== null && mechanical.length > 0) return mechanical;
+    return record.statLines ?? [];
+  }, [record.stats, record.statLines]);
+
   return (
     <div style={{ minWidth: 0 }}>
       <div style={centerIdentityBlockStyle}>
@@ -1691,13 +1714,12 @@ function MonsterTemplateFormattedView({
         </div>
       ) : null}
 
-      {(record.statLines?.length ?? 0) > 0 ||
-      (record.stats && Object.keys(record.stats).length > 0) ? (
+      {statAdjustmentLines.length > 0 || (record.stats && Object.keys(record.stats).length > 0) ? (
         <div style={centerSubsectionPanelStyle}>
           <h3 style={sectionTitleStyle}>Stat adjustments</h3>
-          {(record.statLines?.length ?? 0) > 0 ? (
+          {statAdjustmentLines.length > 0 ? (
             <ul style={{ margin: "0.25rem 0 0 0", paddingLeft: "1rem", ...bodyPrimary }}>
-              {record.statLines!.map((line, i) => (
+              {statAdjustmentLines.map((line, i) => (
                 <li key={`${glossaryKeyPrefix}-statline-${i}`} style={{ marginBottom: "0.22rem" }}>
                   {line}
                 </li>
@@ -1848,6 +1870,8 @@ export function MonsterEditorApp({
   const [templateMessage, setTemplateMessage] = useState<string>(
     "Load monster templates from generated JSON to begin."
   );
+  /** When set, monster sheet shows base creature merged with this template (preview only). */
+  const [monsterTemplatePreviewIdx, setMonsterTemplatePreviewIdx] = useState<number | null>(null);
   const [templateNameQuery, setTemplateNameQuery] = useState<string>("");
   const [templateSourceQuery, setTemplateSourceQuery] = useState<string>("");
   const [serverTemplateRows, setServerTemplateRows] = useState<MonsterTemplateRecord[]>([]);
@@ -1863,7 +1887,7 @@ export function MonsterEditorApp({
   const [jsonSearchJumpTick, setJsonSearchJumpTick] = useState<number>(0);
   const glossaryTooltipUi = useGlossaryTooltip({
     tooltipId: MONSTER_GLOSSARY_TOOLTIP_ID,
-    resetDeps: [selectedId, viewerTab, selectedTemplateIdx]
+    resetDeps: [selectedId, viewerTab, selectedTemplateIdx, monsterTemplatePreviewIdx]
   });
   const startGlossaryHover = glossaryTooltipUi.startHover;
   const leaveGlossaryHover = glossaryTooltipUi.leaveHover;
@@ -1892,6 +1916,10 @@ export function MonsterEditorApp({
 
   useEffect(() => {
     writeStoredSelectedMonsterId(selectedId);
+  }, [selectedId]);
+
+  useEffect(() => {
+    setMonsterTemplatePreviewIdx(null);
   }, [selectedId]);
 
   useEffect(() => {
@@ -1943,6 +1971,13 @@ export function MonsterEditorApp({
       }
     })();
   }, [selectedId]);
+
+  useEffect(() => {
+    if (monsterTemplatePreviewIdx === null) return;
+    if (monsterTemplatePreviewIdx >= templateRows.length) {
+      setMonsterTemplatePreviewIdx(null);
+    }
+  }, [templateRows.length, monsterTemplatePreviewIdx]);
 
   const filteredRows = useMemo(() => {
     const nameNeedle = nameQuery.trim().toLowerCase();
@@ -2086,24 +2121,39 @@ export function MonsterEditorApp({
     return Array.from(unique).sort((a, b) => a.localeCompare(b));
   }, [indexRows]);
 
+  const sheetMonster = useMemo((): MonsterEntryFile | null => {
+    if (!activeMonster) return null;
+    if (viewerTab !== "monsters" || monsterTemplatePreviewIdx === null) return activeMonster;
+    const tpl = templateRows[monsterTemplatePreviewIdx];
+    if (!tpl) return activeMonster;
+    return applyMonsterTemplateToEntry(activeMonster, tpl);
+  }, [activeMonster, viewerTab, monsterTemplatePreviewIdx, templateRows]);
+
+  const templatePreviewDelta = useMemo((): TemplateApplicationDelta | null => {
+    if (!activeMonster || monsterTemplatePreviewIdx === null) return null;
+    const tpl = templateRows[monsterTemplatePreviewIdx];
+    if (!tpl) return null;
+    return computeTemplateApplicationDelta(activeMonster, tpl);
+  }, [activeMonster, monsterTemplatePreviewIdx, templateRows]);
+
   const displayedAuras = useMemo(() => {
-    if (!activeMonster || !Array.isArray(activeMonster.auras)) return [];
-    return activeMonster.auras;
-  }, [activeMonster]);
+    if (!sheetMonster || !Array.isArray(sheetMonster.auras)) return [];
+    return sheetMonster.auras;
+  }, [sheetMonster]);
 
   const displayedTraits = useMemo(() => {
-    if (!activeMonster || !Array.isArray(activeMonster.traits)) return [];
+    if (!sheetMonster || !Array.isArray(sheetMonster.traits)) return [];
     const normalize = (value: unknown): string => String(value ?? "").trim().toLowerCase();
     const auraSignatures = new Set(
       displayedAuras.map((aura) =>
         [normalize(aura.name), normalize(aura.range), normalize(aura.details)].join("||")
       )
     );
-    return activeMonster.traits.filter((trait) => {
+    return sheetMonster.traits.filter((trait) => {
       const signature = [normalize(trait.name), normalize(trait.range), normalize(trait.details)].join("||");
       return !auraSignatures.has(signature);
     });
-  }, [activeMonster, displayedAuras]);
+  }, [sheetMonster, displayedAuras]);
 
   const auraHeadingColumnWidthCh = useMemo(() => {
     if (displayedAuras.length === 0) return 12;
@@ -2124,10 +2174,7 @@ export function MonsterEditorApp({
     const longest = displayedTraits.reduce((max, trait) => {
       const name = String(trait.name ?? "").trim() || "Trait";
       const rangeValue = trait.range;
-      const rangeText =
-        rangeValue !== undefined && rangeValue !== null && String(rangeValue).trim() !== ""
-          ? ` • Range ${String(rangeValue).trim()}`
-          : "";
+      const rangeText = shouldShowTraitRangeLabel(rangeValue) ? ` • Range ${String(rangeValue).trim()}` : "";
       return Math.max(max, `${name}${rangeText}`.length);
     }, 0);
     return Math.max(10, Math.min(26, longest + 1));
@@ -2155,8 +2202,8 @@ export function MonsterEditorApp({
     if (viewerTab === "templates") {
       return JSON.stringify(selectedTemplateRecord ?? {}, null, 2);
     }
-    return JSON.stringify(activeMonster, null, 2);
-  }, [viewerTab, selectedTemplateRecord, activeMonster, createDraftJson]);
+    return JSON.stringify(sheetMonster ?? activeMonster, null, 2);
+  }, [viewerTab, selectedTemplateRecord, activeMonster, sheetMonster, createDraftJson]);
   const jsonSearchMatches = useMemo(
     () => findCaseInsensitiveMatches(rawJsonText, jsonSearchQuery),
     [rawJsonText, jsonSearchQuery]
@@ -2877,20 +2924,94 @@ export function MonsterEditorApp({
             </div>
 
             <div style={{ ...sheetPanel, padding: "0.75rem" }}>
-          {!activeMonster ? (
+          {!sheetMonster ? (
             <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.8125rem", lineHeight: 1.45 }}>
               Select a monster to view its generated JSON data.
             </p>
           ) : (
             <div style={{ minWidth: 0 }}>
+              <div
+                style={{
+                  marginBottom: "0.65rem",
+                  padding: "0.45rem 0.55rem",
+                  borderRadius: "var(--ui-panel-radius, 0.35rem)",
+                  border: "1px solid var(--panel-border)",
+                  backgroundColor: "var(--surface-1)",
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "0.45rem",
+                  alignItems: "center"
+                }}
+              >
+                <span style={{ ...metaMuted, fontSize: "0.78rem", whiteSpace: "nowrap" }}>Template preview</span>
+                <select
+                  value={monsterTemplatePreviewIdx === null ? "" : String(monsterTemplatePreviewIdx)}
+                  onChange={(event) => {
+                    const v = event.target.value;
+                    setMonsterTemplatePreviewIdx(v === "" ? null : Number.parseInt(v, 10));
+                  }}
+                  aria-label="Merge a monster template onto this creature for preview"
+                  style={{
+                    minWidth: "12rem",
+                    maxWidth: "100%",
+                    fontSize: "0.8125rem",
+                    padding: "0.28rem 0.4rem",
+                    borderRadius: "0.25rem",
+                    border: "1px solid var(--panel-border)",
+                    backgroundColor: "var(--surface-0)",
+                    color: "var(--text-primary)"
+                  }}
+                >
+                  <option value="">None (base creature)</option>
+                  {templateRows.map((row, idx) => (
+                    <option key={`monster-sheet-tpl-${idx}`} value={String(idx)}>
+                      {String(row.templateName ?? "").trim() || `Template ${idx + 1}`}
+                      {row.sourceBook ? ` — ${row.sourceBook}` : ""}
+                    </option>
+                  ))}
+                </select>
+                {monsterTemplatePreviewIdx !== null && templatePreviewDelta ? (
+                  <span style={{ fontSize: "0.76rem", color: "var(--text-secondary)", lineHeight: 1.35 }}>
+                    +{templatePreviewDelta.addedPowerNames.length} powers, +{templatePreviewDelta.addedTraitNames.length}{" "}
+                    traits, +{templatePreviewDelta.addedAuraNames.length} auras
+                    {templatePreviewDelta.skippedDuplicatePowers +
+                      templatePreviewDelta.skippedDuplicateTraits +
+                      templatePreviewDelta.skippedDuplicateAuras >
+                    0
+                      ? ` (${templatePreviewDelta.skippedDuplicatePowers + templatePreviewDelta.skippedDuplicateTraits + templatePreviewDelta.skippedDuplicateAuras} duplicate lines skipped)`
+                      : ""}
+                  </span>
+                ) : null}
+              </div>
+              {monsterTemplatePreviewIdx !== null && templateRows[monsterTemplatePreviewIdx] ? (
+                <div
+                  style={{
+                    marginBottom: "0.55rem",
+                    padding: "0.4rem 0.55rem",
+                    borderRadius: "var(--ui-panel-radius, 0.35rem)",
+                    border: "1px solid var(--power-accent-encounter-border)",
+                    backgroundColor: "var(--surface-1)",
+                    fontSize: "0.78rem",
+                    color: "var(--text-secondary)",
+                    lineHeight: 1.45
+                  }}
+                >
+                  Previewing{" "}
+                  <strong style={{ color: "var(--text-primary)" }}>
+                    {templateRows[monsterTemplatePreviewIdx]?.templateName}
+                  </strong>
+                  . Powers, traits, and auras from the template are appended below (deduped by name). Core statistics are
+                  unchanged; adjust HP and defenses using the template&apos;s stat guidance in the book when applicable.
+                </div>
+              ) : null}
               <div style={centerIdentityBlockStyle}>
                 <div style={centerIdentityTitleStyle}>
-                  <span>{activeMonster.name}</span>
-                  {activeMonster.alignment?.name ? (
+                  <span>{sheetMonster.name}</span>
+                  {sheetMonster.alignment?.name ? (
                     <>
                       {" "}
                       <span
-                        {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${activeMonster.alignment.name}`)}
+                        {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${sheetMonster.alignment.name}`)}
                         style={{
                           cursor: "help",
                           borderBottom: "1px dotted var(--text-muted)",
@@ -2899,7 +3020,7 @@ export function MonsterEditorApp({
                           color: "var(--text-primary)"
                         }}
                       >
-                        ({activeMonster.alignment.name})
+                        ({sheetMonster.alignment.name})
                       </span>
                     </>
                   ) : null}
@@ -2911,51 +3032,51 @@ export function MonsterEditorApp({
                   >
                     Level
                   </span>{" "}
-                  {formatValue(activeMonster.level)}{" "}
-                  {isRenderableCardValue(activeMonster.groupRole) ? (
+                  {formatValue(sheetMonster.level)}{" "}
+                  {isRenderableCardValue(sheetMonster.groupRole) ? (
                     <>
                       <span
-                        {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${String(activeMonster.groupRole)}`)}
+                        {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${String(sheetMonster.groupRole)}`)}
                         style={glossaryLinkUnderline}
                       >
-                        {String(activeMonster.groupRole)}
+                        {String(sheetMonster.groupRole)}
                       </span>{" "}
                     </>
                   ) : null}
                   <span
-                    {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${activeMonster.role || "Role"}`)}
+                    {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${sheetMonster.role || "Role"}`)}
                     style={glossaryLinkUnderline}
                   >
-                    {activeMonster.role || ""}
+                    {sheetMonster.role || ""}
                   </span>
                 </div>
                 <div style={centerMetaLineStyle}>
                   <span
-                    {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${activeMonster.size || "Size"}`)}
+                    {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${sheetMonster.size || "Size"}`)}
                     style={glossaryLinkUnderline}
                   >
-                    {activeMonster.size || "Unknown size"}
+                    {sheetMonster.size || "Unknown size"}
                   </span>{" "}
                   <span style={centerBulletStyle} aria-hidden>
                     •
                   </span>{" "}
                   <span
-                    {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${activeMonster.origin || "Origin"}`)}
+                    {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${sheetMonster.origin || "Origin"}`)}
                     style={glossaryLinkUnderline}
                   >
-                    {activeMonster.origin || "Unknown origin"}
+                    {sheetMonster.origin || "Unknown origin"}
                   </span>{" "}
                   <span style={centerBulletStyle} aria-hidden>
                     •
                   </span>{" "}
                   <span
-                    {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${activeMonster.type || "Type"}`)}
+                    {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${sheetMonster.type || "Type"}`)}
                     style={glossaryLinkUnderline}
                   >
-                    {activeMonster.type || "Unknown type"}
+                    {sheetMonster.type || "Unknown type"}
                   </span>{" "}
-                  {Array.isArray(activeMonster.keywords) && activeMonster.keywords.length > 0
-                    ? activeMonster.keywords.map((kw, idx) => (
+                  {Array.isArray(sheetMonster.keywords) && sheetMonster.keywords.length > 0
+                    ? sheetMonster.keywords.map((kw, idx) => (
                         <span key={`monster-header-kw-${idx}-${String(kw)}`}>
                           <span style={centerBulletStyle} aria-hidden>
                             •
@@ -2978,11 +3099,11 @@ export function MonsterEditorApp({
                   >
                     XP
                   </span>{" "}
-                  {formatValue(activeMonster.xp)}
+                  {formatValue(sheetMonster.xp)}
                 </div>
                 {(() => {
-                  const on = (activeMonster.stats?.otherNumbers ?? {}) as Record<string, unknown>;
-                  const skillsBlock = (activeMonster.stats?.skills ?? {}) as Record<string, unknown>;
+                  const on = (sheetMonster.stats?.otherNumbers ?? {}) as Record<string, unknown>;
+                  const skillsBlock = (sheetMonster.stats?.skills ?? {}) as Record<string, unknown>;
                   const pick = (candidates: string[]): string => {
                     const lower = new Map(Object.entries(on).map(([k, v]) => [k.toLowerCase(), v]));
                     for (const c of candidates) {
@@ -3000,7 +3121,7 @@ export function MonsterEditorApp({
                     perceptionFromSkills !== "-" ? perceptionFromSkills : pick(["perception"]);
                   const actionPts = pick(["actionPoints", "action points"]);
                   const saves = pick(["savingThrows", "saving throws"]);
-                  const defensesBlock = (activeMonster.stats?.defenses ?? {}) as Record<string, unknown>;
+                  const defensesBlock = (sheetMonster.stats?.defenses ?? {}) as Record<string, unknown>;
                   const pickDefense = (candidates: string[]): string => {
                     const lower = new Map(Object.entries(defensesBlock).map(([k, v]) => [k.toLowerCase(), v]));
                     for (const c of candidates) {
@@ -3015,7 +3136,7 @@ export function MonsterEditorApp({
                   const fortitude = pickDefense(["fortitude", "Fortitude"]);
                   const reflex = pickDefense(["reflex", "Reflex"]);
                   const will = pickDefense(["will", "Will"]);
-                  const regenerationRaw = activeMonster.regeneration;
+                  const regenerationRaw = sheetMonster.regeneration;
                   let regenerationVal: string | null = null;
                   if (regenerationRaw !== undefined && regenerationRaw !== null && String(regenerationRaw).trim() !== "") {
                     const numeric =
@@ -3107,7 +3228,7 @@ export function MonsterEditorApp({
                 })()}
               </div>
 
-              {activeMonster.parseError && (
+              {sheetMonster.parseError && (
                 <div
                   style={{
                     marginTop: "0.5rem",
@@ -3120,16 +3241,16 @@ export function MonsterEditorApp({
                     lineHeight: 1.45
                   }}
                 >
-                  Parse error: {activeMonster.parseError}
+                  Parse error: {sheetMonster.parseError}
                 </div>
               )}
 
               {(() => {
-                const movementEntries = extractMovementEntries(activeMonster);
-                const showPhasing = activeMonster.phasing === true;
-                const otherNumbers = activeMonster.stats?.otherNumbers ?? {};
+                const movementEntries = extractMovementEntries(sheetMonster);
+                const showPhasing = sheetMonster.phasing === true;
+                const otherNumbers = sheetMonster.stats?.otherNumbers ?? {};
                 const otherMap = otherNumbers as Record<string, unknown>;
-                const skillsMap = (activeMonster.stats?.skills ?? {}) as Record<string, unknown>;
+                const skillsMap = (sheetMonster.stats?.skills ?? {}) as Record<string, unknown>;
                 const bloodied = formatValue(otherMap.bloodied as string | number | boolean | undefined | null);
                 const initiativeFlow = pickFromStatBlock(otherMap, ["initiative"]);
                 const perceptionFromSkillsFlow = pickFromStatBlock(skillsMap, ["perception"]);
@@ -3185,12 +3306,12 @@ export function MonsterEditorApp({
                           ) : null}
                         </div>
                       ) : null}
-                      {(Array.isArray(activeMonster.immunities) && activeMonster.immunities.length > 0) ? (
+                      {(Array.isArray(sheetMonster.immunities) && sheetMonster.immunities.length > 0) ? (
                         <div style={centerFlowLineStyle}>
                           <strong style={centerFlowLabelStrongStyle}>Immunities:</strong>{" "}
                           {(() => {
                             const segments: string[] = [];
-                            for (const imm of activeMonster.immunities ?? []) {
+                            for (const imm of sheetMonster.immunities ?? []) {
                               segments.push(...splitCommaListSegments(String(imm ?? "")));
                             }
                             return segments.map((text, idx) => (
@@ -3211,10 +3332,10 @@ export function MonsterEditorApp({
                           })()}
                         </div>
                       ) : null}
-                      {(Array.isArray(activeMonster.resistances) && activeMonster.resistances.length > 0) ? (
+                      {(Array.isArray(sheetMonster.resistances) && sheetMonster.resistances.length > 0) ? (
                         <div style={centerFlowLineStyle}>
                           <strong style={centerFlowLabelStrongStyle}>Resistances:</strong>{" "}
-                          {activeMonster.resistances.map((resistance, idx) => {
+                          {sheetMonster.resistances.map((resistance, idx) => {
                             const r = resistance as Record<string, unknown>;
                             const name = String(r.name ?? "").trim();
                             const rawAmount = r.amount;
@@ -3243,8 +3364,8 @@ export function MonsterEditorApp({
                       ) : null}
                       {(() => {
                         const entries =
-                          Array.isArray(activeMonster.senses) && activeMonster.senses.length > 0
-                            ? activeMonster.senses
+                          Array.isArray(sheetMonster.senses) && sheetMonster.senses.length > 0
+                            ? sheetMonster.senses
                                 .map((sense) => {
                                   const name = String(sense.name ?? "").trim();
                                   if (!name) return null;
@@ -3280,10 +3401,10 @@ export function MonsterEditorApp({
                           </div>
                         );
                       })()}
-                      {(Array.isArray(activeMonster.weaknesses) && activeMonster.weaknesses.length > 0) ? (
+                      {(Array.isArray(sheetMonster.weaknesses) && sheetMonster.weaknesses.length > 0) ? (
                         <div style={centerFlowLineStyle}>
                           <strong style={centerFlowLabelStrongStyle}>Vulnerabilities:</strong>{" "}
-                          {activeMonster.weaknesses.map((weakness, idx) => {
+                          {sheetMonster.weaknesses.map((weakness, idx) => {
                             const w = weakness as Record<string, unknown>;
                             const name = String(w.name ?? "").trim();
                             const rawAmount = w.amount;
@@ -3314,7 +3435,7 @@ export function MonsterEditorApp({
                     <details style={centerDetailsBlockStyle}>
                       <summary style={detailsSummaryStyle}>Detailed Stats</summary>
                       <div style={{ marginTop: "0.5rem", display: "grid", gap: "0.4rem" }}>
-                        {Object.entries(activeMonster.stats)
+                        {Object.entries(sheetMonster.stats)
                           .filter(
                             ([label]) =>
                               label !== "attackBonuses" && label !== "otherNumbers" && label !== "defenses"
@@ -3377,7 +3498,7 @@ export function MonsterEditorApp({
                               </div>
                             </div>
                           ))}
-                        {Array.isArray(activeMonster.languages) && activeMonster.languages.length > 0 ? (
+                        {Array.isArray(sheetMonster.languages) && sheetMonster.languages.length > 0 ? (
                           <div style={statPanelStyle}>
                             <h3 style={sectionTitleStyle}>Languages</h3>
                             <div
@@ -3388,11 +3509,11 @@ export function MonsterEditorApp({
                                 color: "var(--text-secondary)"
                               }}
                             >
-                              {renderTagList(activeMonster.languages)}
+                              {renderTagList(sheetMonster.languages)}
                             </div>
                           </div>
                         ) : null}
-                        {Array.isArray(activeMonster.sourceBooks) && activeMonster.sourceBooks.length > 0 ? (
+                        {Array.isArray(sheetMonster.sourceBooks) && sheetMonster.sourceBooks.length > 0 ? (
                           <div style={statPanelStyle}>
                             <h3 style={sectionTitleStyle}>Sources</h3>
                             <div
@@ -3403,7 +3524,7 @@ export function MonsterEditorApp({
                                 color: "var(--text-secondary)"
                               }}
                             >
-                              {activeMonster.sourceBooks.join(", ")}
+                              {sheetMonster.sourceBooks.join(", ")}
                             </div>
                           </div>
                         ) : null}
@@ -3413,12 +3534,12 @@ export function MonsterEditorApp({
                 );
               })()}
 
-              {isRenderableCardValue(activeMonster.tactics) ? (
+              {isRenderableCardValue(sheetMonster.tactics) ? (
                 <div style={centerSubsectionPanelStyle}>
                   <h3 style={sectionTitleStyle}>Tactics</h3>
                   <div style={{ ...richTextBodyPrimary.paragraphStyle, whiteSpace: "pre-wrap" }}>
                     {renderGlossaryAwareText(
-                      String(activeMonster.tactics),
+                      String(sheetMonster.tactics),
                       commonDescriptiveGlossaryPhrases,
                       startGlossaryHover,
                       leaveGlossaryHover,
@@ -3593,10 +3714,9 @@ export function MonsterEditorApp({
                             const name = String(trait.name ?? "").trim();
                             const details = String(trait.details ?? "").trim();
                             const rangeValue = trait.range;
-                            const rangeText =
-                              rangeValue !== undefined && rangeValue !== null && String(rangeValue).trim() !== ""
-                                ? `Range ${String(rangeValue).trim()}`
-                                : "";
+                            const rangeText = shouldShowTraitRangeLabel(rangeValue)
+                              ? `Range ${String(rangeValue).trim()}`
+                              : "";
                             const detailParts = splitByGlossaryPhrases(details, traitDetailGlossaryPhrases);
                             const badges = renderTraitMetaBadges(trait);
                             const stripeColor = idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)";
@@ -3716,7 +3836,7 @@ export function MonsterEditorApp({
               ) : null}
 
               {(() => {
-                const items = sectionArrayOfObjects(activeMonster.items);
+                const items = sectionArrayOfObjects(sheetMonster.items);
                 if (items.length === 0) return null;
                 return (
                   <div style={centerSubsectionPanelStyle}>
@@ -3756,7 +3876,7 @@ export function MonsterEditorApp({
               })()}
 
               <MonsterPowersPanels
-                powers={activeMonster.powers}
+                powers={sheetMonster.powers}
                 startGlossaryHover={startGlossaryHover}
                 leaveGlossaryHover={leaveGlossaryHover}
                 shouldHighlightGlossaryTerm={shouldHighlightGlossaryTerm}
