@@ -30,6 +30,21 @@ import {
   type MonsterTrait
 } from "./storage";
 import {
+  isStoredCustomMonsterId,
+  isStoredCustomTemplate,
+  mergeServerAndCustomMonsterIndex,
+  mergeServerAndCustomTemplates,
+  monsterEntryToIndexRow,
+  normalizeMonsterEntryForSave,
+  normalizeTemplateDedupeKey,
+  readCustomMonsterEntries,
+  readCustomMonsterTemplates,
+  readStoredSelectedMonsterId,
+  writeCustomMonsterEntries,
+  writeCustomMonsterTemplates,
+  writeStoredSelectedMonsterId
+} from "./monsterLocalStorage";
+import {
   parsePastedMonsterTemplateText,
   type MonsterTemplateImportValidation,
   validateMonsterTemplateImport
@@ -71,6 +86,33 @@ import {
   monsterMatchesTemplateRecord,
   parseMonsterTemplatePrerequisite
 } from "./templatePrerequisiteCriteria";
+import {
+  detectMonsterRank,
+  filterAndSortMonsterIndexRows,
+  type MonsterRankFilter
+} from "./monsterIndexFilters";
+import {
+  formatXpInteger,
+  monsterQuickAc,
+  monsterQuickHp,
+  monsterXpDisplay,
+  parseMonsterXpToNumber
+} from "../encounterBuilder/encounterMonsterQuickSummary";
+import {
+  loadEncounterStore,
+  saveEncounterStore,
+  stringifyEncounterStoreForExport,
+  storeAddEncounter,
+  storeAddSnapshotToEncounter,
+  storeDeleteEncounter,
+  storeDuplicateEncounter,
+  storeMoveRosterAt,
+  storeRemoveRosterAt,
+  storeRenameEncounter,
+  storeSetActiveEncounter,
+  type EncounterSnapshotExtras,
+  type EncounterStore
+} from "../encounterBuilder/encounterStorage";
 
 /** Matches CharacterSheetApp: panels, section titles, labels, and body scale. */
 const panelStyle: CSSProperties = {
@@ -361,6 +403,46 @@ function TemplateJsonSnippetEditor({
   );
 }
 
+function templatePreviewIdxsToDedupeKeys(
+  idxs: readonly number[],
+  rows: MonsterTemplateRecord[]
+): string[] {
+  const out: string[] = [];
+  for (const i of idxs.slice(0, 2)) {
+    const rec = rows[i];
+    if (!rec) continue;
+    out.push(normalizeTemplateDedupeKey(rec));
+  }
+  return out;
+}
+
+function dedupeKeysToTemplatePreviewIdxs(keys: string[] | undefined, rows: MonsterTemplateRecord[]): number[] {
+  if (!keys?.length) return [];
+  const out: number[] = [];
+  for (const key of keys.slice(0, 2)) {
+    const idx = rows.findIndex((r) => normalizeTemplateDedupeKey(r) === key);
+    if (idx >= 0) out.push(idx);
+  }
+  return out;
+}
+
+/** Fallback for roster rows saved before `templateDedupeKeys`; matches `applyMonsterTemplateToEntry` preview metadata. */
+function templatePreviewIdxsFromSnapshot(snapshot: MonsterEntryFile, rows: MonsterTemplateRecord[]): number[] {
+  const sections = snapshot.sections;
+  if (!sections || typeof sections !== "object" || Array.isArray(sections)) return [];
+  const preview = (sections as Record<string, unknown>).monsterTemplatePreview;
+  if (!preview || typeof preview !== "object" || Array.isArray(preview)) return [];
+  const rawNames = (preview as Record<string, unknown>).templateNames;
+  if (!Array.isArray(rawNames)) return [];
+  const names = rawNames.map((x) => String(x ?? "").trim()).filter(Boolean);
+  const out: number[] = [];
+  for (const n of names.slice(0, 2)) {
+    const idx = rows.findIndex((r) => String(r.templateName ?? "").trim() === n);
+    if (idx >= 0) out.push(idx);
+  }
+  return out;
+}
+
 function templateIdentitySnippet(record: MonsterTemplateRecord): Record<string, unknown> {
   const o: Record<string, unknown> = {
     templateName: record.templateName,
@@ -582,117 +664,10 @@ const microLabelInteractive: CSSProperties = {
   width: "fit-content"
 };
 
-const MONSTER_SELECTED_ID_STORAGE_KEY = "monsterEditor.selectedId";
-
 const MONSTER_VIEWER_TAB_KEY = "monsterEditor.viewerTab";
 const MONSTER_SELECTED_TEMPLATE_IDX_STORAGE_KEY = "monsterEditor.selectedTemplateIdx";
-const MONSTER_CUSTOM_TEMPLATES_STORAGE_KEY = "monsterEditor.customMonsterTemplates";
-const MONSTER_CUSTOM_ENTRIES_STORAGE_KEY = "monsterEditor.customMonsterEntries";
 
 type MonsterViewerTab = "monsters" | "templates" | "createTemplate" | "createMonster";
-
-function normalizeTemplateDedupeKey(t: Pick<MonsterTemplateRecord, "templateName" | "sourceBook">): string {
-  const name = String(t.templateName ?? "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "");
-  const book = String(t.sourceBook ?? "");
-  return `${name}\0${book}`;
-}
-
-function readCustomMonsterTemplates(): MonsterTemplateRecord[] {
-  try {
-    const raw = window.localStorage.getItem(MONSTER_CUSTOM_TEMPLATES_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as MonsterTemplateRecord[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeCustomMonsterTemplates(rows: MonsterTemplateRecord[]): void {
-  try {
-    window.localStorage.setItem(MONSTER_CUSTOM_TEMPLATES_STORAGE_KEY, JSON.stringify(rows));
-  } catch {
-    /* ignore */
-  }
-}
-
-function mergeServerAndCustomTemplates(
-  custom: MonsterTemplateRecord[],
-  server: MonsterTemplateRecord[]
-): MonsterTemplateRecord[] {
-  const customKeys = new Set(custom.map(normalizeTemplateDedupeKey));
-  const out = [...custom];
-  for (const s of server) {
-    if (!customKeys.has(normalizeTemplateDedupeKey(s))) out.push(s);
-  }
-  return out;
-}
-
-function readCustomMonsterEntries(): MonsterEntryFile[] {
-  try {
-    const raw = window.localStorage.getItem(MONSTER_CUSTOM_ENTRIES_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as MonsterEntryFile[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeCustomMonsterEntries(rows: MonsterEntryFile[]): void {
-  try {
-    window.localStorage.setItem(MONSTER_CUSTOM_ENTRIES_STORAGE_KEY, JSON.stringify(rows));
-  } catch {
-    /* ignore */
-  }
-}
-
-function monsterEntryToIndexRow(entry: MonsterEntryFile): MonsterIndexEntry {
-  return {
-    id: entry.id,
-    fileName: entry.fileName || `${entry.id}.json`,
-    relativePath: entry.relativePath || `custom/monsters/${entry.id}.json`,
-    name: entry.name,
-    level: entry.level,
-    role: entry.role,
-    groupRole: entry.groupRole,
-    isLeader: entry.isLeader,
-    parseError: entry.parseError ?? ""
-  };
-}
-
-function mergeServerAndCustomMonsterIndex(server: MonsterIndexEntry[], custom: MonsterEntryFile[]): MonsterIndexEntry[] {
-  const customIds = new Set(custom.map((c) => c.id));
-  const rows = custom.map(monsterEntryToIndexRow);
-  for (const row of server) {
-    if (!customIds.has(row.id)) rows.push(row);
-  }
-  return rows;
-}
-
-/** Persisted browser-only monsters: stable paths and sourceRoot for the sheet. */
-function normalizeMonsterEntryForSave(parsed: MonsterEntryFile): MonsterEntryFile {
-  const id = String(parsed.id ?? "").trim() || `custom-${Date.now().toString(36)}`;
-  const name = String(parsed.name ?? "").trim() || "Unnamed monster";
-  const powers = Array.isArray(parsed.powers) ? parsed.powers : [];
-  return {
-    ...parsed,
-    id,
-    name,
-    powers,
-    fileName: `${id}.json`,
-    relativePath: `custom/monsters/${id}.json`,
-    sourceRoot: "custom",
-    parseError: ""
-  };
-}
-
-function isStoredCustomMonsterId(id: string | null | undefined): boolean {
-  if (!id?.trim()) return false;
-  return readCustomMonsterEntries().some((m) => m.id === id);
-}
 
 /** Trait range line in the sheet (omit empty or numeric 0 placeholders). */
 function shouldShowTraitRangeLabel(rangeValue: unknown): boolean {
@@ -701,33 +676,6 @@ function shouldShowTraitRangeLabel(rangeValue: unknown): boolean {
   if (!s) return false;
   const n = typeof rangeValue === "number" ? rangeValue : Number(s);
   return !(typeof n === "number" && Number.isFinite(n) && n === 0);
-}
-
-/** True when this row matches an entry in local custom storage (deletable); server-only rows are false. */
-function isStoredCustomTemplate(record: MonsterTemplateRecord | null): boolean {
-  if (!record?.templateName?.trim()) return false;
-  const key = normalizeTemplateDedupeKey(record);
-  return readCustomMonsterTemplates().some((c) => normalizeTemplateDedupeKey(c) === key);
-}
-
-function readStoredSelectedMonsterId(): string {
-  try {
-    return window.localStorage.getItem(MONSTER_SELECTED_ID_STORAGE_KEY) ?? "";
-  } catch {
-    return "";
-  }
-}
-
-function writeStoredSelectedMonsterId(id: string): void {
-  try {
-    if (id.trim()) {
-      window.localStorage.setItem(MONSTER_SELECTED_ID_STORAGE_KEY, id);
-    } else {
-      window.localStorage.removeItem(MONSTER_SELECTED_ID_STORAGE_KEY);
-    }
-  } catch {
-    // Ignore storage failures and keep app behavior in-memory.
-  }
 }
 
 function readStoredViewerTab(): MonsterViewerTab {
@@ -1140,38 +1088,6 @@ function statsDisplayOrder(label: string): number {
   if (normalized === "skills") return 1;
   if (normalized === "defenses") return 2;
   return 0;
-}
-
-function parseLevelFilter(rawFilter: string): { exact?: number; range?: { min: number; max: number } } {
-  const trimmed = rawFilter.trim();
-  if (!trimmed) return {};
-
-  if (/^-?\d+$/.test(trimmed)) {
-    return { exact: Number(trimmed) };
-  }
-
-  const rangeMatch = trimmed.match(/^(-?\d+)\s*-\s*(-?\d+)$/);
-  if (rangeMatch) {
-    const start = Number(rangeMatch[1]);
-    const end = Number(rangeMatch[2]);
-    if (Number.isFinite(start) && Number.isFinite(end)) {
-      return { range: { min: Math.min(start, end), max: Math.max(start, end) } };
-    }
-  }
-
-  return {};
-}
-
-type MonsterRankFilter = "all" | "minion" | "standard" | "elite" | "solo";
-
-function detectMonsterRank(entry: MonsterIndexEntry): Exclude<MonsterRankFilter, "all"> {
-  const normalized = String(entry.groupRole ?? entry.role ?? "")
-    .trim()
-    .toLowerCase();
-  if (normalized.includes("minion")) return "minion";
-  if (normalized.includes("elite")) return "elite";
-  if (normalized.includes("solo")) return "solo";
-  return "standard";
 }
 
 function renderDamageSummary(damage?: MonsterPowerDamage): string {
@@ -2352,6 +2268,10 @@ export function MonsterEditorApp({
   const [templateJsonSearchQuery, setTemplateJsonSearchQuery] = useState<string>("");
   const [templateJsonSearchResultIdx, setTemplateJsonSearchResultIdx] = useState<number>(0);
   const [templateJsonSearchJumpTick, setTemplateJsonSearchJumpTick] = useState<number>(0);
+  const [encounterStore, setEncounterStore] = useState<EncounterStore>(() => loadEncounterStore());
+  const [encounterNameEditOpen, setEncounterNameEditOpen] = useState(false);
+  const [encounterNameEditKind, setEncounterNameEditKind] = useState<"new" | "rename">("rename");
+  const [encounterNameEditValue, setEncounterNameEditValue] = useState("");
   const glossaryTooltipUi = useGlossaryTooltip({
     tooltipId: MONSTER_GLOSSARY_TOOLTIP_ID,
     resetDeps: [selectedId, viewerTab, selectedTemplateIdx, monsterTemplatePreviewIdxs.join(",")]
@@ -2401,13 +2321,21 @@ export function MonsterEditorApp({
   }, []);
 
   useEffect(() => {
+    saveEncounterStore(encounterStore);
+  }, [encounterStore]);
+
+  useEffect(() => {
+    setEncounterNameEditOpen(false);
+  }, [encounterStore.activeEncounterId]);
+
+  useEffect(() => {
     writeStoredSelectedMonsterId(selectedId);
   }, [selectedId]);
 
-  useEffect(() => {
+  const resetMonsterSheetAdjustments = useCallback(() => {
     setMonsterTemplatePreviewIdxs([]);
     setMonsterLevelDelta(0);
-  }, [selectedId]);
+  }, []);
 
   useEffect(() => {
     setTemplateJsonSearchInput("");
@@ -2483,72 +2411,40 @@ export function MonsterEditorApp({
     });
   }, [templateRows.length]);
 
-  const filteredRows = useMemo(() => {
-    const nameNeedle = nameQuery.trim().toLowerCase();
-    const roleNeedle = roleQuery.trim().toLowerCase();
-    const rawLevelFilter = levelQuery.trim();
-    const parsedLevelFilter = parseLevelFilter(rawLevelFilter);
+  const filteredRows = useMemo(
+    () =>
+      filterAndSortMonsterIndexRows(indexRows, {
+        nameQuery,
+        levelQuery,
+        roleQuery,
+        rankFilter,
+        leaderFilter,
+        sortBy,
+        sortDir
+      }),
+    [indexRows, nameQuery, levelQuery, roleQuery, rankFilter, leaderFilter, sortBy, sortDir]
+  );
 
-    const rows = indexRows.filter((entry) => {
-      if (nameNeedle && !entry.name.toLowerCase().includes(nameNeedle)) {
-        return false;
-      }
+  const encounterActive = useMemo(() => {
+    const id = encounterStore.activeEncounterId;
+    if (!id) return null;
+    return encounterStore.encounters.find((e) => e.id === id) ?? null;
+  }, [encounterStore]);
 
-      if (roleNeedle && !entry.role.toLowerCase().includes(roleNeedle)) {
-        return false;
-      }
+  const encounterRoster = encounterActive?.roster ?? [];
 
-      if (rankFilter !== "all" && detectMonsterRank(entry) !== rankFilter) {
-        return false;
+  const encounterRosterXpTotals = useMemo(() => {
+    let sum = 0;
+    let parsed = 0;
+    for (const row of encounterRoster) {
+      const n = parseMonsterXpToNumber(row.snapshot);
+      if (n !== null) {
+        sum += n;
+        parsed++;
       }
-
-      const isLeader = entry.isLeader === true;
-      if (leaderFilter === "leader" && !isLeader) {
-        return false;
-      }
-      if (leaderFilter === "notLeader" && isLeader) {
-        return false;
-      }
-
-      if (!rawLevelFilter) {
-        return true;
-      }
-
-      const levelAsNumber = Number(entry.level);
-      if (!Number.isFinite(levelAsNumber)) {
-        return false;
-      }
-
-      if (parsedLevelFilter.exact !== undefined) {
-        return levelAsNumber === parsedLevelFilter.exact;
-      }
-      if (parsedLevelFilter.range) {
-        return levelAsNumber >= parsedLevelFilter.range.min && levelAsNumber <= parsedLevelFilter.range.max;
-      }
-      return false;
-    });
-
-    return [...rows].sort((a, b) => {
-      if (sortBy === "level") {
-        const levelA = Number(a.level);
-        const levelB = Number(b.level);
-        const hasLevelA = Number.isFinite(levelA);
-        const hasLevelB = Number.isFinite(levelB);
-        if (hasLevelA && hasLevelB && levelA !== levelB) {
-          return sortDir === "asc" ? levelA - levelB : levelB - levelA;
-        }
-        if (hasLevelA !== hasLevelB) {
-          return hasLevelA ? -1 : 1;
-        }
-      }
-
-      const byName = a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
-      if (byName !== 0) {
-        return sortDir === "asc" ? byName : -byName;
-      }
-      return a.id.localeCompare(b.id, undefined, { sensitivity: "base" });
-    });
-  }, [indexRows, nameQuery, levelQuery, roleQuery, rankFilter, leaderFilter, sortBy, sortDir]);
+    }
+    return { sum, parsed, total: encounterRoster.length };
+  }, [encounterRoster]);
 
   const customMonsterIdSet = useMemo(
     () => new Set(readCustomMonsterEntries().map((m) => m.id)),
@@ -2638,6 +2534,14 @@ export function MonsterEditorApp({
       const tpl = templateRows[idx];
       if (!tpl) continue;
       merged = applyMonsterTemplateToEntry(merged, tpl);
+    }
+    const prefixParts = monsterTemplatePreviewIdxs
+      .slice(0, 2)
+      .map((idx) => String(templateRows[idx]?.templateName ?? "").trim())
+      .filter(Boolean);
+    const baseName = String(merged.name ?? "").trim();
+    if (prefixParts.length > 0 && baseName) {
+      merged = { ...merged, name: `${prefixParts.join(" ")} ${baseName}` };
     }
     return merged;
   }, [activeMonster, viewerTab, monsterTemplatePreviewIdxs, templateRows]);
@@ -3069,188 +2973,210 @@ export function MonsterEditorApp({
         </button>
       </div>
 
-      <p style={{ marginTop: 0, marginBottom: "0.5rem", color: "var(--text-muted)", fontSize: "0.8rem" }}>
-        {viewerTab === "monsters" ? (
-          <>
-            JSON-backed viewer for <code style={{ fontSize: "0.92em" }}>generated/monsters</code> with formatted identity,
-            stats, powers, and parsed sections.
-          </>
-        ) : viewerTab === "templates" ? (
-          <>
-            Template overlays from{" "}
-            <code style={{ fontSize: "0.92em" }}>generated/monster_templates.json</code> (published PDF-derived text plus
-            structured stats and powers). Custom templates saved here live in{" "}
-            <code style={{ fontSize: "0.92em" }}>localStorage</code> only until you copy them into generated JSON.{" "}
-            <strong>Export Templates</strong> saves the full list shown here (generated{" "}
-            <code style={{ fontSize: "0.92em" }}>monster_templates.json</code> plus browser-saved customs when loaded).{" "}
-            <strong>Copy template</strong> copies JSON for the template selected in the list;{" "}
-            <strong>Import templates</strong> / <strong>Import from clipboard</strong> accepts one template, an array, or the{" "}
-            <code style={{ fontSize: "0.92em" }}>{`{ meta, templates }`}</code> bundle (same as generated{" "}
-            <code style={{ fontSize: "0.92em" }}>monster_templates.json</code>).
-          </>
-        ) : viewerTab === "createMonster" ? (
-          <>Paste copied stat block text.</>
-        ) : (
-          <>
-            Paste raw text for one monster template.  Import and review the result. Edit the JSON, then save it as a local custom
-            template.
-            <span style={{ display: "block", marginTop: "0.35rem" }}>
-              <strong>Tip:</strong> If OCR split a long resistance, vulnerability, or other stat across several lines, delete those
-              line breaks so it reads as one line—this helps the importer recognize stat boundaries.
-            </span>
-            <span style={{ display: "block", marginTop: "0.35rem" }}>
-              Optional: wrap an ability (power, trait, or aura) by putting <code style={{ fontSize: "0.92em" }}>[ABILITY]</code>{" "}
-              on its own line right before the block and <code style={{ fontSize: "0.92em" }}>[ABILITYEND]</code> on its own line
-              right after—those lines fence the block so parsing stays aligned.
-            </span>
-          </>
-        )}
-      </p>
+      {viewerTab === "templates" || viewerTab === "createTemplate" ? (
+        <p style={{ marginTop: 0, marginBottom: "0.5rem", color: "var(--text-muted)", fontSize: "0.8rem" }}>
+          {viewerTab === "templates" ? (
+            <>
+              Template overlays from{" "}
+              <code style={{ fontSize: "0.92em" }}>generated/monster_templates.json</code> (published PDF-derived text plus
+              structured stats and powers). Custom templates saved here live in{" "}
+              <code style={{ fontSize: "0.92em" }}>localStorage</code> only until you copy them into generated JSON.{" "}
+              <strong>Export Templates</strong> saves the full list shown here (generated{" "}
+              <code style={{ fontSize: "0.92em" }}>monster_templates.json</code> plus browser-saved customs when loaded).{" "}
+              <strong>Copy template</strong> copies JSON for the template selected in the list;{" "}
+              <strong>Import templates</strong> / <strong>Import from clipboard</strong> accepts one template, an array, or the{" "}
+              <code style={{ fontSize: "0.92em" }}>{`{ meta, templates }`}</code> bundle (same as generated{" "}
+              <code style={{ fontSize: "0.92em" }}>monster_templates.json</code>).
+            </>
+          ) : (
+            <>
+              <span style={{ display: "block", marginTop: 0 }}>
+                <strong>Tip:</strong> If OCR split a long resistance, vulnerability, or other stat across several lines, delete those
+                line breaks so it reads as one line—this helps the importer recognize stat boundaries.
+              </span>
+              <span style={{ display: "block", marginTop: "0.35rem" }}>
+                Optional: wrap an ability (power, trait, or aura) by putting <code style={{ fontSize: "0.92em" }}>[ABILITY]</code>{" "}
+                on its own line right before the block and <code style={{ fontSize: "0.92em" }}>[ABILITYEND]</code> on its own line
+                right after—those lines fence the block so parsing stays aligned.
+              </span>
+            </>
+          )}
+        </p>
+      ) : null}
 
       {viewerTab === "monsters" ? (
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
-          <input
-            value={nameQuery}
-            onChange={(event) => setNameQuery(event.target.value)}
-            placeholder="Name"
-            style={{
-              minWidth: 220,
-              border: "1px solid var(--panel-border)",
-              borderRadius: "0.28rem",
-              padding: "0.22rem 0.3rem"
-            }}
-          />
-          <input
-            value={levelQuery}
-            onChange={(event) => setLevelQuery(event.target.value)}
-            placeholder="Level (e.g. 7 or 5-8)"
-            style={{
-              minWidth: 200,
-              border: "1px solid var(--panel-border)",
-              borderRadius: "0.28rem",
-              padding: "0.22rem 0.3rem"
-            }}
-          />
-          <select
-            value={roleQuery}
-            onChange={(event) => setRoleQuery(event.target.value)}
-            style={{
-              minWidth: 180,
-              border: "1px solid var(--panel-border)",
-              borderRadius: "0.28rem",
-              padding: "0.22rem 0.3rem"
-            }}
-          >
-            <option value="">All roles</option>
-            {roleOptions.map((role) => (
-              <option key={role} value={role}>
-                {role}
-              </option>
-            ))}
-          </select>
-          <select
-            value={rankFilter}
-            onChange={(event) => setRankFilter(event.target.value as MonsterRankFilter)}
-            style={{
-              minWidth: 180,
-              border: "1px solid var(--panel-border)",
-              borderRadius: "0.28rem",
-              padding: "0.22rem 0.3rem"
-            }}
-          >
-            <option value="all">All ranks</option>
-            <option value="minion">Minion</option>
-            <option value="standard">Standard</option>
-            <option value="elite">Elite</option>
-            <option value="solo">Solo</option>
-          </select>
-          <select
-            value={leaderFilter}
-            onChange={(event) => setLeaderFilter(event.target.value as "both" | "leader" | "notLeader")}
-            style={{
-              minWidth: 150,
-              border: "1px solid var(--panel-border)",
-              borderRadius: "0.28rem",
-              padding: "0.22rem 0.3rem"
-            }}
-          >
-            <option value="both">-</option>
-            <option value="leader">Leader</option>
-            <option value="notLeader">Not leader</option>
-          </select>
-          <select
-            value={sortBy}
-            onChange={(event) => setSortBy(event.target.value as "name" | "level")}
-            style={{
-              minWidth: 140,
-              border: "1px solid var(--panel-border)",
-              borderRadius: "0.28rem",
-              padding: "0.22rem 0.3rem"
-            }}
-          >
-            <option value="name">Sort: Name</option>
-            <option value="level">Sort: Level</option>
-          </select>
-          <select
-            value={sortDir}
-            onChange={(event) => setSortDir(event.target.value as "asc" | "desc")}
-            style={{
-              minWidth: 140,
-              border: "1px solid var(--panel-border)",
-              borderRadius: "0.28rem",
-              padding: "0.22rem 0.3rem"
-            }}
-          >
-            <option value="asc">Ascending</option>
-            <option value="desc">Descending</option>
-          </select>
-          <button
-            type="button"
-            disabled={isBusy || !selectedId || !isStoredCustomMonsterId(selectedId)}
-            title={
-              !selectedId
-                ? "Select a monster in the list first"
-                : isStoredCustomMonsterId(selectedId)
-                  ? "Remove this entry from local custom monsters (browser storage)"
-                  : "Generated monsters cannot be deleted here — only browser-saved customs"
-            }
-            onClick={() => {
-              const id = selectedId;
-              if (!id || !isStoredCustomMonsterId(id)) return;
-              const label =
-                indexRows.find((r) => r.id === id)?.name?.trim() || activeMonster?.name?.trim() || id;
-              if (
-                !window.confirm(
-                  `Remove custom monster “${label}” from this browser’s saved monsters? This does not change generated JSON files.`
-                )
-              ) {
-                return;
+        <div
+          style={{
+            ...panelStyle,
+            marginBottom: "0.75rem",
+            padding: "0.65rem 0.75rem",
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.5rem"
+          }}
+        >
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+            <input
+              value={nameQuery}
+              onChange={(event) => setNameQuery(event.target.value)}
+              placeholder="Name"
+              style={{
+                minWidth: 220,
+                border: "1px solid var(--panel-border)",
+                borderRadius: "0.28rem",
+                padding: "0.22rem 0.3rem"
+              }}
+            />
+            <input
+              value={levelQuery}
+              onChange={(event) => setLevelQuery(event.target.value)}
+              placeholder="Level (e.g. 7 or 5-8)"
+              style={{
+                minWidth: 200,
+                border: "1px solid var(--panel-border)",
+                borderRadius: "0.28rem",
+                padding: "0.22rem 0.3rem"
+              }}
+            />
+            <select
+              value={roleQuery}
+              onChange={(event) => setRoleQuery(event.target.value)}
+              style={{
+                minWidth: 180,
+                border: "1px solid var(--panel-border)",
+                borderRadius: "0.28rem",
+                padding: "0.22rem 0.3rem"
+              }}
+            >
+              <option value="">All roles</option>
+              {roleOptions.map((role) => (
+                <option key={role} value={role}>
+                  {role}
+                </option>
+              ))}
+            </select>
+            <select
+              value={rankFilter}
+              onChange={(event) => setRankFilter(event.target.value as MonsterRankFilter)}
+              style={{
+                minWidth: 180,
+                border: "1px solid var(--panel-border)",
+                borderRadius: "0.28rem",
+                padding: "0.22rem 0.3rem"
+              }}
+            >
+              <option value="all">All ranks</option>
+              <option value="minion">Minion</option>
+              <option value="standard">Standard</option>
+              <option value="elite">Elite</option>
+              <option value="solo">Solo</option>
+            </select>
+            <select
+              value={leaderFilter}
+              onChange={(event) => setLeaderFilter(event.target.value as "both" | "leader" | "notLeader")}
+              style={{
+                minWidth: 150,
+                border: "1px solid var(--panel-border)",
+                borderRadius: "0.28rem",
+                padding: "0.22rem 0.3rem"
+              }}
+            >
+              <option value="both">-</option>
+              <option value="leader">Leader</option>
+              <option value="notLeader">Not leader</option>
+            </select>
+            <select
+              value={sortBy}
+              onChange={(event) => setSortBy(event.target.value as "name" | "level")}
+              style={{
+                minWidth: 140,
+                border: "1px solid var(--panel-border)",
+                borderRadius: "0.28rem",
+                padding: "0.22rem 0.3rem"
+              }}
+            >
+              <option value="name">Sort: Name</option>
+              <option value="level">Sort: Level</option>
+            </select>
+            <select
+              value={sortDir}
+              onChange={(event) => setSortDir(event.target.value as "asc" | "desc")}
+              style={{
+                minWidth: 140,
+                border: "1px solid var(--panel-border)",
+                borderRadius: "0.28rem",
+                padding: "0.22rem 0.3rem"
+              }}
+            >
+              <option value="asc">Ascending</option>
+              <option value="desc">Descending</option>
+            </select>
+            <button
+              type="button"
+              disabled={isBusy || !selectedId || !isStoredCustomMonsterId(selectedId)}
+              title={
+                !selectedId
+                  ? "Select a monster in the list first"
+                  : isStoredCustomMonsterId(selectedId)
+                    ? "Remove this entry from local custom monsters (browser storage)"
+                    : "Generated monsters cannot be deleted here — only browser-saved customs"
               }
-              const nextCustom = readCustomMonsterEntries().filter((m) => m.id !== id);
-              writeCustomMonsterEntries(nextCustom);
-              setIsBusy(true);
-              void (async () => {
-                let server: MonsterIndexEntry[] = [];
-                try {
-                  server = await loadMonsterIndex();
-                } catch {
-                  server = [];
+              onClick={() => {
+                const id = selectedId;
+                if (!id || !isStoredCustomMonsterId(id)) return;
+                const label =
+                  indexRows.find((r) => r.id === id)?.name?.trim() || activeMonster?.name?.trim() || id;
+                if (
+                  !window.confirm(
+                    `Remove custom monster “${label}” from this browser’s saved monsters? This does not change generated JSON files.`
+                  )
+                ) {
+                  return;
                 }
-                const merged = mergeServerAndCustomMonsterIndex(server, readCustomMonsterEntries());
-                setIndexRows(merged);
-                setSelectedId((current) => {
-                  if (current === id) {
-                    return merged[0]?.id ?? "";
+                const nextCustom = readCustomMonsterEntries().filter((m) => m.id !== id);
+                writeCustomMonsterEntries(nextCustom);
+                setIsBusy(true);
+                void (async () => {
+                  let server: MonsterIndexEntry[] = [];
+                  try {
+                    server = await loadMonsterIndex();
+                  } catch {
+                    server = [];
                   }
-                  return merged.some((r) => r.id === current) ? current : merged[0]?.id ?? "";
-                });
-                setMessage(`Removed custom monster “${label}”.`);
-                setIsBusy(false);
-              })();
+                  const merged = mergeServerAndCustomMonsterIndex(server, readCustomMonsterEntries());
+                  setIndexRows(merged);
+                  setSelectedId((current) => {
+                    if (current === id) {
+                      return merged[0]?.id ?? "";
+                    }
+                    return merged.some((r) => r.id === current) ? current : merged[0]?.id ?? "";
+                  });
+                  resetMonsterSheetAdjustments();
+                  setMessage(`Removed custom monster “${label}”.`);
+                  setIsBusy(false);
+                })();
+              }}
+            >
+              Delete custom monster
+            </button>
+          </div>
+          <div
+            role="status"
+            aria-live="polite"
+            style={{
+              fontSize: "0.8rem",
+              color: (() => {
+                const line = message;
+                return line.toLowerCase().includes("could not") ||
+                  line.toLowerCase().includes("invalid") ||
+                  line.toLowerCase().includes("issues")
+                  ? "var(--status-danger)"
+                  : "var(--text-muted)";
+              })()
             }}
           >
-            Delete custom monster
-          </button>
+            {message}
+          </div>
         </div>
       ) : viewerTab === "templates" ? (
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.75rem", alignItems: "center" }}>
@@ -3557,6 +3483,7 @@ export function MonsterEditorApp({
                   server = [];
                 }
                 setIndexRows(mergeServerAndCustomMonsterIndex(server, readCustomMonsterEntries()));
+                resetMonsterSheetAdjustments();
                 setSelectedId(normalized.id);
                 setActiveMonster(normalized);
                 setViewerTab("monsters");
@@ -3583,37 +3510,35 @@ export function MonsterEditorApp({
         </div>
       ) : null}
 
-      <div
-        role="status"
-        aria-live="polite"
-        style={{
-          marginBottom: "0.75rem",
-          fontSize: "0.8rem",
-          color: (() => {
-            const line =
-              viewerTab === "monsters"
-                ? message
-                : viewerTab === "templates"
+      {viewerTab !== "monsters" ? (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            marginBottom: "0.75rem",
+            fontSize: "0.8rem",
+            color: (() => {
+              const line =
+                viewerTab === "templates"
                   ? templateMessage
                   : viewerTab === "createMonster"
                     ? createMonsterImportMessage
                     : createImportMessage;
-            return line.toLowerCase().includes("could not") ||
-              line.toLowerCase().includes("invalid") ||
-              line.toLowerCase().includes("issues")
-              ? "var(--status-danger)"
-              : "var(--text-muted)";
-          })()
-        }}
-      >
-        {viewerTab === "monsters"
-          ? message
-          : viewerTab === "templates"
+              return line.toLowerCase().includes("could not") ||
+                line.toLowerCase().includes("invalid") ||
+                line.toLowerCase().includes("issues")
+                ? "var(--status-danger)"
+                : "var(--text-muted)";
+            })()
+          }}
+        >
+          {viewerTab === "templates"
             ? templateMessage
             : viewerTab === "createMonster"
               ? createMonsterImportMessage
               : createImportMessage}
-      </div>
+        </div>
+      ) : null}
       {viewerTab === "createTemplate" && createImportValidation && createImportValidation.errors.length > 0 && (
         <div style={errorPanelStyle}>
           <strong style={{ fontSize: "0.85rem", color: "var(--status-danger)" }}>Import issues</strong>
@@ -3640,10 +3565,183 @@ export function MonsterEditorApp({
         </div>
       )}
 
+      {viewerTab === "monsters" ? (
+        <div
+          style={{
+            ...panelStyle,
+            marginBottom: "1rem",
+            padding: "0.65rem 0.75rem",
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "0.5rem",
+            alignItems: "center"
+          }}
+        >
+          <label style={{ display: "flex", alignItems: "center", fontSize: "0.85rem" }}>
+            <select
+              aria-label="Encounter"
+              value={encounterStore.activeEncounterId ?? ""}
+              onChange={(event) => {
+                const id = event.target.value;
+                setEncounterStore((prev) => storeSetActiveEncounter(prev, id.trim() ? id : null));
+              }}
+              style={{
+                minWidth: "12rem",
+                border: "1px solid var(--panel-border)",
+                borderRadius: "0.28rem",
+                padding: "0.22rem 0.3rem",
+                backgroundColor: "var(--surface-0)",
+                color: "var(--text-primary)"
+              }}
+            >
+              {encounterStore.encounters.map((enc) => (
+                <option key={enc.id} value={enc.id}>
+                  {enc.name} ({enc.roster.length})
+                </option>
+              ))}
+            </select>
+          </label>
+          {encounterNameEditOpen ? (
+            <>
+              <input
+                type="text"
+                aria-label={encounterNameEditKind === "new" ? "New encounter name" : "Rename encounter"}
+                value={encounterNameEditValue}
+                onChange={(event) => setEncounterNameEditValue(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    setEncounterNameEditOpen(false);
+                  }
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    if (encounterNameEditKind === "new") {
+                      setEncounterStore((prev) => storeAddEncounter(prev, encounterNameEditValue).store);
+                    } else {
+                      const id = encounterStore.activeEncounterId;
+                      if (!id) return;
+                      setEncounterStore((prev) => storeRenameEncounter(prev, id, encounterNameEditValue));
+                    }
+                    setEncounterNameEditOpen(false);
+                  }
+                }}
+                autoFocus
+                style={{
+                  minWidth: "14rem",
+                  maxWidth: "22rem",
+                  flex: "1 1 12rem",
+                  border: "1px solid var(--panel-border)",
+                  borderRadius: "0.28rem",
+                  padding: "0.28rem 0.45rem",
+                  backgroundColor: "var(--surface-0)",
+                  color: "var(--text-primary)",
+                  fontSize: "0.85rem"
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (encounterNameEditKind === "new") {
+                    setEncounterStore((prev) => storeAddEncounter(prev, encounterNameEditValue).store);
+                  } else {
+                    const id = encounterStore.activeEncounterId;
+                    if (!id) return;
+                    setEncounterStore((prev) => storeRenameEncounter(prev, id, encounterNameEditValue));
+                  }
+                  setEncounterNameEditOpen(false);
+                }}
+              >
+                Save name
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEncounterNameEditOpen(false);
+                }}
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setEncounterNameEditKind("new");
+                  setEncounterNameEditValue("New encounter");
+                  setEncounterNameEditOpen(true);
+                }}
+              >
+                New encounter
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!encounterActive) return;
+                  setEncounterNameEditKind("rename");
+                  setEncounterNameEditValue(encounterActive.name);
+                  setEncounterNameEditOpen(true);
+                }}
+                disabled={!encounterActive}
+              >
+                Rename
+              </button>
+            </>
+          )}
+          <button type="button" onClick={() => {
+            if (!encounterStore.activeEncounterId) return;
+            const result = storeDuplicateEncounter(encounterStore, encounterStore.activeEncounterId);
+            if (!result) return;
+            setEncounterStore(result.store);
+          }} disabled={!encounterStore.activeEncounterId}>
+            Duplicate
+          </button>
+          <button
+            type="button"
+            title="Download all encounters and rosters as JSON (same structure as saved in this browser)"
+            onClick={() => {
+              const text = stringifyEncounterStoreForExport(encounterStore);
+              const blob = new Blob([text], { type: "application/json;charset=utf-8" });
+              const url = URL.createObjectURL(blob);
+              try {
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `encounters_export_${new Date().toISOString().slice(0, 10)}.json`;
+                a.rel = "noopener";
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+              } finally {
+                URL.revokeObjectURL(url);
+              }
+              setMessage(`Exported ${encounterStore.encounters.length} encounter(s) as JSON.`);
+            }}
+          >
+            Export encounter
+          </button>
+          <button type="button" onClick={() => {
+            if (!encounterStore.activeEncounterId || !encounterActive) return;
+            if (
+              !window.confirm(
+                `Delete encounter "${encounterActive.name}" and its roster? This cannot be undone.`
+              )
+            ) {
+              return;
+            }
+            setEncounterStore(storeDeleteEncounter(encounterStore, encounterStore.activeEncounterId));
+          }} disabled={!encounterActive}>
+            Delete
+          </button>
+        </div>
+      ) : null}
+
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "minmax(0, 0.9fr) minmax(0, 2.1fr)",
+          gridTemplateColumns:
+            viewerTab === "monsters"
+              ? "minmax(0, 0.7fr) minmax(0, 1.45fr) minmax(200px, 0.72fr)"
+              : "minmax(0, 0.9fr) minmax(0, 2.1fr)",
           gap: "1rem",
           minHeight: "65vh"
         }}
@@ -3871,7 +3969,10 @@ export function MonsterEditorApp({
                     <button
                       key={entry.id}
                       type="button"
-                      onClick={() => setSelectedId(entry.id)}
+                      onClick={() => {
+                        resetMonsterSheetAdjustments();
+                        setSelectedId(entry.id);
+                      }}
                       style={{
                         display: "block",
                         width: "100%",
@@ -3925,7 +4026,7 @@ export function MonsterEditorApp({
                     ref={createMonsterPasteTextareaRef}
                     value={createMonsterPasteText}
                     onChange={(event) => setCreateMonsterPasteText(event.target.value)}
-                    placeholder="Paste one monster stat block (name line, defenses, TRAITS, STANDARD ACTIONS, …)…"
+                    placeholder="Paste monster stat block…"
                     style={{
                       flex: 1,
                       minHeight: "12rem",
@@ -3955,32 +4056,6 @@ export function MonsterEditorApp({
             </p>
           ) : (
             <div style={{ minWidth: 0 }}>
-              {viewerTab === "monsters" && monsterTemplatePreviewIdxs.length > 0 ? (
-                <div
-                  style={{
-                    marginBottom: "0.55rem",
-                    padding: "0.4rem 0.55rem",
-                    borderRadius: "var(--ui-panel-radius, 0.35rem)",
-                    border: "1px solid var(--power-accent-encounter-border)",
-                    backgroundColor: "var(--surface-1)",
-                    fontSize: "0.78rem",
-                    color: "var(--text-secondary)",
-                    lineHeight: 1.45
-                  }}
-                >
-                  Previewing{" "}
-                  <strong style={{ color: "var(--text-primary)" }}>
-                    {monsterTemplatePreviewIdxs
-                      .slice(0, 2)
-                      .map((idx) => templateRows[idx]?.templateName)
-                      .filter((name) => String(name ?? "").trim())
-                      .join(" + ") || "template overlay"}
-                  </strong>
-                    . Powers, traits, and auras from selected template(s) are appended below (deduped by name). Structured stat
-                    adjustments from the template JSON (HP, defenses, skills, and other parsed stat lines) are merged into the
-                    quick stats and stat block when available; use the book for edge cases and situational modifiers.
-                </div>
-              ) : null}
               {viewerTab === "monsters" && selectedTemplatePrereqFailures.length > 0 ? (
                 <div
                   role="status"
@@ -4009,24 +4084,82 @@ export function MonsterEditorApp({
                 return (
                   <>
               <div style={centerIdentityBlockStyle}>
-                <div style={centerIdentityTitleStyle}>
-                  <span>{viewMonster.name}</span>
-                  {viewMonster.alignment?.name ? (
-                    <>
-                      {" "}
-                      <span
-                        {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${viewMonster.alignment.name}`)}
-                        style={{
-                          cursor: "help",
-                          borderBottom: "1px dotted var(--text-muted)",
-                          fontWeight: 700,
-                          letterSpacing: "0.02em",
-                          color: "var(--text-primary)"
-                        }}
-                      >
-                        ({viewMonster.alignment.name})
-                      </span>
-                    </>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    justifyContent: "space-between",
+                    gap: "0.75rem",
+                    minWidth: 0
+                  }}
+                >
+                  <div
+                    style={{
+                      ...centerIdentityTitleStyle,
+                      flex: "1 1 auto",
+                      minWidth: 0,
+                      overflowWrap: "anywhere"
+                    }}
+                  >
+                    <span>{viewMonster.name}</span>
+                    {viewMonster.alignment?.name ? (
+                      <>
+                        {" "}
+                        <span
+                          {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${viewMonster.alignment.name}`)}
+                          style={{
+                            cursor: "help",
+                            borderBottom: "1px dotted var(--text-muted)",
+                            fontWeight: 700,
+                            letterSpacing: "0.02em",
+                            color: "var(--text-primary)"
+                          }}
+                        >
+                          ({viewMonster.alignment.name})
+                        </span>
+                      </>
+                    ) : null}
+                  </div>
+                  {viewerTab === "monsters" ? (
+                    <button
+                      type="button"
+                      disabled={!formatMonster || !selectedId || !encounterStore.activeEncounterId}
+                      title={
+                        !formatMonster || !selectedId
+                          ? "Select a monster and wait for the sheet to load"
+                          : "Adds the creature as shown (templates + level adjustment) to the encounter selected above"
+                      }
+                      onClick={() => {
+                        if (!formatMonster || !selectedId) return;
+                        const encLabel = encounterActive?.name?.trim() || "encounter";
+                        const templateDedupeKeys = templatePreviewIdxsToDedupeKeys(
+                          monsterTemplatePreviewIdxs,
+                          templateRows
+                        );
+                        setEncounterStore((prev) => {
+                          const targetId = prev.activeEncounterId;
+                          if (!targetId) return prev;
+                          const extras: EncounterSnapshotExtras = {};
+                          if (templateDedupeKeys.length > 0) extras.templateDedupeKeys = templateDedupeKeys;
+                          if (monsterLevelDelta !== 0) extras.levelAdjustment = monsterLevelDelta;
+                          return storeAddSnapshotToEncounter(
+                            prev,
+                            targetId,
+                            formatMonster,
+                            selectedId,
+                            Object.keys(extras).length > 0 ? extras : undefined
+                          );
+                        });
+                        setMessage(`Added “${formatMonster.name}” to encounter “${encLabel}”.`);
+                      }}
+                      style={{
+                        flexShrink: 0,
+                        marginLeft: "auto",
+                        alignSelf: "center"
+                      }}
+                    >
+                      Add to encounter
+                    </button>
                   ) : null}
                 </div>
                 <div style={centerMetaLineStyle}>
@@ -4037,7 +4170,7 @@ export function MonsterEditorApp({
                     Level
                   </span>{" "}
                   {formatValue(viewMonster.level)}
-                  {viewerTab === "monsters" && effectiveMonsterLevelDelta !== 0 ? (
+                  {viewerTab === "monsters" && effectiveMonsterLevelDelta !== 0 && sheetMonster ? (
                     <span style={{ color: "var(--text-secondary)", fontSize: "0.85em", marginLeft: "0.28rem" }}>
                       (base {formatValue(sheetMonster.level)})
                     </span>
@@ -5079,6 +5212,194 @@ export function MonsterEditorApp({
             </div>
           )}
         </div>
+            {viewerTab === "monsters" ? (
+              <div
+                style={{
+                  ...sheetPanel,
+                  padding: "0.75rem",
+                  minHeight: 0,
+                  minWidth: 0,
+                  maxHeight: "97.5vh",
+                  overflow: "hidden",
+                  overflowX: "hidden",
+                  display: "flex",
+                  flexDirection: "column"
+                }}
+              >
+                {encounterActive ? (
+                  <div
+                    style={{
+                      flexShrink: 0,
+                      display: "flex",
+                      alignItems: "baseline",
+                      justifyContent: "space-between",
+                      gap: "0.65rem",
+                      margin: "0 0 0.5rem 0",
+                      minWidth: 0,
+                      lineHeight: 1.35
+                    }}
+                  >
+                    <div
+                      style={{
+                        flex: "1 1 auto",
+                        minWidth: 0,
+                        fontSize: "0.95rem",
+                        fontWeight: 700,
+                        color: "var(--text-primary)",
+                        overflowWrap: "anywhere",
+                        wordBreak: "break-word"
+                      }}
+                    >
+                      {encounterActive.name}
+                    </div>
+                    <div
+                      style={{
+                        flex: "0 1 auto",
+                        minWidth: 0,
+                        textAlign: "right",
+                        fontSize: "0.78rem",
+                        color: "var(--text-secondary)",
+                        lineHeight: 1.4,
+                        overflowWrap: "anywhere"
+                      }}
+                    >
+                      <strong style={{ color: "var(--text-primary)" }}>Total XP:</strong>{" "}
+                      {encounterRoster.length === 0 ? (
+                        <span style={{ color: "var(--text-muted)" }}>—</span>
+                      ) : encounterRosterXpTotals.parsed === 0 ? (
+                        <span style={{ color: "var(--text-muted)" }}>— (no numeric XP on roster)</span>
+                      ) : encounterRosterXpTotals.parsed === encounterRosterXpTotals.total ? (
+                        <span>{formatXpInteger(encounterRosterXpTotals.sum)}</span>
+                      ) : (
+                        <span>
+                          {formatXpInteger(encounterRosterXpTotals.sum)}
+                          <span style={{ color: "var(--text-muted)" }}>
+                            {" "}
+                            ({encounterRosterXpTotals.parsed} of {encounterRosterXpTotals.total} with numeric XP)
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+                {!encounterActive ? (
+                  <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", margin: 0 }}>Select an encounter above.</p>
+                ) : encounterRoster.length === 0 ? (
+                  <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", margin: 0 }}>
+                    No creatures yet. Use <strong>Add to encounter</strong> on the stat block.
+                  </p>
+                ) : (
+                  <ul
+                    style={{
+                      listStyle: "none",
+                      margin: 0,
+                      padding: 0,
+                      overflowY: "auto",
+                      overflowX: "hidden",
+                      flex: 1,
+                      minHeight: 0,
+                      minWidth: 0
+                    }}
+                  >
+                    {encounterRoster.map((row, idx) => {
+                      const m = row.snapshot;
+                      const rosterSelectId = row.sourceMonsterId?.trim() || m.id;
+                      const rosterRowSelected = rosterSelectId === selectedId;
+                      return (
+                        <li
+                          key={row.rosterInstanceId}
+                          style={{
+                            borderBottom: "1px solid var(--panel-border)",
+                            padding: "0.45rem 0.25rem",
+                            margin: "0 -0.25rem",
+                            fontSize: "0.8rem",
+                            borderRadius: "0.25rem",
+                            backgroundColor: rosterRowSelected ? "var(--table-stripe-odd)" : "transparent",
+                            minWidth: 0,
+                            overflowX: "hidden"
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!rosterSelectId) return;
+                              setSelectedId(rosterSelectId);
+                              const fromKeys = dedupeKeysToTemplatePreviewIdxs(row.templateDedupeKeys, templateRows);
+                              if (fromKeys.length > 0) {
+                                setMonsterTemplatePreviewIdxs(fromKeys);
+                              } else {
+                                const fromSnap = templatePreviewIdxsFromSnapshot(row.snapshot, templateRows);
+                                setMonsterTemplatePreviewIdxs(fromSnap.length > 0 ? fromSnap : []);
+                              }
+                              const la = row.levelAdjustment;
+                              setMonsterLevelDelta(
+                                typeof la === "number" && Number.isFinite(la) ? Math.trunc(la) : 0
+                              );
+                            }}
+                            style={{
+                              display: "block",
+                              width: "100%",
+                              maxWidth: "100%",
+                              margin: 0,
+                              padding: 0,
+                              border: "none",
+                              background: "transparent",
+                              cursor: "pointer",
+                              textAlign: "left",
+                              font: "inherit",
+                              color: "inherit",
+                              minWidth: 0,
+                              overflowWrap: "anywhere"
+                            }}
+                          >
+                            <div style={{ fontWeight: 700, color: "var(--text-primary)" }}>{m.name}</div>
+                            <div style={{ color: "var(--text-muted)", overflowWrap: "anywhere" }}>
+                              L{m.level} · {m.role} · HP {monsterQuickHp(m)} · AC {monsterQuickAc(m)} · XP{" "}
+                              {monsterXpDisplay(m)}
+                            </div>
+                          </button>
+                          <div style={{ marginTop: "0.35rem", display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const id = encounterStore.activeEncounterId;
+                                if (!id) return;
+                                setEncounterStore((prev) => storeMoveRosterAt(prev, id, idx, -1));
+                              }}
+                              disabled={idx === 0}
+                            >
+                              Up
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const id = encounterStore.activeEncounterId;
+                                if (!id) return;
+                                setEncounterStore((prev) => storeMoveRosterAt(prev, id, idx, 1));
+                              }}
+                              disabled={idx >= encounterRoster.length - 1}
+                            >
+                              Down
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const id = encounterStore.activeEncounterId;
+                                if (!id) return;
+                                if (!window.confirm(`Remove ${m.name} from this encounter?`)) return;
+                                setEncounterStore((prev) => storeRemoveRosterAt(prev, id, idx));
+                              }}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            ) : null}
             </>
           ) : viewerTab === "createTemplate" ? (
             <>
@@ -5106,7 +5427,7 @@ export function MonsterEditorApp({
                     ref={createPasteTextareaRef}
                     value={createPasteText}
                     onChange={(event) => setCreatePasteText(event.target.value)}
-                    placeholder="Paste OCR or extracted PDF text for a single monster template…"
+                    placeholder="Paste monster template..."
                     style={{
                       flex: 1,
                       minHeight: "12rem",
