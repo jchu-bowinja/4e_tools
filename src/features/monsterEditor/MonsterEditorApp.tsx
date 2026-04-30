@@ -78,6 +78,7 @@ import {
 import {
   applyMonsterLevelDelta,
   clampMonsterLevelDelta,
+  minMonsterLevelDeltaForBase,
   parseMonsterLevel,
   RECOMMENDED_MAX_MONSTER_LEVEL_DELTA
 } from "./monsterLevelDelta";
@@ -2560,7 +2561,7 @@ export function MonsterEditorApp({
     () =>
       baseMonsterLevelForClamp === undefined || !Number.isFinite(baseMonsterLevelForClamp)
         ? -RECOMMENDED_MAX_MONSTER_LEVEL_DELTA
-        : Math.max(-RECOMMENDED_MAX_MONSTER_LEVEL_DELTA, 1 - baseMonsterLevelForClamp),
+        : minMonsterLevelDeltaForBase(baseMonsterLevelForClamp),
     [baseMonsterLevelForClamp]
   );
 
@@ -3936,7 +3937,8 @@ export function MonsterEditorApp({
                   </button>
                   <span style={{ fontSize: "0.74rem", color: "var(--text-secondary)", lineHeight: 1.35, maxWidth: "28rem" }}>
                     +1 attacks, defenses, AC, role HP, and scaled XP per level; +1 damage per 2 levels on attacks. Effective level
-                    cannot go below 1. Best within +/-{RECOMMENDED_MAX_MONSTER_LEVEL_DELTA}.
+                    cannot go below {baseMonsterLevelForClamp === 0 ? "0 (this creature is level 0)" : "1"}. Best within +/-
+                    {RECOMMENDED_MAX_MONSTER_LEVEL_DELTA}.
                   </span>
                   {effectiveMonsterLevelDelta !== 0 ? (
                     <button

@@ -69,15 +69,29 @@ export function parseMonsterLevel(value: unknown): number | undefined {
   return parseFlexibleInt(value);
 }
 
+/** Lowest allowed effective level after quick adjustment when base level is known (DMG level 0 creatures vs standard 1–30). */
+export function minimumEffectiveMonsterLevel(baseLevel: number): number {
+  const L = Math.trunc(baseLevel);
+  return L === 0 ? 0 : 1;
+}
+
 /**
- * Clamps requested level delta so the effective level stays ≥ 1 and within ±RECOMMENDED_MAX_MONSTER_LEVEL_DELTA
- * when the base level is known.
+ * Minimum allowed level delta for a known base level (matches {@link clampMonsterLevelDelta} lower bound).
+ */
+export function minMonsterLevelDeltaForBase(baseLevel: number): number {
+  const L = Math.trunc(baseLevel);
+  return Math.max(-RECOMMENDED_MAX_MONSTER_LEVEL_DELTA, minimumEffectiveMonsterLevel(L) - L);
+}
+
+/**
+ * Clamps requested level delta so the effective level stays ≥ 1 (≥ 0 if the creature starts at level 0)
+ * and within ±RECOMMENDED_MAX_MONSTER_LEVEL_DELTA when the base level is known.
  */
 export function clampMonsterLevelDelta(baseLevel: number | undefined, requestedDelta: number): number {
   const lo =
     baseLevel === undefined || !Number.isFinite(baseLevel)
       ? -RECOMMENDED_MAX_MONSTER_LEVEL_DELTA
-      : Math.max(-RECOMMENDED_MAX_MONSTER_LEVEL_DELTA, 1 - Math.trunc(baseLevel));
+      : minMonsterLevelDeltaForBase(Math.trunc(baseLevel));
   const hi = RECOMMENDED_MAX_MONSTER_LEVEL_DELTA;
   return Math.min(hi, Math.max(lo, requestedDelta));
 }
@@ -263,7 +277,7 @@ function adjustHpAndBloodied(entry: MonsterEntryFile, levelDelta: number, hpPerL
 /**
  * Applies DMG quick level adjustment: +1 attacks, defenses, AC, and role HP per level;
  * +1 damage per two levels on attack damage expressions; scales XP by standard monster XP table;
- * clamps adjustment so effective level is never below 1 (within ±5 when base level is known).
+ * clamps adjustment so effective level is never below 1, or below 0 if the creature starts at level 0 (within ±5 when base level is known).
  * Preview-only — pass a clone if you must preserve the source entry.
  */
 export function applyMonsterLevelDelta(entry: MonsterEntryFile, levelDelta: number): MonsterEntryFile {

@@ -5,6 +5,7 @@ import {
   clampMonsterLevelDelta,
   damageDeltaForLevelDelta,
   hitPointsPerLevelForMonsterRole,
+  minMonsterLevelDeltaForBase,
   standardMonsterXpForLevel
 } from "./monsterLevelDelta";
 
@@ -90,12 +91,32 @@ describe("monsterLevelDelta", () => {
     expect(out.stats?.defenses?.AC).toBe(20);
   });
 
-  it("never lowers effective level below 1", () => {
+  it("never lowers effective level below 1 for standard creatures", () => {
     const m = sample();
     m.level = 2;
     const out = applyMonsterLevelDelta(m, -5);
     expect(out.level).toBe(1);
     expect(clampMonsterLevelDelta(2, -5)).toBe(-1);
+  });
+
+  it("allows effective level 0 when base creature is level 0", () => {
+    expect(minMonsterLevelDeltaForBase(0)).toBe(0);
+    expect(clampMonsterLevelDelta(0, -5)).toBe(0);
+    const m = sample();
+    m.level = 0;
+    m.xp = 50;
+    const out = applyMonsterLevelDelta(m, -3);
+    expect(out.level).toBe(0);
+    expect(out).toBe(m);
+  });
+
+  it("can raise level 0 creature with positive delta", () => {
+    const m = sample();
+    m.level = 0;
+    m.xp = 50;
+    const out = applyMonsterLevelDelta(m, 2);
+    expect(out.level).toBe(2);
+    expect(out).not.toBe(m);
   });
 
   it("returns same reference when adjustment clamps to zero change", () => {
