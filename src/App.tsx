@@ -15,6 +15,7 @@ import { MonsterEditorApp } from "./features/monsterEditor/MonsterEditorApp";
 import { GlossaryEditorApp } from "./features/glossaryEditor/GlossaryEditorApp";
 import { glossaryRowsToTooltipMap, type GlossaryTermRow } from "./data/tooltipGlossary";
 import { loadInitialGlossaryRows, reloadGlossaryRowsFromBundle } from "./data/loadGlossaryRows";
+import { ReportingFloatingControl } from "./features/reporting/ReportingFloatingControl";
 
 type AppScreen = "builder" | "resourceEditor" | "characterSheet" | "monsters" | "glossary";
 type AppTheme = "light" | "dark";
@@ -253,6 +254,18 @@ export default function App(): JSX.Element {
           <CharacterBuilderApp index={effectiveIndex} tooltipGlossary={tooltipGlossary} />
         )}
       </main>
+      <ReportingFloatingControl
+        getHashRoute={() => (typeof window !== "undefined" ? window.location.hash || "#/builder" : "#/builder")}
+        colors={{
+          text: colors.text,
+          mutedText: colors.mutedText,
+          errorText: colors.errorText,
+          toggleBackground: colors.toggleBackground,
+          toggleBorder: colors.toggleBorder,
+          surfaceBackground: colors.headerBackground,
+          headerBorder: colors.headerBorder
+        }}
+      />
     </div>
   );
 }

@@ -25,6 +25,7 @@ Web-first, guided D&D 4e character builder using data extracted from the legacy 
   - live character sheet
   - local persistence (`localStorage`)
   - JSON import/export
+  - In-app **Feedback** modal (feedback / bug report) that posts to `POST /api/reports` when using `npm run dev` (reports append to `received_reports/reports.jsonl`, gitignored). Static production builds have no API unless you add a host or proxy.
 - Test coverage for ETL artifact presence and rules core behavior
 
 ## Prerequisites

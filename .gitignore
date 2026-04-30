@@ -24,6 +24,9 @@ generated_*/
 
 # ETL / conversion logs
 *.jsonl
+
+# User reports captured by dev-server POST /api/reports
+received_reports/
 debug.log
 
 # Local env
