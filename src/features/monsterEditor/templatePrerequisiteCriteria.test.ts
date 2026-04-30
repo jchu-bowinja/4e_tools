@@ -317,6 +317,21 @@ describe("monsterMatchesPrerequisite", () => {
       monsterMatchesPrerequisite(sampleMonster({ level: "11", traits: [{ name: "Undead", details: "" }] }), p)
     ).toBe(false);
   });
+
+  it("rejects constructs for living prerequisite", () => {
+    const p: MonsterTemplatePrerequisite = { living: true, typeAnd: ["construct"] };
+    expect(
+      monsterMatchesPrerequisite(
+        sampleMonster({
+          origin: "Natural",
+          type: "Animate",
+          keywords: ["construct"],
+          traits: [{ name: "Undead Ward", details: "" }]
+        }),
+        p
+      )
+    ).toBe(false);
+  });
 });
 
 describe("monsterMatchesTemplateRecord", () => {

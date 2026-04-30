@@ -472,6 +472,11 @@ function monsterIsUndead(entry: MonsterEntryFile): boolean {
   return false;
 }
 
+function monsterIsConstruct(entry: MonsterEntryFile): boolean {
+  const t = `${entry.type ?? ""} ${(entry.keywords ?? []).join(" ")}`.toLowerCase();
+  return /\bconstruct\b/i.test(t);
+}
+
 function buildMonsterHaystack(entry: MonsterEntryFile): string {
   const kw = Array.isArray(entry.keywords) ? entry.keywords.join(" ") : "";
   const line = `${entry.size ?? ""} ${entry.origin ?? ""} ${entry.type ?? ""} ${kw}`.toLowerCase();
@@ -528,7 +533,7 @@ export function monsterMatchesPrerequisite(entry: MonsterEntryFile, p: MonsterTe
     }
   }
 
-  if (p.living && monsterIsUndead(entry)) return false;
+  if (p.living && (monsterIsUndead(entry) || monsterIsConstruct(entry))) return false;
   if (p.undead && !monsterIsUndead(entry)) return false;
 
   function typeTokenToTags(token: string): string[] {
