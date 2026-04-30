@@ -58,7 +58,11 @@ import {
   computeTemplateApplicationDelta,
   type TemplateApplicationDelta
 } from "./applyMonsterTemplate";
-import { migrateKindFieldsToType, parseMonsterTemplatePrerequisite } from "./templatePrerequisiteCriteria";
+import {
+  migrateKindFieldsToType,
+  monsterMatchesTemplateRecord,
+  parseMonsterTemplatePrerequisite
+} from "./templatePrerequisiteCriteria";
 
 /** Matches CharacterSheetApp: panels, section titles, labels, and body scale. */
 const panelStyle: CSSProperties = {
@@ -2179,6 +2183,10 @@ export function MonsterEditorApp({
   const [jsonSearchQuery, setJsonSearchQuery] = useState<string>("");
   const [jsonSearchResultIdx, setJsonSearchResultIdx] = useState<number>(0);
   const [jsonSearchJumpTick, setJsonSearchJumpTick] = useState<number>(0);
+  const [templateJsonSearchInput, setTemplateJsonSearchInput] = useState<string>("");
+  const [templateJsonSearchQuery, setTemplateJsonSearchQuery] = useState<string>("");
+  const [templateJsonSearchResultIdx, setTemplateJsonSearchResultIdx] = useState<number>(0);
+  const [templateJsonSearchJumpTick, setTemplateJsonSearchJumpTick] = useState<number>(0);
   const glossaryTooltipUi = useGlossaryTooltip({
     tooltipId: MONSTER_GLOSSARY_TOOLTIP_ID,
     resetDeps: [selectedId, viewerTab, selectedTemplateIdx, monsterTemplatePreviewIdx]
@@ -2186,6 +2194,7 @@ export function MonsterEditorApp({
   const startGlossaryHover = glossaryTooltipUi.startHover;
   const leaveGlossaryHover = glossaryTooltipUi.leaveHover;
   const jsonTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const templateJsonTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const createPasteTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const customTemplatesJsonFileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -2215,6 +2224,12 @@ export function MonsterEditorApp({
   useEffect(() => {
     setMonsterTemplatePreviewIdx(null);
   }, [selectedId]);
+
+  useEffect(() => {
+    setTemplateJsonSearchInput("");
+    setTemplateJsonSearchQuery("");
+    setTemplateJsonSearchResultIdx(0);
+  }, [monsterTemplatePreviewIdx]);
 
   useEffect(() => {
     writeStoredViewerTab(viewerTab);
@@ -2430,6 +2445,16 @@ export function MonsterEditorApp({
     return computeTemplateApplicationDelta(activeMonster, tpl);
   }, [activeMonster, monsterTemplatePreviewIdx, templateRows]);
 
+  const templatePrereqMetByRow = useMemo((): boolean[] | null => {
+    if (!activeMonster) return null;
+    return templateRows.map((row) => monsterMatchesTemplateRecord(activeMonster, row));
+  }, [activeMonster, templateRows]);
+
+  const selectedTemplatePrereqMet =
+    monsterTemplatePreviewIdx !== null && templatePrereqMetByRow
+      ? templatePrereqMetByRow[monsterTemplatePreviewIdx]
+      : true;
+
   const displayedAuras = useMemo(() => {
     if (!sheetMonster || !Array.isArray(sheetMonster.auras)) return [];
     return sheetMonster.auras;
@@ -2502,7 +2527,21 @@ export function MonsterEditorApp({
     () => findCaseInsensitiveMatches(rawJsonText, jsonSearchQuery),
     [rawJsonText, jsonSearchQuery]
   );
+
+  const templatePreviewJsonText = useMemo(() => {
+    if (viewerTab !== "monsters" || monsterTemplatePreviewIdx === null) return "";
+    const row = templateRows[monsterTemplatePreviewIdx];
+    if (!row) return "";
+    return JSON.stringify(row, null, 2);
+  }, [viewerTab, monsterTemplatePreviewIdx, templateRows]);
+
+  const templateJsonSearchMatches = useMemo(
+    () => findCaseInsensitiveMatches(templatePreviewJsonText, templateJsonSearchQuery),
+    [templatePreviewJsonText, templateJsonSearchQuery]
+  );
+
   const lastHandledJsonSearchJumpTickRef = useRef<number>(0);
+  const lastHandledTemplateJsonSearchJumpTickRef = useRef<number>(0);
   const glossaryResolutionCacheRef = useRef<Map<string, boolean>>(new Map());
 
   useEffect(() => {
@@ -2512,6 +2551,10 @@ export function MonsterEditorApp({
   useEffect(() => {
     setJsonSearchResultIdx(0);
   }, [jsonSearchQuery, rawJsonText]);
+
+  useEffect(() => {
+    setTemplateJsonSearchResultIdx(0);
+  }, [templateJsonSearchQuery, templatePreviewJsonText]);
 
   useEffect(() => {
     if (jsonSearchJumpTick === 0) return;
@@ -2528,6 +2571,28 @@ export function MonsterEditorApp({
     textarea.setSelectionRange(start, end);
     scrollTextareaToMatch(textarea, rawJsonText, start);
   }, [jsonSearchJumpTick, jsonSearchMatches, jsonSearchQuery, jsonSearchResultIdx, rawJsonText]);
+
+  useEffect(() => {
+    if (templateJsonSearchJumpTick === 0) return;
+    if (lastHandledTemplateJsonSearchJumpTickRef.current === templateJsonSearchJumpTick) return;
+    lastHandledTemplateJsonSearchJumpTickRef.current = templateJsonSearchJumpTick;
+    if (!templateJsonSearchQuery.trim()) return;
+    if (templateJsonSearchMatches.length === 0) return;
+    const textarea = templateJsonTextareaRef.current;
+    if (!textarea) return;
+    const safeIdx = Math.min(templateJsonSearchResultIdx, templateJsonSearchMatches.length - 1);
+    const start = templateJsonSearchMatches[safeIdx];
+    const end = start + templateJsonSearchQuery.trim().length;
+    textarea.focus();
+    textarea.setSelectionRange(start, end);
+    scrollTextareaToMatch(textarea, templatePreviewJsonText, start);
+  }, [
+    templateJsonSearchJumpTick,
+    templateJsonSearchMatches,
+    templateJsonSearchQuery,
+    templateJsonSearchResultIdx,
+    templatePreviewJsonText
+  ]);
 
   function monsterGlossaryContent(key: MonsterGlossaryHoverKey): JSX.Element {
     const monsterCtx = { glossaryByName: tooltipGlossary, index };
@@ -3188,14 +3253,73 @@ export function MonsterEditorApp({
               style={{
                 ...sheetPanel,
                 overflow: "hidden",
-                display: "grid",
-                gridTemplateRows: "auto 1fr",
+                display: "flex",
+                flexDirection: "column",
                 minHeight: 0,
                 maxHeight: "97.5vh"
               }}
             >
-              <div style={indexColumnHeaderStyle}>Monsters ({filteredRows.length})</div>
-              <div style={{ minHeight: 0, overflow: "auto" }}>
+              {sheetMonster ? (
+                <div
+                  style={{
+                    flexShrink: 0,
+                    marginBottom: "0.5rem",
+                    padding: "0.45rem 0.55rem",
+                    borderRadius: "var(--ui-panel-radius, 0.35rem)",
+                    border: "1px solid var(--panel-border)",
+                    backgroundColor: "var(--surface-1)",
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "0.45rem",
+                    alignItems: "center"
+                  }}
+                >
+                  <span style={{ ...metaMuted, fontSize: "0.78rem", whiteSpace: "nowrap" }}>Template preview</span>
+                  <select
+                    value={monsterTemplatePreviewIdx === null ? "" : String(monsterTemplatePreviewIdx)}
+                    onChange={(event) => {
+                      const v = event.target.value;
+                      setMonsterTemplatePreviewIdx(v === "" ? null : Number.parseInt(v, 10));
+                    }}
+                    aria-label="Merge a monster template onto this creature for preview"
+                    style={{
+                      minWidth: "12rem",
+                      maxWidth: "100%",
+                      fontSize: "0.8125rem",
+                      padding: "0.28rem 0.4rem",
+                      borderRadius: "0.25rem",
+                      border: "1px solid var(--panel-border)",
+                      backgroundColor: "var(--surface-0)",
+                      color: "var(--text-primary)"
+                    }}
+                  >
+                    <option value="">None (base creature)</option>
+                    {templateRows.map((row, idx) => {
+                      const prereqOk = templatePrereqMetByRow?.[idx] !== false;
+                      return (
+                        <option key={`monster-sheet-tpl-${idx}`} value={String(idx)}>
+                          {String(row.templateName ?? "").trim() || `Template ${idx + 1}`}
+                          {!prereqOk ? " — prerequisite not met" : ""}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  {monsterTemplatePreviewIdx !== null && templatePreviewDelta ? (
+                    <span style={{ fontSize: "0.76rem", color: "var(--text-secondary)", lineHeight: 1.35 }}>
+                      +{templatePreviewDelta.addedPowerNames.length} powers, +{templatePreviewDelta.addedTraitNames.length}{" "}
+                      traits, +{templatePreviewDelta.addedAuraNames.length} auras
+                      {templatePreviewDelta.skippedDuplicatePowers +
+                        templatePreviewDelta.skippedDuplicateTraits +
+                        templatePreviewDelta.skippedDuplicateAuras >
+                      0
+                        ? ` (${templatePreviewDelta.skippedDuplicatePowers + templatePreviewDelta.skippedDuplicateTraits + templatePreviewDelta.skippedDuplicateAuras} duplicate lines skipped)`
+                        : ""}
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+              <div style={{ ...indexColumnHeaderStyle, flexShrink: 0 }}>Monsters ({filteredRows.length})</div>
+              <div style={{ minHeight: 0, flex: 1, overflow: "auto" }}>
                 {filteredRows.map((entry) => {
                   const selectedRow = selectedId === entry.id;
                   return (
@@ -3237,59 +3361,6 @@ export function MonsterEditorApp({
             </p>
           ) : (
             <div style={{ minWidth: 0 }}>
-              <div
-                style={{
-                  marginBottom: "0.65rem",
-                  padding: "0.45rem 0.55rem",
-                  borderRadius: "var(--ui-panel-radius, 0.35rem)",
-                  border: "1px solid var(--panel-border)",
-                  backgroundColor: "var(--surface-1)",
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: "0.45rem",
-                  alignItems: "center"
-                }}
-              >
-                <span style={{ ...metaMuted, fontSize: "0.78rem", whiteSpace: "nowrap" }}>Template preview</span>
-                <select
-                  value={monsterTemplatePreviewIdx === null ? "" : String(monsterTemplatePreviewIdx)}
-                  onChange={(event) => {
-                    const v = event.target.value;
-                    setMonsterTemplatePreviewIdx(v === "" ? null : Number.parseInt(v, 10));
-                  }}
-                  aria-label="Merge a monster template onto this creature for preview"
-                  style={{
-                    minWidth: "12rem",
-                    maxWidth: "100%",
-                    fontSize: "0.8125rem",
-                    padding: "0.28rem 0.4rem",
-                    borderRadius: "0.25rem",
-                    border: "1px solid var(--panel-border)",
-                    backgroundColor: "var(--surface-0)",
-                    color: "var(--text-primary)"
-                  }}
-                >
-                  <option value="">None (base creature)</option>
-                  {templateRows.map((row, idx) => (
-                    <option key={`monster-sheet-tpl-${idx}`} value={String(idx)}>
-                      {String(row.templateName ?? "").trim() || `Template ${idx + 1}`}
-                      {row.sourceBook ? ` — ${row.sourceBook}` : ""}
-                    </option>
-                  ))}
-                </select>
-                {monsterTemplatePreviewIdx !== null && templatePreviewDelta ? (
-                  <span style={{ fontSize: "0.76rem", color: "var(--text-secondary)", lineHeight: 1.35 }}>
-                    +{templatePreviewDelta.addedPowerNames.length} powers, +{templatePreviewDelta.addedTraitNames.length}{" "}
-                    traits, +{templatePreviewDelta.addedAuraNames.length} auras
-                    {templatePreviewDelta.skippedDuplicatePowers +
-                      templatePreviewDelta.skippedDuplicateTraits +
-                      templatePreviewDelta.skippedDuplicateAuras >
-                    0
-                      ? ` (${templatePreviewDelta.skippedDuplicatePowers + templatePreviewDelta.skippedDuplicateTraits + templatePreviewDelta.skippedDuplicateAuras} duplicate lines skipped)`
-                      : ""}
-                  </span>
-                ) : null}
-              </div>
               {monsterTemplatePreviewIdx !== null && templateRows[monsterTemplatePreviewIdx] ? (
                 <div
                   style={{
@@ -3307,8 +3378,42 @@ export function MonsterEditorApp({
                   <strong style={{ color: "var(--text-primary)" }}>
                     {templateRows[monsterTemplatePreviewIdx]?.templateName}
                   </strong>
-                  . Powers, traits, and auras from the template are appended below (deduped by name). Core statistics are
-                  unchanged; adjust HP and defenses using the template&apos;s stat guidance in the book when applicable.
+                    . Powers, traits, and auras from the template are appended below (deduped by name). Structured stat
+                    adjustments from the template JSON (HP, defenses, skills, and other parsed stat lines) are merged into the
+                    quick stats and stat block when available; use the book for edge cases and situational modifiers.
+                </div>
+              ) : null}
+              {monsterTemplatePreviewIdx !== null &&
+              templateRows[monsterTemplatePreviewIdx] &&
+              !selectedTemplatePrereqMet ? (
+                <div
+                  role="status"
+                  style={{
+                    marginBottom: "0.55rem",
+                    padding: "0.4rem 0.55rem",
+                    borderRadius: "var(--ui-panel-radius, 0.35rem)",
+                    border: "1px solid var(--panel-border)",
+                    backgroundColor: "var(--surface-1)",
+                    fontSize: "0.78rem",
+                    color: "var(--status-danger)",
+                    lineHeight: 1.45
+                  }}
+                >
+                  This creature does not meet the template&apos;s prerequisites
+                  {String(templateRows[monsterTemplatePreviewIdx]?.prerequisite ?? "").trim() ? (
+                    <>
+                      :{" "}
+                      <span style={{ color: "var(--text-secondary)" }}>
+                        {String(templateRows[monsterTemplatePreviewIdx]?.prerequisite).trim()}
+                      </span>
+                    </>
+                  ) : (
+                    <span style={{ color: "var(--text-secondary)" }}>
+                      {" "}
+                      (saved prerequisite rules do not match this creature)
+                    </span>
+                  )}
+                  . The preview still shows what would be merged; use the book guidance only for legal candidates.
                 </div>
               ) : null}
               <div style={centerIdentityBlockStyle}>
@@ -3479,12 +3584,30 @@ export function MonsterEditorApp({
                       val: formatLeadingPlusIfPositive(perception)
                     });
                   }
+                  const standardQuickDefenseKeys = new Set(["ac", "fortitude", "reflex", "will"]);
                   if (ac !== "-") col2.push({ label: "AC", glossary: "glossaryTerm:AC", val: ac });
                   if (fortitude !== "-") {
                     col2.push({ label: "Fortitude", glossary: "glossaryTerm:Fortitude", val: fortitude });
                   }
                   if (reflex !== "-") col2.push({ label: "Reflex", glossary: "glossaryTerm:Reflex", val: reflex });
                   if (will !== "-") col2.push({ label: "Will", glossary: "glossaryTerm:Will", val: will });
+                  for (const [defKey, rawVal] of Object.entries(defensesBlock)) {
+                    if (standardQuickDefenseKeys.has(defKey.trim().toLowerCase())) continue;
+                    if (rawVal === undefined || rawVal === null || String(rawVal).trim() === "") continue;
+                    const formatted = formatValue(
+                      rawVal as string | number | boolean | undefined | null
+                    );
+                    if (formatted === "-") continue;
+                    const defenseLabel =
+                      /\s/.test(defKey) || defKey.includes("_")
+                        ? titleCaseWords(defKey.replace(/_/g, " "))
+                        : formatMonsterStatLabelForDisplay(defKey);
+                    col2.push({
+                      label: defenseLabel,
+                      glossary: "glossaryTerm:Defenses",
+                      val: formatLeadingPlusIfPositive(formatted)
+                    });
+                  }
                   if (regenerationVal !== null) {
                     col3.push({
                       label: "Regeneration",
@@ -4491,6 +4614,109 @@ export function MonsterEditorApp({
             }}
           />
         </details>
+        {viewerTab === "monsters" &&
+        monsterTemplatePreviewIdx !== null &&
+        templateRows[monsterTemplatePreviewIdx] ? (
+          <details style={{ marginTop: "0.65rem" }}>
+            <summary style={jsonSummaryStyle}>Template JSON</summary>
+            <div style={{ marginTop: "0.5rem", display: "flex", flexWrap: "wrap", gap: "0.35rem", alignItems: "center" }}>
+              <input
+                value={templateJsonSearchInput}
+                onChange={(event) => setTemplateJsonSearchInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter") return;
+                  event.preventDefault();
+                  const committed = templateJsonSearchInput.trim();
+                  setTemplateJsonSearchQuery(committed);
+                  setTemplateJsonSearchResultIdx(0);
+                  setTemplateJsonSearchJumpTick((prev) => prev + 1);
+                }}
+                placeholder="Search template JSON..."
+                style={{
+                  minWidth: 260,
+                  border: "1px solid var(--panel-border)",
+                  borderRadius: "0.28rem",
+                  padding: "0.22rem 0.3rem"
+                }}
+              />
+              <button
+                type="button"
+                disabled={templateJsonSearchMatches.length === 0}
+                onClick={() =>
+                  setTemplateJsonSearchResultIdx((prev) => {
+                    const nextIdx =
+                      templateJsonSearchMatches.length === 0
+                        ? 0
+                        : (prev - 1 + templateJsonSearchMatches.length) % templateJsonSearchMatches.length;
+                    setTemplateJsonSearchJumpTick((tick) => tick + 1);
+                    return nextIdx;
+                  })
+                }
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                disabled={templateJsonSearchMatches.length === 0}
+                onClick={() =>
+                  setTemplateJsonSearchResultIdx((prev) => {
+                    const nextIdx =
+                      templateJsonSearchMatches.length === 0
+                        ? 0
+                        : (prev + 1) % templateJsonSearchMatches.length;
+                    setTemplateJsonSearchJumpTick((tick) => tick + 1);
+                    return nextIdx;
+                  })
+                }
+              >
+                Next
+              </button>
+              <span style={metaSecondary}>
+                {templateJsonSearchQuery.trim()
+                  ? templateJsonSearchMatches.length > 0
+                    ? `${Math.min(templateJsonSearchResultIdx + 1, templateJsonSearchMatches.length)} of ${templateJsonSearchMatches.length}`
+                    : "0 matches"
+                  : "Type and press Enter"}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!navigator.clipboard?.writeText) {
+                    alert("Clipboard API unavailable in this browser.");
+                    return;
+                  }
+                  void navigator.clipboard.writeText(templatePreviewJsonText);
+                }}
+                style={{ marginLeft: "auto" }}
+              >
+                Copy Contents
+              </button>
+            </div>
+            <textarea
+              ref={templateJsonTextareaRef}
+              value={templatePreviewJsonText}
+              readOnly
+              spellCheck={false}
+              style={{
+                margin: "0.55rem 0 0 0",
+                padding: "0.55rem",
+                borderRadius: "0.32rem",
+                border: "1px solid var(--panel-border)",
+                backgroundColor: "var(--surface-1)",
+                color: "var(--text-primary)",
+                overflow: "auto",
+                height: "44rem",
+                minHeight: "12rem",
+                width: "100%",
+                boxSizing: "border-box",
+                resize: "vertical",
+                fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+                fontSize: "0.76rem",
+                lineHeight: 1.35
+              }}
+            />
+          </details>
+        ) : null}
       </div>
 
       {glossaryTooltipUi.showPanel && glossaryTooltipUi.hoverKey && glossaryTooltipUi.panelPos && (

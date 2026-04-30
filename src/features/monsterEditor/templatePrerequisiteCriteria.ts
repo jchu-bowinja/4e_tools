@@ -584,3 +584,13 @@ export function resolveTemplatePrerequisite(
   if (!raw) return {};
   return parseMonsterTemplatePrerequisite(raw).data;
 }
+
+/**
+ * Whether `entry` meets this template's prerequisites (`prerequisiteExpr`, else parsed `prerequisite` prose).
+ */
+export function monsterMatchesTemplateRecord(
+  entry: MonsterEntryFile,
+  record: Pick<MonsterTemplateRecord, "prerequisite" | "prerequisiteExpr">
+): boolean {
+  return monsterMatchesPrerequisite(entry, resolveTemplatePrerequisite(record));
+}

@@ -58,4 +58,60 @@ describe("applyMonsterTemplateToEntry", () => {
     expect(delta.addedTraitNames).toEqual(["Undead"]);
     expect(delta.addedAuraNames).toEqual(["Despair"]);
   });
+
+  it("merges template stat adjustments onto base creature stats", () => {
+    const base = baseMonster();
+    base.level = "5";
+    base.stats.abilityScores = { Constitution: 14 };
+    base.stats.defenses = { AC: 14, Fortitude: 12, Reflex: 13, Will: 11 };
+    base.stats.otherNumbers = { ...base.stats.otherNumbers, hitPoints: 40, initiative: 2 };
+    base.stats.skills = { Perception: 5 };
+    const tpl = {
+      ...sampleTemplate(),
+      stats: {
+        hitPoints: { default: { perLevel: 4, addConstitution: true } },
+        defenses: { AC: 2, Fortitude: 1 },
+        skills: { entries: [{ skill: "Stealth", value: 3, trained: false }] },
+        initiative: { value: 1 },
+        savingThrows: { value: 2 }
+      }
+    } as MonsterTemplateRecord;
+
+    const merged = applyMonsterTemplateToEntry(base, tpl);
+    expect(merged.stats?.defenses?.AC).toBe(16);
+    expect(merged.stats?.defenses?.Fortitude).toBe(13);
+    expect(merged.stats?.otherNumbers?.hitPoints).toBe(74);
+    expect(merged.stats?.otherNumbers?.initiative).toBe(3);
+    expect(merged.stats?.otherNumbers?.savingThrows).toBe(2);
+    expect(merged.stats?.skills?.Stealth).toBe(3);
+    expect(merged.stats?.skills?.Perception).toBe(5);
+  });
+
+  it("merges situational 'to all defenses against …' as its own defenses row, not spread across AC/NADs", () => {
+    const base = baseMonster();
+    base.stats.defenses = { AC: 15, Fortitude: 14, Reflex: 13, Will: 12 };
+    const tpl = {
+      templateName: "Demagogue",
+      sourceBook: "Test",
+      powers: [],
+      stats: {
+        defenses: {
+          FORTITUDE: 2,
+          WILL: 4,
+          "to all defenses against charm and fear effects": 4
+        }
+      }
+    } as MonsterTemplateRecord;
+
+    const merged = applyMonsterTemplateToEntry(base, tpl);
+    const d = merged.stats?.defenses as Record<string, unknown>;
+    expect(d?.Fortitude).toBe(16);
+    expect(d?.Will).toBe(16);
+    expect(d?.AC).toBe(15);
+    expect(d?.Reflex).toBe(13);
+    const situational =
+      d?.["to all defenses against charm and fear effects"] ??
+      Object.entries(d ?? {}).find(([k]) => k.toLowerCase().includes("charm and fear"))?.[1];
+    expect(situational).toBe(4);
+  });
 });

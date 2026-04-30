@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   monsterMatchesPrerequisite,
+  monsterMatchesTemplateRecord,
   parseMonsterTemplatePrerequisite,
   parseTypePhraseToTags,
   splitTypeAlternatives
@@ -315,5 +316,24 @@ describe("monsterMatchesPrerequisite", () => {
     expect(
       monsterMatchesPrerequisite(sampleMonster({ level: "11", traits: [{ name: "Undead", details: "" }] }), p)
     ).toBe(false);
+  });
+});
+
+describe("monsterMatchesTemplateRecord", () => {
+  it("uses prerequisiteExpr when present", () => {
+    const entry = sampleMonster({ level: "5", type: "Humanoid" });
+    const ok = monsterMatchesTemplateRecord(entry, {
+      prerequisite: "ignored when expr set",
+      prerequisiteExpr: { minLevel: 11, typeAnd: ["humanoid"] }
+    });
+    expect(ok).toBe(false);
+  });
+
+  it("parses prerequisite prose when expr is absent", () => {
+    const entry = sampleMonster({ level: "12", type: "Humanoid" });
+    const ok = monsterMatchesTemplateRecord(entry, {
+      prerequisite: "Prerequisites: Humanoid, level 11"
+    });
+    expect(ok).toBe(true);
   });
 });
