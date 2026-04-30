@@ -10,6 +10,7 @@ import type {
   MonsterTemplateRecord,
   MonsterTrait
 } from "./storage";
+import { standardMonsterXpForLevel } from "./monsterLevelDelta";
 
 function deepClone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -87,6 +88,73 @@ function normalizeRole(value: unknown): string {
     .trim()
     .toLowerCase()
     .replace(/\s+/g, " ");
+}
+
+type MonsterRank = "minion" | "standard" | "elite" | "solo";
+type RankTransition = { from: MonsterRank; to: MonsterRank };
+
+const RANK_ORDER: readonly MonsterRank[] = ["minion", "standard", "elite", "solo"];
+const RANK_XP_MULTIPLIER: Record<MonsterRank, number> = {
+  minion: 0.25,
+  standard: 1,
+  elite: 2,
+  solo: 5
+};
+
+function detectMonsterRank(entry: Pick<MonsterEntryFile, "groupRole" | "role">): MonsterRank {
+  const normalized = String(entry.groupRole ?? entry.role ?? "")
+    .trim()
+    .toLowerCase();
+  if (normalized.includes("minion")) return "minion";
+  if (normalized.includes("elite")) return "elite";
+  if (normalized.includes("solo")) return "solo";
+  return "standard";
+}
+
+function formatGroupRole(rank: MonsterRank): string {
+  return rank.charAt(0).toUpperCase() + rank.slice(1);
+}
+
+function parseFlexibleInt(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return Math.trunc(value);
+  if (typeof value === "string") {
+    const m = value.match(/-?\d+/);
+    if (m) {
+      const n = Number.parseInt(m[0], 10);
+      if (Number.isFinite(n)) return n;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Template preview rule: each added template promotes monster rank one step
+ * (minion -> standard -> elite -> solo) and scales XP to that rank.
+ */
+function promoteRankAndAdjustXp(entry: MonsterEntryFile): RankTransition {
+  const currentRank = detectMonsterRank(entry);
+  const idx = RANK_ORDER.indexOf(currentRank);
+  const nextRank = RANK_ORDER[Math.min(RANK_ORDER.length - 1, idx + 1)];
+  if (nextRank === currentRank) return { from: currentRank, to: nextRank };
+  entry.groupRole = formatGroupRole(nextRank);
+
+  const oldXp = parseFlexibleInt(entry.xp);
+  if (oldXp === undefined) return { from: currentRank, to: nextRank };
+  const oldMultiplier = RANK_XP_MULTIPLIER[currentRank];
+  const newMultiplier = RANK_XP_MULTIPLIER[nextRank];
+  if (oldMultiplier <= 0 || newMultiplier <= 0) return { from: currentRank, to: nextRank };
+
+  const level = parseMonsterLevel(entry);
+  const standardLevelXp = level > 0 ? standardMonsterXpForLevel(level) : undefined;
+  if (standardLevelXp !== undefined) {
+    const nextXp = Math.max(0, Math.round(standardLevelXp * newMultiplier));
+    entry.xp = nextXp;
+    return { from: currentRank, to: nextRank };
+  }
+
+  const scaled = Math.max(0, Math.round(oldXp * (newMultiplier / oldMultiplier)));
+  entry.xp = scaled;
+  return { from: currentRank, to: nextRank };
 }
 
 function getConstitutionScore(entry: MonsterEntryFile): number {
@@ -172,26 +240,49 @@ function applyDefenseDelta(
   defs[keyToUse] = cur + delta;
 }
 
+function resolveDefenseKey(defs: Record<string, number | string>, rawKey: string): string {
+  const normLower = rawKey.trim().toLowerCase();
+  for (const canon of CANON_DEFENSE_LABELS) {
+    if (normLower === canon) {
+      const prefer = preferredDefenseKey(canon);
+      return (
+        findMapKeyCaseInsensitive(defs as Record<string, unknown>, prefer) ??
+        findMapKeyCaseInsensitive(defs as Record<string, unknown>, canon) ??
+        prefer
+      );
+    }
+  }
+  return findMapKeyCaseInsensitive(defs as Record<string, unknown>, rawKey.trim()) ?? rawKey.trim();
+}
+
 function mergeDefenseBonuses(entry: MonsterEntryFile, bonuses: Record<string, number>): void {
   ensureStats(entry);
   const defs = { ...(entry.stats!.defenses ?? {}) } as Record<string, number | string>;
   for (const [rawKey, delta] of Object.entries(bonuses)) {
     if (!Number.isFinite(delta)) continue;
-    const normLower = rawKey.trim().toLowerCase();
+    const key = resolveDefenseKey(defs, rawKey);
+    const cur = parseFlexibleNumber(defs[key]) ?? 0;
+    defs[key] = cur + delta;
+  }
+  entry.stats!.defenses = defs as MonsterEntryFile["stats"]["defenses"];
+}
 
-    let matched = false;
-    for (const canon of CANON_DEFENSE_LABELS) {
-      if (normLower === canon) {
-        applyDefenseDelta(defs, canon, delta);
-        matched = true;
-        break;
-      }
-    }
-    if (matched) continue;
-
-    const existingKey = findMapKeyCaseInsensitive(defs as Record<string, unknown>, rawKey.trim()) ?? rawKey.trim();
-    const cur = parseFlexibleNumber(defs[existingKey]) ?? 0;
-    defs[existingKey] = cur + delta;
+function mergeDefenseBonusesUsingMax(
+  entry: MonsterEntryFile,
+  bonuses: Record<string, number>,
+  priorAppliedBonuses: Record<string, number>
+): void {
+  ensureStats(entry);
+  const defs = { ...(entry.stats!.defenses ?? {}) } as Record<string, number | string>;
+  for (const [rawKey, delta] of Object.entries(bonuses)) {
+    if (!Number.isFinite(delta)) continue;
+    const key = resolveDefenseKey(defs, rawKey);
+    const trackerKey = key.trim().toLowerCase();
+    const prevApplied = parseFlexibleNumber(priorAppliedBonuses[trackerKey]) ?? 0;
+    const nextApplied = Math.max(prevApplied, delta);
+    const cur = parseFlexibleNumber(defs[key]) ?? 0;
+    defs[key] = cur - prevApplied + nextApplied;
+    priorAppliedBonuses[trackerKey] = nextApplied;
   }
   entry.stats!.defenses = defs as MonsterEntryFile["stats"]["defenses"];
 }
@@ -220,6 +311,17 @@ function addOtherNumberDelta(entry: MonsterEntryFile, keys: string[], delta: num
     }
   }
   on[keys[0]] = delta;
+}
+
+function setOtherNumberValue(entry: MonsterEntryFile, keys: string[], value: number): void {
+  const on = ensureOtherNumbers(entry);
+  for (const k of keys) {
+    if (Object.prototype.hasOwnProperty.call(on, k)) {
+      on[k] = value;
+      return;
+    }
+  }
+  on[keys[0]] = value;
 }
 
 function tierBracket(level: number): "1" | "11" | "21" {
@@ -314,7 +416,36 @@ function mergeHpFromTemplate(
   on[hpKey] = cur + hpBonus;
 }
 
-function mergeTemplateStatAdjustments(entry: MonsterEntryFile, template: MonsterTemplateRecord): void {
+function scaleMonsterHitPoints(entry: MonsterEntryFile, multiplier: number): void {
+  if (!Number.isFinite(multiplier) || multiplier <= 0) return;
+  const on = ensureOtherNumbers(entry);
+  const hpKey =
+    findMapKeyCaseInsensitive(on, "hit points") ??
+    findMapKeyCaseInsensitive(on, "hitPoints") ??
+    findMapKeyCaseInsensitive(on, "hp") ??
+    pickHpFieldKey(on);
+  const curHp = parseFlexibleNumber(on[hpKey]);
+  if (curHp === undefined) return;
+  const nextHp = Math.max(1, Math.round(curHp * multiplier));
+  on[hpKey] = nextHp;
+  const bloodiedKey = findMapKeyCaseInsensitive(on, "bloodied") ?? findMapKeyCaseInsensitive(on, "Bloodied");
+  if (bloodiedKey) on[bloodiedKey] = Math.max(0, Math.floor(nextHp / 2));
+}
+
+function isLikelyClassTemplate(template: MonsterTemplateRecord): boolean {
+  const text = `${String(template.roleLine ?? "")} ${String(template.role?.templateLabel ?? "")} ${String(template.role?.raw ?? "")}`
+    .toLowerCase()
+    .trim();
+  if (!text) return false;
+  return /\b(class|cleric|fighter|paladin|ranger|rogue|warlock|warlord|wizard)\b/.test(text);
+}
+
+function mergeTemplateStatAdjustments(
+  entry: MonsterEntryFile,
+  template: MonsterTemplateRecord,
+  rankTransition: RankTransition,
+  classDefenseBonusTracker: Record<string, number>
+): void {
   const rawStats = template.stats;
   if (!isRecord(rawStats)) return;
 
@@ -335,7 +466,13 @@ function mergeTemplateStatAdjustments(entry: MonsterEntryFile, template: Monster
 
   const hpCfg = stats.hitPoints;
   if (hpCfg && typeof hpCfg === "object") {
-    mergeHpFromTemplate(entry, hpCfg as NonNullable<MonsterTemplatePasteStatsOptionB["hitPoints"]>, level, roleLower, conScore);
+    if (rankTransition.from === "solo") {
+      // No template HP additions for creatures that are already solo.
+    } else if (rankTransition.from === "elite" && rankTransition.to === "solo") {
+      // Already scaled above; skip additive template HP.
+    } else {
+      mergeHpFromTemplate(entry, hpCfg as NonNullable<MonsterTemplatePasteStatsOptionB["hitPoints"]>, level, roleLower, conScore);
+    }
   }
 
   const defs = stats.defenses;
@@ -344,7 +481,13 @@ function mergeTemplateStatAdjustments(entry: MonsterEntryFile, template: Monster
     for (const [k, v] of Object.entries(defs)) {
       if (typeof v === "number" && Number.isFinite(v)) nums[k] = v;
     }
-    if (Object.keys(nums).length > 0) mergeDefenseBonuses(entry, nums);
+    if (Object.keys(nums).length > 0) {
+      if (isLikelyClassTemplate(template)) {
+        mergeDefenseBonusesUsingMax(entry, nums, classDefenseBonusTracker);
+      } else {
+        mergeDefenseBonuses(entry, nums);
+      }
+    }
   }
 
   const skillsObj = stats.skills;
@@ -437,6 +580,19 @@ function mergeTemplateStatAdjustments(entry: MonsterEntryFile, template: Monster
       curArr.push(line);
     }
     entry.weaknesses = curArr;
+  }
+}
+
+function applyRankBasedSavingThrowsAndActionPoints(entry: MonsterEntryFile): void {
+  const rank = detectMonsterRank(entry);
+  if (rank === "solo") {
+    setOtherNumberValue(entry, ["savingThrows", "saving throws"], 5);
+    setOtherNumberValue(entry, ["actionPoints", "action points"], 2);
+    return;
+  }
+  if (rank === "standard") {
+    setOtherNumberValue(entry, ["savingThrows", "saving throws"], 0);
+    setOtherNumberValue(entry, ["actionPoints", "action points"], 0);
   }
 }
 
@@ -546,13 +702,37 @@ export function applyMonsterTemplateToEntry(entry: MonsterEntryFile, template: M
     }
   }
 
-  mergeTemplateStatAdjustments(out, template);
+  const priorPreviewState =
+    isRecord(out.sections) && isRecord((out.sections as Record<string, unknown>).monsterTemplatePreview)
+      ? ((out.sections as Record<string, unknown>).monsterTemplatePreview as Record<string, unknown>)
+      : {};
+  const classDefenseBonusTracker =
+    isRecord(priorPreviewState.classDefenseBonuses) ?
+      ({ ...(priorPreviewState.classDefenseBonuses as Record<string, number>) } as Record<string, number>) :
+      {};
+
+  const rankTransition = promoteRankAndAdjustXp(out);
+  if (rankTransition.from === "elite" && rankTransition.to === "solo") {
+    const level = parseMonsterLevel(out);
+    scaleMonsterHitPoints(out, level >= 11 ? 2.5 : 2);
+  }
+  mergeTemplateStatAdjustments(out, template, rankTransition, classDefenseBonusTracker);
+  applyRankBasedSavingThrowsAndActionPoints(out);
+  // TODO: Merge monster keywords with template keywords and implement consistent keyword handling.
+
+  const priorTemplateNames = Array.isArray(priorPreviewState.templateNames)
+    ? priorPreviewState.templateNames.map((x) => String(x ?? "").trim()).filter(Boolean)
+    : [];
+  const nextTemplateNames = [...priorTemplateNames, String(template.templateName ?? "").trim()].filter(Boolean);
 
   out.sections = {
     ...(out.sections ?? {}),
     monsterTemplatePreview: {
+      ...priorPreviewState,
       templateName: template.templateName,
-      sourceBook: template.sourceBook
+      sourceBook: template.sourceBook,
+      templateNames: nextTemplateNames,
+      classDefenseBonuses: classDefenseBonusTracker
     }
   };
 

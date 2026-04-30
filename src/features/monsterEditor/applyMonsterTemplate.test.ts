@@ -144,4 +144,113 @@ describe("applyMonsterTemplateToEntry", () => {
       Object.entries(d ?? {}).find(([k]) => k.toLowerCase().includes("charm and fear"))?.[1];
     expect(situational).toBe(4);
   });
+
+  it("promotes rank one step and adjusts xp when a template is applied", () => {
+    const base = baseMonster();
+    base.level = "5";
+    base.groupRole = "Minion";
+    base.xp = 50;
+
+    const merged = applyMonsterTemplateToEntry(base, sampleTemplate());
+    expect(merged.groupRole).toBe("Standard");
+    expect(merged.xp).toBe(200);
+  });
+
+  it("caps rank at solo and scales xp across chained template applications", () => {
+    const base = baseMonster();
+    base.level = "5";
+    base.groupRole = "Minion";
+    base.xp = 50;
+
+    const once = applyMonsterTemplateToEntry(base, sampleTemplate());
+    const twice = applyMonsterTemplateToEntry(once, sampleTemplate());
+    const thrice = applyMonsterTemplateToEntry(twice, sampleTemplate());
+    const fourth = applyMonsterTemplateToEntry(thrice, sampleTemplate());
+
+    expect(once.groupRole).toBe("Standard");
+    expect(twice.groupRole).toBe("Elite");
+    expect(thrice.groupRole).toBe("Solo");
+    expect(fourth.groupRole).toBe("Solo");
+    expect(once.xp).toBe(200);
+    expect(twice.xp).toBe(400);
+    expect(thrice.xp).toBe(1000);
+    expect(fourth.xp).toBe(1000);
+  });
+
+  it("does not stack class-template defense bonuses across two templates; keeps higher bonus per defense", () => {
+    const base = baseMonster();
+    base.groupRole = "Standard";
+    base.stats.defenses = { AC: 18, Fortitude: 16 };
+
+    const fighterClass = {
+      ...sampleTemplate(),
+      roleLine: "Fighter Class Standard Soldier",
+      stats: { defenses: { AC: 2, Fortitude: 1 } }
+    } as MonsterTemplateRecord;
+    const wizardClass = {
+      ...sampleTemplate(),
+      roleLine: "Wizard Class Standard Controller",
+      stats: { defenses: { AC: 4, Fortitude: 1 } }
+    } as MonsterTemplateRecord;
+
+    const once = applyMonsterTemplateToEntry(base, fighterClass);
+    const twice = applyMonsterTemplateToEntry(once, wizardClass);
+    expect(once.stats?.defenses?.AC).toBe(20);
+    expect(twice.stats?.defenses?.AC).toBe(22);
+    expect(twice.stats?.defenses?.Fortitude).toBe(17);
+  });
+
+  it("elite to solo multiplies HP instead of adding template HP", () => {
+    const base = baseMonster();
+    base.level = "10";
+    base.groupRole = "Elite";
+    base.stats.otherNumbers = { hitPoints: 100, bloodied: 50 };
+    const tpl = {
+      ...sampleTemplate(),
+      stats: { hitPoints: { default: { perLevel: 10, addConstitution: true } } }
+    } as MonsterTemplateRecord;
+    const merged = applyMonsterTemplateToEntry(base, tpl);
+    expect(merged.groupRole).toBe("Solo");
+    expect(merged.stats?.otherNumbers?.hitPoints).toBe(200);
+    expect(merged.stats?.otherNumbers?.bloodied).toBe(100);
+  });
+
+  it("level 11+ elite to solo multiplies HP by 2.5", () => {
+    const base = baseMonster();
+    base.level = "11";
+    base.groupRole = "Elite";
+    base.stats.otherNumbers = { hitPoints: 120 };
+    const merged = applyMonsterTemplateToEntry(base, sampleTemplate());
+    expect(merged.groupRole).toBe("Solo");
+    expect(merged.stats?.otherNumbers?.hitPoints).toBe(300);
+  });
+
+  it("solo does not gain template HP and uses fixed solo save/action values", () => {
+    const base = baseMonster();
+    base.groupRole = "Solo";
+    base.stats.otherNumbers = { hitPoints: 120, savingThrows: 1, actionPoints: 9 };
+    const tpl = {
+      ...sampleTemplate(),
+      stats: {
+        hitPoints: { default: { perLevel: 20, addConstitution: true } },
+        savingThrows: { value: 99 },
+        actionPoints: { value: 99 }
+      }
+    } as MonsterTemplateRecord;
+    const merged = applyMonsterTemplateToEntry(base, tpl);
+    expect(merged.groupRole).toBe("Solo");
+    expect(merged.stats?.otherNumbers?.hitPoints).toBe(120);
+    expect(merged.stats?.otherNumbers?.savingThrows).toBe(5);
+    expect(merged.stats?.otherNumbers?.actionPoints).toBe(2);
+  });
+
+  it("standard creatures end with no save bonus and no action points", () => {
+    const base = baseMonster();
+    base.groupRole = "Minion";
+    base.stats.otherNumbers = { savingThrows: 4, actionPoints: 3 };
+    const merged = applyMonsterTemplateToEntry(base, sampleTemplate());
+    expect(merged.groupRole).toBe("Standard");
+    expect(merged.stats?.otherNumbers?.savingThrows).toBe(0);
+    expect(merged.stats?.otherNumbers?.actionPoints).toBe(0);
+  });
 });
