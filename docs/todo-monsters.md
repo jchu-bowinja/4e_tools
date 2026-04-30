@@ -23,6 +23,14 @@ Backlog for monster data, power cards, templates, and monster-facing UI (includi
   - Model or surface how stats, powers, and traits differ across monster level (and template tier where applicable) instead of assuming a single flat snapshot.
   - Align ETL, editor, and card rendering so scaled values, level ranges, and tier-specific variants stay consistent end to end.
 
+- [ ] Parse level-based damage expressions in damage templates and apply them to monsters
+  - Add parsing support for template damage expressions that scale by level (for example formula-driven or tier-bracket expressions) and persist the parsed representation.
+  - Apply resolved values when templates are attached to monsters so resulting attacks/powers reflect the monster's target level consistently across ETL and editor flows.
+
+- [ ] Adjust monster XP when applying a template
+  - Update template-application flow to recalculate or remap monster XP when a template changes effective level, role, or tier assumptions.
+  - Ensure persisted monster/template output keeps XP in sync with derived post-template stats so encounter budgeting remains accurate.
+
 ## Tooltips (monster editor / power cards)
 
 - [ ] Move monster tooltip glossary matching away from hardcoded UI phrase lists

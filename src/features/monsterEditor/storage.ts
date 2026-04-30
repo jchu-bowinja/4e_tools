@@ -5,6 +5,7 @@ export interface MonsterIndexEntry {
   name: string;
   level: string | number;
   role: string;
+  groupRole?: string;
   isLeader?: boolean;
   parseError: string;
 }

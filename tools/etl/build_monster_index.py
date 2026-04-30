@@ -1295,12 +1295,13 @@ def build_monster_index(monster_root: Path, output_root: Path) -> None:
                 "name": parsed_payload.get("name", fallback_name),
                 "level": parsed_payload.get("level", ""),
                 "role": parsed_payload.get("role", ""),
+                "groupRole": parsed_payload.get("groupRole", ""),
                 "isLeader": bool(parsed_payload.get("isLeader", False)),
                 "parseError": parse_error,
             }
         )
 
-    index_payload = {"meta": {"version": 3, "count": len(index_rows), "source": str(monster_root)}, "monsters": index_rows}
+    index_payload = {"meta": {"version": 4, "count": len(index_rows), "source": str(monster_root)}, "monsters": index_rows}
     (monsters_dir / "index.json").write_text(
         json.dumps(index_payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"
     )

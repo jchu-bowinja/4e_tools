@@ -657,6 +657,7 @@ function monsterEntryToIndexRow(entry: MonsterEntryFile): MonsterIndexEntry {
     name: entry.name,
     level: entry.level,
     role: entry.role,
+    groupRole: entry.groupRole,
     isLeader: entry.isLeader,
     parseError: entry.parseError ?? ""
   };
@@ -1159,6 +1160,18 @@ function parseLevelFilter(rawFilter: string): { exact?: number; range?: { min: n
   }
 
   return {};
+}
+
+type MonsterRankFilter = "all" | "minion" | "standard" | "elite" | "solo";
+
+function detectMonsterRank(entry: MonsterIndexEntry): Exclude<MonsterRankFilter, "all"> {
+  const normalized = String(entry.groupRole ?? entry.role ?? "")
+    .trim()
+    .toLowerCase();
+  if (normalized.includes("minion")) return "minion";
+  if (normalized.includes("elite")) return "elite";
+  if (normalized.includes("solo")) return "solo";
+  return "standard";
 }
 
 function renderDamageSummary(damage?: MonsterPowerDamage): string {
@@ -2304,6 +2317,7 @@ export function MonsterEditorApp({
   const [nameQuery, setNameQuery] = useState<string>("");
   const [levelQuery, setLevelQuery] = useState<string>("");
   const [roleQuery, setRoleQuery] = useState<string>("");
+  const [rankFilter, setRankFilter] = useState<MonsterRankFilter>("all");
   const [leaderFilter, setLeaderFilter] = useState<"both" | "leader" | "notLeader">("both");
   const [sortBy, setSortBy] = useState<"name" | "level">("level");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -2478,6 +2492,10 @@ export function MonsterEditorApp({
         return false;
       }
 
+      if (rankFilter !== "all" && detectMonsterRank(entry) !== rankFilter) {
+        return false;
+      }
+
       const isLeader = entry.isLeader === true;
       if (leaderFilter === "leader" && !isLeader) {
         return false;
@@ -2524,7 +2542,7 @@ export function MonsterEditorApp({
       }
       return a.id.localeCompare(b.id, undefined, { sensitivity: "base" });
     });
-  }, [indexRows, nameQuery, levelQuery, roleQuery, leaderFilter, sortBy, sortDir]);
+  }, [indexRows, nameQuery, levelQuery, roleQuery, rankFilter, leaderFilter, sortBy, sortDir]);
 
   const customMonsterIdSet = useMemo(
     () => new Set(readCustomMonsterEntries().map((m) => m.id)),
@@ -3097,6 +3115,22 @@ export function MonsterEditorApp({
                 {role}
               </option>
             ))}
+          </select>
+          <select
+            value={rankFilter}
+            onChange={(event) => setRankFilter(event.target.value as MonsterRankFilter)}
+            style={{
+              minWidth: 180,
+              border: "1px solid var(--panel-border)",
+              borderRadius: "0.28rem",
+              padding: "0.22rem 0.3rem"
+            }}
+          >
+            <option value="all">All ranks</option>
+            <option value="minion">Minion</option>
+            <option value="standard">Standard</option>
+            <option value="elite">Elite</option>
+            <option value="solo">Solo</option>
           </select>
           <select
             value={leaderFilter}
