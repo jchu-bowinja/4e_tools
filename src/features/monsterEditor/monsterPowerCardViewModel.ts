@@ -13,10 +13,37 @@ function splitPowerKeywords(rawKeywords: string): string[] {
     .filter((part) => part.length > 0);
 }
 
-function renderAttackBonusLine(attack?: MonsterPowerAttack): string {
+function hasLevelBasedAttackLanguage(power: MonsterPower, attack?: MonsterPowerAttack): boolean {
+  const fragments: string[] = [String(power.description || "")];
+  const hitDesc = String(attack?.hit?.description || "");
+  const missDesc = String(attack?.miss?.description || "");
+  const effectDesc = String(attack?.effect?.description || "");
+  if (hitDesc) fragments.push(hitDesc);
+  if (missDesc) fragments.push(missDesc);
+  if (effectDesc) fragments.push(effectDesc);
+  return fragments.some((text) => /\blevel\s*\+\s*\d+\s+vs\.\s*(?:ac|fortitude|reflex|will)\b/i.test(text));
+}
+
+function renderAttackBonusLine(power: MonsterPower, attack?: MonsterPowerAttack): string {
   if (!attack?.attackBonuses?.length) return "";
+  const useLevelFormulaDisplay = hasLevelBasedAttackLanguage(power, attack);
   return attack.attackBonuses
-    .map((bonus) => `${bonus.bonus ?? "?"} vs ${(bonus.defense ?? "?").toString().toLowerCase()}`)
+    .map((bonus) => {
+      const rawBonus = bonus.bonus ?? "?";
+      const parsedBonus =
+        typeof rawBonus === "number"
+          ? rawBonus
+          : typeof rawBonus === "string" && /^[+-]?\d+$/.test(rawBonus.trim())
+            ? Number.parseInt(rawBonus.trim(), 10)
+            : null;
+      const displayBonus =
+        useLevelFormulaDisplay && parsedBonus !== null
+          ? parsedBonus >= 0
+            ? `level + ${parsedBonus}`
+            : `level - ${Math.abs(parsedBonus)}`
+          : rawBonus;
+      return `${displayBonus} vs ${(bonus.defense ?? "?").toString().toLowerCase()}`;
+    })
     .join(" * ");
 }
 
@@ -176,7 +203,7 @@ function dedupeLabeledLines(lines: Array<{ label: string; text: string }>): Arra
 
 export function buildMonsterPowerCardViewModel(power: MonsterPower): MonsterPowerCardViewModel {
   const primaryAttack = power.attacks?.[0];
-  const attackBonusLine = renderAttackBonusLine(primaryAttack);
+  const attackBonusLine = renderAttackBonusLine(power, primaryAttack);
   const compactOutcomeLines = dedupeLabeledLines(renderCompactOutcomeLines(power, primaryAttack));
   const normalizedDescription = normalizeSemicolonWhitespace(String(power.description || "").trim());
   const normalizedEffectDescription = normalizeSemicolonWhitespace(String(primaryAttack?.effect?.description || "").trim());
@@ -244,7 +271,7 @@ export function buildMonsterPowerCardViewModel(power: MonsterPower): MonsterPowe
     .slice(1)
     .map((attack, idx) => {
       const secondaryRange = String(attack.range || "").trim();
-      const secondaryBonusLine = renderAttackBonusLine(attack);
+      const secondaryBonusLine = renderAttackBonusLine(power, attack);
       const secondaryAttackLineParts = [secondaryRange, secondaryBonusLine]
         .map((part) => String(part || "").trim())
         .filter((part) => isRenderableCardValue(part));

@@ -84,4 +84,138 @@ describe("parsePastedMonsterTemplateTextLocal recharge usageDetails from Unicode
     expect(clever!.usageDetails).toBe("5");
     expect(clever!.action.toLowerCase()).toBe("move");
   });
+
+  it("parses conditional saving throw bonuses into structured stats", () => {
+    const block = `Fear Knight
+Prerequisite: Humanoid
+Fear Knight Elite Soldier
+Humanoid XP Elite
+Saving Throws +2; +4 against fear and charm effects
+Hit Points +8 per level + Constitution score
+POWERS
+M Strike (standard; at-will)
+Melee 1; +3 vs AC; 1d8 damage.`;
+    const r = parsePastedMonsterTemplateTextLocal(block, "Fear Knight");
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const st = (r.template.stats as {
+      savingThrows?: { value?: number; conditionalBonuses?: Array<{ value: number; when: string; sourceLine?: string }> };
+    })?.savingThrows;
+    expect(st?.value).toBe(2);
+    expect(st?.conditionalBonuses).toEqual([
+      {
+        value: 4,
+        when: "fear and charm effects",
+        conditions: ["fear", "charm effects"],
+        sourceLine: "Saving Throws +2; +4 against fear and charm effects"
+      }
+    ]);
+  });
+
+  it("handles diverse saving throw special-case formats", () => {
+    const cases: Array<{
+      line: string;
+      expected: Record<string, unknown>;
+    }> = [
+      {
+        line: "Saving Throws +2 against immobilized, restrained, and slowed",
+        expected: {
+          conditionalBonuses: [
+            {
+              value: 2,
+              when: "immobilized, restrained, and slowed",
+              conditions: ["immobilized", "restrained", "slowed"]
+            }
+          ]
+        }
+      },
+      { line: "Saving Throws see twist free", expected: { references: ["twist free"] } },
+      { line: "Saving Throws +2; see also twist free", expected: { value: 2, references: ["twist free"] } },
+      {
+        line: "Saving Throws +5 against charm eff ects",
+        expected: {
+          conditionalBonuses: [{ value: 5, when: "charm effects", conditions: ["charm effects"] }]
+        }
+      },
+      {
+        line: "Saving Throws +2 (+5 against charm effects)",
+        expected: {
+          value: 2,
+          conditionalBonuses: [{ value: 5, when: "charm effects", conditions: ["charm effects"] }]
+        }
+      },
+      {
+        line: "Saving Throws +2 against charm effects, immobilized, restrained, and slowed",
+        expected: {
+          conditionalBonuses: [
+            {
+              value: 2,
+              when: "charm effects, immobilized, restrained, and slowed",
+              conditions: ["charm effects", "immobilized", "restrained", "slowed"]
+            }
+          ]
+        }
+      },
+      {
+        line: "Saving Throws +2 (+4 against charm eff ects, immobilized, restrained, and slowed)",
+        expected: {
+          value: 2,
+          conditionalBonuses: [
+            {
+              value: 4,
+              when: "charm effects, immobilized, restrained, and slowed",
+              conditions: ["charm effects", "immobilized", "restrained", "slowed"]
+            }
+          ]
+        }
+      },
+      {
+        line: "Saving Throws +2 against ongoing damage",
+        expected: {
+          conditionalBonuses: [{ value: 2, when: "ongoing damage", conditions: ["ongoing damage"] }]
+        }
+      },
+      {
+        line: "Saving Throws +2 (+4 against ongoing damage)",
+        expected: {
+          value: 2,
+          conditionalBonuses: [{ value: 4, when: "ongoing damage", conditions: ["ongoing damage"] }]
+        }
+      }
+    ];
+
+    for (const row of cases) {
+      const block = `Fear Knight
+Prerequisite: Humanoid
+Fear Knight Elite Soldier
+Humanoid XP Elite
+${row.line}
+Hit Points +8 per level + Constitution score
+POWERS
+M Strike (standard; at-will)
+Melee 1; +3 vs AC; 1d8 damage.`;
+      const r = parsePastedMonsterTemplateTextLocal(block, "Fear Knight");
+      expect(r.ok).toBe(true);
+      if (!r.ok) continue;
+      const st = (r.template.stats as { savingThrows?: Record<string, unknown> })?.savingThrows;
+      expect(st).toBeDefined();
+      const normalized = {
+        ...(typeof st?.value === "number" ? { value: st.value } : {}),
+        ...(Array.isArray(st?.conditionalBonuses)
+          ? {
+              conditionalBonuses: st.conditionalBonuses.map((x) => ({
+                value: (x as { value: number }).value,
+                when: (x as { when: string }).when,
+                ...(Array.isArray((x as { conditions?: string[] }).conditions)
+                  ? { conditions: (x as { conditions: string[] }).conditions }
+                  : {})
+              }))
+            }
+          : {}),
+        ...(Array.isArray(st?.references) ? { references: st.references } : {})
+      };
+      expect(normalized).toEqual(row.expected);
+    }
+  });
+
 });

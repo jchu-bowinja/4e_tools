@@ -169,9 +169,16 @@ export interface MonsterTemplatePasteHitPointsOptionB {
 }
 
 export interface MonsterTemplatePasteScalarStatOptionB {
-  value: number;
+  value?: number;
   sourceLine?: string;
   notes?: string[];
+  conditionalBonuses?: Array<{
+    value: number;
+    when: string;
+    conditions?: string[];
+    sourceLine?: string;
+  }>;
+  references?: string[];
 }
 
 export interface MonsterTemplatePasteSpeedOptionB {

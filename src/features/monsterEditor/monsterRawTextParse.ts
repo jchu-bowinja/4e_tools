@@ -5,6 +5,7 @@ import {
   findSpeedLineSensePhraseStart,
   parseMonsterSensesSegments
 } from "./monsterSensesParse";
+import { parseSavingThrowsDetail } from "./savingThrowsParse";
 
 const SECTION_HEAD =
   /^(TRAITS|STANDARD\s+ACTIONS|MOVE\s+ACTIONS|MINOR\s+ACTIONS|TRIGGERED\s+ACTIONS|FREE\s+ACTIONS)\b/i;
@@ -22,6 +23,7 @@ const AC_LINE_RE =
   /^AC\s+(\d+)\s*,\s*Fortitude\s+(\d+)\s*,\s*Reflex\s+(\d+)\s*,\s*Will\s+(\d+)(?:\s+Perception\s+([+-]?\d+))?\s*$/i;
 
 const SAVES_AP_RE = /^Saving Throws\s+([+-]?\d+)\s*;\s*Action Points\s+(\d+)\s*$/i;
+const ACTION_POINTS_RE = /\bAction Points\s+(\d+)\b/i;
 
 const RESIST_RE = /^Resist\s+(\d+)\s+(.+?)\s*$/i;
 const VULN_RE = /^Vulnerable\s+(\d+)\s+(.+?)\s*$/i;
@@ -487,7 +489,32 @@ export function parseMonsterStatBlockText(raw: string, nameHint?: string): Parse
     if (SAVES_AP_RE.test(L)) {
       const smt = L.match(SAVES_AP_RE)!;
       otherNumbers.savingThrows = smt[1].trim();
+      otherNumbers.savingThrowsDetail = {
+        value: Number.parseInt(smt[1], 10),
+        sourceLine: L
+      };
       otherNumbers.actionPoints = Number.parseInt(smt[2], 10);
+      idx++;
+      continue;
+    }
+    if (/^Saving Throws\b/i.test(L)) {
+      const apInline = L.match(ACTION_POINTS_RE);
+      const saveOnlyLine = L.replace(/\s*;\s*Action Points\s+\d+\s*$/i, "").trim();
+      const parsedSaves = parseSavingThrowsDetail(saveOnlyLine);
+      if (
+        parsedSaves.value !== undefined ||
+        (parsedSaves.conditionalBonuses?.length ?? 0) > 0 ||
+        (parsedSaves.references?.length ?? 0) > 0 ||
+        (parsedSaves.notes?.length ?? 0) > 0
+      ) {
+        otherNumbers.savingThrowsDetail = { ...parsedSaves, sourceLine: saveOnlyLine };
+        if (parsedSaves.value !== undefined) {
+          otherNumbers.savingThrows = parsedSaves.value >= 0 ? `+${parsedSaves.value}` : String(parsedSaves.value);
+        }
+      }
+      if (apInline?.[1]) {
+        otherNumbers.actionPoints = Number.parseInt(apInline[1], 10);
+      }
       idx++;
       continue;
     }

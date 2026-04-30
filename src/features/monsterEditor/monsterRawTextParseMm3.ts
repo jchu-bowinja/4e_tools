@@ -1,6 +1,7 @@
 import type { MonsterEntryFile, MonsterPower, MonsterStats, MonsterTrait } from "./storage";
 import { normalizeMonsterPowerShape } from "./monsterPowerNormalize";
 import { parseMonsterSensesSegments } from "./monsterSensesParse";
+import { parseSavingThrowsDetail } from "./savingThrowsParse";
 
 /** Fix common OCR line breaks inside words (MM3 PDF extracts). */
 export function normalizeMm3OcrLine(line: string): string {
@@ -426,6 +427,26 @@ export function parseMm3StatBlock(args: {
     const stM = L.match(SAVING_THROWS_ONLY_RE);
     if (stM) {
       otherNumbers.savingThrows = stM[1].trim();
+      otherNumbers.savingThrowsDetail = {
+        value: Number.parseInt(stM[1], 10),
+        sourceLine: L
+      };
+      continue;
+    }
+
+    if (/^Saving Throws\b/i.test(L)) {
+      const parsedSaves = parseSavingThrowsDetail(L);
+      if (
+        parsedSaves.value !== undefined ||
+        (parsedSaves.conditionalBonuses?.length ?? 0) > 0 ||
+        (parsedSaves.references?.length ?? 0) > 0 ||
+        (parsedSaves.notes?.length ?? 0) > 0
+      ) {
+        otherNumbers.savingThrowsDetail = { ...parsedSaves, sourceLine: L };
+        if (parsedSaves.value !== undefined) {
+          otherNumbers.savingThrows = parsedSaves.value >= 0 ? `+${parsedSaves.value}` : String(parsedSaves.value);
+        }
+      }
       continue;
     }
 

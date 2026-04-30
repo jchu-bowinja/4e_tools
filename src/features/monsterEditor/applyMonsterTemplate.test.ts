@@ -59,6 +59,36 @@ describe("applyMonsterTemplateToEntry", () => {
     expect(delta.addedAuraNames).toEqual(["Despair"]);
   });
 
+  it("calculates template power attack bonuses as monster level + bonus", () => {
+    const base = baseMonster();
+    base.level = "11";
+    const tpl = {
+      templateName: "Spawn of Kyuss",
+      sourceBook: "Test",
+      powers: [
+        {
+          name: "Touch of Kyuss",
+          usage: "Recharge",
+          action: "Standard",
+          keywords: "Necrotic",
+          description: "Template attack.",
+          attacks: [
+            {
+              kind: "MonsterAttack",
+              name: "Hit",
+              attackBonuses: [{ defense: "Fortitude", bonus: 3 }],
+              hit: { description: "2d6 necrotic damage." }
+            }
+          ]
+        }
+      ]
+    } as MonsterTemplateRecord;
+
+    const merged = applyMonsterTemplateToEntry(base, tpl);
+    const power = merged.powers?.find((p) => p.name === "Touch of Kyuss");
+    expect(power?.attacks?.[0]?.attackBonuses?.[0]?.bonus).toBe(14);
+  });
+
   it("merges template stat adjustments onto base creature stats", () => {
     const base = baseMonster();
     base.level = "5";

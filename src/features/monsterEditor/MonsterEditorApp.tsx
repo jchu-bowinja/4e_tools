@@ -1747,55 +1747,73 @@ function MonsterPowersPanels({
                       ) : null}
                       <div style={{ marginTop: "0.22rem", display: "grid", gap: "0.14rem" }}>
                         {cardModel.outcomeLines.map((line) => (
-                          <div
-                            key={`${power.name}-${index}-${line.label}-${line.text}`}
-                            style={{ fontSize: "0.8rem", color: "var(--text-primary)" }}
-                          >
-                            {(() => {
-                              const split = splitFailedEscapeAttemptSections(line.text);
-                              return (
-                                <>
-                                  {isRenderableCardValue(split.mainText) ? (
-                                    <div>
-                                      <strong>{line.label}:</strong>{" "}
-                                      {renderGlossaryAwareText(
-                                        split.mainText,
-                                        commonDescriptiveGlossaryPhrases,
-                                        startGlossaryHover,
-                                        leaveGlossaryHover,
-                                        `${power.name}-${index}-${line.label}-main`,
-                                        shouldHighlightGlossaryTerm
-                                      )}
-                                    </div>
-                                  ) : (
-                                    <div>
-                                      <strong>{line.label}:</strong>{" "}
-                                      {renderGlossaryAwareText(
-                                        line.text,
-                                        commonDescriptiveGlossaryPhrases,
-                                        startGlossaryHover,
-                                        leaveGlossaryHover,
-                                        `${power.name}-${index}-${line.label}-fallback`,
-                                        shouldHighlightGlossaryTerm
-                                      )}
-                                    </div>
-                                  )}
-                                  {split.failedEscapeTexts.map((failedText) => (
-                                    <div key={`${power.name}-${index}-${line.label}-failed-${failedText}`} style={{ marginTop: "0.04rem" }}>
-                                      <strong>Failed Escape Attempt:</strong>{" "}
-                                      {renderGlossaryAwareText(
-                                        failedText,
-                                        commonDescriptiveGlossaryPhrases,
-                                        startGlossaryHover,
-                                        leaveGlossaryHover,
-                                        `${power.name}-${index}-${line.label}-failed`,
-                                        shouldHighlightGlossaryTerm
-                                      )}
-                                    </div>
-                                  ))}
-                                </>
-                              );
-                            })()}
+                          <div key={`${power.name}-${index}-${line.label}-${line.text}`}>
+                            <div
+                              style={{
+                                fontSize: "0.8rem",
+                                color: "var(--text-primary)",
+                                marginLeft: line.label === "FAILED SAVE" ? "0.95rem" : 0
+                              }}
+                            >
+                              {(() => {
+                                const split = splitFailedEscapeAttemptSections(line.text);
+                                return (
+                                  <>
+                                    {isRenderableCardValue(split.mainText) ? (
+                                      <div>
+                                        <strong>{line.label}:</strong>{" "}
+                                        {renderGlossaryAwareText(
+                                          split.mainText,
+                                          commonDescriptiveGlossaryPhrases,
+                                          startGlossaryHover,
+                                          leaveGlossaryHover,
+                                          `${power.name}-${index}-${line.label}-main`,
+                                          shouldHighlightGlossaryTerm
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <div>
+                                        <strong>{line.label}:</strong>{" "}
+                                        {renderGlossaryAwareText(
+                                          line.text,
+                                          commonDescriptiveGlossaryPhrases,
+                                          startGlossaryHover,
+                                          leaveGlossaryHover,
+                                          `${power.name}-${index}-${line.label}-fallback`,
+                                          shouldHighlightGlossaryTerm
+                                        )}
+                                      </div>
+                                    )}
+                                    {split.failedEscapeTexts.map((failedText) => (
+                                      <div key={`${power.name}-${index}-${line.label}-failed-${failedText}`} style={{ marginTop: "0.04rem" }}>
+                                        <strong>Failed Escape Attempt:</strong>{" "}
+                                        {renderGlossaryAwareText(
+                                          failedText,
+                                          commonDescriptiveGlossaryPhrases,
+                                          startGlossaryHover,
+                                          leaveGlossaryHover,
+                                          `${power.name}-${index}-${line.label}-failed`,
+                                          shouldHighlightGlossaryTerm
+                                        )}
+                                      </div>
+                                    ))}
+                                  </>
+                                );
+                              })()}
+                            </div>
+                            {line.label === "HIT" && isRenderableCardValue(cardModel.ongoingText) ? (
+                              <div style={{ marginTop: "0.04rem", fontSize: "0.8rem", color: "var(--text-primary)" }}>
+                                <strong>ONGOING:</strong>{" "}
+                                {renderGlossaryAwareText(
+                                  cardModel.ongoingText,
+                                  commonDescriptiveGlossaryPhrases,
+                                  startGlossaryHover,
+                                  leaveGlossaryHover,
+                                  `${power.name}-${index}-ongoing-inline`,
+                                  shouldHighlightGlossaryTerm
+                                )}
+                              </div>
+                            ) : null}
                           </div>
                         ))}
                       </div>
@@ -1840,7 +1858,11 @@ function MonsterPowersPanels({
                                 {secondaryAttack.outcomeLines.map((line) => (
                                   <div
                                     key={`${power.name}-${index}-secondary-${secondaryIndex}-${line.label}-${line.text}`}
-                                    style={{ fontSize: "0.8rem", color: "var(--text-primary)" }}
+                                    style={{
+                                      fontSize: "0.8rem",
+                                      color: "var(--text-primary)",
+                                      marginLeft: line.label === "FAILED SAVE" ? "0.95rem" : 0
+                                    }}
                                   >
                                     {(() => {
                                       const split = splitFailedEscapeAttemptSections(line.text);
@@ -1923,7 +1945,8 @@ function MonsterPowersPanels({
                           </div>
                         ) : null}
                       </div>
-                      {isRenderableCardValue(cardModel.ongoingText) ? (
+                      {isRenderableCardValue(cardModel.ongoingText) &&
+                      !cardModel.outcomeLines.some((line) => line.label === "HIT") ? (
                         <div style={{ marginTop: "0.05rem", ...bodyPrimary }}>
                           <strong>ONGOING:</strong>{" "}
                           {renderGlossaryAwareText(
@@ -2970,20 +2993,20 @@ export function MonsterEditorApp({
         <button
           type="button"
           role="tab"
-          aria-selected={viewerTab === "templates"}
-          onClick={() => setViewerTab("templates")}
-          disabled={viewerTab === "templates"}
-        >
-          Monster templates
-        </button>
-        <button
-          type="button"
-          role="tab"
           aria-selected={viewerTab === "createMonster"}
           onClick={() => setViewerTab("createMonster")}
           disabled={viewerTab === "createMonster"}
         >
-          Create monster
+          Create Monster
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={viewerTab === "templates"}
+          onClick={() => setViewerTab("templates")}
+          disabled={viewerTab === "templates"}
+        >
+          Monster Templates
         </button>
         <button
           type="button"
@@ -3587,7 +3610,6 @@ export function MonsterEditorApp({
                     alignItems: "center"
                   }}
                 >
-                  <span style={{ ...metaMuted, fontSize: "0.78rem", whiteSpace: "nowrap" }}>Template preview</span>
                   <select
                     value={monsterTemplatePreviewIdx === null ? "" : String(monsterTemplatePreviewIdx)}
                     onChange={(event) => {
@@ -3606,7 +3628,7 @@ export function MonsterEditorApp({
                       color: "var(--text-primary)"
                     }}
                   >
-                    <option value="">None (base creature)</option>
+                    <option value="">Add template...</option>
                     {templateRows.map((row, idx) => {
                       const prereqOk = templatePrereqMetByRow?.[idx] !== false;
                       return (

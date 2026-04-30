@@ -249,15 +249,49 @@ export function formatMonsterTemplateStatAdjustmentLines(
   if (hpLines.length) lines.push(...hpLines);
 
   const stObj = stats.savingThrows;
-  if (isRecord(stObj) && typeof stObj.value === "number") {
-    const v = stObj.value;
-    const sign = v >= 0 ? "+" : "";
-    let s = `Saving Throws ${sign}${v}`;
+  if (isRecord(stObj)) {
+    let s = "Saving Throws";
+    if (typeof stObj.value === "number") {
+      const v = stObj.value;
+      const sign = v >= 0 ? "+" : "";
+      s += ` ${sign}${v}`;
+    }
+    const conditionalBonuses = Array.isArray(stObj.conditionalBonuses)
+      ? stObj.conditionalBonuses
+          .filter((entry): entry is { value: number; when: string } => {
+            return (
+              isRecord(entry) &&
+              typeof entry.value === "number" &&
+              Number.isFinite(entry.value) &&
+              typeof entry.when === "string" &&
+              entry.when.trim().length > 0
+            );
+          })
+          .map((entry) => {
+            const condSign = entry.value >= 0 ? "+" : "";
+            return `${condSign}${entry.value} against ${entry.when.trim()}`;
+          })
+      : [];
+    if (conditionalBonuses.length > 0) {
+      s += `${typeof stObj.value === "number" ? "; " : " "}${conditionalBonuses.join("; ")}`;
+    }
+    const references = Array.isArray(stObj.references)
+      ? stObj.references.map((x) => String(x).trim()).filter(Boolean)
+      : [];
+    if (references.length > 0) {
+      const refsText = references.map((ref) => `see ${ref}`).join("; ");
+      s += `${typeof stObj.value === "number" || conditionalBonuses.length > 0 ? "; " : " "}${refsText}`;
+    }
     const notes = stObj.notes;
     if (Array.isArray(notes) && notes.length) {
-      s += `; ${notes.join("; ")}`;
+      const cleanNotes = notes.map((n) => String(n).trim()).filter(Boolean);
+      for (const note of cleanNotes) {
+        const normalizedNote = note.toLowerCase();
+        const duplicateConditional = conditionalBonuses.some((cond) => cond.toLowerCase() === normalizedNote);
+        if (!duplicateConditional) s += `; ${note}`;
+      }
     }
-    lines.push(s);
+    if (s !== "Saving Throws") lines.push(s);
   } else {
     const stNum = getNumber(stats as Record<string, unknown>, ["savingThrows"]);
     if (stNum !== undefined) {

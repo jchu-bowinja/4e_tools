@@ -65,4 +65,30 @@ describe("formatMonsterTemplateStatAdjustmentLines", () => {
       "Immune disease, poison"
     ]);
   });
+
+  it("formats structured conditional saving throw bonuses", () => {
+    const lines = formatMonsterTemplateStatAdjustmentLines({
+      savingThrows: {
+        value: 2,
+        conditionalBonuses: [{ value: 4, when: "fear and charm effects" }]
+      }
+    });
+    expect(lines).toEqual(["Saving Throws +2; +4 against fear and charm effects"]);
+  });
+
+  it("formats saving throw references and conditional-only bonuses", () => {
+    const refLines = formatMonsterTemplateStatAdjustmentLines({
+      savingThrows: {
+        references: ["twist free"]
+      }
+    });
+    expect(refLines).toEqual(["Saving Throws see twist free"]);
+
+    const conditionalOnly = formatMonsterTemplateStatAdjustmentLines({
+      savingThrows: {
+        conditionalBonuses: [{ value: 2, when: "ongoing damage" }]
+      }
+    });
+    expect(conditionalOnly).toEqual(["Saving Throws +2 against ongoing damage"]);
+  });
 });

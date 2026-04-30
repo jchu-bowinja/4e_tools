@@ -1,6 +1,9 @@
 import type {
   MonsterEntryFile,
   MonsterPower,
+  MonsterPowerAttack,
+  MonsterPowerOutcome,
+  MonsterPowerOutcomeEntry,
   MonsterTemplatePasteResistanceEntryOptionB,
   MonsterTemplatePasteSkillEntryOptionB,
   MonsterTemplatePasteStatsOptionB,
@@ -20,6 +23,63 @@ function parseMonsterLevel(entry: MonsterEntryFile): number {
   const raw = entry.level;
   const n = typeof raw === "number" ? raw : Number.parseInt(String(raw ?? "").trim(), 10);
   return Number.isFinite(n) ? n : 0;
+}
+
+function asNumber(value: number | string | undefined): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const m = value.trim().match(/^[+-]?\d+$/);
+    if (!m) return undefined;
+    const n = Number.parseInt(m[0], 10);
+    if (Number.isFinite(n)) return n;
+  }
+  return undefined;
+}
+
+function applyMonsterLevelToAttackBonus(value: number | string | undefined, monsterLevel: number): number | string | undefined {
+  const baseBonus = asNumber(value);
+  if (baseBonus === undefined || !Number.isFinite(monsterLevel)) return value;
+  return monsterLevel + baseBonus;
+}
+
+function calculateAttackBonusesForAttack(attack: MonsterPowerAttack | undefined, monsterLevel: number): void {
+  if (!attack) return;
+  if (Array.isArray(attack.attackBonuses)) {
+    for (const attackBonus of attack.attackBonuses) {
+      if (!attackBonus) continue;
+      attackBonus.bonus = applyMonsterLevelToAttackBonus(attackBonus.bonus, monsterLevel);
+    }
+  }
+  calculateAttackBonusesForOutcome(attack.hit, monsterLevel);
+  calculateAttackBonusesForOutcome(attack.miss, monsterLevel);
+  calculateAttackBonusesForOutcome(attack.effect, monsterLevel);
+}
+
+function calculateAttackBonusesForOutcomeEntry(entry: MonsterPowerOutcomeEntry | undefined, monsterLevel: number): void {
+  if (!entry) return;
+  entry.attacks?.forEach((attack) => calculateAttackBonusesForAttack(attack, monsterLevel));
+  entry.aftereffects?.forEach((child) => calculateAttackBonusesForOutcomeEntry(child, monsterLevel));
+  entry.sustains?.forEach((child) => calculateAttackBonusesForOutcomeEntry(child, monsterLevel));
+  entry.failedSavingThrows?.forEach((child) => calculateAttackBonusesForOutcomeEntry(child, monsterLevel));
+}
+
+function calculateAttackBonusesForOutcome(outcome: MonsterPowerOutcome | undefined, monsterLevel: number): void {
+  if (!outcome) return;
+  outcome.aftereffects?.forEach((entry) => calculateAttackBonusesForOutcomeEntry(entry, monsterLevel));
+  outcome.sustains?.forEach((entry) => calculateAttackBonusesForOutcomeEntry(entry, monsterLevel));
+  outcome.failedSavingThrows?.forEach((entry) => calculateAttackBonusesForOutcomeEntry(entry, monsterLevel));
+  const nested = outcome.nestedAttackDescriptions;
+  if (!Array.isArray(nested)) return;
+  for (const nestedEntry of nested) {
+    if (!nestedEntry || typeof nestedEntry !== "object" || Array.isArray(nestedEntry)) continue;
+    calculateAttackBonusesForOutcome(nestedEntry as MonsterPowerOutcome, monsterLevel);
+  }
+}
+
+function calculateAttackBonusesForTemplatePower(power: MonsterPower, monsterLevel: number): void {
+  for (const attack of power.attacks ?? []) {
+    calculateAttackBonusesForAttack(attack, monsterLevel);
+  }
 }
 
 function normalizeRole(value: unknown): string {
@@ -453,12 +513,15 @@ export function computeTemplateApplicationDelta(
  */
 export function applyMonsterTemplateToEntry(entry: MonsterEntryFile, template: MonsterTemplateRecord): MonsterEntryFile {
   const out = deepClone(entry);
+  const monsterLevel = parseMonsterLevel(out);
   const powerKeys = new Set((out.powers ?? []).map(powerSignature));
   out.powers = [...(out.powers ?? [])];
   for (const p of template.powers ?? []) {
     const sig = powerSignature(p);
     if (!powerKeys.has(sig)) {
-      out.powers.push(deepClone(p));
+      const clonedPower = deepClone(p);
+      calculateAttackBonusesForTemplatePower(clonedPower, monsterLevel);
+      out.powers.push(clonedPower);
       powerKeys.add(sig);
     }
   }

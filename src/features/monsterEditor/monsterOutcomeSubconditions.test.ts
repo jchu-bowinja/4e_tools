@@ -83,4 +83,46 @@ describe("buildMonsterPowerCardViewModel ongoing line", () => {
     expect(vm.ongoingText.toLowerCase()).not.toContain("failed saving throw");
     expect(vm.ongoingText.toLowerCase()).not.toContain("make an attack");
   });
+
+  it("shows attack bonus as level + bonus for template-style level-based attacks", () => {
+    const power: MonsterPower = {
+      name: "Creeping Rot",
+      usage: "Recharge",
+      action: "Standard",
+      keywords: "Necrotic",
+      description:
+        "Area burst 2 within 10; ascetic of Vecna's level + 3 vs. Fortitude; 3d6 necrotic damage.",
+      attacks: [
+        {
+          kind: "MonsterAttack",
+          name: "Hit",
+          attackBonuses: [{ defense: "Fortitude", bonus: 3 }],
+          hit: { description: "3d6 necrotic damage." }
+        }
+      ]
+    };
+    const vm = buildMonsterPowerCardViewModel(power);
+    expect(vm.attackLineParts.join(" ")).toContain("level + 3 vs fortitude");
+  });
+
+  it("keeps plain numeric attack bonus display when not level-based text", () => {
+    const power: MonsterPower = {
+      name: "Longsword",
+      usage: "At-Will",
+      action: "Standard",
+      keywords: "Weapon",
+      description: "Melee 1; 1d8 + 4 damage.",
+      attacks: [
+        {
+          kind: "MonsterAttack",
+          name: "Hit",
+          attackBonuses: [{ defense: "AC", bonus: 3 }],
+          hit: { description: "1d8 + 4 damage." }
+        }
+      ]
+    };
+    const vm = buildMonsterPowerCardViewModel(power);
+    expect(vm.attackLineParts.join(" ")).toContain("3 vs ac");
+    expect(vm.attackLineParts.join(" ")).not.toContain("level + 3");
+  });
 });

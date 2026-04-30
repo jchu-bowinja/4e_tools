@@ -171,4 +171,60 @@ Alignment evil Languages Common
     if (!r.ok) return;
     expect(r.entry.weaknesses?.[0]?.name).toMatch(/fire/i);
   });
+
+  it("parses structured saving throw conditionals in standard layout", () => {
+    const text = `Warden Shade Level 12 Elite Soldier
+Medium shadow humanoid XP 1400
+HP 120; Bloodied 60 Initiative +10
+AC 28, Fortitude 25, Reflex 24, Will 26 Perception +11
+Speed 6
+Saving Throws +2 (+4 against ongoing damage); Action Points 1
+STANDARD ACTIONS
+5 Shade Blade ✦ At-Will
+Attack: Melee 1 (one creature); +17 vs. AC
+Hit: 1d8 + 7 necrotic damage.
+Str 18 (+10) Dex 16 (+9) Wis 17 (+9)
+Con 18 (+10) Int 13 (+7) Cha 15 (+8)
+Alignment evil Languages Common
+`;
+    const r = parseMonsterStatBlockText(text);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const detail = (r.entry.stats.otherNumbers as { savingThrowsDetail?: Record<string, unknown> }).savingThrowsDetail;
+    expect(detail).toBeDefined();
+    expect(detail?.value).toBe(2);
+    expect(detail?.conditionalBonuses).toEqual([
+      {
+        value: 4,
+        when: "ongoing damage",
+        conditions: ["ongoing damage"],
+        sourceLine: "Saving Throws +2 (+4 against ongoing damage)"
+      }
+    ]);
+    expect((r.entry.stats.otherNumbers as { actionPoints?: number }).actionPoints).toBe(1);
+  });
+
+  it("parses structured saving throw references in MM3 layout", () => {
+    const text = `Azer Marshal Level 17 Minion
+Medium elemental humanoid (fire) XP 400
+Initiative +11 Senses Perception +12
+HP 1; a missed attack never damages a minion.
+AC 31; Fortitude 30, Reflex 26, Will 27
+Saving Throws +2; see also twist free
+Speed 5
+m Warhammer (standard; at-will) ✦ Fire, Weapon
++20 vs. AC; 7 fire damage.
+Alignment Unaligned Languages Giant
+Str 21 (+13) Dex 17 (+11) Wis 18 (+12)
+Con 23 (+14) Int 11 (+8) Cha 16 (+11)
+`;
+    const r = parseMonsterStatBlockText(text);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const detail = (r.entry.stats.otherNumbers as { savingThrowsDetail?: Record<string, unknown> }).savingThrowsDetail;
+    expect(detail).toBeDefined();
+    expect(detail?.value).toBe(2);
+    expect(detail?.references).toEqual(["twist free"]);
+    expect((r.entry.sections as { layout?: string } | undefined)?.layout).toBe("mm3");
+  });
 });
