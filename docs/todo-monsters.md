@@ -1,4 +1,8 @@
-# TODO: Monster Power Cards
+# TODO: Monsters
+
+Backlog for monster data, power cards, templates, and monster-facing UI (including editor tooltips).
+
+## Power cards and rendering
 
 - [x] Handling monster nested attack
   - Monster power cards now render compact nested attack details from both:
@@ -6,12 +10,20 @@
     - Additional attack entries (`attacks[1..n]`) with their own name/range/bonuses and hit/miss/effect blocks.
   - Rendering also deduplicates repeated outcome text between primary and secondary attack sections to reduce noise.
 
+- [ ] Check for unrendered monster data (for example, traits)
+  - Audit generated monster JSON against card output to identify fields that exist in data but are not rendered yet.
+
+## Data, ETL, and level or tier
+
 - [ ] Improve ETL normalization for monster data
   - Standardize how source monster text is transformed into canonical fields so downstream rendering is less brittle.
   - Focus on consistent normalization of attacks, nested outcomes, keywords, and repeated formatting variants before JSON generation.
 
-- [ ] Check for unrendered monster data (for example, traits)
-  - Audit generated monster JSON against card output to identify fields that exist in data but are not rendered yet.
+- [ ] Per-level and per-tier handling for monsters and templates
+  - Model or surface how stats, powers, and traits differ across monster level (and template tier where applicable) instead of assuming a single flat snapshot.
+  - Align ETL, editor, and card rendering so scaled values, level ranges, and tier-specific variants stay consistent end to end.
+
+## Tooltips (monster editor / power cards)
 
 - [ ] Move monster tooltip glossary matching away from hardcoded UI phrase lists
   - Build description/details term matching from glossary data (term + aliases/subterms) instead of maintaining static phrase arrays in UI code.
