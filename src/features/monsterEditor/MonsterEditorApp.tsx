@@ -2328,8 +2328,8 @@ export function MonsterEditorApp({
   const [templateMessage, setTemplateMessage] = useState<string>(
     "Load monster templates from generated JSON to begin."
   );
-  /** When set, monster sheet shows base creature merged with this template (preview only). */
-  const [monsterTemplatePreviewIdx, setMonsterTemplatePreviewIdx] = useState<number | null>(null);
+  /** When set, monster sheet shows base creature merged with up to two templates (preview only). */
+  const [monsterTemplatePreviewIdxs, setMonsterTemplatePreviewIdxs] = useState<number[]>([]);
   /** DMG quick level adjustment preview (−5…+5): attacks, defenses, AC, role HP, damage. */
   const [monsterLevelDelta, setMonsterLevelDelta] = useState(0);
   const [templateNameQuery, setTemplateNameQuery] = useState<string>("");
@@ -2354,7 +2354,7 @@ export function MonsterEditorApp({
   const [templateJsonSearchJumpTick, setTemplateJsonSearchJumpTick] = useState<number>(0);
   const glossaryTooltipUi = useGlossaryTooltip({
     tooltipId: MONSTER_GLOSSARY_TOOLTIP_ID,
-    resetDeps: [selectedId, viewerTab, selectedTemplateIdx, monsterTemplatePreviewIdx]
+    resetDeps: [selectedId, viewerTab, selectedTemplateIdx, monsterTemplatePreviewIdxs.join(",")]
   });
   const startGlossaryHover = glossaryTooltipUi.startHover;
   const leaveGlossaryHover = glossaryTooltipUi.leaveHover;
@@ -2405,7 +2405,7 @@ export function MonsterEditorApp({
   }, [selectedId]);
 
   useEffect(() => {
-    setMonsterTemplatePreviewIdx(null);
+    setMonsterTemplatePreviewIdxs([]);
     setMonsterLevelDelta(0);
   }, [selectedId]);
 
@@ -2413,7 +2413,7 @@ export function MonsterEditorApp({
     setTemplateJsonSearchInput("");
     setTemplateJsonSearchQuery("");
     setTemplateJsonSearchResultIdx(0);
-  }, [monsterTemplatePreviewIdx]);
+  }, [monsterTemplatePreviewIdxs.join(",")]);
 
   useEffect(() => {
     writeStoredViewerTab(viewerTab);
@@ -2471,11 +2471,17 @@ export function MonsterEditorApp({
   }, [selectedId]);
 
   useEffect(() => {
-    if (monsterTemplatePreviewIdx === null) return;
-    if (monsterTemplatePreviewIdx >= templateRows.length) {
-      setMonsterTemplatePreviewIdx(null);
-    }
-  }, [templateRows.length, monsterTemplatePreviewIdx]);
+    setMonsterTemplatePreviewIdxs((prev) => {
+      const valid = prev
+        .filter((idx) => idx >= 0 && idx < templateRows.length)
+        .filter((idx, i, list) => list.indexOf(idx) === i)
+        .slice(0, 2);
+      if (valid.length === prev.length && valid.every((idx, i) => idx === prev[i])) {
+        return prev;
+      }
+      return valid;
+    });
+  }, [templateRows.length]);
 
   const filteredRows = useMemo(() => {
     const nameNeedle = nameQuery.trim().toLowerCase();
@@ -2626,11 +2632,15 @@ export function MonsterEditorApp({
 
   const sheetMonster = useMemo((): MonsterEntryFile | null => {
     if (!activeMonster) return null;
-    if (viewerTab !== "monsters" || monsterTemplatePreviewIdx === null) return activeMonster;
-    const tpl = templateRows[monsterTemplatePreviewIdx];
-    if (!tpl) return activeMonster;
-    return applyMonsterTemplateToEntry(activeMonster, tpl);
-  }, [activeMonster, viewerTab, monsterTemplatePreviewIdx, templateRows]);
+    if (viewerTab !== "monsters" || monsterTemplatePreviewIdxs.length === 0) return activeMonster;
+    let merged = activeMonster;
+    for (const idx of monsterTemplatePreviewIdxs.slice(0, 2)) {
+      const tpl = templateRows[idx];
+      if (!tpl) continue;
+      merged = applyMonsterTemplateToEntry(merged, tpl);
+    }
+    return merged;
+  }, [activeMonster, viewerTab, monsterTemplatePreviewIdxs, templateRows]);
 
   const baseMonsterLevelForClamp = useMemo(
     () => (sheetMonster ? parseMonsterLevel(sheetMonster.level) : undefined),
@@ -2684,21 +2694,43 @@ export function MonsterEditorApp({
   }, [viewerTab, createMonsterDraftEntry, viewMonster]);
 
   const templatePreviewDelta = useMemo((): TemplateApplicationDelta | null => {
-    if (!activeMonster || monsterTemplatePreviewIdx === null) return null;
-    const tpl = templateRows[monsterTemplatePreviewIdx];
-    if (!tpl) return null;
-    return computeTemplateApplicationDelta(activeMonster, tpl);
-  }, [activeMonster, monsterTemplatePreviewIdx, templateRows]);
+    if (!activeMonster || monsterTemplatePreviewIdxs.length === 0) return null;
+    let base = activeMonster;
+    const totals: TemplateApplicationDelta = {
+      addedPowerNames: [],
+      addedTraitNames: [],
+      addedAuraNames: [],
+      skippedDuplicatePowers: 0,
+      skippedDuplicateTraits: 0,
+      skippedDuplicateAuras: 0
+    };
+    for (const idx of monsterTemplatePreviewIdxs.slice(0, 2)) {
+      const tpl = templateRows[idx];
+      if (!tpl) continue;
+      const delta = computeTemplateApplicationDelta(base, tpl);
+      totals.addedPowerNames.push(...delta.addedPowerNames);
+      totals.addedTraitNames.push(...delta.addedTraitNames);
+      totals.addedAuraNames.push(...delta.addedAuraNames);
+      totals.skippedDuplicatePowers += delta.skippedDuplicatePowers;
+      totals.skippedDuplicateTraits += delta.skippedDuplicateTraits;
+      totals.skippedDuplicateAuras += delta.skippedDuplicateAuras;
+      base = applyMonsterTemplateToEntry(base, tpl);
+    }
+    return totals;
+  }, [activeMonster, monsterTemplatePreviewIdxs, templateRows]);
 
   const templatePrereqMetByRow = useMemo((): boolean[] | null => {
     if (!activeMonster) return null;
     return templateRows.map((row) => monsterMatchesTemplateRecord(activeMonster, row));
   }, [activeMonster, templateRows]);
 
-  const selectedTemplatePrereqMet =
-    monsterTemplatePreviewIdx !== null && templatePrereqMetByRow
-      ? templatePrereqMetByRow[monsterTemplatePreviewIdx]
-      : true;
+  const selectedTemplatePrereqFailures = useMemo(() => {
+    if (!templatePrereqMetByRow || monsterTemplatePreviewIdxs.length === 0) return [];
+    return monsterTemplatePreviewIdxs
+      .slice(0, 2)
+      .map((idx) => ({ row: templateRows[idx], met: templatePrereqMetByRow[idx] !== false }))
+      .filter((entry) => entry.row && !entry.met);
+  }, [templatePrereqMetByRow, monsterTemplatePreviewIdxs, templateRows]);
 
   const displayedAuras = useMemo(() => {
     if (!formatMonster || !Array.isArray(formatMonster.auras)) return [];
@@ -2783,11 +2815,11 @@ export function MonsterEditorApp({
   );
 
   const templatePreviewJsonText = useMemo(() => {
-    if (viewerTab !== "monsters" || monsterTemplatePreviewIdx === null) return "";
-    const row = templateRows[monsterTemplatePreviewIdx];
+    if (viewerTab !== "monsters" || monsterTemplatePreviewIdxs.length === 0) return "";
+    const row = templateRows[monsterTemplatePreviewIdxs[0]];
     if (!row) return "";
     return JSON.stringify(row, null, 2);
-  }, [viewerTab, monsterTemplatePreviewIdx, templateRows]);
+  }, [viewerTab, monsterTemplatePreviewIdxs, templateRows]);
 
   const templateJsonSearchMatches = useMemo(
     () => findCaseInsensitiveMatches(templatePreviewJsonText, templateJsonSearchQuery),
@@ -3611,7 +3643,7 @@ export function MonsterEditorApp({
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "minmax(0, 1fr) minmax(0, 2fr)",
+          gridTemplateColumns: "minmax(0, 0.9fr) minmax(0, 2.1fr)",
           gap: "1rem",
           minHeight: "65vh"
         }}
@@ -3630,6 +3662,7 @@ export function MonsterEditorApp({
               }}
             >
               {viewerTab === "monsters" && sheetMonster ? (
+                <>
                 <div
                   style={{
                     flexShrink: 0,
@@ -3645,12 +3678,22 @@ export function MonsterEditorApp({
                   }}
                 >
                   <select
-                    value={monsterTemplatePreviewIdx === null ? "" : String(monsterTemplatePreviewIdx)}
+                    value={monsterTemplatePreviewIdxs[0] === undefined ? "" : String(monsterTemplatePreviewIdxs[0])}
                     onChange={(event) => {
                       const v = event.target.value;
-                      setMonsterTemplatePreviewIdx(v === "" ? null : Number.parseInt(v, 10));
+                      if (v === "") {
+                        setMonsterTemplatePreviewIdxs([]);
+                        return;
+                      }
+                      const firstIdx = Number.parseInt(v, 10);
+                      setMonsterTemplatePreviewIdxs((prev) => {
+                        const second = prev[1];
+                        if (Number.isNaN(firstIdx)) return [];
+                        if (second === undefined || second === firstIdx) return [firstIdx];
+                        return [firstIdx, second];
+                      });
                     }}
-                    aria-label="Merge a monster template onto this creature for preview"
+                    aria-label="Merge a primary monster template onto this creature for preview"
                     style={{
                       minWidth: "12rem",
                       maxWidth: "100%",
@@ -3666,14 +3709,54 @@ export function MonsterEditorApp({
                     {templateRows.map((row, idx) => {
                       const prereqOk = templatePrereqMetByRow?.[idx] !== false;
                       return (
-                        <option key={`monster-sheet-tpl-${idx}`} value={String(idx)}>
+                        <option key={`monster-sheet-tpl-primary-${idx}`} value={String(idx)}>
                           {String(row.templateName ?? "").trim() || `Template ${idx + 1}`}
                           {!prereqOk ? " — prerequisite not met" : ""}
                         </option>
                       );
                     })}
                   </select>
-                  {monsterTemplatePreviewIdx !== null && templatePreviewDelta ? (
+                  <select
+                    value={monsterTemplatePreviewIdxs[1] === undefined ? "" : String(monsterTemplatePreviewIdxs[1])}
+                    disabled={monsterTemplatePreviewIdxs[0] === undefined || templateRows.length === 0}
+                    onChange={(event) => {
+                      const v = event.target.value;
+                      setMonsterTemplatePreviewIdxs((prev) => {
+                        const first = prev[0];
+                        if (first === undefined) return prev;
+                        if (v === "") return [first];
+                        const secondIdx = Number.parseInt(v, 10);
+                        if (Number.isNaN(secondIdx) || secondIdx === first) return [first];
+                        return [first, secondIdx];
+                      });
+                    }}
+                    aria-label="Merge a second monster template onto this creature for preview"
+                    style={{
+                      minWidth: "12rem",
+                      maxWidth: "100%",
+                      fontSize: "0.8125rem",
+                      padding: "0.28rem 0.4rem",
+                      borderRadius: "0.25rem",
+                      border: "1px solid var(--panel-border)",
+                      backgroundColor: "var(--surface-0)",
+                      color: "var(--text-primary)"
+                    }}
+                  >
+                    <option value="">Add second template...</option>
+                    {templateRows
+                      .map((row, idx) => ({ row, idx }))
+                      .filter(({ idx }) => idx !== monsterTemplatePreviewIdxs[0])
+                      .map(({ row, idx }) => {
+                        const prereqOk = templatePrereqMetByRow?.[idx] !== false;
+                        return (
+                          <option key={`monster-sheet-tpl-secondary-${idx}`} value={String(idx)}>
+                            {String(row.templateName ?? "").trim() || `Template ${idx + 1}`}
+                            {!prereqOk ? " — prerequisite not met" : ""}
+                          </option>
+                        );
+                      })}
+                  </select>
+                  {monsterTemplatePreviewIdxs.length > 0 && templatePreviewDelta ? (
                     <span style={{ fontSize: "0.76rem", color: "var(--text-secondary)", lineHeight: 1.35 }}>
                       +{templatePreviewDelta.addedPowerNames.length} powers, +{templatePreviewDelta.addedTraitNames.length}{" "}
                       traits, +{templatePreviewDelta.addedAuraNames.length} auras
@@ -3686,11 +3769,104 @@ export function MonsterEditorApp({
                     </span>
                   ) : null}
                 </div>
+                <div
+                  style={{
+                    flexShrink: 0,
+                    marginBottom: "0.5rem",
+                    padding: "0.45rem 0.55rem",
+                    borderRadius: "var(--ui-panel-radius, 0.35rem)",
+                    border: "1px solid var(--panel-border)",
+                    backgroundColor: "var(--surface-1)",
+                    display: "flex",
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                    gap: "0.35rem"
+                  }}
+                >
+                  <span
+                    {...glossaryTooltipUi.hoverA11y("glossaryTerm:Level")}
+                    style={{ ...microLabelStyle, width: "fit-content", cursor: "help", borderBottom: "1px dotted var(--text-muted)" }}
+                  >
+                    LEVEL
+                  </span>
+                  <button
+                    type="button"
+                    disabled={effectiveMonsterLevelDelta <= minMonsterLevelDelta}
+                    onClick={() =>
+                      setMonsterLevelDelta((d) => Math.max(minMonsterLevelDelta, d - 1))
+                    }
+                    aria-label="Decrease monster level adjustment by one"
+                    style={{
+                      minWidth: "1.75rem",
+                      padding: "0.18rem 0.45rem",
+                      fontSize: "0.8125rem",
+                      lineHeight: 1.2,
+                      borderRadius: "0.25rem",
+                      border: "1px solid var(--panel-border)",
+                      backgroundColor: "var(--surface-0)",
+                      color: "var(--text-primary)",
+                      cursor: effectiveMonsterLevelDelta <= minMonsterLevelDelta ? "not-allowed" : "pointer",
+                      opacity: effectiveMonsterLevelDelta <= minMonsterLevelDelta ? 0.45 : 1
+                    }}
+                  >
+                    -
+                  </button>
+                  <span style={{ fontSize: "0.8125rem", color: "var(--text-primary)", minWidth: "2.5rem", textAlign: "center" }}>
+                    {effectiveMonsterLevelDelta > 0 ? `+${effectiveMonsterLevelDelta}` : effectiveMonsterLevelDelta}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={effectiveMonsterLevelDelta >= RECOMMENDED_MAX_MONSTER_LEVEL_DELTA}
+                    onClick={() =>
+                      setMonsterLevelDelta((d) => Math.min(RECOMMENDED_MAX_MONSTER_LEVEL_DELTA, d + 1))
+                    }
+                    aria-label="Increase monster level adjustment by one"
+                    style={{
+                      minWidth: "1.75rem",
+                      padding: "0.18rem 0.45rem",
+                      fontSize: "0.8125rem",
+                      lineHeight: 1.2,
+                      borderRadius: "0.25rem",
+                      border: "1px solid var(--panel-border)",
+                      backgroundColor: "var(--surface-0)",
+                      color: "var(--text-primary)",
+                      cursor: effectiveMonsterLevelDelta >= RECOMMENDED_MAX_MONSTER_LEVEL_DELTA ? "not-allowed" : "pointer",
+                      opacity: effectiveMonsterLevelDelta >= RECOMMENDED_MAX_MONSTER_LEVEL_DELTA ? 0.45 : 1
+                    }}
+                  >
+                    +
+                  </button>
+                  <span style={{ fontSize: "0.74rem", color: "var(--text-secondary)", lineHeight: 1.35, maxWidth: "28rem" }}>
+                    +1 attacks, defenses, AC, role HP, and scaled XP per level; +1 damage per 2 levels on attacks. Effective level
+                    cannot go below 1. Best within +/-{RECOMMENDED_MAX_MONSTER_LEVEL_DELTA}.
+                  </span>
+                  {effectiveMonsterLevelDelta !== 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => setMonsterLevelDelta(0)}
+                      style={{
+                        marginLeft: "0.15rem",
+                        padding: "0.18rem 0.5rem",
+                        fontSize: "0.76rem",
+                        lineHeight: 1.2,
+                        borderRadius: "0.25rem",
+                        border: "1px solid var(--panel-border)",
+                        backgroundColor: "transparent",
+                        color: "var(--text-secondary)",
+                        cursor: "pointer"
+                      }}
+                    >
+                      Reset
+                    </button>
+                  ) : null}
+                </div>
+                </>
               ) : null}
               <div style={{ ...indexColumnHeaderStyle, flexShrink: 0 }}>Monsters ({filteredRows.length})</div>
               <div style={{ minHeight: 0, flex: 1, overflow: "auto" }}>
                 {filteredRows.map((entry) => {
                   const selectedRow = selectedId === entry.id;
+                  const rankLabel = detectMonsterRank(entry).replace(/^./, (ch) => ch.toUpperCase());
                   return (
                     <button
                       key={entry.id}
@@ -3711,6 +3887,7 @@ export function MonsterEditorApp({
                       {entry.level && (
                         <div style={metaMuted}>
                           Level {entry.level}
+                          {` • ${rankLabel}`}
                           {entry.role ? ` • ${entry.role}` : ""}
                           {customMonsterIdSet.has(entry.id) ? ` • saved in browser` : ""}
                         </div>
@@ -3778,7 +3955,7 @@ export function MonsterEditorApp({
             </p>
           ) : (
             <div style={{ minWidth: 0 }}>
-              {viewerTab === "monsters" && monsterTemplatePreviewIdx !== null && templateRows[monsterTemplatePreviewIdx] ? (
+              {viewerTab === "monsters" && monsterTemplatePreviewIdxs.length > 0 ? (
                 <div
                   style={{
                     marginBottom: "0.55rem",
@@ -3793,17 +3970,18 @@ export function MonsterEditorApp({
                 >
                   Previewing{" "}
                   <strong style={{ color: "var(--text-primary)" }}>
-                    {templateRows[monsterTemplatePreviewIdx]?.templateName}
+                    {monsterTemplatePreviewIdxs
+                      .slice(0, 2)
+                      .map((idx) => templateRows[idx]?.templateName)
+                      .filter((name) => String(name ?? "").trim())
+                      .join(" + ") || "template overlay"}
                   </strong>
-                    . Powers, traits, and auras from the template are appended below (deduped by name). Structured stat
+                    . Powers, traits, and auras from selected template(s) are appended below (deduped by name). Structured stat
                     adjustments from the template JSON (HP, defenses, skills, and other parsed stat lines) are merged into the
                     quick stats and stat block when available; use the book for edge cases and situational modifiers.
                 </div>
               ) : null}
-              {viewerTab === "monsters" &&
-              monsterTemplatePreviewIdx !== null &&
-              templateRows[monsterTemplatePreviewIdx] &&
-              !selectedTemplatePrereqMet ? (
+              {viewerTab === "monsters" && selectedTemplatePrereqFailures.length > 0 ? (
                 <div
                   role="status"
                   style={{
@@ -3817,20 +3995,12 @@ export function MonsterEditorApp({
                     lineHeight: 1.45
                   }}
                 >
-                  This creature does not meet the template&apos;s prerequisites
-                  {String(templateRows[monsterTemplatePreviewIdx]?.prerequisite ?? "").trim() ? (
-                    <>
-                      :{" "}
-                      <span style={{ color: "var(--text-secondary)" }}>
-                        {String(templateRows[monsterTemplatePreviewIdx]?.prerequisite).trim()}
-                      </span>
-                    </>
-                  ) : (
-                    <span style={{ color: "var(--text-secondary)" }}>
-                      {" "}
-                      (saved prerequisite rules do not match this creature)
-                    </span>
-                  )}
+                  This creature does not meet prerequisite rules for{" "}
+                  <span style={{ color: "var(--text-secondary)" }}>
+                    {selectedTemplatePrereqFailures
+                      .map(({ row }) => String(row?.templateName ?? "").trim() || "unnamed template")
+                      .join(", ")}
+                  </span>
                   . The preview still shows what would be merged; use the book guidance only for legal candidates.
                 </div>
               ) : null}
@@ -3940,94 +4110,6 @@ export function MonsterEditorApp({
                   </span>{" "}
                   {formatValue(viewMonster.xp)}
                 </div>
-                {viewerTab === "monsters" ? (
-                <div
-                  style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    alignItems: "center",
-                    gap: "0.35rem",
-                    marginTop: "0.35rem"
-                  }}
-                >
-                  <span
-                    {...glossaryTooltipUi.hoverA11y("glossaryTerm:Level")}
-                    style={{ ...microLabelStyle, width: "fit-content", cursor: "help", borderBottom: "1px dotted var(--text-muted)" }}
-                  >
-                    Quick level (DMG)
-                  </span>
-                  <button
-                    type="button"
-                    disabled={effectiveMonsterLevelDelta <= minMonsterLevelDelta}
-                    onClick={() =>
-                      setMonsterLevelDelta((d) => Math.max(minMonsterLevelDelta, d - 1))
-                    }
-                    aria-label="Decrease monster level adjustment by one"
-                    style={{
-                      minWidth: "1.75rem",
-                      padding: "0.18rem 0.45rem",
-                      fontSize: "0.8125rem",
-                      lineHeight: 1.2,
-                      borderRadius: "0.25rem",
-                      border: "1px solid var(--panel-border)",
-                      backgroundColor: "var(--surface-0)",
-                      color: "var(--text-primary)",
-                      cursor: effectiveMonsterLevelDelta <= minMonsterLevelDelta ? "not-allowed" : "pointer",
-                      opacity: effectiveMonsterLevelDelta <= minMonsterLevelDelta ? 0.45 : 1
-                    }}
-                  >
-                    −
-                  </button>
-                  <span style={{ fontSize: "0.8125rem", color: "var(--text-primary)", minWidth: "2.5rem", textAlign: "center" }}>
-                    {effectiveMonsterLevelDelta > 0 ? `+${effectiveMonsterLevelDelta}` : effectiveMonsterLevelDelta}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={effectiveMonsterLevelDelta >= RECOMMENDED_MAX_MONSTER_LEVEL_DELTA}
-                    onClick={() =>
-                      setMonsterLevelDelta((d) => Math.min(RECOMMENDED_MAX_MONSTER_LEVEL_DELTA, d + 1))
-                    }
-                    aria-label="Increase monster level adjustment by one"
-                    style={{
-                      minWidth: "1.75rem",
-                      padding: "0.18rem 0.45rem",
-                      fontSize: "0.8125rem",
-                      lineHeight: 1.2,
-                      borderRadius: "0.25rem",
-                      border: "1px solid var(--panel-border)",
-                      backgroundColor: "var(--surface-0)",
-                      color: "var(--text-primary)",
-                      cursor: effectiveMonsterLevelDelta >= RECOMMENDED_MAX_MONSTER_LEVEL_DELTA ? "not-allowed" : "pointer",
-                      opacity: effectiveMonsterLevelDelta >= RECOMMENDED_MAX_MONSTER_LEVEL_DELTA ? 0.45 : 1
-                    }}
-                  >
-                    +
-                  </button>
-                  <span style={{ fontSize: "0.74rem", color: "var(--text-secondary)", lineHeight: 1.35, maxWidth: "28rem" }}>
-                    +1 attacks, defenses, AC, role HP, and scaled XP per level; +1 damage per 2 levels on attacks. Effective
-                    level cannot go below 1. Best within ±{RECOMMENDED_MAX_MONSTER_LEVEL_DELTA}.
-                  </span>
-                  {effectiveMonsterLevelDelta !== 0 ? (
-                    <button
-                      type="button"
-                      onClick={() => setMonsterLevelDelta(0)}
-                      style={{
-                        marginLeft: "0.15rem",
-                        padding: "0.18rem 0.5rem",
-                        fontSize: "0.76rem",
-                        lineHeight: 1.2,
-                        borderRadius: "0.25rem",
-                        border: "1px solid var(--panel-border)",
-                        backgroundColor: "transparent",
-                        color: "var(--text-secondary)",
-                        cursor: "pointer"
-                      }}
-                    >
-                      Reset
-                    </button>
-                  ) : null}
-                </div>
-                ) : null}
                 {(() => {
                   const on = (viewMonster.stats?.otherNumbers ?? {}) as Record<string, unknown>;
                   const skillsBlock = (viewMonster.stats?.skills ?? {}) as Record<string, unknown>;
@@ -5308,9 +5390,7 @@ export function MonsterEditorApp({
             }}
           />
         </details>
-        {viewerTab === "monsters" &&
-        monsterTemplatePreviewIdx !== null &&
-        templateRows[monsterTemplatePreviewIdx] ? (
+        {viewerTab === "monsters" && monsterTemplatePreviewIdxs.length > 0 && templateRows[monsterTemplatePreviewIdxs[0]] ? (
           <details style={{ marginTop: "0.65rem" }}>
             <summary style={jsonSummaryStyle}>Template JSON</summary>
             <div style={{ marginTop: "0.5rem", display: "flex", flexWrap: "wrap", gap: "0.35rem", alignItems: "center" }}>
