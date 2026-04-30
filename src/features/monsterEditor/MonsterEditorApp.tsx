@@ -33,6 +33,7 @@ import {
   type MonsterTemplateImportValidation,
   validateMonsterTemplateImport
 } from "./pasteMonsterTemplateEtl";
+import { parseMonsterStatBlockText } from "./monsterRawTextParse";
 import {
   formatMonsterStatLabelForDisplay,
   isRenderableCardValue,
@@ -536,7 +537,7 @@ const MONSTER_VIEWER_TAB_KEY = "monsterEditor.viewerTab";
 const MONSTER_SELECTED_TEMPLATE_IDX_STORAGE_KEY = "monsterEditor.selectedTemplateIdx";
 const MONSTER_CUSTOM_TEMPLATES_STORAGE_KEY = "monsterEditor.customMonsterTemplates";
 
-type MonsterViewerTab = "monsters" | "templates" | "createTemplate";
+type MonsterViewerTab = "monsters" | "templates" | "createTemplate" | "createMonster";
 
 function normalizeTemplateDedupeKey(t: Pick<MonsterTemplateRecord, "templateName" | "sourceBook">): string {
   const name = String(t.templateName ?? "")
@@ -618,6 +619,7 @@ function readStoredViewerTab(): MonsterViewerTab {
     const stored = window.localStorage.getItem(MONSTER_VIEWER_TAB_KEY);
     if (stored === "templates") return "templates";
     if (stored === "createTemplate") return "createTemplate";
+    if (stored === "createMonster") return "createMonster";
     return "monsters";
   } catch {
     return "monsters";
@@ -2184,6 +2186,9 @@ export function MonsterEditorApp({
   const [createPasteText, setCreatePasteText] = useState<string>("");
   const [createNameHint, setCreateNameHint] = useState<string>("");
   const [createDraftJson, setCreateDraftJson] = useState<string>("");
+  const [createMonsterPasteText, setCreateMonsterPasteText] = useState<string>("");
+  const [createMonsterDraftJson, setCreateMonsterDraftJson] = useState<string>("");
+  const [createMonsterImportMessage, setCreateMonsterImportMessage] = useState<string>("");
   const [createImportMessage, setCreateImportMessage] = useState<string>("");
   const [createImportValidation, setCreateImportValidation] = useState<MonsterTemplateImportValidation | null>(null);
   const [isBusy, setIsBusy] = useState<boolean>(false);
@@ -2204,6 +2209,7 @@ export function MonsterEditorApp({
   const jsonTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const templateJsonTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const createPasteTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const createMonsterPasteTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const customTemplatesJsonFileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -2470,6 +2476,34 @@ export function MonsterEditorApp({
     return applyMonsterLevelDelta(sheetMonster, monsterLevelDelta);
   }, [sheetMonster, monsterLevelDelta]);
 
+  const createMonsterDraftEntry = useMemo((): MonsterEntryFile | null => {
+    if (viewerTab !== "createMonster") return null;
+    const raw = createMonsterDraftJson.trim();
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as MonsterEntryFile;
+    } catch {
+      return null;
+    }
+  }, [viewerTab, createMonsterDraftJson]);
+
+  const createMonsterDraftJsonInvalid = useMemo(() => {
+    if (viewerTab !== "createMonster") return false;
+    const raw = createMonsterDraftJson.trim();
+    if (!raw) return false;
+    try {
+      JSON.parse(raw);
+      return false;
+    } catch {
+      return true;
+    }
+  }, [viewerTab, createMonsterDraftJson]);
+
+  const formatMonster = useMemo((): MonsterEntryFile | null => {
+    if (viewerTab === "createMonster") return createMonsterDraftEntry;
+    return viewMonster;
+  }, [viewerTab, createMonsterDraftEntry, viewMonster]);
+
   const templatePreviewDelta = useMemo((): TemplateApplicationDelta | null => {
     if (!activeMonster || monsterTemplatePreviewIdx === null) return null;
     const tpl = templateRows[monsterTemplatePreviewIdx];
@@ -2488,23 +2522,23 @@ export function MonsterEditorApp({
       : true;
 
   const displayedAuras = useMemo(() => {
-    if (!viewMonster || !Array.isArray(viewMonster.auras)) return [];
-    return viewMonster.auras;
-  }, [viewMonster]);
+    if (!formatMonster || !Array.isArray(formatMonster.auras)) return [];
+    return formatMonster.auras;
+  }, [formatMonster]);
 
   const displayedTraits = useMemo(() => {
-    if (!viewMonster || !Array.isArray(viewMonster.traits)) return [];
+    if (!formatMonster || !Array.isArray(formatMonster.traits)) return [];
     const normalize = (value: unknown): string => String(value ?? "").trim().toLowerCase();
     const auraSignatures = new Set(
       displayedAuras.map((aura) =>
         [normalize(aura.name), normalize(aura.range), normalize(aura.details)].join("||")
       )
     );
-    return viewMonster.traits.filter((trait) => {
+    return formatMonster.traits.filter((trait) => {
       const signature = [normalize(trait.name), normalize(trait.range), normalize(trait.details)].join("||");
       return !auraSignatures.has(signature);
     });
-  }, [viewMonster, displayedAuras]);
+  }, [formatMonster, displayedAuras]);
 
   const auraHeadingColumnWidthCh = useMemo(() => {
     if (displayedAuras.length === 0) return 12;
@@ -2550,11 +2584,20 @@ export function MonsterEditorApp({
         return createDraftJson;
       }
     }
+    if (viewerTab === "createMonster") {
+      const raw = createMonsterDraftJson.trim();
+      if (!raw) return "{}";
+      try {
+        return JSON.stringify(JSON.parse(raw), null, 2);
+      } catch {
+        return createMonsterDraftJson;
+      }
+    }
     if (viewerTab === "templates") {
       return JSON.stringify(selectedTemplateRecord ?? {}, null, 2);
     }
     return JSON.stringify(viewMonster ?? activeMonster, null, 2);
-  }, [viewerTab, selectedTemplateRecord, activeMonster, viewMonster, createDraftJson]);
+  }, [viewerTab, selectedTemplateRecord, activeMonster, viewMonster, createDraftJson, createMonsterDraftJson]);
   const jsonSearchMatches = useMemo(
     () => findCaseInsensitiveMatches(rawJsonText, jsonSearchQuery),
     [rawJsonText, jsonSearchQuery]
@@ -2785,6 +2828,15 @@ export function MonsterEditorApp({
         <button
           type="button"
           role="tab"
+          aria-selected={viewerTab === "createMonster"}
+          onClick={() => setViewerTab("createMonster")}
+          disabled={viewerTab === "createMonster"}
+        >
+          Create monster
+        </button>
+        <button
+          type="button"
+          role="tab"
           aria-selected={viewerTab === "createTemplate"}
           onClick={() => setViewerTab("createTemplate")}
           disabled={viewerTab === "createTemplate"}
@@ -2812,6 +2864,16 @@ export function MonsterEditorApp({
             <code style={{ fontSize: "0.92em" }}>{`{ meta, templates }`}</code> bundle (same as generated{" "}
             <code style={{ fontSize: "0.92em" }}>monster_templates.json</code>).
           </>
+        ) : viewerTab === "createMonster" ? (
+          <>
+            Paste copied MM-style stat block text (name line through powers). <strong>Import stat block</strong> parses it into
+            monster sheet JSON. Edit the JSON draft below to fix gaps — parsing is best-effort for OCR quirks.
+            <span style={{ display: "block", marginTop: "0.35rem" }}>
+              <strong>Tip:</strong> Powers must include ✦ before usage (At-Will, Encounter, ...). Section headers such as{" "}
+              <code style={{ fontSize: "0.92em" }}>TRAITS</code> and{" "}
+              <code style={{ fontSize: "0.92em" }}>STANDARD ACTIONS</code> help split abilities.
+            </span>
+          </>
         ) : (
           <>
             Paste raw text for one monster template.  Import and review the result. Edit the JSON, then save it as a local custom
@@ -2831,30 +2893,6 @@ export function MonsterEditorApp({
 
       {viewerTab === "monsters" ? (
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
-          <button
-            type="button"
-            onClick={() => {
-              setIsBusy(true);
-              void loadMonsterIndex()
-                .then((rows) => {
-                  setIndexRows(rows);
-                  if (rows.length > 0) {
-                    const preferredId = selectedId && rows.some((row) => row.id === selectedId) ? selectedId : rows[0].id;
-                    setSelectedId(preferredId);
-                  } else {
-                    setSelectedId("");
-                  }
-                  setMessage(`Reloaded generated index (${rows.length} records).`);
-                })
-                .catch((error: unknown) => {
-                  setMessage(error instanceof Error ? error.message : "Could not reload monster index.");
-                })
-                .finally(() => setIsBusy(false));
-            }}
-            disabled={isBusy}
-          >
-            Reload monster index
-          </button>
           <input
             value={nameQuery}
             onChange={(event) => setNameQuery(event.target.value)}
@@ -2937,42 +2975,6 @@ export function MonsterEditorApp({
         </div>
       ) : viewerTab === "templates" ? (
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.75rem", alignItems: "center" }}>
-          <button
-            type="button"
-            onClick={() => {
-              setIsBusy(true);
-              void loadMonsterTemplates()
-                .then((rows) => {
-                  setServerTemplateRows(rows);
-                  const merged = mergeServerAndCustomTemplates(readCustomMonsterTemplates(), rows);
-                  setTemplateRows(merged);
-                  setSelectedTemplateIdx((prev) =>
-                    merged.length === 0 ? 0 : Math.min(prev, merged.length - 1)
-                  );
-                  setTemplateMessage(`Reloaded ${rows.length} server templates (${merged.length} total with custom).`);
-                })
-                .catch((error: unknown) => {
-                  const custom = readCustomMonsterTemplates();
-                  const merged = mergeServerAndCustomTemplates(custom, serverTemplateRows);
-                  setTemplateRows(merged);
-                  setSelectedTemplateIdx((prev) =>
-                    merged.length === 0 ? 0 : Math.min(prev, merged.length - 1)
-                  );
-                  const errMsg = error instanceof Error ? error.message : "Could not reload monster templates.";
-                  setTemplateMessage(
-                    merged.length > 0
-                      ? serverTemplateRows.length > 0
-                        ? `${errMsg} Kept previous server list in memory; ${custom.length} custom from storage.`
-                        : `${errMsg} Showing ${custom.length} custom template(s) from local storage.`
-                      : errMsg
-                  );
-                })
-                .finally(() => setIsBusy(false));
-            }}
-            disabled={isBusy}
-          >
-            Reload templates
-          </button>
           <button
             type="button"
             disabled={isBusy || templateRows.length === 0}
@@ -3216,6 +3218,34 @@ export function MonsterEditorApp({
             }}
           />
         </div>
+      ) : viewerTab === "createMonster" ? (
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center", marginBottom: "0.75rem" }}>
+          <button
+            type="button"
+            disabled={isBusy || !createMonsterPasteText.trim()}
+            onClick={() => {
+              setIsBusy(true);
+              setCreateMonsterImportMessage("");
+              const result = parseMonsterStatBlockText(createMonsterPasteText);
+              if (!result.ok) {
+                setCreateMonsterImportMessage(result.error);
+                setIsBusy(false);
+                return;
+              }
+              setCreateMonsterDraftJson(JSON.stringify(result.entry, null, 2));
+              if (result.warnings.length > 0) {
+                setCreateMonsterImportMessage(
+                  `Imported with ${result.warnings.length} parse warning(s). Review the JSON and formatted sheet.`
+                );
+              } else {
+                setCreateMonsterImportMessage("Imported — review the formatted sheet and JSON below.");
+              }
+              setIsBusy(false);
+            }}
+          >
+            Import stat block
+          </button>
+        </div>
       ) : null}
 
       <div
@@ -3230,7 +3260,9 @@ export function MonsterEditorApp({
                 ? message
                 : viewerTab === "templates"
                   ? templateMessage
-                  : createImportMessage;
+                  : viewerTab === "createMonster"
+                    ? createMonsterImportMessage
+                    : createImportMessage;
             return line.toLowerCase().includes("could not") ||
               line.toLowerCase().includes("invalid") ||
               line.toLowerCase().includes("issues")
@@ -3243,7 +3275,9 @@ export function MonsterEditorApp({
           ? message
           : viewerTab === "templates"
             ? templateMessage
-            : createImportMessage}
+            : viewerTab === "createMonster"
+              ? createMonsterImportMessage
+              : createImportMessage}
       </div>
       {viewerTab === "createTemplate" && createImportValidation && createImportValidation.errors.length > 0 && (
         <div style={errorPanelStyle}>
@@ -3279,8 +3313,9 @@ export function MonsterEditorApp({
           minHeight: "65vh"
         }}
       >
-        {viewerTab === "monsters" ? (
+        {(viewerTab === "monsters" || viewerTab === "createMonster") ? (
           <>
+            {viewerTab === "monsters" ? (
             <div
               style={{
                 ...sheetPanel,
@@ -3291,7 +3326,7 @@ export function MonsterEditorApp({
                 maxHeight: "97.5vh"
               }}
             >
-              {sheetMonster ? (
+              {viewerTab === "monsters" && sheetMonster ? (
                 <div
                   style={{
                     flexShrink: 0,
@@ -3385,15 +3420,62 @@ export function MonsterEditorApp({
                 })}
               </div>
             </div>
+            ) : (
+              <div
+                style={{
+                  ...sheetPanel,
+                  overflow: "hidden",
+                  display: "grid",
+                  gridTemplateRows: "auto 1fr",
+                  minHeight: 0,
+                  maxHeight: "97.5vh"
+                }}
+              >
+                <div style={indexColumnHeaderStyle}>Paste stat block text</div>
+                <div
+                  style={{
+                    minHeight: 0,
+                    overflow: "hidden",
+                    display: "flex",
+                    flexDirection: "column",
+                    padding: "0.65rem 0.75rem"
+                  }}
+                >
+                  <textarea
+                    ref={createMonsterPasteTextareaRef}
+                    value={createMonsterPasteText}
+                    onChange={(event) => setCreateMonsterPasteText(event.target.value)}
+                    placeholder="Paste one monster stat block (name line, defenses, TRAITS, STANDARD ACTIONS, …)…"
+                    style={{
+                      flex: 1,
+                      minHeight: "12rem",
+                      width: "100%",
+                      boxSizing: "border-box",
+                      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+                      fontSize: "0.76rem",
+                      lineHeight: 1.4,
+                      padding: "0.55rem",
+                      borderRadius: "0.32rem",
+                      border: "1px solid var(--panel-border)",
+                      backgroundColor: "var(--surface-1)",
+                      color: "var(--text-primary)",
+                      resize: "vertical"
+                    }}
+                  />
+                </div>
+              </div>
+            )}
 
             <div style={{ ...sheetPanel, padding: "0.75rem" }}>
-          {!viewMonster ? (
+          {!formatMonster ? (
             <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.8125rem", lineHeight: 1.45 }}>
-              Select a monster to view its generated JSON data.
+              {viewerTab === "createMonster"
+                ? "Paste text and use Import stat block, or edit JSON below."
+                : "Select a monster to view its generated JSON data."}
             </p>
           ) : (
             <div style={{ minWidth: 0 }}>
-              {monsterTemplatePreviewIdx !== null && templateRows[monsterTemplatePreviewIdx] ? (
+              {viewerTab === "monsters" && monsterTemplatePreviewIdx !== null && templateRows[monsterTemplatePreviewIdx] ? (
                 <div
                   style={{
                     marginBottom: "0.55rem",
@@ -3415,7 +3497,8 @@ export function MonsterEditorApp({
                     quick stats and stat block when available; use the book for edge cases and situational modifiers.
                 </div>
               ) : null}
-              {monsterTemplatePreviewIdx !== null &&
+              {viewerTab === "monsters" &&
+              monsterTemplatePreviewIdx !== null &&
               templateRows[monsterTemplatePreviewIdx] &&
               !selectedTemplatePrereqMet ? (
                 <div
@@ -3448,6 +3531,10 @@ export function MonsterEditorApp({
                   . The preview still shows what would be merged; use the book guidance only for legal candidates.
                 </div>
               ) : null}
+              {(() => {
+                const viewMonster = formatMonster!;
+                return (
+                  <>
               <div style={centerIdentityBlockStyle}>
                 <div style={centerIdentityTitleStyle}>
                   <span>{viewMonster.name}</span>
@@ -3477,7 +3564,7 @@ export function MonsterEditorApp({
                     Level
                   </span>{" "}
                   {formatValue(viewMonster.level)}
-                  {effectiveMonsterLevelDelta !== 0 ? (
+                  {viewerTab === "monsters" && effectiveMonsterLevelDelta !== 0 ? (
                     <span style={{ color: "var(--text-secondary)", fontSize: "0.85em", marginLeft: "0.28rem" }}>
                       (base {formatValue(sheetMonster.level)})
                     </span>
@@ -3550,6 +3637,7 @@ export function MonsterEditorApp({
                   </span>{" "}
                   {formatValue(viewMonster.xp)}
                 </div>
+                {viewerTab === "monsters" ? (
                 <div
                   style={{
                     display: "flex",
@@ -3636,6 +3724,7 @@ export function MonsterEditorApp({
                     </button>
                   ) : null}
                 </div>
+                ) : null}
                 {(() => {
                   const on = (viewMonster.stats?.otherNumbers ?? {}) as Record<string, unknown>;
                   const skillsBlock = (viewMonster.stats?.skills ?? {}) as Record<string, unknown>;
@@ -4434,6 +4523,9 @@ export function MonsterEditorApp({
                 leaveGlossaryHover={leaveGlossaryHover}
                 shouldHighlightGlossaryTerm={shouldHighlightGlossaryTerm}
               />
+                  </>
+                );
+              })()}
 
             </div>
           )}
@@ -4640,7 +4732,11 @@ export function MonsterEditorApp({
       <div style={{ marginTop: "0.85rem", ...panelStyle, padding: "0.55rem" }}>
         <details>
           <summary style={jsonSummaryStyle}>
-            {viewerTab === "createTemplate" ? "Template draft (JSON)" : "JSON"}
+            {viewerTab === "createTemplate"
+              ? "Template draft (JSON)"
+              : viewerTab === "createMonster"
+                ? "Monster draft (JSON)"
+                : "JSON"}
           </summary>
           <div style={{ marginTop: "0.5rem", display: "flex", flexWrap: "wrap", gap: "0.35rem", alignItems: "center" }}>
             <input
@@ -4711,12 +4807,20 @@ export function MonsterEditorApp({
           </div>
           <textarea
             ref={jsonTextareaRef}
-            value={viewerTab === "createTemplate" ? createDraftJson : rawJsonText}
-            readOnly={viewerTab !== "createTemplate"}
+            value={
+              viewerTab === "createTemplate"
+                ? createDraftJson
+                : viewerTab === "createMonster"
+                  ? createMonsterDraftJson
+                  : rawJsonText
+            }
+            readOnly={viewerTab !== "createTemplate" && viewerTab !== "createMonster"}
             onChange={
               viewerTab === "createTemplate"
                 ? (event) => setCreateDraftJson(event.target.value)
-                : undefined
+                : viewerTab === "createMonster"
+                  ? (event) => setCreateMonsterDraftJson(event.target.value)
+                  : undefined
             }
             style={{
               margin: "0.55rem 0 0 0",
