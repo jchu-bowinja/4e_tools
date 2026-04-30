@@ -536,6 +536,7 @@ const MONSTER_SELECTED_ID_STORAGE_KEY = "monsterEditor.selectedId";
 const MONSTER_VIEWER_TAB_KEY = "monsterEditor.viewerTab";
 const MONSTER_SELECTED_TEMPLATE_IDX_STORAGE_KEY = "monsterEditor.selectedTemplateIdx";
 const MONSTER_CUSTOM_TEMPLATES_STORAGE_KEY = "monsterEditor.customMonsterTemplates";
+const MONSTER_CUSTOM_ENTRIES_STORAGE_KEY = "monsterEditor.customMonsterEntries";
 
 type MonsterViewerTab = "monsters" | "templates" | "createTemplate" | "createMonster";
 
@@ -576,6 +577,69 @@ function mergeServerAndCustomTemplates(
     if (!customKeys.has(normalizeTemplateDedupeKey(s))) out.push(s);
   }
   return out;
+}
+
+function readCustomMonsterEntries(): MonsterEntryFile[] {
+  try {
+    const raw = window.localStorage.getItem(MONSTER_CUSTOM_ENTRIES_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as MonsterEntryFile[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeCustomMonsterEntries(rows: MonsterEntryFile[]): void {
+  try {
+    window.localStorage.setItem(MONSTER_CUSTOM_ENTRIES_STORAGE_KEY, JSON.stringify(rows));
+  } catch {
+    /* ignore */
+  }
+}
+
+function monsterEntryToIndexRow(entry: MonsterEntryFile): MonsterIndexEntry {
+  return {
+    id: entry.id,
+    fileName: entry.fileName || `${entry.id}.json`,
+    relativePath: entry.relativePath || `custom/monsters/${entry.id}.json`,
+    name: entry.name,
+    level: entry.level,
+    role: entry.role,
+    isLeader: entry.isLeader,
+    parseError: entry.parseError ?? ""
+  };
+}
+
+function mergeServerAndCustomMonsterIndex(server: MonsterIndexEntry[], custom: MonsterEntryFile[]): MonsterIndexEntry[] {
+  const customIds = new Set(custom.map((c) => c.id));
+  const rows = custom.map(monsterEntryToIndexRow);
+  for (const row of server) {
+    if (!customIds.has(row.id)) rows.push(row);
+  }
+  return rows;
+}
+
+/** Persisted browser-only monsters: stable paths and sourceRoot for the sheet. */
+function normalizeMonsterEntryForSave(parsed: MonsterEntryFile): MonsterEntryFile {
+  const id = String(parsed.id ?? "").trim() || `custom-${Date.now().toString(36)}`;
+  const name = String(parsed.name ?? "").trim() || "Unnamed monster";
+  const powers = Array.isArray(parsed.powers) ? parsed.powers : [];
+  return {
+    ...parsed,
+    id,
+    name,
+    powers,
+    fileName: `${id}.json`,
+    relativePath: `custom/monsters/${id}.json`,
+    sourceRoot: "custom",
+    parseError: ""
+  };
+}
+
+function isStoredCustomMonsterId(id: string | null | undefined): boolean {
+  if (!id?.trim()) return false;
+  return readCustomMonsterEntries().some((m) => m.id === id);
 }
 
 /** Trait range line in the sheet (omit empty or numeric 0 placeholders). */
@@ -2187,6 +2251,7 @@ export function MonsterEditorApp({
   const [createNameHint, setCreateNameHint] = useState<string>("");
   const [createDraftJson, setCreateDraftJson] = useState<string>("");
   const [createMonsterPasteText, setCreateMonsterPasteText] = useState<string>("");
+  const [createMonsterNameHint, setCreateMonsterNameHint] = useState<string>("");
   const [createMonsterDraftJson, setCreateMonsterDraftJson] = useState<string>("");
   const [createMonsterImportMessage, setCreateMonsterImportMessage] = useState<string>("");
   const [createImportMessage, setCreateImportMessage] = useState<string>("");
@@ -2214,19 +2279,36 @@ export function MonsterEditorApp({
 
   useEffect(() => {
     void (async () => {
+      const customs = readCustomMonsterEntries();
       try {
-        const rows = await loadMonsterIndex();
+        const server = await loadMonsterIndex();
+        const merged = mergeServerAndCustomMonsterIndex(server, customs);
+        setIndexRows(merged);
+        if (merged.length > 0) {
+          const preferredId = selectedId && merged.some((row) => row.id === selectedId) ? selectedId : merged[0].id;
+          setSelectedId(preferredId);
+          setMessage(
+            customs.length > 0
+              ? `Loaded monster index (${server.length} generated; ${customs.length} custom in this browser).`
+              : `Loaded monster index (${server.length} records).`
+          );
+        } else {
+          setSelectedId("");
+          setMessage(customs.length > 0 ? "No generated index — custom monsters only." : "Monster index is empty.");
+        }
+      } catch (error) {
+        const rows = customs.map(monsterEntryToIndexRow);
         setIndexRows(rows);
         if (rows.length > 0) {
           const preferredId = selectedId && rows.some((row) => row.id === selectedId) ? selectedId : rows[0].id;
           setSelectedId(preferredId);
-          setMessage(`Loaded monster index (${rows.length} records).`);
+          setMessage(
+            `${error instanceof Error ? error.message : "Could not load generated monsters."} Showing ${customs.length} custom monster(s) from local storage.`
+          );
         } else {
           setSelectedId("");
-          setMessage("Monster index is empty.");
+          setMessage(error instanceof Error ? error.message : "Could not load monster index.");
         }
-      } catch (error) {
-        setMessage(error instanceof Error ? error.message : "Could not load monster index.");
       }
     })();
   }, []);
@@ -2282,6 +2364,11 @@ export function MonsterEditorApp({
 
   useEffect(() => {
     if (!selectedId) return;
+    const custom = readCustomMonsterEntries().find((m) => m.id === selectedId);
+    if (custom) {
+      setActiveMonster(custom);
+      return;
+    }
     setIsBusy(true);
     void (async () => {
       try {
@@ -2365,6 +2452,11 @@ export function MonsterEditorApp({
       return a.id.localeCompare(b.id, undefined, { sensitivity: "base" });
     });
   }, [indexRows, nameQuery, levelQuery, roleQuery, leaderFilter, sortBy, sortDir]);
+
+  const customMonsterIdSet = useMemo(
+    () => new Set(readCustomMonsterEntries().map((m) => m.id)),
+    [indexRows]
+  );
 
   const filteredTemplateIndexes = useMemo(() => {
     const nameNeedle = templateNameQuery.trim().toLowerCase();
@@ -2865,15 +2957,7 @@ export function MonsterEditorApp({
             <code style={{ fontSize: "0.92em" }}>monster_templates.json</code>).
           </>
         ) : viewerTab === "createMonster" ? (
-          <>
-            Paste copied MM-style stat block text (name line through powers). <strong>Import stat block</strong> parses it into
-            monster sheet JSON. Edit the JSON draft below to fix gaps — parsing is best-effort for OCR quirks.
-            <span style={{ display: "block", marginTop: "0.35rem" }}>
-              <strong>Tip:</strong> Powers must include ✦ before usage (At-Will, Encounter, ...). Section headers such as{" "}
-              <code style={{ fontSize: "0.92em" }}>TRAITS</code> and{" "}
-              <code style={{ fontSize: "0.92em" }}>STANDARD ACTIONS</code> help split abilities.
-            </span>
-          </>
+          <>Paste copied stat block text.</>
         ) : (
           <>
             Paste raw text for one monster template.  Import and review the result. Edit the JSON, then save it as a local custom
@@ -2972,6 +3056,53 @@ export function MonsterEditorApp({
             <option value="asc">Ascending</option>
             <option value="desc">Descending</option>
           </select>
+          <button
+            type="button"
+            disabled={isBusy || !selectedId || !isStoredCustomMonsterId(selectedId)}
+            title={
+              !selectedId
+                ? "Select a monster in the list first"
+                : isStoredCustomMonsterId(selectedId)
+                  ? "Remove this entry from local custom monsters (browser storage)"
+                  : "Generated monsters cannot be deleted here — only browser-saved customs"
+            }
+            onClick={() => {
+              const id = selectedId;
+              if (!id || !isStoredCustomMonsterId(id)) return;
+              const label =
+                indexRows.find((r) => r.id === id)?.name?.trim() || activeMonster?.name?.trim() || id;
+              if (
+                !window.confirm(
+                  `Remove custom monster “${label}” from this browser’s saved monsters? This does not change generated JSON files.`
+                )
+              ) {
+                return;
+              }
+              const nextCustom = readCustomMonsterEntries().filter((m) => m.id !== id);
+              writeCustomMonsterEntries(nextCustom);
+              setIsBusy(true);
+              void (async () => {
+                let server: MonsterIndexEntry[] = [];
+                try {
+                  server = await loadMonsterIndex();
+                } catch {
+                  server = [];
+                }
+                const merged = mergeServerAndCustomMonsterIndex(server, readCustomMonsterEntries());
+                setIndexRows(merged);
+                setSelectedId((current) => {
+                  if (current === id) {
+                    return merged[0]?.id ?? "";
+                  }
+                  return merged.some((r) => r.id === current) ? current : merged[0]?.id ?? "";
+                });
+                setMessage(`Removed custom monster “${label}”.`);
+                setIsBusy(false);
+              })();
+            }}
+          >
+            Delete custom monster
+          </button>
         </div>
       ) : viewerTab === "templates" ? (
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.75rem", alignItems: "center" }}>
@@ -3209,7 +3340,7 @@ export function MonsterEditorApp({
           <input
             value={createNameHint}
             onChange={(event) => setCreateNameHint(event.target.value)}
-            placeholder="Template name hint (optional)"
+            placeholder="Template name"
             style={{
               minWidth: 200,
               border: "1px solid var(--panel-border)",
@@ -3226,7 +3357,7 @@ export function MonsterEditorApp({
             onClick={() => {
               setIsBusy(true);
               setCreateMonsterImportMessage("");
-              const result = parseMonsterStatBlockText(createMonsterPasteText);
+              const result = parseMonsterStatBlockText(createMonsterPasteText, createMonsterNameHint);
               if (!result.ok) {
                 setCreateMonsterImportMessage(result.error);
                 setIsBusy(false);
@@ -3244,6 +3375,61 @@ export function MonsterEditorApp({
             }}
           >
             Import stat block
+          </button>
+          <button
+            type="button"
+            disabled={
+              isBusy ||
+              !createMonsterDraftJson.trim() ||
+              createMonsterDraftJsonInvalid ||
+              !createMonsterDraftEntry
+            }
+            onClick={() => {
+              if (createMonsterDraftJsonInvalid || !createMonsterDraftEntry) {
+                setCreateMonsterImportMessage("Invalid or empty JSON — fix the draft before saving.");
+                return;
+              }
+              let parsed: MonsterEntryFile;
+              try {
+                parsed = JSON.parse(createMonsterDraftJson) as MonsterEntryFile;
+              } catch {
+                setCreateMonsterImportMessage("Invalid JSON — fix the draft before saving.");
+                return;
+              }
+              if (!String(parsed.name ?? "").trim()) {
+                setCreateMonsterImportMessage("Draft must include a name.");
+                return;
+              }
+              if (!parsed.stats || typeof parsed.stats !== "object" || Array.isArray(parsed.stats)) {
+                setCreateMonsterImportMessage("Draft must include a stats object.");
+                return;
+              }
+              if (parsed.powers != null && !Array.isArray(parsed.powers)) {
+                setCreateMonsterImportMessage("powers must be an array when present.");
+                return;
+              }
+              setIsBusy(true);
+              const normalized = normalizeMonsterEntryForSave(parsed);
+              const prev = readCustomMonsterEntries();
+              writeCustomMonsterEntries([normalized, ...prev.filter((e) => e.id !== normalized.id)]);
+              void (async () => {
+                let server: MonsterIndexEntry[] = [];
+                try {
+                  server = await loadMonsterIndex();
+                } catch {
+                  server = [];
+                }
+                setIndexRows(mergeServerAndCustomMonsterIndex(server, readCustomMonsterEntries()));
+                setSelectedId(normalized.id);
+                setActiveMonster(normalized);
+                setViewerTab("monsters");
+                setMessage(`Saved custom monster “${normalized.name}” to this browser (localStorage).`);
+                setCreateMonsterImportMessage("");
+                setIsBusy(false);
+              })();
+            }}
+          >
+            Save to custom monsters
           </button>
         </div>
       ) : null}
@@ -3410,6 +3596,7 @@ export function MonsterEditorApp({
                         <div style={metaMuted}>
                           Level {entry.level}
                           {entry.role ? ` • ${entry.role}` : ""}
+                          {customMonsterIdSet.has(entry.id) ? ` • saved in browser` : ""}
                         </div>
                       )}
                       {entry.parseError && (
