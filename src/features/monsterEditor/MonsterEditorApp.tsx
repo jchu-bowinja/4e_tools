@@ -19,6 +19,7 @@ import {
   loadMonsterIndex,
   loadMonsterTemplates,
   type MonsterEntryFile,
+  type MonsterStats,
   type MonsterTemplateRecord,
   type MonsterIndexEntry,
   type MonsterPower,
@@ -168,6 +169,56 @@ function mapImportParseErrorToMessage(errorCode: string): string {
   if (errorCode === "emptyInput") return "No paste text was provided.";
   if (errorCode === "couldNotInferTemplateName") return "Could not infer a template name from the pasted text.";
   return errorCode;
+}
+
+const CREATE_MONSTER_IDENTITY_JSON_KEYS = new Set<string>([
+  "id",
+  "fileName",
+  "relativePath",
+  "name",
+  "level",
+  "role",
+  "groupRole",
+  "isLeader",
+  "size",
+  "origin",
+  "type",
+  "xp",
+  "keywords",
+  "alignment",
+  "description",
+  "compendiumUrl",
+  "parseError",
+  "sections"
+]);
+
+const CREATE_MONSTER_PROFILE_JSON_KEYS = new Set<string>([
+  "phasing",
+  "regeneration",
+  "immunities",
+  "resistances",
+  "senses",
+  "weaknesses",
+  "languages",
+  "sourceBooks"
+]);
+
+function createMonsterIdentitySnippet(entry: MonsterEntryFile): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const key of CREATE_MONSTER_IDENTITY_JSON_KEYS) {
+    const v = (entry as Record<string, unknown>)[key];
+    if (v !== undefined) out[key] = v;
+  }
+  return out;
+}
+
+function createMonsterProfileSnippet(entry: MonsterEntryFile): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const key of CREATE_MONSTER_PROFILE_JSON_KEYS) {
+    const v = (entry as Record<string, unknown>)[key];
+    if (v !== undefined) out[key] = v;
+  }
+  return out;
 }
 
 function TemplateJsonCollapsible({
@@ -2245,7 +2296,6 @@ export function MonsterEditorApp({
   /** DMG quick level adjustment preview (−5…+5): attacks, defenses, AC, role HP, damage. */
   const [monsterLevelDelta, setMonsterLevelDelta] = useState(0);
   const [templateNameQuery, setTemplateNameQuery] = useState<string>("");
-  const [templateSourceQuery, setTemplateSourceQuery] = useState<string>("");
   const [serverTemplateRows, setServerTemplateRows] = useState<MonsterTemplateRecord[]>([]);
   const [createPasteText, setCreatePasteText] = useState<string>("");
   const [createNameHint, setCreateNameHint] = useState<string>("");
@@ -2460,19 +2510,15 @@ export function MonsterEditorApp({
 
   const filteredTemplateIndexes = useMemo(() => {
     const nameNeedle = templateNameQuery.trim().toLowerCase();
-    const bookNeedle = templateSourceQuery.trim().toLowerCase();
     return templateRows
       .map((row, idx) => ({ row, idx }))
       .filter(({ row }) => {
         if (nameNeedle && !String(row.templateName ?? "").toLowerCase().includes(nameNeedle)) {
           return false;
         }
-        if (bookNeedle && !String(row.sourceBook ?? "").toLowerCase().includes(bookNeedle)) {
-          return false;
-        }
         return true;
       });
-  }, [templateRows, templateNameQuery, templateSourceQuery]);
+  }, [templateRows, templateNameQuery]);
 
   const selectedTemplateRecord = useMemo(() => {
     if (templateRows.length === 0) return null;
@@ -2835,6 +2881,19 @@ export function MonsterEditorApp({
       if (!raw) return prev;
       try {
         const base = JSON.parse(raw) as MonsterTemplateRecord;
+        return JSON.stringify(recipe(base), null, 2);
+      } catch {
+        return prev;
+      }
+    });
+  }, []);
+
+  const commitCreateMonsterDraftPatch = useCallback((recipe: (base: MonsterEntryFile) => MonsterEntryFile) => {
+    setCreateMonsterDraftJson((prev) => {
+      const raw = prev.trim();
+      if (!raw) return prev;
+      try {
+        const base = JSON.parse(raw) as MonsterEntryFile;
         return JSON.stringify(recipe(base), null, 2);
       } catch {
         return prev;
@@ -3246,17 +3305,6 @@ export function MonsterEditorApp({
             placeholder="Template name"
             style={{
               minWidth: 220,
-              border: "1px solid var(--panel-border)",
-              borderRadius: "0.28rem",
-              padding: "0.22rem 0.3rem"
-            }}
-          />
-          <input
-            value={templateSourceQuery}
-            onChange={(event) => setTemplateSourceQuery(event.target.value)}
-            placeholder="Source PDF (substring)"
-            style={{
-              minWidth: 240,
               border: "1px solid var(--panel-border)",
               borderRadius: "0.28rem",
               padding: "0.22rem 0.3rem"
@@ -4069,6 +4117,24 @@ export function MonsterEditorApp({
                 })()}
               </div>
 
+              {viewerTab === "createMonster" ? (
+                <TemplateJsonSnippetEditor
+                  summaryLabel="JSON (identity)"
+                  value={createMonsterIdentitySnippet(viewMonster)}
+                  onValidCommit={(parsed) =>
+                    commitCreateMonsterDraftPatch((base) => {
+                      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return base;
+                      const p = parsed as Record<string, unknown>;
+                      const next = { ...base };
+                      for (const key of CREATE_MONSTER_IDENTITY_JSON_KEYS) {
+                        if (key in p) (next as Record<string, unknown>)[key] = p[key];
+                      }
+                      return next;
+                    })
+                  }
+                />
+              ) : null}
+
               {viewMonster.parseError && (
                 <div
                   style={{
@@ -4085,6 +4151,20 @@ export function MonsterEditorApp({
                   Parse error: {viewMonster.parseError}
                 </div>
               )}
+
+              {viewerTab === "createMonster" ? (
+                <TemplateJsonSnippetEditor
+                  summaryLabel="JSON (stats)"
+                  value={viewMonster.stats}
+                  preExtraStyle={{ maxHeight: "min(45vh, 28rem)", overflow: "auto" }}
+                  onValidCommit={(parsed) =>
+                    commitCreateMonsterDraftPatch((base) => {
+                      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return base;
+                      return { ...base, stats: parsed as MonsterStats };
+                    })
+                  }
+                />
+              ) : null}
 
               {(() => {
                 const movementEntries = extractMovementEntries(viewMonster);
@@ -4273,6 +4353,24 @@ export function MonsterEditorApp({
                         </div>
                       ) : null}
                     </div>
+                    {viewerTab === "createMonster" ? (
+                      <TemplateJsonSnippetEditor
+                        summaryLabel="JSON (defenses, senses, languages)"
+                        value={createMonsterProfileSnippet(viewMonster)}
+                        preExtraStyle={{ maxHeight: "min(40vh, 24rem)", overflow: "auto" }}
+                        onValidCommit={(parsed) =>
+                          commitCreateMonsterDraftPatch((base) => {
+                            if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return base;
+                            const p = parsed as Record<string, unknown>;
+                            const next = { ...base };
+                            for (const key of CREATE_MONSTER_PROFILE_JSON_KEYS) {
+                              if (key in p) (next as Record<string, unknown>)[key] = p[key];
+                            }
+                            return next;
+                          })
+                        }
+                      />
+                    ) : null}
                     <details style={centerDetailsBlockStyle}>
                       <summary style={detailsSummaryStyle}>Detailed Stats</summary>
                       <div style={{ marginTop: "0.5rem", display: "grid", gap: "0.4rem" }}>
@@ -4388,6 +4486,23 @@ export function MonsterEditorApp({
                       shouldHighlightGlossaryTerm
                     )}
                   </div>
+                  {viewerTab === "createMonster" ? (
+                    <TemplateJsonSnippetEditor
+                      summaryLabel="JSON"
+                      value={viewMonster.tactics ?? ""}
+                      onValidCommit={(parsed) =>
+                        commitCreateMonsterDraftPatch((base) => {
+                          if (typeof parsed === "string") {
+                            return { ...base, tactics: parsed };
+                          }
+                          if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && "tactics" in parsed) {
+                            return { ...base, tactics: String((parsed as { tactics?: unknown }).tactics ?? "") };
+                          }
+                          return base;
+                        })
+                      }
+                    />
+                  ) : null}
                 </div>
               ) : null}
 
@@ -4528,6 +4643,20 @@ export function MonsterEditorApp({
                             );
                           })()}
                         </div>
+                        {viewerTab === "createMonster" ? (
+                          <TemplateJsonSnippetEditor
+                            summaryLabel="JSON"
+                            value={aura}
+                            onValidCommit={(parsed) =>
+                              commitCreateMonsterDraftPatch((base) => {
+                                if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return base;
+                                const auras = [...(base.auras ?? [])];
+                                auras[idx] = parsed as MonsterTrait;
+                                return { ...base, auras };
+                              })
+                            }
+                          />
+                        ) : null}
                       </div>
                     ))}
                   </div>
@@ -4538,9 +4667,31 @@ export function MonsterEditorApp({
                 <div style={centerSubsectionPanelStyle}>
                   <h3 style={sectionTitleStyle}>Traits</h3>
                   <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.2rem" }}>
-                    {displayedTraits.map((trait, idx) => (
+                    {(() => {
+                      const normalizeTraitSig = (value: unknown): string =>
+                        String(value ?? "").trim().toLowerCase();
+                      const auraSignaturesForTraits = new Set(
+                        displayedAuras.map((aura) =>
+                          [
+                            normalizeTraitSig(aura.name),
+                            normalizeTraitSig(aura.range),
+                            normalizeTraitSig(aura.details)
+                          ].join("||")
+                        )
+                      );
+                      const traitsToShow = (viewMonster.traits ?? [])
+                        .map((trait, sourceIndex) => ({ trait, sourceIndex }))
+                        .filter(({ trait }) => {
+                          const signature = [
+                            normalizeTraitSig(trait.name),
+                            normalizeTraitSig(trait.range),
+                            normalizeTraitSig(trait.details)
+                          ].join("||");
+                          return !auraSignaturesForTraits.has(signature);
+                        });
+                      return traitsToShow.map(({ trait, sourceIndex }, idx) => (
                       <div
-                        key={`trait-${idx}`}
+                        key={`trait-${sourceIndex}`}
                         style={{
                           ...bodyPrimary,
                           display: "grid",
@@ -4670,25 +4821,51 @@ export function MonsterEditorApp({
                             );
                           })()}
                         </div>
+                        {viewerTab === "createMonster" ? (
+                          <TemplateJsonSnippetEditor
+                            summaryLabel="JSON"
+                            value={trait}
+                            onValidCommit={(parsed) =>
+                              commitCreateMonsterDraftPatch((base) => {
+                                if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return base;
+                                const traits = [...(base.traits ?? [])];
+                                traits[sourceIndex] = parsed as MonsterTrait;
+                                return { ...base, traits };
+                              })
+                            }
+                          />
+                        ) : null}
                       </div>
-                    ))}
+                    ));
+                    })()}
                   </div>
                 </div>
               ) : null}
 
               {(() => {
-                const items = sectionArrayOfObjects(viewMonster.items);
-                if (items.length === 0) return null;
+                const rawItems = viewMonster.items ?? [];
+                const hasVisible = rawItems.some((raw) => Object.keys(sectionObject(raw)).length > 0);
+                if (!hasVisible) return null;
                 return (
                   <div style={centerSubsectionPanelStyle}>
                     <h3 style={sectionTitleStyle}>Items</h3>
                     <div style={{ marginTop: "0.4rem", display: "grid", gap: "0.35rem" }}>
-                      {items.map((item, idx) => {
+                      {rawItems.flatMap((rawItem, sourceIndex) => {
+                        const item = sectionObject(rawItem);
+                        if (Object.keys(item).length === 0) return [];
                         const quantity = item.quantity;
                         const name = String(item.name ?? "").trim();
                         const description = String(item.description ?? "").trim();
-                        return (
-                          <div key={`item-${idx}`} style={{ border: "1px solid var(--panel-border)", borderRadius: "0.3rem", padding: "0.4rem", backgroundColor: "var(--surface-1)" }}>
+                        return [
+                          <div
+                            key={`item-${sourceIndex}`}
+                            style={{
+                              border: "1px solid var(--panel-border)",
+                              borderRadius: "0.3rem",
+                              padding: "0.4rem",
+                              backgroundColor: "var(--surface-1)"
+                            }}
+                          >
                             <div style={bodyPrimary}>
                               <strong>{name || "Item"}</strong>
                               {quantity !== undefined && quantity !== null && quantity !== "" ? ` x${quantity}` : ""}
@@ -4696,20 +4873,42 @@ export function MonsterEditorApp({
                             {isRenderableCardValue(description) ? (
                               <details style={{ marginTop: "0.22rem" }}>
                                 <summary style={detailsSummaryStyle}>Description</summary>
-                                <div style={{ fontSize: "0.8rem", color: "var(--text-primary)", margin: "0.24rem 0 0 0", whiteSpace: "pre-wrap" }}>
+                                <div
+                                  style={{
+                                    fontSize: "0.8rem",
+                                    color: "var(--text-primary)",
+                                    margin: "0.24rem 0 0 0",
+                                    whiteSpace: "pre-wrap"
+                                  }}
+                                >
                                   {renderGlossaryAwareText(
                                     description,
                                     commonDescriptiveGlossaryPhrases,
                                     startGlossaryHover,
                                     leaveGlossaryHover,
-                                    `item-${idx}-description`,
+                                    `item-${sourceIndex}-description`,
                                     shouldHighlightGlossaryTerm
                                   )}
                                 </div>
                               </details>
                             ) : null}
+                            {viewerTab === "createMonster" ? (
+                              <TemplateJsonSnippetEditor
+                                summaryLabel="JSON"
+                                value={rawItem}
+                                onValidCommit={(parsed) =>
+                                  commitCreateMonsterDraftPatch((base) => {
+                                    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return base;
+                                    const itemsNext = [...(base.items ?? [])];
+                                    itemsNext[sourceIndex] =
+                                      parsed as NonNullable<MonsterEntryFile["items"]>[number];
+                                    return { ...base, items: itemsNext };
+                                  })
+                                }
+                              />
+                            ) : null}
                           </div>
-                        );
+                        ];
                       })}
                     </div>
                   </div>
@@ -4721,6 +4920,19 @@ export function MonsterEditorApp({
                 startGlossaryHover={startGlossaryHover}
                 leaveGlossaryHover={leaveGlossaryHover}
                 shouldHighlightGlossaryTerm={shouldHighlightGlossaryTerm}
+                showJson={viewerTab === "createMonster"}
+                livePowerJsonEditing={viewerTab === "createMonster"}
+                onPowerJsonCommit={
+                  viewerTab === "createMonster"
+                    ? (powerIndex, parsed) =>
+                        commitCreateMonsterDraftPatch((base) => {
+                          if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return base;
+                          const powers = [...(base.powers ?? [])];
+                          powers[powerIndex] = parsed as MonsterPower;
+                          return { ...base, powers };
+                        })
+                    : undefined
+                }
               />
                   </>
                 );

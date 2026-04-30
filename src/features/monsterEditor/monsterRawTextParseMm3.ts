@@ -1,5 +1,6 @@
 import type { MonsterEntryFile, MonsterPower, MonsterStats, MonsterTrait } from "./storage";
 import { normalizeMonsterPowerShape } from "./monsterPowerNormalize";
+import { parseMonsterSensesSegments } from "./monsterSensesParse";
 
 /** Fix common OCR line breaks inside words (MM3 PDF extracts). */
 export function normalizeMm3OcrLine(line: string): string {
@@ -512,7 +513,9 @@ export function parseMm3StatBlock(args: {
     const initM = L.match(INIT_SENSES_RE);
     if (initM) {
       const tail = initM[2].trim();
-      if (tail) senses.push({ name: tail, range: 0 });
+      for (const row of parseMonsterSensesSegments(tail)) {
+        senses.push(row);
+      }
     }
   }
 

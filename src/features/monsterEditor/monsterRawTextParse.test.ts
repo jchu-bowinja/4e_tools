@@ -89,6 +89,69 @@ Equipment chainmail, light shield, warhammer
     expect(r.entry.sections && "layout" in r.entry.sections && r.entry.sections.layout).toBe("mm3");
   });
 
+  it("parses MM3 senses: Perception strip; truesight range; low-light vision range 0", () => {
+    const cyclops = `Cyclops Guard Level 14 Minion
+Large fey humanoid XP 250
+Initiative +8 Senses Perception +13; truesight 6
+HP 1; a missed attack never damages a minion.
+AC 27; Fortitude 26, Refl ex 23, Will 23
+Speed 6
+m Battleaxe (standard; at-will) ✦ Weapon
+ Reach 2; +17 vs. AC; 7 damage.
+Alignment Unaligned Languages Elven
+Str 22 (+11) Dex 16 (+8) Wis 17 (+8)
+Con 20 (+10) Int 11 (+5) Cha 11 (+5)
+`;
+    const r1 = parseMonsterStatBlockText(cyclops);
+    expect(r1.ok).toBe(true);
+    if (!r1.ok) return;
+    expect(r1.entry.senses).toEqual([{ name: "truesight", range: 6 }]);
+    expect(String(r1.entry.stats.otherNumbers.perception)).toMatch(/^\+?13$/);
+
+    const choker = `Feygrove Choker Level 12 Lurker
+Medium fey humanoid XP 700
+Initiative +14 Senses Perception +7; low-light vision
+HP 91; Bloodied 45
+AC 24; Fortitude 22, Refl ex 22, Will 19
+Speed 8 (forest walk), climb 8 (spider climb)
+m Tentacle Claw (standard; at-will)
+ Reach 3; +17 vs. AC; 2d6 + 4 damage.
+Alignment Unaligned Languages Elven
+Str 19 (+10) Dex 18 (+10) Wis 13 (+7)
+Con 13 (+7) Int 6 (+4) Cha 6 (+4)
+`;
+    const r2 = parseMonsterStatBlockText(choker);
+    expect(r2.ok).toBe(true);
+    if (!r2.ok) return;
+    expect(r2.entry.senses).toEqual([{ name: "low-light vision", range: 0 }]);
+  });
+
+  it("parses Low-light vision on the Speed line (MM layout with sections)", () => {
+    const treant = `Treant Vassal Level 8 Elite Soldier
+Large fey magical beast (plant) XP 700
+HP 182; Bloodied 91 Initiative +7
+AC 24, Fortitude 21, Reflex 18, Will 22 Perception +9
+Speed 8 (forest walk, ice walk) Low-light vision
+Resist 5 cold
+Saving Throws +2; Action Points 1
+TRAITS
+Threatening Reach
+The treant can make opportunity attacks within 2 squares of it.
+STANDARD ACTIONS
+5 Slam ✦ At-Will
+Attack: Melee 2 (one creature); +13 vs. AC
+Hit: 1d12 + 10 damage.
+Str 20 (+9) Dex 13 (+5) Wis 21 (+9)
+Con 19 (+8) Int 13 (+5) Cha 11 (+4)
+Alignment unaligned Languages Common
+`;
+    const r = parseMonsterStatBlockText(treant);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.entry.senses).toEqual([{ name: "Low-light vision", range: 0 }]);
+    expect((r.entry.sections as { layout?: string } | undefined)?.layout).not.toBe("mm3");
+  });
+
   it("parses combined resist and vulnerable on one line", () => {
     const text = `X Level 18 Elite Controller
 Medium natural humanoid XP 100

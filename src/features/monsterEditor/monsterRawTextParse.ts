@@ -1,6 +1,10 @@
 import type { MonsterEntryFile, MonsterPower, MonsterStats, MonsterTrait } from "./storage";
 import { normalizeMonsterPowerShape } from "./monsterPowerNormalize";
 import { parseMm3StatBlock, shouldUseMm3Parser } from "./monsterRawTextParseMm3";
+import {
+  findSpeedLineSensePhraseStart,
+  parseMonsterSensesSegments
+} from "./monsterSensesParse";
 
 const SECTION_HEAD =
   /^(TRAITS|STANDARD\s+ACTIONS|MOVE\s+ACTIONS|MINOR\s+ACTIONS|TRIGGERED\s+ACTIONS|FREE\s+ACTIONS)\b/i;
@@ -99,19 +103,7 @@ function splitPhysicalLine(line: string): {
   const speedMatch = line.match(/^Speed\s+(.+)$/i);
   if (!speedMatch) return { speedPart: "", sensesPart: line };
   const rest = speedMatch[1].trim();
-  const senseNames = [
-    "Darkvision",
-    "Low-light vision",
-    "Low-Light Vision",
-    "Tremorsense",
-    "Blindsight",
-    "Truesight"
-  ];
-  let cut = rest.length;
-  for (const sn of senseNames) {
-    const idx = rest.indexOf(sn);
-    if (idx >= 0 && idx < cut) cut = idx;
-  }
+  const cut = findSpeedLineSensePhraseStart(rest);
   const speedPart = cut < rest.length ? rest.slice(0, cut).replace(/[,\s]+$/g, "").trim() : rest;
   const sensesPart = cut < rest.length ? rest.slice(cut).trim() : "";
   return { speedPart: speedPart, sensesPart: sensesPart };
@@ -147,8 +139,7 @@ function parseSpeedToMovement(speedPart: string): Array<{ type: string; value: s
 }
 
 function parseSensesFragment(s: string): Array<{ name: string; range?: string | number }> {
-  if (!s.trim()) return [];
-  return [{ name: s.trim(), range: 0 }];
+  return parseMonsterSensesSegments(s);
 }
 
 function parseSkillsLine(line: string): Record<string, number | string> {
