@@ -3431,6 +3431,18 @@ export function MonsterEditorApp({
           >
             Save to custom monsters
           </button>
+          <input
+            value={createMonsterNameHint}
+            onChange={(event) => setCreateMonsterNameHint(event.target.value)}
+            placeholder="Monster name"
+            aria-label="Monster name (optional override when importing)"
+            style={{
+              minWidth: 200,
+              border: "1px solid var(--panel-border)",
+              borderRadius: "0.28rem",
+              padding: "0.22rem 0.3rem"
+            }}
+          />
         </div>
       ) : null}
 
