@@ -262,6 +262,8 @@ export type MonsterTemplatePrerequisite = {
 export interface MonsterTemplateRecord {
   templateName: string;
   sourceBook: string;
+  /** Creature-type / monster keywords from the stat-block header line after the role line (e.g. `(undead) XP Elite`, `Humanoid or magical beast XP Elite`). */
+  keywords?: string[];
   pageStart?: number;
   pageEnd?: number;
   description?: string;

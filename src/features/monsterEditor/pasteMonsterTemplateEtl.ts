@@ -75,6 +75,44 @@ function titleCase(name: string): string {
     .join(" ");
 }
 
+const XP_TIER_WORD_RE = "(?:Elite|Standard|Solo|Minion)";
+
+/**
+ * Stat-block line immediately after the role line: parenthetical keywords, plain type line, or bare `XP Elite` (no keywords).
+ * Returns `undefined` if `line` is not this header form (e.g. `Defenses +2`).
+ */
+export function parseMonsterKeywordsFromXpHeaderLine(line: string): string[] | undefined {
+  const t = line.trim();
+  if (!t) return undefined;
+
+  const parenXp = t.match(new RegExp(`^\\(([^)]+)\\)\\s+XP\\s+${XP_TIER_WORD_RE}\\b`, "i"));
+  if (parenXp?.[1]) {
+    return parenXp[1]
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((s) => titleCase(s));
+  }
+
+  if (new RegExp(`^XP\\s+${XP_TIER_WORD_RE}\\b`, "i").test(t)) {
+    return [];
+  }
+
+  const bareXp = t.match(new RegExp(`^(.+?)\\s+XP\\s+${XP_TIER_WORD_RE}\\b`, "i"));
+  if (!bareXp?.[1] || t.startsWith("(")) return undefined;
+
+  const before = bareXp[1].trim();
+  if (!before || before.length > 120) return undefined;
+
+  if (/\s+or\s+/i.test(before)) {
+    return before
+      .split(/\s+or\s+/i)
+      .map((x) => titleCase(x.trim()))
+      .filter(Boolean);
+  }
+  return [titleCase(before)];
+}
+
 /** Wrapped resist/vuln lines: `At 11th level, 15 (choose…)` — not a power name. */
 function looksLikeTieredDefenseContinuation(line: string): boolean {
   return /^\s*at\s+\d+(?:st|nd|rd|th)?\s*level\b/i.test(line.trim());
@@ -1277,6 +1315,7 @@ function buildTemplateRow(
   parsed: {
     prerequisite: string;
     roleLine: string;
+    templateKeywords?: string[];
     statLines: string[];
     powersText: string[];
     powers: MonsterPower[];
@@ -1316,6 +1355,7 @@ function buildTemplateRow(
     prerequisiteExpr: prereq.trim() ? parseMonsterTemplatePrerequisite(prereq).data : undefined,
     roleLine: roleLineStr || undefined,
     role: parseRoleLine(roleLineStr),
+    ...(parsed.templateKeywords !== undefined ? { keywords: parsed.templateKeywords } : {}),
     isEliteTemplate: isElite,
     statLines: mergedStatLines.length ? mergedStatLines : undefined,
     stats: parsedStats,
@@ -1463,6 +1503,16 @@ function parseSimpleTemplateSections(lines: string[]) {
     }
   }
 
+  let xpHeaderKeywordLineIndex = -1;
+  let templateKeywords: string[] | undefined;
+  if (roleIdx >= 0 && cleaned[roleIdx + 1] !== undefined) {
+    const parsedKw = parseMonsterKeywordsFromXpHeaderLine(cleaned[roleIdx + 1]!);
+    if (parsedKw !== undefined) {
+      xpHeaderKeywordLineIndex = roleIdx + 1;
+      templateKeywords = parsedKw;
+    }
+  }
+
   const descriptionLines: string[] = [];
   const prerequisiteLines: string[] = [];
   if (prereqStartIdx >= 0) {
@@ -1489,18 +1539,9 @@ function parseSimpleTemplateSections(lines: string[]) {
   for (let i = 0; i < cleaned.length; i++) {
     const line = cleaned[i];
     if (line === roleLine) continue;
+    if (i === xpHeaderKeywordLineIndex) continue;
     if (prereqStartIdx >= 0 && i >= prereqStartIdx && (roleIdx < 0 || i < roleIdx)) continue;
     if (roleIdx >= 0 && i < roleIdx) continue;
-    if (
-      roleIdx >= 0 &&
-      !inAbilitySection &&
-      statLines.length === 0 &&
-      /^Humanoid(?:\s+or\s+magical\s+beast)?(?:\s*\([^)]*\))?\s+XP\s+(?:Elite|Standard|Solo|Minion)\b/i.test(
-        line
-      )
-    ) {
-      continue;
-    }
     if (roleIdx >= 0 && SECTION_MARKER_RE.test(line)) {
       inAbilitySection = true;
       continue;
@@ -1578,6 +1619,7 @@ function parseSimpleTemplateSections(lines: string[]) {
   return {
     prerequisite,
     roleLine,
+    ...(templateKeywords !== undefined ? { templateKeywords } : {}),
     statLines,
     powersText,
     powers: buckets.powers,

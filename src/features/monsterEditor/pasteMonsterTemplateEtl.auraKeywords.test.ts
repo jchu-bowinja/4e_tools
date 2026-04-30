@@ -74,6 +74,7 @@ Spawn of Kyuss's level + 3 vs. Fortitude; 2d6 + Constitution modifier damage.`;
     expect(r.template.statLines?.some((line) => line.includes("[ABILITY]"))).toBe(false);
     expect(r.template.auras?.some((a) => a.name.includes("Fear of Worms"))).toBe(true);
     expect(r.template.powers?.some((p) => p.name.includes("Touch of Kyuss"))).toBe(true);
+    expect(r.template.keywords).toEqual(["Undead"]);
   });
 
   it("captures wrapped prerequisite up to role line and keeps Regeneration as stat line", () => {

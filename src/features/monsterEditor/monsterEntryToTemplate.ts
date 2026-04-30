@@ -137,6 +137,7 @@ export function monsterEntryToTemplateRecord(entry: MonsterEntryFile): MonsterTe
   return {
     templateName: String(entry.name ?? "").trim() || "Unnamed monster",
     sourceBook: sourceBookFromEntry(entry),
+    ...(Array.isArray(entry.keywords) && entry.keywords.length > 0 ? { keywords: [...entry.keywords] } : {}),
     description: descriptionFromEntry(entry),
     roleLine: roleLineFromEntry(entry),
     statLines: statLines.length > 0 ? statLines : undefined,

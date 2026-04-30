@@ -45,10 +45,12 @@ describe("monsterEntryToTemplateRecord", () => {
         name: "Grave Worm",
         sourceBooks: ["MM", "DMG"],
         description: "Undead horror.",
-        tactics: "Burrows."
+        tactics: "Burrows.",
+        keywords: ["Undead", "Humanoid"]
       })
     );
     expect(t.templateName).toBe("Grave Worm");
+    expect(t.keywords).toEqual(["Undead", "Humanoid"]);
     expect(t.sourceBook).toBe("MM; DMG");
     expect(t.roleLine).toContain("Level 5");
     expect(t.roleLine).toContain("Brute");

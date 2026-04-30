@@ -20,6 +20,22 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return v != null && typeof v === "object" && !Array.isArray(v);
 }
 
+function mergeTemplateMonsterKeywords(entry: MonsterEntryFile, template: MonsterTemplateRecord): void {
+  const add = template.keywords;
+  if (!add || add.length === 0) return;
+  const cur = Array.isArray(entry.keywords) ? [...entry.keywords] : [];
+  const seen = new Set(cur.map((k) => String(k).toLowerCase()));
+  for (const k of add) {
+    const s = String(k).trim();
+    if (!s) continue;
+    const low = s.toLowerCase();
+    if (seen.has(low)) continue;
+    seen.add(low);
+    cur.push(s);
+  }
+  entry.keywords = cur;
+}
+
 function parseMonsterLevel(entry: MonsterEntryFile): number {
   const raw = entry.level;
   const n = typeof raw === "number" ? raw : Number.parseInt(String(raw ?? "").trim(), 10);
@@ -718,7 +734,7 @@ export function applyMonsterTemplateToEntry(entry: MonsterEntryFile, template: M
   }
   mergeTemplateStatAdjustments(out, template, rankTransition, classDefenseBonusTracker);
   applyRankBasedSavingThrowsAndActionPoints(out);
-  // TODO: Merge monster keywords with template keywords and implement consistent keyword handling.
+  mergeTemplateMonsterKeywords(out, template);
 
   const priorTemplateNames = Array.isArray(priorPreviewState.templateNames)
     ? priorPreviewState.templateNames.map((x) => String(x ?? "").trim()).filter(Boolean)

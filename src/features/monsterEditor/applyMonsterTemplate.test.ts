@@ -59,6 +59,14 @@ describe("applyMonsterTemplateToEntry", () => {
     expect(delta.addedAuraNames).toEqual(["Despair"]);
   });
 
+  it("merges template monster keywords onto the base entry", () => {
+    const base = baseMonster();
+    base.keywords = ["Humanoid"];
+    const tpl = { ...sampleTemplate(), keywords: ["Undead", "humanoid"] } as MonsterTemplateRecord;
+    const merged = applyMonsterTemplateToEntry(base, tpl);
+    expect(merged.keywords?.map((k) => k.toLowerCase()).sort()).toEqual(["humanoid", "undead"]);
+  });
+
   it("calculates template power attack bonuses as monster level + bonus", () => {
     const base = baseMonster();
     base.level = "11";
