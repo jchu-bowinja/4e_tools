@@ -15,9 +15,8 @@ import { MonsterEditorApp } from "./features/monsterEditor/MonsterEditorApp";
 import { GlossaryEditorApp } from "./features/glossaryEditor/GlossaryEditorApp";
 import { glossaryRowsToTooltipMap, type GlossaryTermRow } from "./data/tooltipGlossary";
 import { loadInitialGlossaryRows, reloadGlossaryRowsFromBundle } from "./data/loadGlossaryRows";
-import { UtilitiesApp } from "./features/utilities/UtilitiesApp";
 
-type AppScreen = "builder" | "resourceEditor" | "characterSheet" | "monsters" | "glossary" | "utilities";
+type AppScreen = "builder" | "resourceEditor" | "characterSheet" | "monsters" | "glossary";
 type AppTheme = "light" | "dark";
 
 const THEME_STORAGE_KEY = "dnd4e.app.theme";
@@ -27,8 +26,7 @@ const SCREEN_HASH: Record<AppScreen, string> = {
   resourceEditor: "#/resource-editor",
   characterSheet: "#/character-sheet",
   monsters: "#/monsters",
-  glossary: "#/glossary",
-  utilities: "#/utilities"
+  glossary: "#/glossary"
 };
 
 function screenFromHash(hash: string): AppScreen {
@@ -37,7 +35,6 @@ function screenFromHash(hash: string): AppScreen {
   if (normalized === "#/character-sheet") return "characterSheet";
   if (normalized === "#/monsters") return "monsters";
   if (normalized === "#/glossary") return "glossary";
-  if (normalized === "#/utilities") return "utilities";
   return "builder";
 }
 
@@ -219,9 +216,6 @@ export default function App(): JSX.Element {
           <button type="button" aria-current={screen === "resourceEditor" ? "page" : undefined} onClick={() => goToScreen("resourceEditor")} disabled={screen === "resourceEditor"}>
             Resource Editor
           </button>
-          <button type="button" aria-current={screen === "utilities" ? "page" : undefined} onClick={() => goToScreen("utilities")} disabled={screen === "utilities"}>
-            Utilities
-          </button>
           <button
             type="button"
             aria-label="Toggle dark mode"
@@ -255,8 +249,6 @@ export default function App(): JSX.Element {
           <GlossaryEditorApp rows={glossaryRows} onRowsChange={setGlossaryRows} onResetToBundled={handleGlossaryResetToBundled} />
         ) : screen === "glossary" ? (
           <div style={{ padding: "1.25rem", color: "var(--text-muted, inherit)" }}>Loading glossary…</div>
-        ) : screen === "utilities" ? (
-          <UtilitiesApp />
         ) : (
           <CharacterBuilderApp index={effectiveIndex} tooltipGlossary={tooltipGlossary} />
         )}
