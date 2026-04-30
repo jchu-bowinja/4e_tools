@@ -298,6 +298,15 @@ textarea:hover {
   transform: rotate(90deg);
 }
 
+/* Monster editor encounter roster: same ▶ disclosure glyph as JSON <details> (scaled for icon-only control) */
+.encounter-roster-disclosure-btn .template-json-collapsible-arrow {
+  font-size: 0.7rem;
+}
+
+.encounter-roster-disclosure-btn--expandLeft .template-json-collapsible-arrow {
+  transform: rotate(180deg);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

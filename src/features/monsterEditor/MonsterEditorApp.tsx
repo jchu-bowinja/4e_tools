@@ -639,6 +639,23 @@ const centerSubsectionPanelStyle: CSSProperties = {
   marginBottom: "0.65rem"
 };
 
+/** Inset strip inside the monster index sheet column (template preview + level tweak). */
+const monsterSheetTemplateToolbarInsetStyle: CSSProperties = {
+  flexShrink: 0,
+  marginTop: "0.5rem",
+  marginLeft: "0.5rem",
+  marginRight: "0.5rem",
+  marginBottom: "0.5rem",
+  padding: "0.32rem 0.42rem",
+  borderRadius: "0.28rem",
+  border: "1px solid var(--inset-section-border, var(--panel-border))",
+  backgroundColor: "var(--surface-2)",
+  display: "flex",
+  flexDirection: "column",
+  gap: "0.38rem",
+  boxShadow: "none"
+};
+
 const statPanelStyle: CSSProperties = {
   border: "1px solid var(--panel-border)",
   borderRadius: "var(--ui-panel-radius, 0.35rem)",
@@ -1414,7 +1431,13 @@ function renderGlossaryAwareText(
   );
 }
 
-type MonsterGlossaryHoverKey = `powerKeyword:${string}` | `glossaryTerm:${string}` | `glossaryTerms:${string}`;
+type MonsterGlossaryHoverKey =
+  | `powerKeyword:${string}`
+  | `glossaryTerm:${string}`
+  | `glossaryTerms:${string}`
+  | "monsterLevelAdjustment:glossaryTerm:Level";
+
+const MONSTER_LEVEL_ADJUSTMENT_LABEL_GLOSSARY_KEY = "monsterLevelAdjustment:glossaryTerm:Level" as const;
 
 function splitCommaListSegments(raw: string): string[] {
   return String(raw ?? "")
@@ -2273,6 +2296,22 @@ export function MonsterEditorApp({
   const [encounterNameEditOpen, setEncounterNameEditOpen] = useState(false);
   const [encounterNameEditKind, setEncounterNameEditKind] = useState<"new" | "rename">("rename");
   const [encounterNameEditValue, setEncounterNameEditValue] = useState("");
+  const [encounterRosterPanelCollapsed, setEncounterRosterPanelCollapsed] = useState(false);
+  const [pinnedMonsterListColumnWidthPx, setPinnedMonsterListColumnWidthPx] = useState<number | null>(null);
+  const monsterListColumnRef = useRef<HTMLDivElement | null>(null);
+
+  const collapseEncounterRosterPanel = useCallback(() => {
+    const w = monsterListColumnRef.current?.offsetWidth;
+    if (typeof w === "number" && w > 0) {
+      setPinnedMonsterListColumnWidthPx(w);
+    }
+    setEncounterRosterPanelCollapsed(true);
+  }, []);
+
+  const expandEncounterRosterPanel = useCallback(() => {
+    setPinnedMonsterListColumnWidthPx(null);
+    setEncounterRosterPanelCollapsed(false);
+  }, []);
   const glossaryTooltipUi = useGlossaryTooltip({
     tooltipId: MONSTER_GLOSSARY_TOOLTIP_ID,
     resetDeps: [selectedId, viewerTab, selectedTemplateIdx, monsterTemplatePreviewIdxs.join(",")]
@@ -2328,6 +2367,10 @@ export function MonsterEditorApp({
   useEffect(() => {
     setEncounterNameEditOpen(false);
   }, [encounterStore.activeEncounterId]);
+
+  useEffect(() => {
+    if (encounterRosterPanelCollapsed) setEncounterNameEditOpen(false);
+  }, [encounterRosterPanelCollapsed]);
 
   useEffect(() => {
     writeStoredSelectedMonsterId(selectedId);
@@ -2787,6 +2830,36 @@ export function MonsterEditorApp({
 
   function monsterGlossaryContent(key: MonsterGlossaryHoverKey): JSX.Element {
     const monsterCtx = { glossaryByName: tooltipGlossary, index };
+
+    if (key === MONSTER_LEVEL_ADJUSTMENT_LABEL_GLOSSARY_KEY) {
+      const levelAdjustmentPreamble =
+        `+1 attacks, defenses, AC, role HP, and scaled XP per level; +1 damage per 2 levels on attacks. Effective level cannot go below ${baseMonsterLevelForClamp === 0 ? "0 (this creature is level 0)" : "1"}. Best within +/-${RECOMMENDED_MAX_MONSTER_LEVEL_DELTA}.`;
+      const resolvedEntries = resolveMonsterGlossaryHoverSections("glossaryTerm:Level", monsterCtx);
+      let glossaryBody: JSX.Element;
+      if (resolvedEntries.length === 1) {
+        glossaryBody = <GlossaryTooltipRichText text={resolvedEntries[0].text} />;
+      } else if (resolvedEntries.length > 1) {
+        glossaryBody = (
+          <div style={{ display: "grid", gap: "0.35rem" }}>
+            {resolvedEntries.map((entry) => (
+              <div key={entry.term}>
+                <div style={{ fontWeight: 700 }}>{entry.term}</div>
+                <GlossaryTooltipRichText text={entry.text} />
+              </div>
+            ))}
+          </div>
+        );
+      } else {
+        glossaryBody = <div>No description available.</div>;
+      }
+      return (
+        <div style={{ display: "grid", gap: "0.45rem" }}>
+          <div style={{ fontSize: "0.82rem", color: "var(--text-primary)", lineHeight: 1.45 }}>{levelAdjustmentPreamble}</div>
+          {glossaryBody}
+        </div>
+      );
+    }
+
     const resolvedEntries = resolveMonsterGlossaryHoverSections(key, monsterCtx);
     if (resolvedEntries.length === 1) {
       return <GlossaryTooltipRichText text={resolvedEntries[0].text} />;
@@ -3566,7 +3639,7 @@ export function MonsterEditorApp({
         </div>
       )}
 
-      {viewerTab === "monsters" ? (
+      {viewerTab === "monsters" && !encounterRosterPanelCollapsed ? (
         <div
           style={{
             ...panelStyle,
@@ -3741,8 +3814,14 @@ export function MonsterEditorApp({
           display: "grid",
           gridTemplateColumns:
             viewerTab === "monsters"
-              ? "minmax(0, 0.7fr) minmax(0, 1.45fr) minmax(200px, 0.72fr)"
-              : "minmax(0, 0.9fr) minmax(0, 2.1fr)",
+              ? encounterRosterPanelCollapsed
+                ? pinnedMonsterListColumnWidthPx != null
+                  ? `minmax(0, ${pinnedMonsterListColumnWidthPx}px) minmax(0, 1fr) minmax(0, 2.75rem)`
+                  : "minmax(0, 0.7fr) minmax(0, 1fr) minmax(0, 2.75rem)"
+                : "minmax(0, 0.7fr) minmax(0, 1.45fr) minmax(200px, 0.72fr)"
+              : viewerTab === "templates"
+                ? "minmax(0, 0.7fr) minmax(0, 1.45fr)"
+                : "minmax(0, 0.9fr) minmax(0, 2.1fr)",
           gap: "1rem",
           minHeight: "65vh"
         }}
@@ -3751,6 +3830,7 @@ export function MonsterEditorApp({
           <>
             {viewerTab === "monsters" ? (
             <div
+              ref={monsterListColumnRef}
               style={{
                 ...sheetPanel,
                 overflow: "hidden",
@@ -3762,20 +3842,15 @@ export function MonsterEditorApp({
             >
               {viewerTab === "monsters" && sheetMonster ? (
                 <>
-                <div
-                  style={{
-                    flexShrink: 0,
-                    marginBottom: "0.5rem",
-                    padding: "0.45rem 0.55rem",
-                    borderRadius: "var(--ui-panel-radius, 0.35rem)",
-                    border: "1px solid var(--panel-border)",
-                    backgroundColor: "var(--surface-1)",
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: "0.45rem",
-                    alignItems: "center"
-                  }}
-                >
+                <div style={monsterSheetTemplateToolbarInsetStyle}>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: "0.38rem",
+                      alignItems: "center"
+                    }}
+                  >
                   <select
                     value={monsterTemplatePreviewIdxs[0] === undefined ? "" : String(monsterTemplatePreviewIdxs[0])}
                     onChange={(event) => {
@@ -3867,23 +3942,17 @@ export function MonsterEditorApp({
                         : ""}
                     </span>
                   ) : null}
-                </div>
-                <div
-                  style={{
-                    flexShrink: 0,
-                    marginBottom: "0.5rem",
-                    padding: "0.45rem 0.55rem",
-                    borderRadius: "var(--ui-panel-radius, 0.35rem)",
-                    border: "1px solid var(--panel-border)",
-                    backgroundColor: "var(--surface-1)",
-                    display: "flex",
-                    flexWrap: "wrap",
-                    alignItems: "center",
-                    gap: "0.35rem"
-                  }}
-                >
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: "0.35rem",
+                      alignItems: "center"
+                    }}
+                  >
                   <span
-                    {...glossaryTooltipUi.hoverA11y("glossaryTerm:Level")}
+                    {...glossaryTooltipUi.hoverA11y(MONSTER_LEVEL_ADJUSTMENT_LABEL_GLOSSARY_KEY)}
                     style={{ ...microLabelStyle, width: "fit-content", cursor: "help", borderBottom: "1px dotted var(--text-muted)" }}
                   >
                     LEVEL
@@ -3935,17 +4004,11 @@ export function MonsterEditorApp({
                   >
                     +
                   </button>
-                  <span style={{ fontSize: "0.74rem", color: "var(--text-secondary)", lineHeight: 1.35, maxWidth: "28rem" }}>
-                    +1 attacks, defenses, AC, role HP, and scaled XP per level; +1 damage per 2 levels on attacks. Effective level
-                    cannot go below {baseMonsterLevelForClamp === 0 ? "0 (this creature is level 0)" : "1"}. Best within +/-
-                    {RECOMMENDED_MAX_MONSTER_LEVEL_DELTA}.
-                  </span>
                   {effectiveMonsterLevelDelta !== 0 ? (
                     <button
                       type="button"
                       onClick={() => setMonsterLevelDelta(0)}
                       style={{
-                        marginLeft: "0.15rem",
                         padding: "0.18rem 0.5rem",
                         fontSize: "0.76rem",
                         lineHeight: 1.2,
@@ -3959,6 +4022,7 @@ export function MonsterEditorApp({
                       Reset
                     </button>
                   ) : null}
+                  </div>
                 </div>
                 </>
               ) : null}
@@ -5218,7 +5282,7 @@ export function MonsterEditorApp({
               <div
                 style={{
                   ...sheetPanel,
-                  padding: "0.75rem",
+                  padding: encounterRosterPanelCollapsed ? "0.35rem 0.2rem" : "0.75rem",
                   minHeight: 0,
                   minWidth: 0,
                   maxHeight: "97.5vh",
@@ -5228,177 +5292,243 @@ export function MonsterEditorApp({
                   flexDirection: "column"
                 }}
               >
-                {encounterActive ? (
-                  <div
+                {encounterRosterPanelCollapsed ? (
+                  <button
+                    type="button"
+                    className="encounter-roster-disclosure-btn encounter-roster-disclosure-btn--expandLeft"
+                    aria-expanded={false}
+                    title="Show encounter"
+                    aria-label={`Show encounter${encounterActive ? ` for ${encounterActive.name}` : ""}${encounterRoster.length > 0 ? `, ${encounterRoster.length} creature(s)` : ""}`}
+                    onClick={expandEncounterRosterPanel}
                     style={{
-                      flexShrink: 0,
-                      display: "flex",
-                      alignItems: "baseline",
-                      justifyContent: "space-between",
-                      gap: "0.65rem",
-                      margin: "0 0 0.5rem 0",
-                      minWidth: 0,
-                      lineHeight: 1.35
-                    }}
-                  >
-                    <div
-                      style={{
-                        flex: "1 1 auto",
-                        minWidth: 0,
-                        fontSize: "0.95rem",
-                        fontWeight: 700,
-                        color: "var(--text-primary)",
-                        overflowWrap: "anywhere",
-                        wordBreak: "break-word"
-                      }}
-                    >
-                      {encounterActive.name}
-                    </div>
-                    <div
-                      style={{
-                        flex: "0 1 auto",
-                        minWidth: 0,
-                        textAlign: "right",
-                        fontSize: "0.78rem",
-                        color: "var(--text-secondary)",
-                        lineHeight: 1.4,
-                        overflowWrap: "anywhere"
-                      }}
-                    >
-                      <strong style={{ color: "var(--text-primary)" }}>Total XP:</strong>{" "}
-                      {encounterRoster.length === 0 ? (
-                        <span style={{ color: "var(--text-muted)" }}>—</span>
-                      ) : encounterRosterXpTotals.parsed === 0 ? (
-                        <span style={{ color: "var(--text-muted)" }}>— (no numeric XP on roster)</span>
-                      ) : encounterRosterXpTotals.parsed === encounterRosterXpTotals.total ? (
-                        <span>{formatXpInteger(encounterRosterXpTotals.sum)}</span>
-                      ) : (
-                        <span>
-                          {formatXpInteger(encounterRosterXpTotals.sum)}
-                          <span style={{ color: "var(--text-muted)" }}>
-                            {" "}
-                            ({encounterRosterXpTotals.parsed} of {encounterRosterXpTotals.total} with numeric XP)
-                          </span>
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ) : null}
-                {!encounterActive ? (
-                  <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", margin: 0 }}>Select an encounter above.</p>
-                ) : encounterRoster.length === 0 ? (
-                  <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", margin: 0 }}>
-                    No creatures yet. Use <strong>Add to encounter</strong> on the stat block.
-                  </p>
-                ) : (
-                  <ul
-                    style={{
-                      listStyle: "none",
-                      margin: 0,
+                      alignSelf: "center",
+                      flex: "0 0 auto",
+                      marginTop: "auto",
+                      marginBottom: "auto",
+                      width: "1.65rem",
+                      height: "1.65rem",
                       padding: 0,
-                      overflowY: "auto",
-                      overflowX: "hidden",
-                      flex: 1,
-                      minHeight: 0,
-                      minWidth: 0
+                      boxSizing: "border-box",
+                      border: "1px solid var(--panel-border)",
+                      borderRadius: "0.28rem",
+                      backgroundColor: "var(--surface-0)",
+                      color: "var(--text-secondary)",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center"
                     }}
                   >
-                    {encounterRoster.map((row, idx) => {
-                      const m = row.snapshot;
-                      const rosterSelectId = row.sourceMonsterId?.trim() || m.id;
-                      const rosterRowSelected = rosterSelectId === selectedId;
-                      return (
-                        <li
-                          key={row.rosterInstanceId}
+                    <span className="template-json-collapsible-arrow" aria-hidden>
+                      ▶
+                    </span>
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className="encounter-roster-disclosure-btn"
+                      aria-expanded={true}
+                      title="Hide encounter"
+                      aria-label="Hide encounter"
+                      onClick={collapseEncounterRosterPanel}
+                      style={{
+                        flexShrink: 0,
+                        alignSelf: "flex-end",
+                        margin: "0 0 0.5rem 0",
+                        padding: 0,
+                        boxSizing: "border-box",
+                        width: "1.65rem",
+                        height: "1.65rem",
+                        border: "1px solid var(--panel-border)",
+                        borderRadius: "0.28rem",
+                        backgroundColor: "var(--surface-0)",
+                        color: "var(--text-secondary)",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center"
+                      }}
+                    >
+                      <span className="template-json-collapsible-arrow" aria-hidden>
+                        ▶
+                      </span>
+                    </button>
+                    {encounterActive ? (
+                      <div
+                        style={{
+                          flexShrink: 0,
+                          display: "flex",
+                          alignItems: "flex-start",
+                          justifyContent: "space-between",
+                          gap: "0.5rem",
+                          margin: "0 0 0.5rem 0",
+                          minWidth: 0,
+                          lineHeight: 1.35
+                        }}
+                      >
+                        <div
                           style={{
-                            borderBottom: "1px solid var(--panel-border)",
-                            padding: "0.45rem 0.25rem",
-                            margin: "0 -0.25rem",
-                            fontSize: "0.8rem",
-                            borderRadius: "0.25rem",
-                            backgroundColor: rosterRowSelected ? "var(--table-stripe-odd)" : "transparent",
+                            flex: "1 1 auto",
                             minWidth: 0,
-                            overflowX: "hidden"
+                            fontSize: "0.95rem",
+                            fontWeight: 700,
+                            color: "var(--text-primary)",
+                            overflowWrap: "anywhere",
+                            wordBreak: "break-word"
                           }}
                         >
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (!rosterSelectId) return;
-                              setSelectedId(rosterSelectId);
-                              const fromKeys = dedupeKeysToTemplatePreviewIdxs(row.templateDedupeKeys, templateRows);
-                              if (fromKeys.length > 0) {
-                                setMonsterTemplatePreviewIdxs(fromKeys);
-                              } else {
-                                const fromSnap = templatePreviewIdxsFromSnapshot(row.snapshot, templateRows);
-                                setMonsterTemplatePreviewIdxs(fromSnap.length > 0 ? fromSnap : []);
-                              }
-                              const la = row.levelAdjustment;
-                              setMonsterLevelDelta(
-                                typeof la === "number" && Number.isFinite(la) ? Math.trunc(la) : 0
-                              );
-                            }}
-                            style={{
-                              display: "block",
-                              width: "100%",
-                              maxWidth: "100%",
-                              margin: 0,
-                              padding: 0,
-                              border: "none",
-                              background: "transparent",
-                              cursor: "pointer",
-                              textAlign: "left",
-                              font: "inherit",
-                              color: "inherit",
-                              minWidth: 0,
-                              overflowWrap: "anywhere"
-                            }}
-                          >
-                            <div style={{ fontWeight: 700, color: "var(--text-primary)" }}>{m.name}</div>
-                            <div style={{ color: "var(--text-muted)", overflowWrap: "anywhere" }}>
-                              L{m.level} · {m.role} · HP {monsterQuickHp(m)} · AC {monsterQuickAc(m)} · XP{" "}
-                              {monsterXpDisplay(m)}
-                            </div>
-                          </button>
-                          <div style={{ marginTop: "0.35rem", display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const id = encounterStore.activeEncounterId;
-                                if (!id) return;
-                                setEncounterStore((prev) => storeMoveRosterAt(prev, id, idx, -1));
+                          {encounterActive.name}
+                        </div>
+                        <div
+                          style={{
+                            flex: "0 1 auto",
+                            minWidth: 0,
+                            textAlign: "right",
+                            fontSize: "0.78rem",
+                            color: "var(--text-secondary)",
+                            lineHeight: 1.4,
+                            overflowWrap: "anywhere"
+                          }}
+                        >
+                          <strong style={{ color: "var(--text-primary)" }}>Total XP:</strong>{" "}
+                          {encounterRoster.length === 0 ? (
+                            <span style={{ color: "var(--text-muted)" }}>—</span>
+                          ) : encounterRosterXpTotals.parsed === 0 ? (
+                            <span style={{ color: "var(--text-muted)" }}>— (no numeric XP on roster)</span>
+                          ) : encounterRosterXpTotals.parsed === encounterRosterXpTotals.total ? (
+                            <span>{formatXpInteger(encounterRosterXpTotals.sum)}</span>
+                          ) : (
+                            <span>
+                              {formatXpInteger(encounterRosterXpTotals.sum)}
+                              <span style={{ color: "var(--text-muted)" }}>
+                                {" "}
+                                ({encounterRosterXpTotals.parsed} of {encounterRosterXpTotals.total} with numeric XP)
+                              </span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+                    {!encounterActive ? (
+                      <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", margin: 0 }}>
+                        Select an encounter above.
+                      </p>
+                    ) : encounterRoster.length === 0 ? (
+                      <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", margin: 0 }}>
+                        No creatures yet. Use <strong>Add to encounter</strong> on the stat block.
+                      </p>
+                    ) : (
+                      <ul
+                        style={{
+                          listStyle: "none",
+                          margin: 0,
+                          padding: 0,
+                          overflowY: "auto",
+                          overflowX: "hidden",
+                          flex: 1,
+                          minHeight: 0,
+                          minWidth: 0
+                        }}
+                      >
+                        {encounterRoster.map((row, idx) => {
+                          const m = row.snapshot;
+                          const rosterSelectId = row.sourceMonsterId?.trim() || m.id;
+                          const rosterRowSelected = rosterSelectId === selectedId;
+                          return (
+                            <li
+                              key={row.rosterInstanceId}
+                              style={{
+                                borderBottom: "1px solid var(--panel-border)",
+                                padding: "0.45rem 0.25rem",
+                                margin: "0 -0.25rem",
+                                fontSize: "0.8rem",
+                                borderRadius: "0.25rem",
+                                backgroundColor: rosterRowSelected ? "var(--table-stripe-odd)" : "transparent",
+                                minWidth: 0,
+                                overflowX: "hidden"
                               }}
-                              disabled={idx === 0}
                             >
-                              Up
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const id = encounterStore.activeEncounterId;
-                                if (!id) return;
-                                setEncounterStore((prev) => storeMoveRosterAt(prev, id, idx, 1));
-                              }}
-                              disabled={idx >= encounterRoster.length - 1}
-                            >
-                              Down
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const id = encounterStore.activeEncounterId;
-                                if (!id) return;
-                                if (!window.confirm(`Remove ${m.name} from this encounter?`)) return;
-                                setEncounterStore((prev) => storeRemoveRosterAt(prev, id, idx));
-                              }}
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (!rosterSelectId) return;
+                                  setSelectedId(rosterSelectId);
+                                  const fromKeys = dedupeKeysToTemplatePreviewIdxs(row.templateDedupeKeys, templateRows);
+                                  if (fromKeys.length > 0) {
+                                    setMonsterTemplatePreviewIdxs(fromKeys);
+                                  } else {
+                                    const fromSnap = templatePreviewIdxsFromSnapshot(row.snapshot, templateRows);
+                                    setMonsterTemplatePreviewIdxs(fromSnap.length > 0 ? fromSnap : []);
+                                  }
+                                  const la = row.levelAdjustment;
+                                  setMonsterLevelDelta(
+                                    typeof la === "number" && Number.isFinite(la) ? Math.trunc(la) : 0
+                                  );
+                                }}
+                                style={{
+                                  display: "block",
+                                  width: "100%",
+                                  maxWidth: "100%",
+                                  margin: 0,
+                                  padding: 0,
+                                  border: "none",
+                                  background: "transparent",
+                                  cursor: "pointer",
+                                  textAlign: "left",
+                                  font: "inherit",
+                                  color: "inherit",
+                                  minWidth: 0,
+                                  overflowWrap: "anywhere"
+                                }}
+                              >
+                                <div style={{ fontWeight: 700, color: "var(--text-primary)" }}>{m.name}</div>
+                                <div style={{ color: "var(--text-muted)", overflowWrap: "anywhere" }}>
+                                  L{m.level} · {m.role} · HP {monsterQuickHp(m)} · AC {monsterQuickAc(m)} · XP{" "}
+                                  {monsterXpDisplay(m)}
+                                </div>
+                              </button>
+                              <div style={{ marginTop: "0.35rem", display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const id = encounterStore.activeEncounterId;
+                                    if (!id) return;
+                                    setEncounterStore((prev) => storeMoveRosterAt(prev, id, idx, -1));
+                                  }}
+                                  disabled={idx === 0}
+                                >
+                                  Up
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const id = encounterStore.activeEncounterId;
+                                    if (!id) return;
+                                    setEncounterStore((prev) => storeMoveRosterAt(prev, id, idx, 1));
+                                  }}
+                                  disabled={idx >= encounterRoster.length - 1}
+                                >
+                                  Down
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const id = encounterStore.activeEncounterId;
+                                    if (!id) return;
+                                    if (!window.confirm(`Remove ${m.name} from this encounter?`)) return;
+                                    setEncounterStore((prev) => storeRemoveRosterAt(prev, id, idx));
+                                  }}
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </>
                 )}
               </div>
             ) : null}
