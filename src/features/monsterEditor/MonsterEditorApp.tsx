@@ -5303,8 +5303,7 @@ export function MonsterEditorApp({
                     style={{
                       alignSelf: "center",
                       flex: "0 0 auto",
-                      marginTop: "auto",
-                      marginBottom: "auto",
+                      margin: 0,
                       width: "1.65rem",
                       height: "1.65rem",
                       padding: 0,
@@ -5325,35 +5324,6 @@ export function MonsterEditorApp({
                   </button>
                 ) : (
                   <>
-                    <button
-                      type="button"
-                      className="encounter-roster-disclosure-btn"
-                      aria-expanded={true}
-                      title="Hide encounter"
-                      aria-label="Hide encounter"
-                      onClick={collapseEncounterRosterPanel}
-                      style={{
-                        flexShrink: 0,
-                        alignSelf: "flex-end",
-                        margin: "0 0 0.5rem 0",
-                        padding: 0,
-                        boxSizing: "border-box",
-                        width: "1.65rem",
-                        height: "1.65rem",
-                        border: "1px solid var(--panel-border)",
-                        borderRadius: "0.28rem",
-                        backgroundColor: "var(--surface-0)",
-                        color: "var(--text-secondary)",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center"
-                      }}
-                    >
-                      <span className="template-json-collapsible-arrow" aria-hidden>
-                        ▶
-                      </span>
-                    </button>
                     {encounterActive ? (
                       <div
                         style={{
@@ -5382,34 +5352,111 @@ export function MonsterEditorApp({
                         </div>
                         <div
                           style={{
+                            display: "flex",
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: "0.35rem",
                             flex: "0 1 auto",
-                            minWidth: 0,
-                            textAlign: "right",
-                            fontSize: "0.78rem",
-                            color: "var(--text-secondary)",
-                            lineHeight: 1.4,
-                            overflowWrap: "anywhere"
+                            minWidth: 0
                           }}
                         >
-                          <strong style={{ color: "var(--text-primary)" }}>Total XP:</strong>{" "}
-                          {encounterRoster.length === 0 ? (
-                            <span style={{ color: "var(--text-muted)" }}>—</span>
-                          ) : encounterRosterXpTotals.parsed === 0 ? (
-                            <span style={{ color: "var(--text-muted)" }}>— (no numeric XP on roster)</span>
-                          ) : encounterRosterXpTotals.parsed === encounterRosterXpTotals.total ? (
-                            <span>{formatXpInteger(encounterRosterXpTotals.sum)}</span>
-                          ) : (
-                            <span>
-                              {formatXpInteger(encounterRosterXpTotals.sum)}
-                              <span style={{ color: "var(--text-muted)" }}>
-                                {" "}
-                                ({encounterRosterXpTotals.parsed} of {encounterRosterXpTotals.total} with numeric XP)
+                          <div
+                            style={{
+                              flex: "0 1 auto",
+                              minWidth: 0,
+                              textAlign: "right",
+                              fontSize: "0.78rem",
+                              color: "var(--text-secondary)",
+                              lineHeight: 1.4,
+                              overflowWrap: "anywhere"
+                            }}
+                          >
+                            <strong style={{ color: "var(--text-primary)" }}>Total XP:</strong>{" "}
+                            {encounterRoster.length === 0 ? (
+                              <span style={{ color: "var(--text-muted)" }}>—</span>
+                            ) : encounterRosterXpTotals.parsed === 0 ? (
+                              <span style={{ color: "var(--text-muted)" }}>— (no numeric XP on roster)</span>
+                            ) : encounterRosterXpTotals.parsed === encounterRosterXpTotals.total ? (
+                              <span>{formatXpInteger(encounterRosterXpTotals.sum)}</span>
+                            ) : (
+                              <span>
+                                {formatXpInteger(encounterRosterXpTotals.sum)}
+                                <span style={{ color: "var(--text-muted)" }}>
+                                  {" "}
+                                  ({encounterRosterXpTotals.parsed} of {encounterRosterXpTotals.total} with numeric XP)
+                                </span>
                               </span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            className="encounter-roster-disclosure-btn"
+                            aria-expanded={true}
+                            title="Hide encounter"
+                            aria-label="Hide encounter"
+                            onClick={collapseEncounterRosterPanel}
+                            style={{
+                              flexShrink: 0,
+                              margin: 0,
+                              padding: 0,
+                              boxSizing: "border-box",
+                              width: "1.65rem",
+                              height: "1.65rem",
+                              border: "1px solid var(--panel-border)",
+                              borderRadius: "0.28rem",
+                              backgroundColor: "var(--surface-0)",
+                              color: "var(--text-secondary)",
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center"
+                            }}
+                          >
+                            <span className="template-json-collapsible-arrow" aria-hidden>
+                              ▶
                             </span>
-                          )}
+                          </button>
                         </div>
                       </div>
-                    ) : null}
+                    ) : (
+                      <div
+                        style={{
+                          flexShrink: 0,
+                          display: "flex",
+                          justifyContent: "flex-end",
+                          margin: "0 0 0.5rem 0"
+                        }}
+                      >
+                        <button
+                          type="button"
+                          className="encounter-roster-disclosure-btn"
+                          aria-expanded={true}
+                          title="Hide encounter"
+                          aria-label="Hide encounter"
+                          onClick={collapseEncounterRosterPanel}
+                          style={{
+                            flexShrink: 0,
+                            margin: 0,
+                            padding: 0,
+                            boxSizing: "border-box",
+                            width: "1.65rem",
+                            height: "1.65rem",
+                            border: "1px solid var(--panel-border)",
+                            borderRadius: "0.28rem",
+                            backgroundColor: "var(--surface-0)",
+                            color: "var(--text-secondary)",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center"
+                          }}
+                        >
+                          <span className="template-json-collapsible-arrow" aria-hidden>
+                            ▶
+                          </span>
+                        </button>
+                      </div>
+                    )}
                     {!encounterActive ? (
                       <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", margin: 0 }}>
                         Select an encounter above.
