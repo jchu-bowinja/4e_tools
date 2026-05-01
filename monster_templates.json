@@ -1,0 +1,1195 @@
+{
+  "meta": {
+    "templateCount": 7,
+    "source": "4e-builder.monsterEditor.exportTemplates",
+    "exportedAt": "2026-04-30T19:59:24.254Z",
+    "dedupeKey": "normalizedTemplateName"
+  },
+  "templates": [
+    {
+      "templateName": "Spirit Possessed",
+      "sourceBook": "manual import",
+      "pageStart": 0,
+      "pageEnd": 0,
+      "description": "Some spirits can inhabit and control living creatures. These creatures hide among the living, aping the actions of the host. Under this guise, a spirit works covertly toward its malicious goals. “Spirit possessed” is a template you can apply to a living creature to represent a subject whose body is possessed by an undead spirit.",
+      "prerequisite": "Living creature, level 11, Charisma 13",
+      "prerequisiteExpr": {
+        "minLevel": 11,
+        "abilities": {
+          "cha": 13
+        },
+        "living": true
+      },
+      "roleLine": "Spirit Possessed Elite Controller",
+      "role": {
+        "raw": "Spirit Possessed Elite Controller",
+        "templateLabel": "Spirit Possessed",
+        "tier": "Elite",
+        "combatRole": "Controller"
+      },
+      "keywords": [
+        "Undead"
+      ],
+      "isEliteTemplate": true,
+      "statLines": [
+        "Defenses Will +4",
+        "Resist 10 necrotic at 11th level, 15 necrotic at 21st level",
+        "Vulnerable 10 radiant at 11th level, 15 radiant at 21st level",
+        "Saving Throws +2",
+        "Action Points 1",
+        "HP +8 per level + Constitution score"
+      ],
+      "stats": {
+        "savingThrows": {
+          "value": 2,
+          "sourceLine": "Saving Throws +2"
+        },
+        "actionPoints": {
+          "value": 1,
+          "sourceLine": "Action Points 1"
+        },
+        "hitPoints": {
+          "default": {
+            "perLevel": 8,
+            "addConstitution": true
+          },
+          "sourceLines": [
+            "HP +8 per level + Constitution score"
+          ]
+        },
+        "defenses": {
+          "WILL": 4
+        },
+        "resistances": {
+          "entries": [
+            {
+              "kind": "typed",
+              "type": "necrotic",
+              "tiers": {
+                "1": 10,
+                "11": 10,
+                "21": 15
+              },
+              "sourceLine": "Resist 10 necrotic at 11th level, 15 necrotic at 21st level"
+            }
+          ]
+        },
+        "vulnerabilities": {
+          "entries": [
+            {
+              "kind": "typed",
+              "type": "radiant",
+              "tiers": {
+                "1": 10,
+                "11": 10,
+                "21": 15
+              },
+              "sourceLine": "Vulnerable 10 radiant at 11th level, 15 radiant at 21st level"
+            }
+          ]
+        }
+      },
+      "powers": [
+        {
+          "name": "Psychic Assault",
+          "usage": "At-Will",
+          "action": "Minor",
+          "type": "Close Burst",
+          "isBasic": false,
+          "tier": "",
+          "flavorText": "",
+          "keywords": "Psychic",
+          "keywordNames": [
+            "Psychic"
+          ],
+          "keywordTokens": [
+            "Psychic"
+          ],
+          "range": "Close Burst 10",
+          "description": "Close burst 10; targets one creature; spirit possessed's level + 2 vs. Will; 1d6 + Charisma modifier psychic damage, and the target is dazed until the end of the spirit possessed's next turn.",
+          "damageExpressions": [
+            "1d6 + Charisma modifier psychic damage"
+          ],
+          "attacks": [
+            {
+              "kind": "MonsterAttack",
+              "name": "Hit",
+              "attackBonuses": [
+                {
+                  "defense": "Will",
+                  "bonus": 2
+                }
+              ],
+              "hit": {
+                "description": "Close burst 10; targets one creature; spirit possessed's level + 2 vs. Will; 1d6 + Charisma modifier psychic damage, and the target is dazed until the end of the spirit possessed's next turn."
+              }
+            }
+          ],
+          "traitTemplateKeywords": [
+            "Psychic"
+          ]
+        },
+        {
+          "name": "Spirit Barrage",
+          "usage": "Recharge",
+          "usageDetails": "5",
+          "action": "Standard",
+          "type": "Close Burst",
+          "isBasic": false,
+          "tier": "",
+          "flavorText": "",
+          "keywords": "Psychic",
+          "keywordNames": [
+            "Psychic"
+          ],
+          "keywordTokens": [
+            "Psychic"
+          ],
+          "range": "Close Burst 2",
+          "description": "Close burst 2; targets enemies; spirit possessed's level +3 vs. Fortitude; 2d6 + Charisma modifier damage, and the target is knocked prone.",
+          "damageExpressions": [
+            "2d6 + Charisma modifier damage"
+          ],
+          "attacks": [
+            {
+              "kind": "MonsterAttack",
+              "name": "Hit",
+              "attackBonuses": [
+                {
+                  "defense": "Fortitude",
+                  "bonus": 3
+                }
+              ],
+              "hit": {
+                "description": "Close burst 2; targets enemies; spirit possessed's level +3 vs. Fortitude; 2d6 + Charisma modifier damage, and the target is knocked prone."
+              }
+            }
+          ],
+          "traitTemplateKeywords": [
+            "Psychic"
+          ]
+        },
+        {
+          "name": "Spirit Transfer",
+          "usage": "",
+          "action": "",
+          "isBasic": false,
+          "tier": "",
+          "flavorText": "",
+          "keywords": "",
+          "keywordNames": [],
+          "keywordTokens": [],
+          "range": "",
+          "description": "0 hit points) ✦ Charm, Psychic Close burst 3; targets one creature; spirit possessed's level + 3 vs. Will; 3d6 + Charisma modifier psychic damage, and the target is dominated and takes 20 ongoing psychic damage (save ends both; also see below). If the target of the attack is reduced to 0 hit points or fewer by the attack or the ongoing damage, the target spends a healing surge to regain half its maximum hit points. The target is dominated (no save) by the spirit and gains all the characteristics of the spirit possessed template. In addition, all the powers associated with the template are recharged. Successful Saving Throw: The spirit possessing the subject is destroyed. Miss: Half damage, no ongoing psychic damage, and the target is not dominated. In addition, the spirit possessing the subject is destroyed. Hit or Miss: The spirit's former host falls prone and is unconscious at 1 hit point until it takes a short rest.",
+          "damageExpressions": [
+            "3d6 + Charisma modifier psychic damage"
+          ],
+          "attacks": [
+            {
+              "kind": "MonsterAttack",
+              "name": "Hit",
+              "attackBonuses": [
+                {
+                  "defense": "Will",
+                  "bonus": 3
+                }
+              ],
+              "hit": {
+                "description": "0 hit points) ✦ Charm, Psychic Close burst 3; targets one creature; spirit possessed's level + 3 vs. Will; 3d6 + Charisma modifier psychic damage, and the target is dominated and takes 20 ongoing psychic damage (save ends both; also see below). If the target of the attack is reduced to 0 hit points or fewer by the attack or the ongoing damage, the target spends a healing surge to regain half its maximum hit points. The target is dominated (no save) by the spirit and gains all the characteristics of the spirit possessed template. In addition, all the powers associated with the template are recharged. Successful Saving Throw: The spirit possessing the subject is destroyed. Miss: Half damage, no ongoing psychic damage, and the target is not dominated. In addition, the spirit possessing the subject is destroyed. Hit or Miss: The spirit's former host falls prone and is unconscious at 1 hit point until it takes a short rest."
+              }
+            }
+          ]
+        }
+      ],
+      "extractionMethod": "paste-ts",
+      "powersText": [
+        "[ABILITY]",
+        "C Psychic Assault (minor 1/round; at-will) ✦ Psychic",
+        "Close burst 10; targets one creature; spirit possessed's",
+        "level + 2 vs. Will; 1d6 + Charisma modifier psychic",
+        "damage, and the target is dazed until the end of the spirit",
+        "possessed's next turn.",
+        "[ABILITY]",
+        "C Spirit Barrage (standard; recharge ⚄ ⚅) ✦ Psychic",
+        "Close burst 2; targets enemies; spirit possessed's level +3",
+        "vs. Fortitude; 2d6 + Charisma modifier damage, and the",
+        "target is knocked prone.",
+        "[ABILITY]",
+        "C Spirit Transfer (when the spirit possessed is reduced to",
+        "0 hit points) ✦ Charm, Psychic",
+        "Close burst 3; targets one creature; spirit possessed's level",
+        "+ 3 vs. Will; 3d6 + Charisma modifier psychic damage,",
+        "and the target is dominated and takes 20 ongoing psychic",
+        "damage (save ends both; also see below). If the target",
+        "of the attack is reduced to 0 hit points or fewer by the",
+        "attack or the ongoing damage, the target spends a healing",
+        "surge to regain half its maximum hit points. The target",
+        "is dominated (no save) by the spirit and gains all the",
+        "characteristics of the spirit possessed template. In addition,",
+        "all the powers associated with the template are recharged.",
+        "Successful Saving Throw: The spirit possessing the subject is",
+        "destroyed. Miss: Half damage, no ongoing psychic damage,",
+        "and the target is not dominated. In addition, the spirit",
+        "possessing the subject is destroyed. Hit or Miss: The spirit's",
+        "former host falls prone and is unconscious at 1 hit point",
+        "until it takes a short rest.",
+        "[ABILITYEND]"
+      ],
+      "rawText": "Spirit Possessed Some spirits can inhabit and control living creatures. These creatures hide among the living, aping the actions of the host. Under this guise, a spirit works covertly toward its malicious goals. “Spirit possessed” is a template you can apply to a living creature to represent a subject whose body is possessed by an undead spirit. Prerequisites: Living creature, level 11, Charisma 13 Spirit Possessed Elite Controller (undead) XP Elite Defenses Will +4 Resist 10 necrotic at 11th level, 15 necrotic at 21st level Vulnerable 10 radiant at 11th level, 15 radiant at 21st level Saving Throws +2 Action Points 1 HP +8 per level + Constitution score [ABILITY] C Psychic Assault (minor 1/round; at-will) ✦ Psychic Close burst 10; targets one creature; spirit possessed's level + 2 vs. Will; 1d6 + Charisma modifier psychic damage, and the target is dazed until the end of the spirit possessed's next turn. [ABILITY] C Spirit Barrage (standard; recharge ⚄ ⚅) ✦ Psychic Close burst 2; targets enemies; spirit possessed's level +3 vs. Fortitude; 2d6 + Charisma modifier damage, and the target is knocked prone. [ABILITY] C Spirit Transfer (when the spirit possessed is reduced to 0 hit points) ✦ Charm, Psychic Close burst 3; targets one creature; spirit possessed's level + 3 vs. Will; 3d6 + Charisma modifier psychic damage, and the target is dominated and takes 20 ongoing psychic damage (save ends both; also see below). If the target of the attack is reduced to 0 hit points or fewer by the attack or the ongoing damage, the target spends a healing surge to regain half its maximum hit points. The target is dominated (no save) by the spirit and gains all the characteristics of the spirit possessed template. In addition, all the powers associated with the template are recharged. Successful Saving Throw: The spirit possessing the subject is destroyed. Miss: Half damage, no ongoing psychic damage, and the target is not dominated. In addition, the spirit possessing the subject is destroyed. Hit or Miss: The spirit's former host falls prone and is unconscious at 1 hit point until it takes a short rest. [ABILITYEND]",
+      "relatedFlavorText": [],
+      "extractionWarnings": []
+    },
+    {
+      "templateName": "Spawn Of Kyuss",
+      "sourceBook": "manual import",
+      "pageStart": 0,
+      "pageEnd": 0,
+      "description": "A spawn of Kyuss is created when an infection from a particular species of necrotic burrowing worms kills its host and transforms the creature into an undead monstrosity. Akin to larva undead, spawns of Kyuss were the Bonemaster's first experiments in the creation of larva- and worm-infused creatures. These larval zombies typically lack the subtlety and power of larva undead, but the strength and virulence of their attacks makes them nonetheless formidable. “Spawn of Kyuss” is a template you can apply to any beast, humanoid, or magical beast. Although the template is most often applied to living creatures, this is not a prerequisite. The infection can afflict virtually any kind of creature, but it typically infects strong subjects that can best spread the disease.",
+      "prerequisite": "Level 11, and beast, humanoid, or magical beast.",
+      "prerequisiteExpr": {
+        "minLevel": 11,
+        "typeOr": [
+          "beast",
+          "humanoid",
+          "magical beast"
+        ]
+      },
+      "roleLine": "Spawn of Kyuss Elite Soldier",
+      "role": {
+        "raw": "Spawn of Kyuss Elite Soldier",
+        "templateLabel": "Spawn of Kyuss",
+        "tier": "Elite",
+        "combatRole": "Soldier"
+      },
+      "keywords": [
+        "Undead"
+      ],
+      "isEliteTemplate": true,
+      "statLines": [
+        "Defenses +2 AC; +2 Fortitude, +2 Will",
+        "Resist 5 necrotic at 1st level, 10 necrotic at 11th level, 15 necrotic at 21st level",
+        "Immune disease, poison",
+        "Saving Throws +2",
+        "Action Points 1",
+        "Hit Points +8 per level + Constitution score"
+      ],
+      "stats": {
+        "savingThrows": {
+          "value": 2,
+          "sourceLine": "Saving Throws +2"
+        },
+        "actionPoints": {
+          "value": 1,
+          "sourceLine": "Action Points 1"
+        },
+        "hitPoints": {
+          "default": {
+            "perLevel": 8,
+            "addConstitution": true
+          },
+          "sourceLines": [
+            "Hit Points +8 per level + Constitution score"
+          ]
+        },
+        "defenses": {
+          "AC": 2,
+          "FORTITUDE": 2,
+          "WILL": 2
+        },
+        "immunities": [
+          "disease",
+          "poison"
+        ],
+        "resistances": {
+          "entries": [
+            {
+              "kind": "typed",
+              "type": "necrotic",
+              "tiers": {
+                "1": 5,
+                "11": 10,
+                "21": 15
+              },
+              "sourceLine": "Resist 5 necrotic at 1st level, 10 necrotic at 11th level, 15 necrotic at 21st level"
+            }
+          ]
+        },
+        "regeneration": 10
+      },
+      "auras": [
+        {
+          "name": "Fear of Worms",
+          "details": "any living creature that starts its turn within the aura takes a –2 penalty to attack rolls against spawn of Kyuss, larva undead, wormspawn praetorians, and Kyuss.",
+          "range": 3,
+          "type": "Trait",
+          "keywords": [
+            "Fear"
+          ]
+        }
+      ],
+      "traits": [
+        {
+          "name": "Regeneration 10",
+          "details": "if a spawn of Kyuss takes radiant damage,",
+          "range": 0,
+          "type": "Trait"
+        },
+        {
+          "name": "regeneration doesn't function until the end of its next turn)",
+          "details": "",
+          "range": 0,
+          "type": "Trait"
+        },
+        {
+          "name": "Constitution modifier damage, and ongoing 10 necrotic",
+          "details": "damage (save ends). First Failed Saving Throw: The target contracts worms of Kyuss (see below).",
+          "range": 0,
+          "type": "Trait"
+        }
+      ],
+      "powers": [
+        {
+          "name": "Touch of Kyuss",
+          "usage": "Recharge",
+          "usageDetails": "5",
+          "action": "Standard",
+          "isBasic": false,
+          "tier": "",
+          "flavorText": "",
+          "keywords": "Disease",
+          "keywordNames": [
+            "Disease"
+          ],
+          "keywordTokens": [
+            "Disease"
+          ],
+          "range": "",
+          "description": "Necrotic Spawn of Kyuss's level + 3 vs. Fortitude; 2d6 +",
+          "damageExpressions": [
+            "2d6"
+          ],
+          "attacks": [
+            {
+              "kind": "MonsterAttack",
+              "name": "Hit",
+              "attackBonuses": [
+                {
+                  "defense": "Fortitude",
+                  "bonus": 3
+                }
+              ],
+              "hit": {
+                "description": "Necrotic Spawn of Kyuss's level + 3 vs. Fortitude; 2d6 +"
+              }
+            }
+          ],
+          "traitTemplateKeywords": [
+            "Disease"
+          ]
+        }
+      ],
+      "extractionMethod": "paste-ts",
+      "powersText": [
+        "Regeneration 10 (if a spawn of Kyuss takes radiant damage,",
+        "regeneration doesn't function until the end of its next turn)",
+        "Fear of Worms (Fear) aura 3; any living creature that",
+        "starts its turn within the aura takes a –2 penalty to attack",
+        "rolls against spawn of Kyuss, larva undead, wormspawn",
+        "praetorians, and Kyuss.",
+        "M Touch of Kyuss (standard; recharge ⚄ ⚅) ✦ Disease,",
+        "Necrotic",
+        "Spawn of Kyuss's level + 3 vs. Fortitude; 2d6 +",
+        "Constitution modifier damage, and ongoing 10 necrotic",
+        "damage (save ends). First Failed Saving Throw: The target",
+        "contracts worms of Kyuss (see below)."
+      ],
+      "rawText": "Spawn of Kyuss A spawn of Kyuss is created when an infection from a particular species of necrotic burrowing worms kills its host and transforms the creature into an undead monstrosity. Akin to larva undead, spawns of Kyuss were the Bonemaster's first experiments in the creation of larva- and worm-infused creatures. These larval zombies typically lack the subtlety and power of larva undead, but the strength and virulence of their attacks makes them nonetheless formidable. “Spawn of Kyuss” is a template you can apply to any beast, humanoid, or magical beast. Although the template is most often applied to living creatures, this is not a prerequisite. The infection can afflict virtually any kind of creature, but it typically infects strong subjects that can best spread the disease. Prerequisites: Level 11, and beast, humanoid, or magical beast. Spawn of Kyuss Elite Soldier (undead) XP Elite Defenses +2 AC; +2 Fortitude, +2 Will Resist 5 necrotic at 1st level, 10 necrotic at 11th level, 15 necrotic at 21st level Immune disease, poison Saving Throws +2 Action Points 1 Hit Points +8 per level + Constitution score Regeneration 10 (if a spawn of Kyuss takes radiant damage, regeneration doesn't function until the end of its next turn) Fear of Worms (Fear) aura 3; any living creature that starts its turn within the aura takes a –2 penalty to attack rolls against spawn of Kyuss, larva undead, wormspawn praetorians, and Kyuss. M Touch of Kyuss (standard; recharge ⚄ ⚅) ✦ Disease, Necrotic Spawn of Kyuss's level + 3 vs. Fortitude; 2d6 + Constitution modifier damage, and ongoing 10 necrotic damage (save ends). First Failed Saving Throw: The target contracts worms of Kyuss (see below).",
+      "relatedFlavorText": [],
+      "extractionWarnings": []
+    },
+    {
+      "templateName": "Lich",
+      "sourceBook": "manual import",
+      "pageStart": 0,
+      "pageEnd": 0,
+      "description": "Liches are evil arcane masterminds that pursue the path of undeath to achieve immortality. They are cold, scheming creatures who hunger for ever-greater power, long-forgotten knowledge, and the most terrible of arcane secrets. Some liches know a ritual that sustains them beyond destruction by tying their essence to a phylactery. When a lich who has performed this ritual is reduced to 0 hit points, its body and possessions crumble into dust, but it is not destroyed. It reappears (along with its possessions) in 1d10 days within 1 square of its phylactery, unless the phylactery is also found and destroyed. “Lich” is a template you can add to any intelligent creature of 11th level or higher. It best complements an arcane NPC, such as a wizard or warlock, or a monster with arcane powers, such as a beholder or oni. Other highly intelligent creatures might also become liches; for example, mind flayers, who draw on psionic power.",
+      "prerequisite": "Level 11, Intelligence 13",
+      "prerequisiteExpr": {
+        "minLevel": 11,
+        "abilities": {
+          "int": 13
+        }
+      },
+      "roleLine": "Lich Elite Controller or Artillery",
+      "role": {
+        "raw": "Lich Elite Controller or Artillery"
+      },
+      "keywords": [
+        "Undead"
+      ],
+      "isEliteTemplate": true,
+      "statLines": [
+        "Senses Darkvision",
+        "Defenses +2 AC; +4 Fortitude, +4 Will",
+        "Immune disease, poison",
+        "Resist 5 + 1/2 level necrotic",
+        "Saving Throws +2",
+        "Action Point 1",
+        "Hit Points +8 per level + Constitution score (controller) or +6 per level + Constitution score (artillery)"
+      ],
+      "stats": {
+        "senses": [
+          {
+            "name": "Darkvision",
+            "range": 0
+          }
+        ],
+        "savingThrows": {
+          "value": 2,
+          "sourceLine": "Saving Throws +2"
+        },
+        "actionPoints": {
+          "value": 1,
+          "sourceLine": "Action Point 1"
+        },
+        "hitPoints": {
+          "variants": [
+            {
+              "when": {
+                "role": "controller"
+              },
+              "perLevel": 8,
+              "addConstitution": true,
+              "sourceLine": "+8 per level + Constitution score (controller)"
+            },
+            {
+              "when": {
+                "role": "artillery"
+              },
+              "perLevel": 6,
+              "addConstitution": true,
+              "sourceLine": "+6 per level + Constitution score (artillery)"
+            }
+          ],
+          "sourceLines": [
+            "Hit Points +8 per level + Constitution score (controller) or +6 per level + Constitution score (artillery)"
+          ]
+        },
+        "defenses": {
+          "AC": 2,
+          "FORTITUDE": 4,
+          "WILL": 4
+        },
+        "immunities": [
+          "disease",
+          "poison"
+        ],
+        "resistances": {
+          "entries": [
+            {
+              "kind": "typed",
+              "type": "necrotic",
+              "baseAmount": 5,
+              "plusHalfLevel": true,
+              "sourceLine": "Resist 5 + 1/2 level necrotic"
+            }
+          ]
+        },
+        "regeneration": 10
+      },
+      "auras": [
+        {
+          "name": "Necromantic Aura",
+          "details": "Any living creature that enters or starts its turn in the aura takes 5 necrotic damage.",
+          "range": 5,
+          "type": "Trait",
+          "keywords": [
+            "Necrotic"
+          ]
+        }
+      ],
+      "traits": [
+        {
+          "name": "Regeneration 10. If the lich takes radiant damage, its regeneration doesn't function on its next turn. POWERS",
+          "details": "",
+          "range": 0,
+          "type": "Trait"
+        },
+        {
+          "name": "Necrotic Master",
+          "details": "The lich can convert any attack power it has to necrotic. Change a power's energy keyword to necrotic, or add necrotic energy to an attack power that doesn't normally deal energy damage.",
+          "range": 0,
+          "type": "Trait"
+        }
+      ],
+      "powers": [
+        {
+          "name": "Spellmaster",
+          "usage": "Recharge",
+          "usageDetails": "5",
+          "action": "Minor",
+          "isBasic": false,
+          "tier": "",
+          "flavorText": "",
+          "keywords": "",
+          "keywordNames": [],
+          "keywordTokens": [],
+          "range": "",
+          "description": "The lich regains the use of an expended encounter power."
+        }
+      ],
+      "extractionMethod": "paste-ts",
+      "powersText": [
+        "Regeneration 10. If the lich takes radiant damage, its regeneration doesn't function on its next turn. POWERS",
+        "Spellmaster (minor; recharge ⚄ ⚅)",
+        "The lich regains the use of an expended encounter power.",
+        "Necromantic Aura (Necrotic) aura 5",
+        "Any living creature that enters or starts its turn in the aura",
+        "takes 5 necrotic damage.",
+        "Necrotic Master",
+        "The lich can convert any attack power it has to necrotic.",
+        "Change a power's energy keyword to necrotic, or add",
+        "necrotic energy to an attack power that doesn't normally",
+        "deal energy damage."
+      ],
+      "rawText": "Lich Liches are evil arcane masterminds that pursue the path of undeath to achieve immortality. They are cold, scheming creatures who hunger for ever-greater power, long-forgotten knowledge, and the most terrible of arcane secrets. Some liches know a ritual that sustains them beyond destruction by tying their essence to a phylactery. When a lich who has performed this ritual is reduced to 0 hit points, its body and possessions crumble into dust, but it is not destroyed. It reappears (along with its possessions) in 1d10 days within 1 square of its phylactery, unless the phylactery is also found and destroyed. “Lich” is a template you can add to any intelligent creature of 11th level or higher. It best complements an arcane NPC, such as a wizard or warlock, or a monster with arcane powers, such as a beholder or oni. Other highly intelligent creatures might also become liches; for example, mind flayers, who draw on psionic power. Prerequisite: Level 11, Intelligence 13 Lich Elite Controller or Artillery (undead) XP Elite Senses Darkvision Defenses +2 AC; +4 Fortitude, +4 Will Immune disease, poison Resist 5 + 1/2 level necrotic Saving Throws +2 Action Point 1 Hit Points +8 per level + Constitution score (controller) or +6 per level + Constitution score (artillery) Regeneration 10. If the lich takes radiant damage, its regeneration doesn't function on its next turn. POWERS Spellmaster (minor; recharge ⚄ ⚅) The lich regains the use of an expended encounter power. Necromantic Aura (Necrotic) aura 5 Any living creature that enters or starts its turn in the aura takes 5 necrotic damage. Necrotic Master The lich can convert any attack power it has to necrotic. Change a power's energy keyword to necrotic, or add necrotic energy to an attack power that doesn't normally deal energy damage.",
+      "relatedFlavorText": [],
+      "extractionWarnings": []
+    },
+    {
+      "templateName": "Demagogue",
+      "sourceBook": "manual import",
+      "pageStart": 0,
+      "pageEnd": 0,
+      "description": "This template portrays a villain with overwhelming force of personality who desires to manipulate and use others. Its followers are utter fanatics dedicated to the cause, no matter the price—even death or worse. “Demagogue” is a template you can apply to any humanoid or magical beast to represent the leader of an evil organization or group. Any NPC or monster that leads and uses others is a good fit for this template.",
+      "prerequisite": "Humanoid or magical beast",
+      "prerequisiteExpr": {
+        "typeOr": [
+          "humanoid",
+          "magical beast"
+        ]
+      },
+      "roleLine": "Demagogue Elite Controller (Leader)",
+      "role": {
+        "raw": "Demagogue Elite Controller (Leader)",
+        "templateLabel": "Demagogue",
+        "tier": "Elite",
+        "combatRole": "Controller",
+        "tags": [
+          "Leader"
+        ]
+      },
+      "keywords": [
+        "Humanoid",
+        "Magical Beast"
+      ],
+      "isEliteTemplate": true,
+      "statLines": [
+        "Defenses +2 Fortitude; +4 Will; +4 to all defenses against charm and fear effects",
+        "Saving Throws +2",
+        "Action Point 1",
+        "Hit Points +8 per level + Constitution score"
+      ],
+      "stats": {
+        "savingThrows": {
+          "value": 2,
+          "sourceLine": "Saving Throws +2"
+        },
+        "actionPoints": {
+          "value": 1,
+          "sourceLine": "Action Point 1"
+        },
+        "hitPoints": {
+          "default": {
+            "perLevel": 8,
+            "addConstitution": true
+          },
+          "sourceLines": [
+            "Hit Points +8 per level + Constitution score"
+          ]
+        },
+        "defenses": {
+          "FORTITUDE": 2,
+          "WILL": 4,
+          "to all defenses against charm and fear effects": 4
+        }
+      },
+      "auras": [
+        {
+          "name": "Deathless Fanaticism aura 5",
+          "details": "Lower-level allies (other than minions) in the aura remain alive when reduced to 0 hit points. An affected creature dies at the end of its next turn if it is still at 0 hit points or below.",
+          "range": 5,
+          "type": "Trait"
+        }
+      ],
+      "traits": [
+        {
+          "name": "Mob Defense",
+          "details": "The demagogue gains a +1 bonus to all defenses for each ally adjacent to it.",
+          "range": 0,
+          "type": "Trait"
+        }
+      ],
+      "powers": [
+        {
+          "name": "Clever Escape",
+          "usage": "Recharge",
+          "usageDetails": "5",
+          "action": "Move",
+          "isBasic": false,
+          "tier": "",
+          "flavorText": "",
+          "keywords": "",
+          "keywordNames": [],
+          "keywordTokens": [],
+          "range": "",
+          "description": "The demagogue moves up to twice its speed. It can move only into squares that take it farther away from its enemies. This movement does not provoke opportunity attacks."
+        }
+      ],
+      "extractionMethod": "paste-ts",
+      "powersText": [
+        "Deathless Fanaticism aura 5",
+        "Lower-level allies (other than minions) in the aura remain alive when reduced to 0 hit points. An affected",
+        "creature dies at the end of its next turn if it is still at 0 hit",
+        "points or below.",
+        "Mob Defense",
+        "The demagogue gains a +1 bonus to all defenses for each",
+        "ally adjacent to it.",
+        "Clever Escape (move; recharge ⚄ ⚅)",
+        "The demagogue moves up to twice its speed. It can move",
+        "only into squares that take it farther away from its enemies.",
+        "This movement does not provoke opportunity attacks."
+      ],
+      "rawText": "Demagogue This template portrays a villain with overwhelming force of personality who desires to manipulate and use others. Its followers are utter fanatics dedicated to the cause, no matter the price—even death or worse. “Demagogue” is a template you can apply to any humanoid or magical beast to represent the leader of an evil organization or group. Any NPC or monster that leads and uses others is a good fit for this template. Prerequisite: Humanoid or magical beast Demagogue Elite Controller (Leader) Humanoid or magical beast XP Elite Defenses +2 Fortitude; +4 Will; +4 to all defenses against charm and fear effects Saving Throws +2 Action Point 1 Hit Points +8 per level + Constitution score POWERS Deathless Fanaticism aura 5 Lower-level allies (other than minions) in the aura remain alive when reduced to 0 hit points. An affected creature dies at the end of its next turn if it is still at 0 hit points or below. Mob Defense The demagogue gains a +1 bonus to all defenses for each ally adjacent to it. Clever Escape (move; recharge ⚄ ⚅) The demagogue moves up to twice its speed. It can move only into squares that take it farther away from its enemies. This movement does not provoke opportunity attacks.",
+      "relatedFlavorText": [],
+      "extractionWarnings": []
+    },
+    {
+      "templateName": "Demonic Acolyte",
+      "sourceBook": "manual import",
+      "pageStart": 0,
+      "pageEnd": 0,
+      "description": "This template reflects grim priests of Orcus, raving cult lords of Demogorgon, sacred berserkers of Baphomet, and devotees of other demon lords. A demon lord must personally invest power in an acolyte, making such foes particularly dangerous. “Demonic acolyte” is a template you can apply to any humanoid or magical beast to represent the priesthood of a demon's cult. If you are modifying a nonplayer character, this template works best with the cleric, warlock, and wizard classes. In particular, clerics who have turned away from the gods and sought power from demons are ideal candidates for such “blessings.”",
+      "prerequisite": "Humanoid or magical beast",
+      "prerequisiteExpr": {
+        "typeOr": [
+          "humanoid",
+          "magical beast"
+        ]
+      },
+      "roleLine": "Demonic Acolyte Elite Controller (Leader)",
+      "role": {
+        "raw": "Demonic Acolyte Elite Controller (Leader)",
+        "templateLabel": "Demonic Acolyte",
+        "tier": "Elite",
+        "combatRole": "Controller",
+        "tags": [
+          "Leader"
+        ]
+      },
+      "keywords": [
+        "Humanoid",
+        "Magical Beast (demon)"
+      ],
+      "isEliteTemplate": true,
+      "statLines": [
+        "Defenses +1 AC; +2 Fortitude; +2 Will",
+        "Resist 5 (choose one type) at 1st level, 10 (choose two types) at 11th level, 15 (choose three types) at 21st level",
+        "Saving Throws +2",
+        "Action Point 1",
+        "Hit Points +8 per level + Constitution score"
+      ],
+      "stats": {
+        "savingThrows": {
+          "value": 2,
+          "sourceLine": "Saving Throws +2"
+        },
+        "actionPoints": {
+          "value": 1,
+          "sourceLine": "Action Point 1"
+        },
+        "hitPoints": {
+          "default": {
+            "perLevel": 8,
+            "addConstitution": true
+          },
+          "sourceLines": [
+            "Hit Points +8 per level + Constitution score"
+          ]
+        },
+        "defenses": {
+          "AC": 1,
+          "FORTITUDE": 2,
+          "WILL": 2
+        },
+        "resistances": {
+          "entries": [
+            {
+              "kind": "variable",
+              "tiers": {
+                "1": 5,
+                "11": 10,
+                "21": 15
+              },
+              "tierRiders": {
+                "1": "choose one type",
+                "11": "choose two types",
+                "21": "choose three types"
+              },
+              "sourceLine": "Resist 5 (choose one type) at 1st level, 10 (choose two types) at 11th level, 15 (choose three types) at 21st level"
+            }
+          ]
+        }
+      },
+      "auras": [
+        {
+          "name": "Shield of Abyssal Majesty aura 5",
+          "details": "Allies in the aura gain the demonic acolyte's resistance(s).",
+          "range": 5,
+          "type": "Trait"
+        }
+      ],
+      "traits": [
+        {
+          "name": "Abyssal Might",
+          "details": "The demonic acolyte gains a +2 power bonus to damage rolls with all attacks. This bonus increases to +4 at 11th level and +6 at 21st level.",
+          "range": 0,
+          "type": "Trait"
+        }
+      ],
+      "powers": [
+        {
+          "name": "Consume Soul",
+          "usage": "At-Will",
+          "action": "Immediate Reaction",
+          "isBasic": false,
+          "tier": "",
+          "flavorText": "",
+          "keywords": "",
+          "keywordNames": [],
+          "keywordTokens": [],
+          "range": "",
+          "description": "squares of the acolyte is reduced to 0 hit points) The demonic acolyte regains hit points equal to one-half its level."
+        }
+      ],
+      "extractionMethod": "paste-ts",
+      "powersText": [
+        "Shield of Abyssal Majesty aura 5",
+        "Allies in the aura gain the demonic acolyte's",
+        "resistance(s).",
+        "Abyssal Might",
+        "The demonic acolyte gains a +2 power bonus to damage",
+        "rolls with all attacks. This bonus increases to +4 at 11th",
+        "level and +6 at 21st level.",
+        "Consume Soul (immediate reaction, when an ally within 5",
+        "squares of the acolyte is reduced to 0 hit points)",
+        "The demonic acolyte regains hit points equal to one-half",
+        "its level."
+      ],
+      "rawText": "Demonic Acolyte This template reflects grim priests of Orcus, raving cult lords of Demogorgon, sacred berserkers of Baphomet, and devotees of other demon lords. A demon lord must personally invest power in an acolyte, making such foes particularly dangerous. “Demonic acolyte” is a template you can apply to any humanoid or magical beast to represent the priesthood of a demon's cult. If you are modifying a nonplayer character, this template works best with the cleric, warlock, and wizard classes. In particular, clerics who have turned away from the gods and sought power from demons are ideal candidates for such “blessings.” Prerequisite: Humanoid or magical beast Demonic Acolyte Elite Controller (Leader) Humanoid or magical beast (demon) XP Elite Defenses +1 AC; +2 Fortitude; +2 Will Resist 5 (choose one type) at 1st level, 10 (choose two types) at 11th level, 15 (choose three types) at 21st level Saving Throws +2 Action Point 1 Hit Points +8 per level + Constitution score POWERS Shield of Abyssal Majesty aura 5 Allies in the aura gain the demonic acolyte's resistance(s). Abyssal Might The demonic acolyte gains a +2 power bonus to damage rolls with all attacks. This bonus increases to +4 at 11th level and +6 at 21st level. Consume Soul (immediate reaction, when an ally within 5 squares of the acolyte is reduced to 0 hit points) The demonic acolyte regains hit points equal to one-half its level.",
+      "relatedFlavorText": [],
+      "extractionWarnings": []
+    },
+    {
+      "templateName": "Vampire Thrall",
+      "sourceBook": "manual import",
+      "pageStart": 0,
+      "pageEnd": 0,
+      "description": "Vampire spawn are useful servants, but sometimes a vampire requires servants that are more hardy and subtle. By feeding on a subject's blood over an extended period of time, a vampire can condition a creature to be a strong yet obedient servant. “Vampire thrall” is a template you can apply to any living humanoid to represent that creature's service to a vampire lord.",
+      "prerequisite": "Living humanoid",
+      "prerequisiteExpr": {
+        "typeAnd": [
+          "humanoid"
+        ],
+        "living": true
+      },
+      "roleLine": "Vampire Thrall Elite Brute",
+      "role": {
+        "raw": "Vampire Thrall Elite Brute",
+        "templateLabel": "Vampire Thrall",
+        "tier": "Elite",
+        "combatRole": "Brute"
+      },
+      "keywords": [
+        "Shapechanger",
+        "Undead"
+      ],
+      "isEliteTemplate": true,
+      "statLines": [
+        "Defenses AC +2; Reflex +2; Fortitude +2; Will –2",
+        "Saving Throws +2",
+        "Action Points 1",
+        "Immune disease, poison",
+        "Resist 5 necrotic at 1st level, 10 necrotic at 11th level, 15 necrotic at 15th level",
+        "Vulnerable 5 radiant at 1st level, 10 radiant at 11th level,",
+        "Hit Points +10 per level + Constitution score"
+      ],
+      "stats": {
+        "savingThrows": {
+          "value": 2,
+          "sourceLine": "Saving Throws +2"
+        },
+        "actionPoints": {
+          "value": 1,
+          "sourceLine": "Action Points 1"
+        },
+        "hitPoints": {
+          "default": {
+            "perLevel": 10,
+            "addConstitution": true
+          },
+          "sourceLines": [
+            "Hit Points +10 per level + Constitution score"
+          ]
+        },
+        "defenses": {
+          "AC": 2,
+          "REFLEX": 2,
+          "FORTITUDE": 2
+        },
+        "immunities": [
+          "disease",
+          "poison"
+        ],
+        "resistances": {
+          "entries": [
+            {
+              "kind": "typed",
+              "type": "necrotic",
+              "tiers": {
+                "1": 5,
+                "11": 10,
+                "21": 15
+              },
+              "sourceLine": "Resist 5 necrotic at 1st level, 10 necrotic at 11th level, 15 necrotic at 15th level"
+            }
+          ]
+        },
+        "vulnerabilities": {
+          "entries": [
+            {
+              "kind": "typed",
+              "type": "radiant",
+              "tiers": {
+                "1": 5,
+                "11": 10,
+                "21": 10
+              },
+              "sourceLine": "Vulnerable 5 radiant at 1st level, 10 radiant at 11th level,"
+            }
+          ]
+        }
+      },
+      "traits": [
+        {
+          "name": "15 radiant at 21st level",
+          "details": "",
+          "range": 0,
+          "type": "Trait"
+        },
+        {
+          "name": "Telepathic Link",
+          "details": "The vampire thrall's master can speak and be spoken to by the vampire thrall as if both had telepathy 20.",
+          "range": 0,
+          "type": "Trait"
+        }
+      ],
+      "powers": [
+        {
+          "name": "Blood Drain",
+          "usage": "Recharge",
+          "action": "Standard",
+          "isBasic": false,
+          "tier": "",
+          "flavorText": "",
+          "keywords": "Healing",
+          "keywordNames": [
+            "Healing"
+          ],
+          "keywordTokens": [
+            "Healing"
+          ],
+          "range": "",
+          "description": "Requires combat advantage against the target; vampire thrall's level + 2 vs. Fortitude; 1d12 + Charisma modifier damage, and the target is weakened (save ends). In addition, the vampire thrall regains hit points equal to one-quarter of its maximum hit points. Increase damage to 2d12 + Charisma modifier at 11th level.",
+          "damageExpressions": [
+            "1d12 + Charisma modifier damage",
+            "2d12 + Charisma modifier at 11th level"
+          ],
+          "attacks": [
+            {
+              "kind": "MonsterAttack",
+              "name": "Hit",
+              "attackBonuses": [
+                {
+                  "defense": "Fortitude",
+                  "bonus": 2
+                }
+              ],
+              "hit": {
+                "description": "Requires combat advantage against the target; vampire thrall's level + 2 vs. Fortitude; 1d12 + Charisma modifier damage, and the target is weakened (save ends). In addition, the vampire thrall regains hit points equal to one-quarter of its maximum hit points. Increase damage to 2d12 + Charisma modifier at 11th level."
+              }
+            }
+          ],
+          "traitTemplateKeywords": [
+            "Healing"
+          ]
+        },
+        {
+          "name": "Wolf Form",
+          "usage": "Daily",
+          "action": "Standard",
+          "isBasic": false,
+          "tier": "",
+          "flavorText": "",
+          "keywords": "Polymorph",
+          "keywordNames": [
+            "Polymorph"
+          ],
+          "keywordTokens": [
+            "Polymorph"
+          ],
+          "range": "",
+          "description": "The vampire thrall takes the form of a Medium black wolf, gaining speed 8 and the savage bite power, described below.",
+          "traitTemplateKeywords": [
+            "Polymorph"
+          ]
+        },
+        {
+          "name": "Savage Bite",
+          "usage": "At-Will",
+          "action": "Standard",
+          "isBasic": false,
+          "tier": "",
+          "flavorText": "",
+          "keywords": "",
+          "keywordNames": [],
+          "keywordTokens": [],
+          "range": "",
+          "description": "Vampire spawn's level + 4 vs AC; 1d10 + Strength modifier damage, and the target is knocked prone. Increase damage to 2d10 + Strength modifier damage at 11th level.",
+          "damageExpressions": [
+            "1d10 + Strength modifier damage",
+            "2d10 + Strength modifier damage at 11th level"
+          ],
+          "attacks": [
+            {
+              "kind": "MonsterAttack",
+              "name": "Hit",
+              "attackBonuses": [
+                {
+                  "defense": "AC",
+                  "bonus": "level + 4"
+                }
+              ],
+              "hit": {
+                "description": "Vampire spawn's level + 4 vs AC; 1d10 + Strength modifier damage, and the target is knocked prone. Increase damage to 2d10 + Strength modifier damage at 11th level."
+              }
+            }
+          ]
+        }
+      ],
+      "extractionMethod": "paste-ts",
+      "powersText": [
+        "15 radiant at 21st level",
+        "[ABILITY]",
+        "M Blood Drain (standard; recharges when an adjacent creature becomes bloodied) ✦ Healing",
+        "Requires combat advantage against the target; vampire",
+        "thrall's level + 2 vs. Fortitude; 1d12 + Charisma modifier",
+        "damage, and the target is weakened (save ends). In",
+        "addition, the vampire thrall regains hit points equal to",
+        "one-quarter of its maximum hit points. Increase damage to",
+        "2d12 + Charisma modifier at 11th level.",
+        "[ABILITY]",
+        "Telepathic Link",
+        "The vampire thrall's master can speak and be spoken to by",
+        "the vampire thrall as if both had telepathy 20.",
+        "[ABILITY]",
+        "Wolf Form (standard; daily) ✦ Polymorph",
+        "The vampire thrall takes the form of a Medium black wolf,",
+        "gaining speed 8 and the savage bite power, described",
+        "below.",
+        "[ABILITY]",
+        "m Savage Bite (standard; at-will)",
+        "Vampire spawn's level + 4 vs AC; 1d10 + Strength",
+        "modifier damage, and the target is knocked prone.",
+        "Increase damage to 2d10 + Strength modifier damage at",
+        "11th level.",
+        "[ABILITYEND]"
+      ],
+      "rawText": "Vampire Thrall Vampire spawn are useful servants, but sometimes a vampire requires servants that are more hardy and subtle. By feeding on a subject's blood over an extended period of time, a vampire can condition a creature to be a strong yet obedient servant. “Vampire thrall” is a template you can apply to any living humanoid to represent that creature's service to a vampire lord. Prerequisites: Living humanoid Vampire Thrall Elite Brute (shapechanger, undead) XP Elite Defenses AC +2; Reflex +2; Fortitude +2; Will –2 Saving Throws +2 Action Points 1 Immune disease, poison Resist 5 necrotic at 1st level, 10 necrotic at 11th level, 15 necrotic at 15th level Vulnerable 5 radiant at 1st level, 10 radiant at 11th level, 15 radiant at 21st level Hit Points +10 per level + Constitution score [ABILITY] M Blood Drain (standard; recharges when an adjacent creature becomes bloodied) ✦ Healing Requires combat advantage against the target; vampire thrall's level + 2 vs. Fortitude; 1d12 + Charisma modifier damage, and the target is weakened (save ends). In addition, the vampire thrall regains hit points equal to one-quarter of its maximum hit points. Increase damage to 2d12 + Charisma modifier at 11th level. [ABILITY] Telepathic Link The vampire thrall's master can speak and be spoken to by the vampire thrall as if both had telepathy 20. [ABILITY] Wolf Form (standard; daily) ✦ Polymorph The vampire thrall takes the form of a Medium black wolf, gaining speed 8 and the savage bite power, described below. [ABILITY] m Savage Bite (standard; at-will) Vampire spawn's level + 4 vs AC; 1d10 + Strength modifier damage, and the target is knocked prone. Increase damage to 2d10 + Strength modifier damage at 11th level. [ABILITYEND]",
+      "relatedFlavorText": [],
+      "extractionWarnings": []
+    },
+    {
+      "templateName": "Tomb Tainted",
+      "sourceBook": "manual import",
+      "pageStart": 0,
+      "pageEnd": 0,
+      "description": "Whether born under a dark star or touched too many times by the hand of the undead, this creature has been tainted by the grave. The creature has sallow skin, receding gums, bloodshot, watery eyes, and elongated yellow fingernails—all signs of its connection to the dead. “Tomb tainted” is a template you can apply to any living creature to represent its connection to death and the undead.",
+      "prerequisite": "Living creature",
+      "prerequisiteExpr": {
+        "living": true
+      },
+      "roleLine": "Tomb Tainted Elite Brute",
+      "role": {
+        "raw": "Tomb Tainted Elite Brute",
+        "templateLabel": "Tomb Tainted",
+        "tier": "Elite",
+        "combatRole": "Brute"
+      },
+      "isEliteTemplate": true,
+      "statLines": [
+        "Defenses AC +2; Fortitude +2, Reflex +2",
+        "Resist 5 necrotic at 1st level, 10 necrotic at 11th level, 15",
+        "Saving Throws +2",
+        "Action Points 1",
+        "Hit Points +10 per level + Constitution score"
+      ],
+      "stats": {
+        "savingThrows": {
+          "value": 2,
+          "sourceLine": "Saving Throws +2"
+        },
+        "actionPoints": {
+          "value": 1,
+          "sourceLine": "Action Points 1"
+        },
+        "hitPoints": {
+          "default": {
+            "perLevel": 10,
+            "addConstitution": true
+          },
+          "sourceLines": [
+            "Hit Points +10 per level + Constitution score"
+          ]
+        },
+        "defenses": {
+          "AC": 2,
+          "FORTITUDE": 2,
+          "REFLEX": 2
+        },
+        "resistances": {
+          "entries": [
+            {
+              "kind": "typed",
+              "type": "necrotic",
+              "tiers": {
+                "1": 5,
+                "11": 10,
+                "21": 10
+              },
+              "sourceLine": "Resist 5 necrotic at 1st level, 10 necrotic at 11th level, 15"
+            }
+          ]
+        }
+      },
+      "traits": [
+        {
+          "name": "XP Elite",
+          "details": "necrotic at 21st level",
+          "range": 0,
+          "type": "Trait"
+        }
+      ],
+      "powers": [
+        {
+          "name": "Necrotic Claws",
+          "usage": "At-Will",
+          "action": "Standard",
+          "isBasic": false,
+          "tier": "",
+          "flavorText": "",
+          "keywords": "Necrotic",
+          "keywordNames": [
+            "Necrotic"
+          ],
+          "keywordTokens": [
+            "Necrotic"
+          ],
+          "range": "",
+          "description": "Make 2 attacks against the same target: tomb tainted's level + 5 vs. AC each; 1d10 + Strength modifier damage each. If both attacks hit, the target takes ongoing 5 necrotic damage (save ends).",
+          "damageExpressions": [
+            "1d10 + Strength modifier damage each"
+          ],
+          "attacks": [
+            {
+              "kind": "MonsterAttack",
+              "name": "Hit",
+              "attackBonuses": [
+                {
+                  "defense": "AC",
+                  "bonus": 5
+                }
+              ],
+              "hit": {
+                "description": "Make 2 attacks against the same target: tomb tainted's level + 5 vs. AC each; 1d10 + Strength modifier damage each. If both attacks hit, the target takes ongoing 5 necrotic damage (save ends)."
+              }
+            }
+          ],
+          "traitTemplateKeywords": [
+            "Necrotic"
+          ]
+        },
+        {
+          "name": "Death's Breath",
+          "usage": "Encounter",
+          "action": "Minor",
+          "type": "Close Burst",
+          "isBasic": false,
+          "tier": "",
+          "flavorText": "",
+          "keywords": "Necrotic",
+          "keywordNames": [
+            "Necrotic"
+          ],
+          "keywordTokens": [
+            "Necrotic"
+          ],
+          "range": "Close Burst 5",
+          "description": "Close burst 5; tomb tainted's level + 2 vs. Fortitude; 1d8 + Constitution modifier necrotic damage, and the target is immobilized (save ends). Increase damage to 2d8 + Constitution modifier at 11th level, and 3d8 + Constitution modifier at 21st level.",
+          "damageExpressions": [
+            "1d8 + Constitution modifier necrotic damage",
+            "2d8 + Constitution modifier at 11th level",
+            "3d8 + Constitution modifier at 21st level"
+          ],
+          "attacks": [
+            {
+              "kind": "MonsterAttack",
+              "name": "Hit",
+              "attackBonuses": [
+                {
+                  "defense": "Fortitude",
+                  "bonus": 2
+                }
+              ],
+              "hit": {
+                "description": "Close burst 5; tomb tainted's level + 2 vs. Fortitude; 1d8 + Constitution modifier necrotic damage, and the target is immobilized (save ends). Increase damage to 2d8 + Constitution modifier at 11th level, and 3d8 + Constitution modifier at 21st level."
+              }
+            }
+          ],
+          "traitTemplateKeywords": [
+            "Necrotic"
+          ]
+        }
+      ],
+      "extractionMethod": "paste-ts",
+      "powersText": [
+        "XP Elite",
+        "necrotic at 21st level",
+        "M Necrotic Claws (standard; at-will) ✦ Necrotic",
+        "Make 2 attacks against the same target: tomb tainted's",
+        "level + 5 vs. AC each; 1d10 + Strength modifier damage",
+        "each. If both attacks hit, the target takes ongoing 5",
+        "necrotic damage (save ends).",
+        "C Death's Breath (minor; encounter) ✦ Necrotic",
+        "Close burst 5; tomb tainted's level + 2 vs. Fortitude;",
+        "1d8 + Constitution modifier necrotic damage, and the",
+        "target is immobilized (save ends). Increase damage to",
+        "2d8 + Constitution modifier at 11th level, and 3d8 +",
+        "Constitution modifier at 21st level."
+      ],
+      "rawText": "Tomb Tainted Whether born under a dark star or touched too many times by the hand of the undead, this creature has been tainted by the grave. The creature has sallow skin, receding gums, bloodshot, watery eyes, and elongated yellow fingernails—all signs of its connection to the dead. “Tomb tainted” is a template you can apply to any living creature to represent its connection to death and the undead. Prerequisites: Living creature Tomb Tainted Elite Brute XP Elite Defenses AC +2; Fortitude +2, Reflex +2 Resist 5 necrotic at 1st level, 10 necrotic at 11th level, 15 necrotic at 21st level Saving Throws +2 Action Points 1 Hit Points +10 per level + Constitution score M Necrotic Claws (standard; at-will) ✦ Necrotic Make 2 attacks against the same target: tomb tainted's level + 5 vs. AC each; 1d10 + Strength modifier damage each. If both attacks hit, the target takes ongoing 5 necrotic damage (save ends). C Death's Breath (minor; encounter) ✦ Necrotic Close burst 5; tomb tainted's level + 2 vs. Fortitude; 1d8 + Constitution modifier necrotic damage, and the target is immobilized (save ends). Increase damage to 2d8 + Constitution modifier at 11th level, and 3d8 + Constitution modifier at 21st level.",
+      "relatedFlavorText": [],
+      "extractionWarnings": []
+    }
+  ]
+}
