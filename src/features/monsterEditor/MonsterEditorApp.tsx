@@ -64,6 +64,12 @@ import {
 import { buildMonsterPowerCardViewModel } from "./monsterPowerCardViewModel";
 import { normalizeMonsterPowerShape } from "./monsterPowerNormalize";
 import {
+  buildMonsterEntriesExportFile,
+  parseMonsterEntriesImportJson,
+  stringifyMonsterEntriesJsonFile,
+  validateMonsterEntryImport
+} from "./monsterEntriesJsonFile";
+import {
   buildMonsterTemplatesExportFile,
   normalizeImportedTemplateRecord,
   parseMonsterTemplatesImportJson,
@@ -2323,6 +2329,7 @@ export function MonsterEditorApp({
   const createPasteTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const createMonsterPasteTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const customTemplatesJsonFileInputRef = useRef<HTMLInputElement | null>(null);
+  const customMonstersJsonFileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -2559,6 +2566,60 @@ export function MonsterEditorApp({
       setTemplateMessage(`Imported ${okRows.length} custom template(s).${skipMsg}`);
     },
     [serverTemplateRows]
+  );
+
+  const importCustomMonstersJsonText = useCallback(
+    (text: string) => {
+      const parsed = parseMonsterEntriesImportJson(text);
+      if (!parsed.ok) {
+        setMessage(parsed.error);
+        return;
+      }
+      const skipped: string[] = [];
+      const okRows: MonsterEntryFile[] = [];
+      for (let i = 0; i < parsed.monsters.length; i++) {
+        const raw = parsed.monsters[i];
+        const normalized = normalizeMonsterEntryForSave(raw);
+        const v = validateMonsterEntryImport(normalized);
+        if (v.length > 0) {
+          const label = String(normalized.name ?? "").trim() || normalized.id || `#${i + 1}`;
+          skipped.push(`${label}: ${v.join("; ")}`);
+          continue;
+        }
+        okRows.push(normalized);
+      }
+      if (okRows.length === 0) {
+        setMessage(
+          skipped.length > 0
+            ? `Could not import any monsters. ${skipped.slice(0, 6).join(" · ")}${skipped.length > 6 ? "…" : ""}`
+            : "Nothing to import."
+        );
+        return;
+      }
+      let nextCustom = readCustomMonsterEntries();
+      for (const m of [...okRows].reverse()) {
+        nextCustom = [m, ...nextCustom.filter((x) => x.id !== m.id)];
+      }
+      writeCustomMonsterEntries(nextCustom);
+      void (async () => {
+        let server: MonsterIndexEntry[] = [];
+        try {
+          server = await loadMonsterIndex();
+        } catch {
+          server = [];
+        }
+        const merged = mergeServerAndCustomMonsterIndex(server, readCustomMonsterEntries());
+        setIndexRows(merged);
+        setSelectedId(okRows[0]!.id);
+        resetMonsterSheetAdjustments();
+        const skipMsg =
+          skipped.length > 0
+            ? ` Skipped ${skipped.length}: ${skipped.slice(0, 2).join(" · ")}${skipped.length > 2 ? "…" : ""}`
+            : "";
+        setMessage(`Imported ${okRows.length} custom monster(s).${skipMsg}`);
+      })();
+    },
+    [resetMonsterSheetAdjustments]
   );
 
   const roleOptions = useMemo(() => {
@@ -3047,9 +3108,19 @@ export function MonsterEditorApp({
         </button>
       </div>
 
-      {viewerTab === "templates" || viewerTab === "createTemplate" ? (
+      {viewerTab === "monsters" || viewerTab === "templates" || viewerTab === "createTemplate" ? (
         <p style={{ marginTop: 0, marginBottom: "0.5rem", color: "var(--text-muted)", fontSize: "0.8rem" }}>
-          {viewerTab === "templates" ? (
+          {viewerTab === "monsters" ? (
+            <>
+              Generated monsters load from <code style={{ fontSize: "0.92em" }}>generated/monsters/</code>. Custom monsters saved
+              here live in <code style={{ fontSize: "0.92em" }}>localStorage</code> until you fold them into generated JSON.{" "}
+              <strong>Export monsters</strong> downloads JSON for every monster in the loaded index (browser customs plus fetched
+              generated entries). <strong>Copy monster</strong> copies JSON for the monster selected in the list (base entry, not
+              template preview overlays). <strong>Import monsters</strong> / <strong>Import from clipboard</strong> accepts one
+              monster, an array, or the <code style={{ fontSize: "0.92em" }}>{`{ meta, monsters }`}</code> bundle (same shape as
+              export); imports merge into custom monsters by <code style={{ fontSize: "0.92em" }}>id</code>.
+            </>
+          ) : viewerTab === "templates" ? (
             <>
               Template overlays from{" "}
               <code style={{ fontSize: "0.92em" }}>generated/monster_templates.json</code> (published PDF-derived text plus
@@ -3093,7 +3164,8 @@ export function MonsterEditorApp({
             <input
               value={nameQuery}
               onChange={(event) => setNameQuery(event.target.value)}
-              placeholder="Name"
+              placeholder="Monster name"
+              aria-label="Monster name"
               style={{
                 minWidth: 220,
                 border: "1px solid var(--panel-border)",
@@ -3185,6 +3257,136 @@ export function MonsterEditorApp({
               <option value="asc">Ascending</option>
               <option value="desc">Descending</option>
             </select>
+          </div>
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+            <button
+              type="button"
+              disabled={isBusy || indexRows.length === 0}
+              title={
+                indexRows.length === 0
+                  ? "No monsters in the loaded index"
+                  : "Export { meta, monsters } for every monster in the index (custom entries from storage; generated entries fetched)"
+              }
+              onClick={() => {
+                if (indexRows.length === 0) return;
+                setIsBusy(true);
+                const customMap = new Map(readCustomMonsterEntries().map((m) => [m.id, m]));
+                void (async () => {
+                  const failed: string[] = [];
+                  const resolved = await Promise.all(
+                    indexRows.map(async (row) => {
+                      const c = customMap.get(row.id);
+                      if (c) return { ok: true as const, entry: c };
+                      try {
+                        const e = await loadMonsterEntry(row.id);
+                        return { ok: true as const, entry: e };
+                      } catch {
+                        return { ok: false as const, id: row.id };
+                      }
+                    })
+                  );
+                  const monsters: MonsterEntryFile[] = [];
+                  for (const r of resolved) {
+                    if (r.ok) monsters.push(r.entry);
+                    else failed.push(r.id);
+                  }
+                  if (monsters.length === 0) {
+                    setMessage(
+                      failed.length > 0
+                        ? `Could not export monsters — failed to load: ${failed.slice(0, 8).join(", ")}${failed.length > 8 ? "…" : ""}`
+                        : "Nothing to export."
+                    );
+                    setIsBusy(false);
+                    return;
+                  }
+                  const file = buildMonsterEntriesExportFile(monsters);
+                  const text = stringifyMonsterEntriesJsonFile(file);
+                  const blob = new Blob([text], { type: "application/json;charset=utf-8" });
+                  const url = URL.createObjectURL(blob);
+                  try {
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `monsters_export_${new Date().toISOString().slice(0, 10)}.json`;
+                    a.rel = "noopener";
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                  } finally {
+                    URL.revokeObjectURL(url);
+                  }
+                  const failMsg =
+                    failed.length > 0
+                      ? ` (${failed.length} entr${failed.length === 1 ? "y" : "ies"} omitted — could not load from generated files)`
+                      : "";
+                  setMessage(`Exported ${monsters.length} monster(s) as JSON.${failMsg}`);
+                  setIsBusy(false);
+                })();
+              }}
+            >
+              Export monsters
+            </button>
+            <button
+              type="button"
+              disabled={isBusy || !activeMonster}
+              title={
+                !activeMonster
+                  ? "Select a monster in the list first"
+                  : "Copy this monster entry as pretty-printed JSON (base stat block)"
+              }
+              onClick={() => {
+                const entry = activeMonster;
+                if (!entry) return;
+                if (!navigator.clipboard?.writeText) {
+                  alert("Clipboard API unavailable in this browser.");
+                  return;
+                }
+                const text = `${JSON.stringify(entry, null, 2)}\n`;
+                void navigator.clipboard.writeText(text);
+                const label = String(entry.name ?? "").trim() || entry.id;
+                setMessage(`Copied “${label}” as JSON.`);
+              }}
+            >
+              Copy monster
+            </button>
+            <input
+              ref={customMonstersJsonFileInputRef}
+              type="file"
+              accept=".json,application/json"
+              aria-label="Import monsters from a JSON file"
+              style={{ display: "none" }}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                if (!file) return;
+                void file.text().then(importCustomMonstersJsonText, () => {
+                  setMessage("Could not read file.");
+                });
+              }}
+            />
+            <button
+              type="button"
+              disabled={isBusy}
+              title='Choose a .json file: one monster object, an array of monsters, or { meta, monsters }'
+              onClick={() => customMonstersJsonFileInputRef.current?.click()}
+            >
+              Import monsters
+            </button>
+            <button
+              type="button"
+              disabled={isBusy}
+              title="Import JSON from the clipboard (same formats as file import)"
+              onClick={() => {
+                if (!navigator.clipboard?.readText) {
+                  alert("Clipboard read is unavailable in this browser.");
+                  return;
+                }
+                void navigator.clipboard.readText().then(importCustomMonstersJsonText, () => {
+                  setMessage("Could not read clipboard.");
+                });
+              }}
+            >
+              Import from clipboard
+            </button>
             <button
               type="button"
               disabled={isBusy || !selectedId || !isStoredCustomMonsterId(selectedId)}
@@ -3253,7 +3455,28 @@ export function MonsterEditorApp({
           </div>
         </div>
       ) : viewerTab === "templates" ? (
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.75rem", alignItems: "center" }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.5rem",
+            marginBottom: "0.75rem"
+          }}
+        >
+          <input
+            value={templateNameQuery}
+            onChange={(event) => setTemplateNameQuery(event.target.value)}
+            placeholder="Template name"
+            aria-label="Filter templates by name"
+            style={{
+              alignSelf: "flex-start",
+              minWidth: 220,
+              border: "1px solid var(--panel-border)",
+              borderRadius: "0.28rem",
+              padding: "0.22rem 0.3rem"
+            }}
+          />
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
           <button
             type="button"
             disabled={isBusy || templateRows.length === 0}
@@ -3388,17 +3611,7 @@ export function MonsterEditorApp({
           >
             Delete custom template
           </button>
-          <input
-            value={templateNameQuery}
-            onChange={(event) => setTemplateNameQuery(event.target.value)}
-            placeholder="Template name"
-            style={{
-              minWidth: 220,
-              border: "1px solid var(--panel-border)",
-              borderRadius: "0.28rem",
-              padding: "0.22rem 0.3rem"
-            }}
-          />
+          </div>
         </div>
       ) : viewerTab === "createTemplate" ? (
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center", marginBottom: "0.75rem" }}>
