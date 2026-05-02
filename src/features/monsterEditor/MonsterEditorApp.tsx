@@ -113,7 +113,7 @@ import {
   storeAddSnapshotToEncounter,
   storeDeleteEncounter,
   storeDuplicateEncounter,
-  storeMoveRosterAt,
+  storeReorderRosterRow,
   storeRemoveRosterAt,
   storeRenameEncounter,
   storeSetActiveEncounter,
@@ -2250,6 +2250,9 @@ function MonsterTemplateFormattedView({
 
 const MONSTER_GLOSSARY_TOOLTIP_ID = "monster-glossary-tooltip";
 
+/** Native DnD payload for encounter roster reorder (index as decimal string). */
+const ENCOUNTER_ROSTER_INDEX_DRAG_MIME = "text/plain";
+
 export function MonsterEditorApp({
   index,
   tooltipGlossary
@@ -2304,6 +2307,8 @@ export function MonsterEditorApp({
   const [encounterNameEditValue, setEncounterNameEditValue] = useState("");
   const [encounterRosterPanelCollapsed, setEncounterRosterPanelCollapsed] = useState(false);
   const [pinnedMonsterListColumnWidthPx, setPinnedMonsterListColumnWidthPx] = useState<number | null>(null);
+  const [encounterRosterDraggingIndex, setEncounterRosterDraggingIndex] = useState<number | null>(null);
+  const [encounterRosterDragOverIndex, setEncounterRosterDragOverIndex] = useState<number | null>(null);
   const monsterListColumnRef = useRef<HTMLDivElement | null>(null);
 
   const collapseEncounterRosterPanel = useCallback(() => {
@@ -2377,6 +2382,18 @@ export function MonsterEditorApp({
 
   useEffect(() => {
     if (encounterRosterPanelCollapsed) setEncounterNameEditOpen(false);
+  }, [encounterRosterPanelCollapsed]);
+
+  useEffect(() => {
+    setEncounterRosterDraggingIndex(null);
+    setEncounterRosterDragOverIndex(null);
+  }, [encounterStore.activeEncounterId]);
+
+  useEffect(() => {
+    if (encounterRosterPanelCollapsed) {
+      setEncounterRosterDraggingIndex(null);
+      setEncounterRosterDragOverIndex(null);
+    }
   }, [encounterRosterPanelCollapsed]);
 
   useEffect(() => {
@@ -5680,6 +5697,10 @@ export function MonsterEditorApp({
                       </p>
                     ) : (
                       <ul
+                        onDragEnd={() => {
+                          setEncounterRosterDraggingIndex(null);
+                          setEncounterRosterDragOverIndex(null);
+                        }}
                         style={{
                           listStyle: "none",
                           margin: 0,
@@ -5695,9 +5716,30 @@ export function MonsterEditorApp({
                           const m = row.snapshot;
                           const rosterSelectId = row.sourceMonsterId?.trim() || m.id;
                           const rosterRowSelected = rosterSelectId === selectedId;
+                          const isDropTarget =
+                            encounterRosterDragOverIndex === idx &&
+                            encounterRosterDraggingIndex !== null &&
+                            encounterRosterDraggingIndex !== idx;
                           return (
                             <li
                               key={row.rosterInstanceId}
+                              onDragOver={(event) => {
+                                event.preventDefault();
+                                event.dataTransfer.dropEffect = "move";
+                                setEncounterRosterDragOverIndex(idx);
+                              }}
+                              onDrop={(event) => {
+                                event.preventDefault();
+                                const raw = event.dataTransfer.getData(ENCOUNTER_ROSTER_INDEX_DRAG_MIME).trim();
+                                const fromIndex = Number.parseInt(raw, 10);
+                                const encId = encounterStore.activeEncounterId;
+                                if (!encId || Number.isNaN(fromIndex) || fromIndex === idx) {
+                                  setEncounterRosterDragOverIndex(null);
+                                  return;
+                                }
+                                setEncounterStore((prev) => storeReorderRosterRow(prev, encId, fromIndex, idx));
+                                setEncounterRosterDragOverIndex(null);
+                              }}
                               style={{
                                 borderBottom: "1px solid var(--panel-border)",
                                 padding: "0.45rem 0.25rem",
@@ -5706,82 +5748,97 @@ export function MonsterEditorApp({
                                 borderRadius: "0.25rem",
                                 backgroundColor: rosterRowSelected ? "var(--table-stripe-odd)" : "transparent",
                                 minWidth: 0,
-                                overflowX: "hidden"
+                                overflowX: "hidden",
+                                opacity: encounterRosterDraggingIndex === idx ? 0.55 : 1,
+                                boxShadow: isDropTarget ? "inset 0 0 0 2px var(--panel-border-strong)" : undefined
                               }}
                             >
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (!rosterSelectId) return;
-                                  setSelectedId(rosterSelectId);
-                                  const fromKeys = dedupeKeysToTemplatePreviewIdxs(row.templateDedupeKeys, templateRows);
-                                  if (fromKeys.length > 0) {
-                                    setMonsterTemplatePreviewIdxs(fromKeys);
-                                  } else {
-                                    const fromSnap = templatePreviewIdxsFromSnapshot(row.snapshot, templateRows);
-                                    setMonsterTemplatePreviewIdxs(fromSnap.length > 0 ? fromSnap : []);
-                                  }
-                                  const la = row.levelAdjustment;
-                                  setMonsterLevelDelta(
-                                    typeof la === "number" && Number.isFinite(la) ? Math.trunc(la) : 0
-                                  );
-                                }}
+                              <div
                                 style={{
-                                  display: "block",
-                                  width: "100%",
-                                  maxWidth: "100%",
-                                  margin: 0,
-                                  padding: 0,
-                                  border: "none",
-                                  background: "transparent",
-                                  cursor: "pointer",
-                                  textAlign: "left",
-                                  font: "inherit",
-                                  color: "inherit",
-                                  minWidth: 0,
-                                  overflowWrap: "anywhere"
+                                  display: "flex",
+                                  gap: "0.35rem",
+                                  alignItems: "flex-start",
+                                  minWidth: 0
                                 }}
                               >
-                                <div style={{ fontWeight: 700, color: "var(--text-primary)" }}>{m.name}</div>
-                                <div style={{ color: "var(--text-muted)", overflowWrap: "anywhere" }}>
-                                  L{m.level} · {m.role} · HP {monsterQuickHp(m)} · AC {monsterQuickAc(m)} · XP{" "}
-                                  {monsterXpDisplay(m)}
+                                <span
+                                  draggable
+                                  tabIndex={0}
+                                  aria-label="Drag to reorder roster entry"
+                                  title="Drag to reorder"
+                                  onDragStart={(event) => {
+                                    event.dataTransfer.setData(ENCOUNTER_ROSTER_INDEX_DRAG_MIME, String(idx));
+                                    event.dataTransfer.effectAllowed = "move";
+                                    setEncounterRosterDraggingIndex(idx);
+                                  }}
+                                  style={{
+                                    cursor: "grab",
+                                    flexShrink: 0,
+                                    padding: "0.12rem 0.2rem",
+                                    marginTop: "0.06rem",
+                                    color: "var(--text-muted)",
+                                    fontSize: "0.95rem",
+                                    lineHeight: 1,
+                                    userSelect: "none",
+                                    borderRadius: "0.2rem"
+                                  }}
+                                >
+                                  ⋮⋮
+                                </span>
+                                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (!rosterSelectId) return;
+                                      setSelectedId(rosterSelectId);
+                                      const fromKeys = dedupeKeysToTemplatePreviewIdxs(row.templateDedupeKeys, templateRows);
+                                      if (fromKeys.length > 0) {
+                                        setMonsterTemplatePreviewIdxs(fromKeys);
+                                      } else {
+                                        const fromSnap = templatePreviewIdxsFromSnapshot(row.snapshot, templateRows);
+                                        setMonsterTemplatePreviewIdxs(fromSnap.length > 0 ? fromSnap : []);
+                                      }
+                                      const la = row.levelAdjustment;
+                                      setMonsterLevelDelta(
+                                        typeof la === "number" && Number.isFinite(la) ? Math.trunc(la) : 0
+                                      );
+                                    }}
+                                    style={{
+                                      display: "block",
+                                      width: "100%",
+                                      maxWidth: "100%",
+                                      margin: 0,
+                                      padding: 0,
+                                      border: "none",
+                                      background: "transparent",
+                                      cursor: "pointer",
+                                      textAlign: "left",
+                                      font: "inherit",
+                                      color: "inherit",
+                                      minWidth: 0,
+                                      overflowWrap: "anywhere"
+                                    }}
+                                  >
+                                    <div style={{ fontWeight: 700, color: "var(--text-primary)" }}>{m.name}</div>
+                                    <div style={{ color: "var(--text-muted)", overflowWrap: "anywhere" }}>
+                                      L{m.level} · {m.role} · HP {monsterQuickHp(m)} · AC {monsterQuickAc(m)} · XP{" "}
+                                      {monsterXpDisplay(m)}
+                                    </div>
+                                  </button>
+                                  <div style={{ marginTop: "0.35rem", display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const id = encounterStore.activeEncounterId;
+                                        if (!id) return;
+                                        if (!window.confirm(`Remove ${m.name} from this encounter?`)) return;
+                                        setEncounterStore((prev) => storeRemoveRosterAt(prev, id, idx));
+                                      }}
+                                    >
+                                      Remove
+                                    </button>
+                                  </div>
                                 </div>
-                              </button>
-                              <div style={{ marginTop: "0.35rem", display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const id = encounterStore.activeEncounterId;
-                                    if (!id) return;
-                                    setEncounterStore((prev) => storeMoveRosterAt(prev, id, idx, -1));
-                                  }}
-                                  disabled={idx === 0}
-                                >
-                                  Up
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const id = encounterStore.activeEncounterId;
-                                    if (!id) return;
-                                    setEncounterStore((prev) => storeMoveRosterAt(prev, id, idx, 1));
-                                  }}
-                                  disabled={idx >= encounterRoster.length - 1}
-                                >
-                                  Down
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const id = encounterStore.activeEncounterId;
-                                    if (!id) return;
-                                    if (!window.confirm(`Remove ${m.name} from this encounter?`)) return;
-                                    setEncounterStore((prev) => storeRemoveRosterAt(prev, id, idx));
-                                  }}
-                                >
-                                  Remove
-                                </button>
                               </div>
                             </li>
                           );

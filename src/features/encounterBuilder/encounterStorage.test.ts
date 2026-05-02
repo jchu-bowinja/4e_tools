@@ -6,11 +6,13 @@ import {
   ENCOUNTER_STORE_VERSION,
   encounterAddSnapshot,
   encounterMoveRoster,
+  encounterReorderRosterRow,
   encounterRemoveRosterAt,
   storeAddEncounter,
   storeAddSnapshotToEncounter,
   storeDeleteEncounter,
   storeMoveRosterAt,
+  storeReorderRosterRow,
   storeRemoveRosterAt,
   stringifyEncounterStoreForExport
 } from "./encounterStorage";
@@ -117,6 +119,27 @@ describe("encounter roster operations", () => {
     s = storeAddSnapshotToEncounter(s, id, stubMonster("n", "N"), "n");
     s = storeMoveRosterAt(s, id, 0, 1);
     expect(findRosterNames(s, id)).toEqual(["N", "M"]);
+  });
+
+  it("encounterReorderRosterRow moves to arbitrary index", () => {
+    let enc = createInitialEncounterStore().encounters[0]!;
+    enc = encounterAddSnapshot(enc, stubMonster("a", "A"), "a");
+    enc = encounterAddSnapshot(enc, stubMonster("b", "B"), "b");
+    enc = encounterAddSnapshot(enc, stubMonster("c", "C"), "c");
+    enc = encounterReorderRosterRow(enc, 0, 2);
+    expect(enc.roster.map((r) => r.snapshot.name)).toEqual(["B", "C", "A"]);
+    enc = encounterReorderRosterRow(enc, 2, 0);
+    expect(enc.roster.map((r) => r.snapshot.name)).toEqual(["A", "B", "C"]);
+  });
+
+  it("storeReorderRosterRow reorders via store", () => {
+    const store = createInitialEncounterStore();
+    const id = store.activeEncounterId!;
+    let s = storeAddSnapshotToEncounter(store, id, stubMonster("m", "M"), "m");
+    s = storeAddSnapshotToEncounter(s, id, stubMonster("n", "N"), "n");
+    s = storeAddSnapshotToEncounter(s, id, stubMonster("p", "P"), "p");
+    s = storeReorderRosterRow(s, id, 2, 0);
+    expect(findRosterNames(s, id)).toEqual(["P", "M", "N"]);
   });
 
   it("storeDeleteEncounter removes encounter and reassigns active", () => {

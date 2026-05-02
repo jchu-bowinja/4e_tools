@@ -288,6 +288,18 @@ export function encounterMoveRoster(encounter: EncounterRecord, index: number, d
   return { ...encounter, updatedAt: nowIso(), roster: next };
 }
 
+/** Move roster row from `fromIndex` to `toIndex` (0-based, inclusive). */
+export function encounterReorderRosterRow(encounter: EncounterRecord, fromIndex: number, toIndex: number): EncounterRecord {
+  const { roster } = encounter;
+  const len = roster.length;
+  if (fromIndex === toIndex) return encounter;
+  if (fromIndex < 0 || fromIndex >= len || toIndex < 0 || toIndex >= len) return encounter;
+  const next = [...roster];
+  const [removed] = next.splice(fromIndex, 1);
+  next.splice(toIndex, 0, removed);
+  return { ...encounter, updatedAt: nowIso(), roster: next };
+}
+
 export function storeUpdateEncounter(
   store: EncounterStore,
   encounterId: string,
@@ -322,4 +334,13 @@ export function storeMoveRosterAt(
   delta: -1 | 1
 ): EncounterStore {
   return storeUpdateEncounter(store, encounterId, (e) => encounterMoveRoster(e, index, delta));
+}
+
+export function storeReorderRosterRow(
+  store: EncounterStore,
+  encounterId: string,
+  fromIndex: number,
+  toIndex: number
+): EncounterStore {
+  return storeUpdateEncounter(store, encounterId, (e) => encounterReorderRosterRow(e, fromIndex, toIndex));
 }
