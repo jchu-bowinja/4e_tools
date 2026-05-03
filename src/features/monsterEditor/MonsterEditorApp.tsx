@@ -6,7 +6,8 @@ import {
   useState,
   type CSSProperties,
   type FocusEvent as ReactFocusEvent,
-  type MouseEvent as ReactMouseEvent
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode
 } from "react";
 import type { RulesIndex } from "../../rules/models";
 import { STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE } from "../../ui/glossaryTooltip";
@@ -51,6 +52,7 @@ import {
 } from "./pasteMonsterTemplateEtl";
 import { parseMonsterStatBlockText } from "./monsterRawTextParse";
 import {
+  formatMonsterCreatureTypeLine,
   formatMonsterStatLabelForDisplay,
   isRenderableCardValue,
   monsterAbilityAbbrevFromStatKey,
@@ -503,14 +505,6 @@ const bodySecondary: CSSProperties = { fontSize: "0.8rem", color: "var(--text-se
 const metaMuted: CSSProperties = { fontSize: "0.78rem", color: "var(--text-muted)" };
 const metaSecondary: CSSProperties = { fontSize: "0.78rem", color: "var(--text-secondary)" };
 const captionMuted: CSSProperties = { fontSize: "0.74rem", color: "var(--text-muted)" };
-const detailsSummaryStyle: CSSProperties = {
-  cursor: "pointer",
-  fontSize: "0.82rem",
-  fontWeight: 700,
-  letterSpacing: "0.04em",
-  textTransform: "uppercase",
-  color: "var(--text-secondary)"
-};
 const jsonSummaryStyle: CSSProperties = {
   cursor: "pointer",
   fontWeight: 700,
@@ -631,13 +625,6 @@ const centerFlowLabelStrongStyle: CSSProperties = {
   marginRight: "0.4rem"
 };
 
-const centerDetailsBlockStyle: CSSProperties = {
-  marginTop: "0.55rem",
-  marginBottom: "0.75rem",
-  paddingTop: "0.55rem",
-  borderTop: "1px solid var(--panel-border)"
-};
-
 /** Inline stat subsections (Tactics, Auras, Traits, Items, etc.). */
 const centerSubsectionPanelStyle: CSSProperties = {
   ...panelStyle,
@@ -660,14 +647,6 @@ const monsterSheetTemplateToolbarInsetStyle: CSSProperties = {
   flexDirection: "column",
   gap: "0.38rem",
   boxShadow: "none"
-};
-
-const statPanelStyle: CSSProperties = {
-  border: "1px solid var(--panel-border)",
-  borderRadius: "var(--ui-panel-radius, 0.35rem)",
-  padding: "0.5rem",
-  backgroundColor: "var(--surface-0)",
-  boxShadow: "var(--ui-panel-shadow, 0 1px 2px rgba(40, 30, 10, 0.08))"
 };
 
 const glossaryLinkUnderline: CSSProperties = {
@@ -861,6 +840,16 @@ function usageBucketLabel(bucket: MonsterPowerActionBucket): string {
   if (bucket === "minor") return "Minor Action";
   if (bucket === "free") return "Free Action";
   if (bucket === "triggered") return "Triggered Actions";
+  return "Other";
+}
+
+/** 4e stat-block section titles (`.monster-stat-block-section-head` applies `text-transform: uppercase`). */
+function usageBucketStatBlockLabel(bucket: MonsterPowerActionBucket): string {
+  if (bucket === "standard") return "Standard actions";
+  if (bucket === "move") return "Move actions";
+  if (bucket === "minor") return "Minor actions";
+  if (bucket === "free") return "Free actions";
+  if (bucket === "triggered") return "Triggered actions";
   return "Other";
 }
 
@@ -1071,11 +1060,6 @@ function weaknessLine(value: Record<string, unknown>): string {
   return `${amountPart}${namePart}${detailsPart ? ` ${detailsPart}` : ""}`.trim();
 }
 
-function renderTagList(values: string[] | undefined): string {
-  if (!Array.isArray(values) || values.length === 0) return "-";
-  return values.join(", ");
-}
-
 function renderTraitMetaBadges(trait: MonsterTrait): string[] {
   const badges: string[] = [];
   const type = String(trait.type ?? "").trim();
@@ -1105,13 +1089,6 @@ function extractMovementEntries(activeMonster: MonsterEntryFile | null): Array<{
       return { type, value: Number.isFinite(numeric) ? numeric : valueText };
     })
     .filter((entry): entry is { type: string; value: string | number } => entry !== null);
-}
-
-function statsDisplayOrder(label: string): number {
-  const normalized = label.trim().toLowerCase();
-  if (normalized === "skills") return 1;
-  if (normalized === "defenses") return 2;
-  return 0;
 }
 
 function renderDamageSummary(damage?: MonsterPowerDamage): string {
@@ -1556,7 +1533,9 @@ function MonsterPowersPanels({
   shouldHighlightGlossaryTerm,
   showJson,
   livePowerJsonEditing,
-  onPowerJsonCommit
+  onPowerJsonCommit,
+  presentation = "panel",
+  statBlockHideBucketHeads = false
 }: {
   powers: MonsterPower[];
   startGlossaryHover: (event: ReactMouseEvent<HTMLElement>, key: MonsterGlossaryHoverKey) => void;
@@ -1567,7 +1546,14 @@ function MonsterPowersPanels({
   /** When set, JSON under each power is a live editor that commits by power index. */
   livePowerJsonEditing?: boolean;
   onPowerJsonCommit?: (powerIndex: number, parsed: unknown) => void;
+  /** Book-style 4e stat block (olive headers, zebra rows); hides JSON editors. */
+  presentation?: "panel" | "statBlock";
+  /** When `presentation` is `statBlock`, omit olive bucket headers (e.g. monster template cards). */
+  statBlockHideBucketHeads?: boolean;
 }): JSX.Element {
+  const isStatBlock = presentation === "statBlock";
+  const effectiveShowJson = Boolean(showJson && !isStatBlock);
+  const effectiveLivePowerJson = Boolean(livePowerJsonEditing && onPowerJsonCommit && !isStatBlock);
   const groupedPowers = useMemo(() => {
     const normalized = powers.map((power) => normalizeMonsterPowerShape(power));
     const buckets: Record<MonsterPowerActionBucket, Array<{ power: MonsterPower; sourceIndex: number }>> = {
@@ -1587,32 +1573,78 @@ function MonsterPowersPanels({
 
   return (
     <div
-      style={{
-        ...panelStyle,
-        borderColor: "var(--panel-border-strong)",
-        padding: "0.6rem 0.65rem",
-        marginBottom: "0.65rem"
-      }}
+      className={isStatBlock ? "monster-stat-block-powers" : undefined}
+      style={
+        isStatBlock
+          ? {
+              display: "grid",
+              gap: "0.3rem",
+              margin: 0,
+              padding: 0,
+              border: "none",
+              background: "transparent"
+            }
+          : {
+              ...panelStyle,
+              borderColor: "var(--panel-border-strong)",
+              padding: "0.6rem 0.65rem",
+              marginBottom: "0.65rem"
+            }
+      }
     >
-      <h3 style={sectionTitleStyle}>Powers ({powers.length})</h3>
-      <div style={{ marginTop: "0.5rem", display: "grid", gap: "0.6rem" }}>
-        {powers.length === 0 ? <div style={metaMuted}>No powers parsed.</div> : null}
+      {isStatBlock ? null : <h3 style={sectionTitleStyle}>Powers ({powers.length})</h3>}
+      <div
+        style={{
+          marginTop: isStatBlock ? 0 : "0.5rem",
+          display: "grid",
+          gap: isStatBlock ? "0.28rem" : "0.6rem"
+        }}
+      >
+        {powers.length === 0 ? (
+          <div className={isStatBlock ? "monster-stat-block-muted" : undefined} style={isStatBlock ? undefined : metaMuted}>
+            No powers parsed.
+          </div>
+        ) : null}
         {(["standard", "move", "minor", "free", "triggered", "other"] as const).map((bucket) => {
           const bucketPowers = groupedPowers[bucket];
           if (bucketPowers.length === 0) return null;
           return (
-            <div key={bucket} style={{ display: "grid", gap: "0.4rem" }}>
-              <div style={powerBucketHeaderStyle}>{usageBucketLabel(bucket)}</div>
-              <div style={{ display: "grid", gap: "0.45rem", gridTemplateColumns: "minmax(0, 1fr)", alignItems: "stretch" }}>
+            <div key={bucket} style={{ display: "grid", gap: isStatBlock ? 0 : "0.4rem" }}>
+              {isStatBlock && !statBlockHideBucketHeads ? (
+                <div className="monster-stat-block-section-head">{usageBucketStatBlockLabel(bucket)}</div>
+              ) : !isStatBlock ? (
+                <div style={powerBucketHeaderStyle}>{usageBucketLabel(bucket)}</div>
+              ) : null}
+              <div
+                style={{
+                  display: "grid",
+                  gap: isStatBlock ? 0 : "0.45rem",
+                  gridTemplateColumns: "minmax(0, 1fr)",
+                  alignItems: "stretch"
+                }}
+              >
                 {bucketPowers.map(({ power, sourceIndex }, index) => {
                   const colorBucket = classifyMonsterPowerColorBucket(power.usage);
                   const accent = usageColorAccentCardStyle(colorBucket);
                   const cardModel = buildMonsterPowerCardViewModel(power);
                   const rawPower = powers[sourceIndex] ?? power;
-                  return (
-                    <div
-                      key={`${bucket}-${power.name}-${sourceIndex}-${index}`}
-                      style={{
+                  const shellStyle: CSSProperties = isStatBlock
+                    ? {
+                        border: "none",
+                        borderLeft: "none",
+                        borderRadius: 0,
+                        padding: "0.38rem 0.55rem",
+                        backgroundColor:
+                          index % 2 === 0
+                            ? "var(--monster-stat-block-stripe-a)"
+                            : "var(--monster-stat-block-stripe-b)",
+                        boxShadow: "none",
+                        height: "100%",
+                        boxSizing: "border-box",
+                        display: "flex",
+                        flexDirection: "column"
+                      }
+                    : {
                         border: accent.border,
                         borderLeft: accent.borderLeft,
                         borderRadius: "8px",
@@ -1623,8 +1655,9 @@ function MonsterPowersPanels({
                         boxSizing: "border-box",
                         display: "flex",
                         flexDirection: "column"
-                      }}
-                    >
+                      };
+                  return (
+                    <div key={`${bucket}-${power.name}-${sourceIndex}-${index}`} style={shellStyle}>
                       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: "0.35rem" }}>
                         <strong>{power.name || `Power ${index + 1}`}</strong>
                         {power.isBasic ? <span style={{ ...sheetTagPillStyle, cursor: "default" }}>Basic Attack</span> : null}
@@ -1780,9 +1813,11 @@ function MonsterPowersPanels({
                         <div
                           style={{
                             marginTop: "0.28rem",
-                            marginLeft: "0.55rem",
-                            paddingLeft: "0.55rem",
-                            borderLeft: "2px solid var(--panel-border)"
+                            marginLeft: isStatBlock ? "0.35rem" : "0.55rem",
+                            paddingLeft: isStatBlock ? "0.45rem" : "0.55rem",
+                            borderLeft: isStatBlock
+                              ? "2px solid color-mix(in srgb, var(--panel-border) 75%, transparent)"
+                              : "2px solid var(--panel-border)"
                           }}
                         >
                           {cardModel.secondaryAttacks.map((secondaryAttack, secondaryIndex) => (
@@ -1918,12 +1953,12 @@ function MonsterPowersPanels({
                           )}
                         </div>
                       ) : null}
-                      {showJson ? (
-                        livePowerJsonEditing && onPowerJsonCommit ? (
+                      {effectiveShowJson ? (
+                        effectiveLivePowerJson ? (
                           <TemplateJsonSnippetEditor
                             summaryLabel="JSON"
                             value={rawPower}
-                            onValidCommit={(parsed) => onPowerJsonCommit(sourceIndex, parsed)}
+                            onValidCommit={(parsed) => onPowerJsonCommit!(sourceIndex, parsed)}
                           />
                         ) : (
                           <TemplateJsonCollapsible summaryLabel="JSON" value={rawPower} />
@@ -1939,6 +1974,628 @@ function MonsterPowersPanels({
       </div>
     </div>
   );
+}
+
+type EncounterRosterGlossaryTooltipUi = Pick<ReturnType<typeof useGlossaryTooltip>, "hoverA11y">;
+
+function MonsterStatBlockCard({
+  monster,
+  statBlockKeyPrefix,
+  glossaryTooltipUi,
+  startGlossaryHover,
+  leaveGlossaryHover,
+  shouldHighlightGlossaryTerm,
+  powersPresentation = "statBlock",
+  powersShowJson = false,
+  livePowerJsonEditing = false,
+  onPowerJsonCommit,
+  levelAnnotation,
+  cardExtraClassName
+}: {
+  monster: MonsterEntryFile;
+  statBlockKeyPrefix: string;
+  glossaryTooltipUi: EncounterRosterGlossaryTooltipUi;
+  startGlossaryHover: (event: ReactMouseEvent<HTMLElement>, key: MonsterGlossaryHoverKey) => void;
+  leaveGlossaryHover: () => void;
+  shouldHighlightGlossaryTerm: (term: string) => boolean;
+  powersPresentation?: "panel" | "statBlock";
+  powersShowJson?: boolean;
+  livePowerJsonEditing?: boolean;
+  onPowerJsonCommit?: (powerIndex: number, parsed: unknown) => void;
+  /** Shown after the level value in the title row (e.g. base level when previewing a level adjustment). */
+  levelAnnotation?: ReactNode;
+  /** Extra classes on the root `.monster-stat-block-card` (e.g. roster expanded scroll cap). */
+  cardExtraClassName?: string;
+}): JSX.Element {
+  const on = (monster.stats?.otherNumbers ?? {}) as Record<string, unknown>;
+  const skillsBlock = (monster.stats?.skills ?? {}) as Record<string, unknown>;
+  const defensesBlock = (monster.stats?.defenses ?? {}) as Record<string, unknown>;
+  const pick = (candidates: string[]): string => {
+    const lower = new Map(Object.entries(on).map(([k, v]) => [k.toLowerCase(), v]));
+    for (const c of candidates) {
+      const v = lower.get(c.toLowerCase());
+      if (v !== undefined && v !== null && String(v).trim() !== "") {
+        return formatValue(v as string | number | boolean | undefined | null);
+      }
+    }
+    return "-";
+  };
+  const pickDefense = (candidates: string[]): string => {
+    const lower = new Map(Object.entries(defensesBlock).map(([k, v]) => [k.toLowerCase(), v]));
+    for (const c of candidates) {
+      const v = lower.get(c.toLowerCase());
+      if (v !== undefined && v !== null && String(v).trim() !== "") {
+        return formatValue(v as string | number | boolean | undefined | null);
+      }
+    }
+    return "-";
+  };
+  const hitPoints = pick(["hp", "hitPoints", "hit points"]);
+  const bloodied = formatValue(on.bloodied as string | number | boolean | undefined | null);
+  const initiative = pickFromStatBlock(on, ["initiative"]);
+  const perceptionFromSkills = pickFromStatBlock(skillsBlock, ["perception"]);
+  const perception =
+    perceptionFromSkills !== "-" ? perceptionFromSkills : pickFromStatBlock(on, ["perception"]);
+  const actionPts = pick(["actionPoints", "action points"]);
+  const saves = pick(["savingThrows", "saving throws"]);
+  const ac = pickDefense(["ac", "AC"]);
+  const fortitude = pickDefense(["fortitude", "Fortitude"]);
+  const reflex = pickDefense(["reflex", "Reflex"]);
+  const will = pickDefense(["will", "Will"]);
+  const movementEntries = extractMovementEntries(monster);
+  const showPhasing = monster.phasing === true;
+  const speedParts: string[] = [];
+  if (movementEntries.length > 0) {
+    for (const entry of movementEntries) {
+      speedParts.push(`${entry.type} ${String(entry.value)}`);
+    }
+  }
+  const speedLine =
+    speedParts.length > 0
+      ? `Speed ${speedParts.join(", ")}${showPhasing ? "; phasing" : ""}`
+      : showPhasing
+        ? "Phasing"
+        : "";
+  const senseEntries =
+    Array.isArray(monster.senses) && monster.senses.length > 0
+      ? monster.senses
+          .map((sense) => {
+            const name = String(sense.name ?? "").trim();
+            if (!name) return null;
+            const displayName = name.charAt(0).toUpperCase() + name.slice(1);
+            const normalizedRange = String(sense.range ?? "").trim();
+            const rangePart =
+              normalizedRange !== "" && normalizedRange !== "0" ? ` ${normalizedRange}` : "";
+            return `${displayName}${rangePart}`;
+          })
+          .filter((e): e is string => e !== null)
+      : [];
+  const senseLine = senseEntries.join(", ");
+  const typeLine = formatMonsterCreatureTypeLine(monster) || "—";
+  const traitEntries: Array<{ kind: "aura" | "trait"; idx: number; trait: MonsterTrait }> = [];
+  (monster.auras ?? []).forEach((trait, idx) => traitEntries.push({ kind: "aura", idx, trait }));
+  (monster.traits ?? []).forEach((trait, idx) => traitEntries.push({ kind: "trait", idx, trait }));
+  const abilityScoresRaw = monster.stats?.abilityScores as Record<string, unknown> | undefined;
+  const ABBR_ORDER = ["STR", "DEX", "WIS", "CON", "INT", "CHA"] as const;
+  const abilityCells: Array<{ abbrev: string; score: number; mod: number } | null> = ABBR_ORDER.map((abbrev) => {
+    if (!abilityScoresRaw) return null;
+    let rawVal: unknown;
+    for (const [k, v] of Object.entries(abilityScoresRaw)) {
+      if (formatMonsterStatLabelForDisplay(k) === abbrev) {
+        rawVal = v;
+        break;
+      }
+    }
+    if (rawVal === undefined) return null;
+    const score = typeof rawVal === "number" ? rawVal : Number(String(rawVal).replace(/,/g, "").trim());
+    if (!Number.isFinite(score)) return null;
+    const mod = Math.floor((score - 10) / 2);
+    return { abbrev, score, mod };
+  });
+  const hasAnyAbility = abilityCells.some(Boolean);
+  const skillPairs = Object.entries(skillsBlock).filter(([k]) => k.trim().toLowerCase() !== "perception");
+  const skillsLine =
+    skillPairs.length > 0
+      ? skillPairs
+          .map(([k, v]) => {
+            const label = formatMonsterStatLabelForDisplay(k);
+            const val = formatValue(v as string | number | boolean | undefined | null);
+            return val === "-" ? null : `${label} ${formatLeadingPlusIfPositive(val)}`;
+          })
+          .filter((s): s is string => Boolean(s))
+          .join(", ")
+      : "";
+  const alignName = monster.alignment?.name != null ? String(monster.alignment.name).trim() : "";
+  const languagesLine =
+    Array.isArray(monster.languages) && monster.languages.length > 0
+      ? monster.languages.map((x) => String(x).trim()).filter(Boolean).join(", ")
+      : "—";
+
+  const cardClass = ["monster-stat-block-card", cardExtraClassName].filter(Boolean).join(" ").trim();
+  return (
+    <div className={cardClass}>
+      <div className="monster-stat-block-card__title">
+        <div className="monster-stat-block-card__title-name">{monster.name || "—"}</div>
+        <div className="monster-stat-block-card__title-right">
+          <span {...glossaryTooltipUi.hoverA11y("glossaryTerm:Level")} className="monster-stat-block-gloss">
+            Level
+          </span>{" "}
+          {formatValue(monster.level)}
+          {levelAnnotation}
+          {isRenderableCardValue(monster.groupRole) ? (
+            <>
+              {" "}
+              <span
+                {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${String(monster.groupRole)}`)}
+                className="monster-stat-block-gloss"
+              >
+                {String(monster.groupRole)}
+              </span>
+            </>
+          ) : null}{" "}
+          <span
+            {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${monster.role || "Role"}`)}
+            className="monster-stat-block-gloss"
+          >
+            {monster.role || ""}
+          </span>
+        </div>
+      </div>
+      <div className="monster-stat-block-card__sub">
+        <div className="monster-stat-block-card__sub-left">{typeLine}</div>
+        <div className="monster-stat-block-card__sub-right">
+          <span {...glossaryTooltipUi.hoverA11y("glossaryTerm:Experience")} className="monster-stat-block-gloss">
+            XP
+          </span>{" "}
+          {formatValue(monster.xp)}
+        </div>
+      </div>
+
+      <div className="monster-stat-block-card__vitals">
+        {hitPoints !== "-" || bloodied !== "-" ? (
+          <div className="monster-stat-block-vitals__row">
+            <div className="monster-stat-block-vitals__cell">
+              {hitPoints !== "-" ? (
+                <>
+                  <span className="monster-stat-block-k">HP</span> {hitPoints}
+                  {bloodied !== "-" ? (
+                    <>
+                      {" "}
+                      <span className="monster-stat-block-k">Bloodied</span> {bloodied}
+                    </>
+                  ) : null}
+                </>
+              ) : bloodied !== "-" ? (
+                <>
+                  <span className="monster-stat-block-k">Bloodied</span> {bloodied}
+                </>
+              ) : null}
+            </div>
+            <div className="monster-stat-block-vitals__cell monster-stat-block-vitals__cell--right">
+              {initiative !== "-" ? (
+                <>
+                  <span {...glossaryTooltipUi.hoverA11y("glossaryTerm:Initiative")} className="monster-stat-block-gloss">
+                    Initiative
+                  </span>{" "}
+                  {formatLeadingPlusIfPositive(initiative)}
+                </>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+        {ac !== "-" || fortitude !== "-" || reflex !== "-" || will !== "-" || perception !== "-" ? (
+          <div className="monster-stat-block-vitals__row">
+            <div className="monster-stat-block-vitals__cell">
+              {ac !== "-" ? (
+                <>
+                  <span {...glossaryTooltipUi.hoverA11y("glossaryTerm:AC")} className="monster-stat-block-gloss">
+                    AC
+                  </span>{" "}
+                  {ac}
+                </>
+              ) : null}
+              {fortitude !== "-" ? (
+                <>
+                  {ac !== "-" ? ", " : null}
+                  <span {...glossaryTooltipUi.hoverA11y("glossaryTerm:Fortitude")} className="monster-stat-block-gloss">
+                    Fortitude
+                  </span>{" "}
+                  {fortitude}
+                </>
+              ) : null}
+              {reflex !== "-" ? (
+                <>
+                  {ac !== "-" || fortitude !== "-" ? ", " : null}
+                  <span {...glossaryTooltipUi.hoverA11y("glossaryTerm:Reflex")} className="monster-stat-block-gloss">
+                    Reflex
+                  </span>{" "}
+                  {reflex}
+                </>
+              ) : null}
+              {will !== "-" ? (
+                <>
+                  {ac !== "-" || fortitude !== "-" || reflex !== "-" ? ", " : null}
+                  <span {...glossaryTooltipUi.hoverA11y("glossaryTerm:Will")} className="monster-stat-block-gloss">
+                    Will
+                  </span>{" "}
+                  {will}
+                </>
+              ) : null}
+            </div>
+            <div className="monster-stat-block-vitals__cell monster-stat-block-vitals__cell--right">
+              {perception !== "-" ? (
+                <>
+                  <span {...glossaryTooltipUi.hoverA11y("glossaryTerm:Perception")} className="monster-stat-block-gloss">
+                    Perception
+                  </span>{" "}
+                  {formatLeadingPlusIfPositive(perception)}
+                </>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+        {speedLine || senseLine ? (
+          <div className="monster-stat-block-vitals__row">
+            <div className="monster-stat-block-vitals__cell">{speedLine || null}</div>
+            <div className="monster-stat-block-vitals__cell monster-stat-block-vitals__cell--right">
+              {senseLine
+                ? senseEntries.map((text, idx) => (
+                    <span key={`${statBlockKeyPrefix}-sense-${idx}`}>
+                      {idx > 0 ? ", " : null}
+                      <span
+                        {...glossaryTooltipUi.hoverA11y(
+                          buildGlossaryHoverKeyForTerm(text, { tryTitleCaseVariant: true })
+                        )}
+                        className="monster-stat-block-gloss"
+                      >
+                        {text}
+                      </span>
+                    </span>
+                  ))
+                : null}
+            </div>
+          </div>
+        ) : null}
+        {(Array.isArray(monster.immunities) && monster.immunities.length > 0) ? (
+          <div className="monster-stat-block-vitals__row monster-stat-block-vitals__row--label-value">
+            <span className="monster-stat-block-k monster-stat-block-vitals__label-col">Immune</span>
+            <div className="monster-stat-block-vitals__value-col">
+              {(() => {
+                const segments: string[] = [];
+                for (const imm of monster.immunities ?? []) {
+                  segments.push(...splitCommaListSegments(String(imm ?? "")));
+                }
+                return segments.map((text, idx) => (
+                  <span key={`${statBlockKeyPrefix}-imm-${idx}`}>
+                    {idx > 0 ? ", " : null}
+                    {immunitySegmentEligibleForGlossaryHover(text) ? (
+                      <span {...glossaryTooltipUi.hoverA11y(buildGlossaryHoverKeyForTerm(text))} className="monster-stat-block-gloss">
+                        {text}
+                      </span>
+                    ) : (
+                      <span>{text}</span>
+                    )}
+                  </span>
+                ));
+              })()}
+            </div>
+          </div>
+        ) : null}
+        {(Array.isArray(monster.resistances) && monster.resistances.length > 0) ? (
+          <div className="monster-stat-block-vitals__row monster-stat-block-vitals__row--label-value">
+            <span className="monster-stat-block-k monster-stat-block-vitals__label-col">Resist</span>
+            <div className="monster-stat-block-vitals__value-col">
+              {monster.resistances.map((resistance, idx) => {
+                const r = resistance as Record<string, unknown>;
+                const name = String(r.name ?? "").trim();
+                const rawAmount = r.amount;
+                const amount = typeof rawAmount === "number" ? rawAmount : Number(rawAmount);
+                const amountPart = Number.isFinite(amount) && amount !== 0 ? `${amount} ` : "";
+                const detailsPart = String(r.details ?? "").trim();
+                return (
+                  <span key={`${statBlockKeyPrefix}-res-${idx}`}>
+                    {idx > 0 ? ", " : null}
+                    {amountPart}
+                    {name ? (
+                      <span
+                        {...glossaryTooltipUi.hoverA11y(buildGlossaryHoverKeyForTerm(name, { tryDamageTypeEntry: true }))}
+                        className="monster-stat-block-gloss"
+                      >
+                        {name}
+                      </span>
+                    ) : (
+                      weaknessLine(r)
+                    )}
+                    {detailsPart ? ` ${detailsPart}` : ""}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+        {(Array.isArray(monster.weaknesses) && monster.weaknesses.length > 0) ? (
+          <div className="monster-stat-block-vitals__row monster-stat-block-vitals__row--label-value">
+            <span className="monster-stat-block-k monster-stat-block-vitals__label-col">Vulnerable</span>
+            <div className="monster-stat-block-vitals__value-col">
+              {monster.weaknesses.map((weakness, idx) => {
+                const w = weakness as Record<string, unknown>;
+                const name = String(w.name ?? "").trim();
+                const rawAmount = w.amount;
+                const amount = typeof rawAmount === "number" ? rawAmount : Number(rawAmount);
+                const amountPart = Number.isFinite(amount) && amount !== 0 ? `${amount} ` : "";
+                const detailsPart = String(w.details ?? "").trim();
+                return (
+                  <span key={`${statBlockKeyPrefix}-weak-${idx}`}>
+                    {idx > 0 ? ", " : null}
+                    {amountPart}
+                    {name ? (
+                      <span
+                        {...glossaryTooltipUi.hoverA11y(buildGlossaryHoverKeyForTerm(name, { tryDamageTypeEntry: true }))}
+                        className="monster-stat-block-gloss"
+                      >
+                        {name}
+                      </span>
+                    ) : (
+                      weaknessLine(w)
+                    )}
+                    {detailsPart ? ` ${detailsPart}` : ""}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+        {includeUnlessZeroNumeric(saves) || includeUnlessZeroNumeric(actionPts) ? (
+          <div className="monster-stat-block-vitals__row monster-stat-block-vitals__row--full">
+            {includeUnlessZeroNumeric(saves) ? (
+              <>
+                <span {...glossaryTooltipUi.hoverA11y("glossaryTerm:Saving Throws")} className="monster-stat-block-gloss">
+                  Saving throws
+                </span>{" "}
+                {formatLeadingPlusIfPositive(saves)}
+              </>
+            ) : null}
+            {includeUnlessZeroNumeric(saves) && includeUnlessZeroNumeric(actionPts) ? "; " : null}
+            {includeUnlessZeroNumeric(actionPts) ? (
+              <>
+                <span {...glossaryTooltipUi.hoverA11y("glossaryTerm:Action Points")} className="monster-stat-block-gloss">
+                  Action points
+                </span>{" "}
+                {actionPts}
+              </>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+
+      {traitEntries.length > 0 ? (
+        <>
+          <div className="monster-stat-block-section-head">Traits</div>
+          <div className="monster-stat-block-traits">
+            {traitEntries.map(({ kind, idx, trait }, stripe) => {
+              const traitNameRaw = String(trait.name ?? "").trim();
+              const traitName = traitNameRaw || (kind === "aura" ? "Aura" : "Trait");
+              const traitBadges = renderTraitMetaBadges(trait);
+              return (
+                <div
+                  key={`${statBlockKeyPrefix}-${kind}-${idx}`}
+                  className="monster-stat-block-trait-row"
+                  data-stripe={stripe % 2 === 0 ? "even" : "odd"}
+                >
+                  <div className="monster-stat-block-trait-title">
+                    <strong>{traitName}</strong>
+                    {traitBadges.length > 0
+                      ? traitBadges.map((badge) => (
+                          <span key={`${statBlockKeyPrefix}-${kind}-${idx}-b-${badge}`} className="monster-stat-block-trait-badge">
+                            {badge}
+                          </span>
+                        ))
+                      : null}
+                  </div>
+                  <div className="monster-stat-block-trait-body">
+                    {renderGlossaryAwareText(
+                      String(trait.details ?? ""),
+                      commonDescriptiveGlossaryPhrases,
+                      startGlossaryHover,
+                      leaveGlossaryHover,
+                      `${statBlockKeyPrefix}-${kind}-${idx}`,
+                      shouldHighlightGlossaryTerm
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      ) : null}
+
+      <MonsterPowersPanels
+        powers={monster.powers ?? []}
+        startGlossaryHover={startGlossaryHover}
+        leaveGlossaryHover={leaveGlossaryHover}
+        shouldHighlightGlossaryTerm={shouldHighlightGlossaryTerm}
+        showJson={powersShowJson}
+        presentation={powersPresentation}
+        livePowerJsonEditing={livePowerJsonEditing}
+        onPowerJsonCommit={onPowerJsonCommit}
+      />
+
+      <div className="monster-stat-block-footer">
+        {skillsLine ? (
+          <div className="monster-stat-block-footer__skills">
+            <span className="monster-stat-block-k">Skills</span> {skillsLine}
+          </div>
+        ) : null}
+        {hasAnyAbility ? (
+          <div className="monster-stat-block-abilities">
+            {[0, 1].map((row) => (
+              <div key={`ab-row-${row}`} className="monster-stat-block-abilities__row">
+                {[0, 1, 2].map((col) => {
+                  const cell = abilityCells[row * 3 + col];
+                  if (!cell) {
+                    return (
+                      <div
+                        key={`ab-${row}-${col}`}
+                        className="monster-stat-block-abilities__cell monster-stat-block-abilities__cell--empty"
+                      >
+                        —
+                      </div>
+                    );
+                  }
+                  const gloss = monsterStatGlossaryTermForKey(cell.abbrev);
+                  const modStr = cell.mod >= 0 ? `+${cell.mod}` : `${cell.mod}`;
+                  const shortLabel = cell.abbrev.charAt(0) + cell.abbrev.slice(1).toLowerCase();
+                  return (
+                    <div key={`ab-${row}-${col}`} className="monster-stat-block-abilities__cell">
+                      <span {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${gloss}`)} className="monster-stat-block-gloss">
+                        {shortLabel}
+                      </span>{" "}
+                      {cell.score}{" "}
+                      <span className="monster-stat-block-abilities__mod">({modStr})</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        ) : null}
+        <div className="monster-stat-block-footer__meta">
+          {alignName ? (
+            <span>
+              <span className="monster-stat-block-k">Alignment</span> {alignName}
+            </span>
+          ) : null}
+          {alignName ? <span className="monster-stat-block-footer__dot"> </span> : null}
+          <span>
+            <span className="monster-stat-block-k">Languages</span> {languagesLine}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EncounterRosterMonsterStatBlock({
+  monster,
+  statBlockKeyPrefix,
+  glossaryTooltipUi,
+  startGlossaryHover,
+  leaveGlossaryHover,
+  shouldHighlightGlossaryTerm,
+  expandAll = false
+}: {
+  monster: MonsterEntryFile;
+  statBlockKeyPrefix: string;
+  glossaryTooltipUi: EncounterRosterGlossaryTooltipUi;
+  startGlossaryHover: (event: ReactMouseEvent<HTMLElement>, key: MonsterGlossaryHoverKey) => void;
+  leaveGlossaryHover: () => void;
+  shouldHighlightGlossaryTerm: (term: string) => boolean;
+  /** When true (roster “Expand all”), show the full stat block without requiring hover. */
+  expandAll?: boolean;
+}): JSX.Element {
+  const [hoverOpen, setHoverOpen] = useState(false);
+  const showCard = expandAll || hoverOpen;
+  if (!showCard) {
+    return (
+      <div
+        className="monster-stat-block-roster-wrap"
+        onMouseEnter={() => setHoverOpen(true)}
+        onMouseLeave={() => setHoverOpen(false)}
+      >
+        <div className="monster-stat-block-roster-peek-row">
+          <div className="monster-stat-block-card__title-name monster-stat-block-roster-peek-name" title="Hover to show creature stat block">
+            {monster.name || "—"}
+          </div>
+          <div className="monster-stat-block-card__title-right monster-stat-block-roster-peek-meta">
+            <span {...glossaryTooltipUi.hoverA11y("glossaryTerm:Level")} className="monster-stat-block-gloss">
+              Level
+            </span>{" "}
+            {formatValue(monster.level)}
+            {isRenderableCardValue(monster.groupRole) ? (
+              <>
+                {" "}
+                <span
+                  {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${String(monster.groupRole)}`)}
+                  className="monster-stat-block-gloss"
+                >
+                  {String(monster.groupRole)}
+                </span>
+              </>
+            ) : null}{" "}
+            <span
+              {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${monster.role || "Role"}`)}
+              className="monster-stat-block-gloss"
+            >
+              {monster.role || ""}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div
+      className="monster-stat-block-roster-wrap"
+      onMouseEnter={() => setHoverOpen(true)}
+      onMouseLeave={() => setHoverOpen(false)}
+    >
+      <MonsterStatBlockCard
+        monster={monster}
+        statBlockKeyPrefix={statBlockKeyPrefix}
+        glossaryTooltipUi={glossaryTooltipUi}
+        startGlossaryHover={startGlossaryHover}
+        leaveGlossaryHover={leaveGlossaryHover}
+        shouldHighlightGlossaryTerm={shouldHighlightGlossaryTerm}
+        cardExtraClassName="monster-stat-block-card--roster-expanded"
+      />
+    </div>
+  );
+}
+
+function formatTemplateCardKeywordSubline(record: MonsterTemplateRecord): string | null {
+  const parts = (record.keywords ?? []).map((k) => String(k).trim()).filter(Boolean);
+  if (parts.length === 0) return null;
+  const lowered = parts.map((p) => (p ? p.charAt(0).toLowerCase() + p.slice(1) : p));
+  return `(${lowered.join(", ")})`;
+}
+
+function formatTemplateCardRolePrimary(record: MonsterTemplateRecord): string {
+  const r = record.role;
+  if (r?.tier && r.combatRole) {
+    const tagPart =
+      Array.isArray(r.tags) && r.tags.length > 0
+        ? ` (${r.tags.map((t) => String(t).trim()).filter(Boolean).join(", ")})`
+        : "";
+    return `${r.tier} ${r.combatRole}${tagPart}`;
+  }
+  const line = (record.roleLine ?? r?.raw ?? "").trim();
+  const nm = (record.templateName ?? "").trim();
+  if (nm && line.length >= nm.length) {
+    const head = line.slice(0, nm.length);
+    if (head.localeCompare(nm, undefined, { sensitivity: "accent" }) === 0) {
+      const rest = line.slice(nm.length).trim();
+      if (rest) return rest;
+    }
+  }
+  return line || "—";
+}
+
+function formatTemplateCardXpLine(record: MonsterTemplateRecord): string | null {
+  const tier = record.role?.tier?.trim();
+  if (tier) return `XP ${tier}`;
+  if (record.isEliteTemplate) return "XP Elite";
+  const rl = (record.roleLine ?? "").toLowerCase();
+  if (rl.includes("solo")) return "XP Solo";
+  if (rl.includes("elite")) return "XP Elite";
+  if (rl.includes("minion")) return "XP Minion";
+  return null;
+}
+
+function splitTemplateStatAdjustmentLine(line: string): { label: string; body: string } {
+  const trimmed = line.trim();
+  const m = trimmed.match(/^([A-Za-z]+)\s+(.*)$/);
+  if (m) return { label: m[1], body: m[2] };
+  return { label: "", body: trimmed };
 }
 
 function MonsterTemplateFormattedView({
@@ -1970,24 +2627,17 @@ function MonsterTemplateFormattedView({
     return record.statLines ?? [];
   }, [record.stats, record.statLines]);
 
+  const templatePowersForDisplay = useMemo(() => {
+    const primary = record.powers ?? [];
+    if (liveSnippetEditing && onTemplateSnippetCommit) return primary;
+    return [...primary, ...(record.uncategorizedAbilities ?? [])];
+  }, [liveSnippetEditing, onTemplateSnippetCommit, record.powers, record.uncategorizedAbilities]);
+
+  const xpLine = formatTemplateCardXpLine(record);
+  const kwSubline = formatTemplateCardKeywordSubline(record);
+
   return (
     <div style={{ minWidth: 0 }}>
-      <div style={centerIdentityBlockStyle}>
-        <div style={centerIdentityTitleStyle}>{record.templateName}</div>
-        <div style={centerMetaLineStyle}>
-          {(record.roleLine ?? record.role?.raw ?? "").trim() || "—"}
-          {record.isEliteTemplate ? (
-            <>
-              {" "}
-              <span style={sheetTagPillStyle}>Elite template</span>
-            </>
-          ) : null}
-        </div>
-        <div style={centerMetaLineStyle}>
-          <strong>Source:</strong> {record.sourceBook}
-        </div>
-      </div>
-
       {liveSnippetEditing && onTemplateSnippetCommit ? (
         <TemplateJsonSnippetEditor
           summaryLabel="JSON (name & source)"
@@ -2053,197 +2703,281 @@ function MonsterTemplateFormattedView({
         </div>
       ) : null}
 
-      {statAdjustmentLines.length > 0 ||
-      (record.stats && Object.keys(record.stats).length > 0) ||
-      (liveSnippetEditing && onTemplateSnippetCommit) ? (
-        <div style={centerSubsectionPanelStyle}>
-          <h3 style={sectionTitleStyle}>Stat adjustments</h3>
-          {statAdjustmentLines.length > 0 ? (
-            <div style={{ marginTop: "0.25rem", display: "grid", gap: "0.2rem" }}>
-              {statAdjustmentLines.map((line, i) => (
-                <div key={`${glossaryKeyPrefix}-statline-${i}`} style={{ ...bodyPrimary, ...monsterTemplateEntryStripeStyle(i) }}>
-                  {line}
+      <div className="monster-stat-block-card monster-stat-block-card--template">
+        <div className="monster-stat-block-card__title">
+          <div
+            className="monster-stat-block-card__title-name"
+            style={{ display: "flex", flexDirection: "column", alignItems: "stretch", gap: "0.12rem", minWidth: 0 }}
+          >
+            <span>{String(record.templateName ?? "").trim() || "—"}</span>
+            {kwSubline ? <span className="monster-stat-block-card__title-keywords">{kwSubline}</span> : null}
+          </div>
+          <div
+            className="monster-stat-block-card__title-right"
+            style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.08rem", textAlign: "right" }}
+          >
+            <span>{formatTemplateCardRolePrimary(record)}</span>
+            {xpLine ? <span style={{ fontSize: "0.68rem", fontWeight: 600, opacity: 0.95 }}>{xpLine}</span> : null}
+          </div>
+        </div>
+
+        {statAdjustmentLines.length > 0 ||
+        (record.stats && Object.keys(record.stats).length > 0) ||
+        (liveSnippetEditing && onTemplateSnippetCommit) ? (
+          <div className="monster-stat-block-card__vitals">
+            {statAdjustmentLines.map((line, i) => {
+              const { label, body } = splitTemplateStatAdjustmentLine(line);
+              return (
+                <div
+                  key={`${glossaryKeyPrefix}-statline-${i}`}
+                  className="monster-stat-block-vitals__row monster-stat-block-vitals__row--full"
+                >
+                  {label ? (
+                    <>
+                      <span className="monster-stat-block-k">{label}</span>{" "}
+                      {renderGlossaryAwareText(
+                        body,
+                        commonDescriptiveGlossaryPhrases,
+                        startGlossaryHover,
+                        leaveGlossaryHover,
+                        `${glossaryKeyPrefix}-statline-${i}-body`,
+                        shouldHighlightGlossaryTerm
+                      )}
+                    </>
+                  ) : (
+                    renderGlossaryAwareText(
+                      line,
+                      commonDescriptiveGlossaryPhrases,
+                      startGlossaryHover,
+                      leaveGlossaryHover,
+                      `${glossaryKeyPrefix}-statline-${i}`,
+                      shouldHighlightGlossaryTerm
+                    )
+                  )}
                 </div>
-              ))}
+              );
+            })}
+            {(record.stats && Object.keys(record.stats).length > 0) || (liveSnippetEditing && onTemplateSnippetCommit) ? (
+              <div className="monster-stat-block-vitals__row monster-stat-block-vitals__row--full" style={{ display: "block" }}>
+                {liveSnippetEditing && onTemplateSnippetCommit ? (
+                  <TemplateJsonSnippetEditor
+                    summaryLabel="JSON (stats)"
+                    value={record.stats ?? {}}
+                    onValidCommit={(parsed) =>
+                      onTemplateSnippetCommit((base) => {
+                        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return base;
+                        return { ...base, stats: parsed as Record<string, unknown> };
+                      })
+                    }
+                    preExtraStyle={{
+                      maxHeight: "min(40vh, 22rem)",
+                      overflowY: "auto",
+                      background: "rgba(0,0,0,0.04)",
+                      fontSize: "0.82rem",
+                      color: "var(--text-primary)"
+                    }}
+                  />
+                ) : (
+                  <TemplateJsonCollapsible
+                    summaryLabel="JSON (stats)"
+                    value={record.stats}
+                    preExtraStyle={{
+                      maxHeight: "min(40vh, 22rem)",
+                      overflowY: "auto",
+                      background: "rgba(0,0,0,0.04)",
+                      fontSize: "0.82rem",
+                      color: "var(--text-primary)"
+                    }}
+                  />
+                )}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {(record.auras ?? []).length > 0 ? (
+          <>
+            <div className="monster-stat-block-section-head">Auras</div>
+            <div className="monster-stat-block-traits">
+              {(record.auras ?? []).map((aura, idx) => {
+                const auraNameRaw = String(aura.name ?? "").trim();
+                const auraName = auraNameRaw || "Aura";
+                const auraBadges = renderTraitMetaBadges(aura);
+                return (
+                  <div
+                    key={`${glossaryKeyPrefix}-aura-${idx}`}
+                    className="monster-stat-block-trait-row"
+                    data-stripe={idx % 2 === 0 ? "even" : "odd"}
+                  >
+                    <div className="monster-stat-block-trait-title">
+                      <strong>{auraName}</strong>
+                      {auraBadges.length > 0
+                        ? auraBadges.map((badge) => (
+                            <span key={`${glossaryKeyPrefix}-aura-${idx}-b-${badge}`} className="monster-stat-block-trait-badge">
+                              {badge}
+                            </span>
+                          ))
+                        : null}
+                    </div>
+                    <div className="monster-stat-block-trait-body">
+                      {renderGlossaryAwareText(
+                        String(aura.details ?? ""),
+                        commonDescriptiveGlossaryPhrases,
+                        startGlossaryHover,
+                        leaveGlossaryHover,
+                        `${glossaryKeyPrefix}-aura-${idx}`,
+                        shouldHighlightGlossaryTerm
+                      )}
+                    </div>
+                    {showAbilityJson ? (
+                      liveSnippetEditing && onTemplateSnippetCommit ? (
+                        <TemplateJsonSnippetEditor
+                          summaryLabel="JSON"
+                          value={aura}
+                          onValidCommit={(parsed) =>
+                            onTemplateSnippetCommit((base) => {
+                              if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return base;
+                              const auras = [...(base.auras ?? [])];
+                              auras[idx] = parsed as MonsterTrait;
+                              return { ...base, auras };
+                            })
+                          }
+                        />
+                      ) : (
+                        <TemplateJsonCollapsible summaryLabel="JSON" value={aura} />
+                      )
+                    ) : null}
+                  </div>
+                );
+              })}
             </div>
-          ) : null}
-          {(record.stats && Object.keys(record.stats).length > 0) || (liveSnippetEditing && onTemplateSnippetCommit) ? (
-            liveSnippetEditing && onTemplateSnippetCommit ? (
-              <TemplateJsonSnippetEditor
-                summaryLabel="JSON"
-                value={record.stats ?? {}}
-                onValidCommit={(parsed) =>
+          </>
+        ) : null}
+
+        {(record.traits ?? []).length > 0 ? (
+          <>
+            <div className="monster-stat-block-section-head">Traits</div>
+            <div className="monster-stat-block-traits">
+              {(record.traits ?? []).map((trait, idx) => {
+                const auraCount = (record.auras ?? []).length;
+                const traitNameRaw = String(trait.name ?? "").trim();
+                const traitName = traitNameRaw || "Trait";
+                const traitBadges = renderTraitMetaBadges(trait);
+                return (
+                  <div
+                    key={`${glossaryKeyPrefix}-trait-${idx}`}
+                    className="monster-stat-block-trait-row"
+                    data-stripe={(auraCount + idx) % 2 === 0 ? "even" : "odd"}
+                  >
+                    <div className="monster-stat-block-trait-title">
+                      <strong>{traitName}</strong>
+                      {traitBadges.length > 0
+                        ? traitBadges.map((badge) => (
+                            <span key={`${glossaryKeyPrefix}-trait-${idx}-b-${badge}`} className="monster-stat-block-trait-badge">
+                              {badge}
+                            </span>
+                          ))
+                        : null}
+                    </div>
+                    <div className="monster-stat-block-trait-body">
+                      {renderGlossaryAwareText(
+                        String(trait.details ?? ""),
+                        commonDescriptiveGlossaryPhrases,
+                        startGlossaryHover,
+                        leaveGlossaryHover,
+                        `${glossaryKeyPrefix}-trait-${idx}`,
+                        shouldHighlightGlossaryTerm
+                      )}
+                    </div>
+                    {showAbilityJson ? (
+                      liveSnippetEditing && onTemplateSnippetCommit ? (
+                        <TemplateJsonSnippetEditor
+                          summaryLabel="JSON"
+                          value={trait}
+                          onValidCommit={(parsed) =>
+                            onTemplateSnippetCommit((base) => {
+                              if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return base;
+                              const traits = [...(base.traits ?? [])];
+                              traits[idx] = parsed as MonsterTrait;
+                              return { ...base, traits };
+                            })
+                          }
+                        />
+                      ) : (
+                        <TemplateJsonCollapsible summaryLabel="JSON" value={trait} />
+                      )
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        ) : null}
+
+        <MonsterPowersPanels
+          powers={templatePowersForDisplay}
+          startGlossaryHover={startGlossaryHover}
+          leaveGlossaryHover={leaveGlossaryHover}
+          shouldHighlightGlossaryTerm={shouldHighlightGlossaryTerm}
+          showJson={showAbilityJson}
+          livePowerJsonEditing={Boolean(liveSnippetEditing && onTemplateSnippetCommit)}
+          presentation="statBlock"
+          statBlockHideBucketHeads
+          onPowerJsonCommit={
+            liveSnippetEditing && onTemplateSnippetCommit
+              ? (powerIndex, parsed) =>
                   onTemplateSnippetCommit((base) => {
                     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return base;
-                    return { ...base, stats: parsed as Record<string, unknown> };
+                    const powers = [...(base.powers ?? [])];
+                    powers[powerIndex] = parsed as MonsterPower;
+                    return { ...base, powers };
                   })
-                }
-                preExtraStyle={{
-                  maxHeight: "min(40vh, 22rem)",
-                  overflowY: "auto",
-                  background: "rgba(0,0,0,0.04)",
-                  fontSize: "0.82rem",
-                  color: "var(--text-primary)"
-                }}
-              />
-            ) : (
-              <TemplateJsonCollapsible
-                summaryLabel="JSON"
-                value={record.stats}
-                preExtraStyle={{
-                  maxHeight: "min(40vh, 22rem)",
-                  overflowY: "auto",
-                  background: "rgba(0,0,0,0.04)",
-                  fontSize: "0.82rem",
-                  color: "var(--text-primary)"
-                }}
-              />
-            )
-          ) : null}
+              : undefined
+          }
+        />
+      </div>
+
+      {record.sourceBook?.trim() ||
+      (record.pageStart != null && record.pageStart > 0) ||
+      (record.pageEnd != null && record.pageEnd > 0) ? (
+        <div style={{ ...metaMuted, marginTop: "0.45rem", fontSize: "0.78rem", lineHeight: 1.45 }}>
+          <strong style={{ color: "var(--text-secondary)" }}>Source:</strong> {record.sourceBook?.trim() || "—"}
+          {record.pageStart != null && record.pageStart > 0
+            ? ` · p. ${record.pageStart}${record.pageEnd != null && record.pageEnd > 0 && record.pageEnd !== record.pageStart ? `–${record.pageEnd}` : ""}`
+            : null}
         </div>
       ) : null}
 
-      {(record.auras ?? []).length > 0 ? (
-        <div style={centerSubsectionPanelStyle}>
-          <h3 style={sectionTitleStyle}>Auras</h3>
-          <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.2rem" }}>
-            {(record.auras ?? []).map((aura, idx) => {
-              const auraName = String(aura.name ?? "Aura").trim() || "Aura";
-              const auraBadges = renderTraitMetaBadges(aura);
-              return (
-                <div key={`${glossaryKeyPrefix}-aura-${idx}`} style={{ ...bodyPrimary, ...monsterTemplateEntryStripeStyle(idx) }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      alignItems: "center",
-                      gap: "0.35rem",
-                      marginBottom: "0.18rem"
-                    }}
-                  >
-                    <strong>{auraName}:</strong>
-                    {auraBadges.map((badge) => (
-                      <span
-                        key={`${glossaryKeyPrefix}-aura-${idx}-tag-${badge}`}
-                        style={{ ...sheetTagPillStyle, cursor: "default" }}
-                      >
-                        {badge}
-                      </span>
-                    ))}
-                  </div>
-                  {renderGlossaryAwareText(
-                    String(aura.details ?? ""),
-                    commonDescriptiveGlossaryPhrases,
-                    startGlossaryHover,
-                    leaveGlossaryHover,
-                    `${glossaryKeyPrefix}-aura-${idx}`,
-                    shouldHighlightGlossaryTerm
-                  )}
-                  {showAbilityJson ? (
-                    liveSnippetEditing && onTemplateSnippetCommit ? (
-                      <TemplateJsonSnippetEditor
-                        summaryLabel="JSON"
-                        value={aura}
-                        onValidCommit={(parsed) =>
-                          onTemplateSnippetCommit((base) => {
-                            if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return base;
-                            const auras = [...(base.auras ?? [])];
-                            auras[idx] = parsed as MonsterTrait;
-                            return { ...base, auras };
-                          })
-                        }
-                      />
-                    ) : (
-                      <TemplateJsonCollapsible summaryLabel="JSON" value={aura} />
-                    )
-                  ) : null}
-                </div>
-              );
-            })}
+      {liveSnippetEditing && onTemplateSnippetCommit && (record.uncategorizedAbilities?.length ?? 0) > 0 ? (
+        <div style={{ ...centerSubsectionPanelStyle, marginTop: "0.55rem" }}>
+          <h3 style={sectionTitleStyle}>Uncategorized abilities</h3>
+          <p style={{ ...metaMuted, margin: "0 0 0.35rem 0", fontSize: "0.78rem" }}>
+            These entries are not wired to the main <code>powers</code> array in live JSON editing; edit them in the draft JSON
+            panel, or merge into <code>powers</code> there.
+          </p>
+          <div style={{ display: "grid", gap: "0.35rem" }}>
+            {(record.uncategorizedAbilities ?? []).map((p, idx) => (
+              <div key={`${glossaryKeyPrefix}-uncat-${idx}`} style={{ ...bodyPrimary, ...monsterTemplateEntryStripeStyle(idx) }}>
+                <strong>{String(p.name ?? "").trim() || "Ability"}</strong>
+                {showAbilityJson ? (
+                  <TemplateJsonSnippetEditor
+                    summaryLabel="JSON"
+                    value={p}
+                    onValidCommit={(parsed) =>
+                      onTemplateSnippetCommit((base) => {
+                        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return base;
+                        const unc = [...(base.uncategorizedAbilities ?? [])];
+                        unc[idx] = parsed as MonsterPower;
+                        return { ...base, uncategorizedAbilities: unc };
+                      })
+                    }
+                  />
+                ) : null}
+              </div>
+            ))}
           </div>
         </div>
       ) : null}
-
-      {(record.traits ?? []).length > 0 ? (
-        <div style={centerSubsectionPanelStyle}>
-          <h3 style={sectionTitleStyle}>Traits</h3>
-          <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.2rem" }}>
-            {(record.traits ?? []).map((trait, idx) => {
-              const traitName = String(trait.name ?? "Trait").trim() || "Trait";
-              const traitBadges = renderTraitMetaBadges(trait);
-              return (
-                <div key={`${glossaryKeyPrefix}-trait-${idx}`} style={{ ...bodyPrimary, ...monsterTemplateEntryStripeStyle(idx) }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      alignItems: "center",
-                      gap: "0.35rem",
-                      marginBottom: "0.18rem"
-                    }}
-                  >
-                    <strong>{traitName}:</strong>
-                    {traitBadges.map((badge) => (
-                      <span
-                        key={`${glossaryKeyPrefix}-trait-${idx}-tag-${badge}`}
-                        style={{ ...sheetTagPillStyle, cursor: "default" }}
-                      >
-                        {badge}
-                      </span>
-                    ))}
-                  </div>
-                  {renderGlossaryAwareText(
-                    String(trait.details ?? ""),
-                    commonDescriptiveGlossaryPhrases,
-                    startGlossaryHover,
-                    leaveGlossaryHover,
-                    `${glossaryKeyPrefix}-trait-${idx}`,
-                    shouldHighlightGlossaryTerm
-                  )}
-                  {showAbilityJson ? (
-                    liveSnippetEditing && onTemplateSnippetCommit ? (
-                      <TemplateJsonSnippetEditor
-                        summaryLabel="JSON"
-                        value={trait}
-                        onValidCommit={(parsed) =>
-                          onTemplateSnippetCommit((base) => {
-                            if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return base;
-                            const traits = [...(base.traits ?? [])];
-                            traits[idx] = parsed as MonsterTrait;
-                            return { ...base, traits };
-                          })
-                        }
-                      />
-                    ) : (
-                      <TemplateJsonCollapsible summaryLabel="JSON" value={trait} />
-                    )
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
-
-      <MonsterPowersPanels
-        powers={record.powers ?? []}
-        startGlossaryHover={startGlossaryHover}
-        leaveGlossaryHover={leaveGlossaryHover}
-        shouldHighlightGlossaryTerm={shouldHighlightGlossaryTerm}
-        showJson={showAbilityJson}
-        livePowerJsonEditing={Boolean(liveSnippetEditing && onTemplateSnippetCommit)}
-        onPowerJsonCommit={
-          liveSnippetEditing && onTemplateSnippetCommit
-            ? (powerIndex, parsed) =>
-                onTemplateSnippetCommit((base) => {
-                  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return base;
-                  const powers = [...(base.powers ?? [])];
-                  powers[powerIndex] = parsed as MonsterPower;
-                  return { ...base, powers };
-                })
-            : undefined
-        }
-      />
     </div>
   );
 }
@@ -2306,6 +3040,7 @@ export function MonsterEditorApp({
   const [encounterNameEditKind, setEncounterNameEditKind] = useState<"new" | "rename">("rename");
   const [encounterNameEditValue, setEncounterNameEditValue] = useState("");
   const [encounterRosterPanelCollapsed, setEncounterRosterPanelCollapsed] = useState(false);
+  const [encounterRosterStatCardsExpandAll, setEncounterRosterStatCardsExpandAll] = useState(false);
   const [pinnedMonsterListColumnWidthPx, setPinnedMonsterListColumnWidthPx] = useState<number | null>(null);
   const [encounterRosterDraggingIndex, setEncounterRosterDraggingIndex] = useState<number | null>(null);
   const [encounterRosterDragOverIndex, setEncounterRosterDragOverIndex] = useState<number | null>(null);
@@ -2387,12 +3122,14 @@ export function MonsterEditorApp({
   useEffect(() => {
     setEncounterRosterDraggingIndex(null);
     setEncounterRosterDragOverIndex(null);
+    setEncounterRosterStatCardsExpandAll(false);
   }, [encounterStore.activeEncounterId]);
 
   useEffect(() => {
     if (encounterRosterPanelCollapsed) {
       setEncounterRosterDraggingIndex(null);
       setEncounterRosterDragOverIndex(null);
+      setEncounterRosterStatCardsExpandAll(false);
     }
   }, [encounterRosterPanelCollapsed]);
 
@@ -4379,310 +5116,120 @@ export function MonsterEditorApp({
                 const viewMonster = formatMonster!;
                 return (
                   <>
-              <div style={centerIdentityBlockStyle}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    justifyContent: "space-between",
-                    gap: "0.75rem",
-                    minWidth: 0
-                  }}
-                >
-                  <div
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  alignItems: "center",
+                  marginBottom: "0.45rem",
+                  gap: "0.5rem",
+                  minWidth: 0
+                }}
+              >
+                {viewerTab === "monsters" ? (
+                  <button
+                    type="button"
+                    disabled={!formatMonster || !selectedId || !encounterStore.activeEncounterId}
+                    title={
+                      !formatMonster || !selectedId
+                        ? "Select a monster and wait for the sheet to load"
+                        : "Adds the creature as shown (templates + level adjustment) to the encounter selected above"
+                    }
+                    onClick={() => {
+                      if (!formatMonster || !selectedId) return;
+                      const encLabel = encounterActive?.name?.trim() || "encounter";
+                      const templateDedupeKeys = templatePreviewIdxsToDedupeKeys(
+                        monsterTemplatePreviewIdxs,
+                        templateRows
+                      );
+                      setEncounterStore((prev) => {
+                        const targetId = prev.activeEncounterId;
+                        if (!targetId) return prev;
+                        const extras: EncounterSnapshotExtras = {};
+                        if (templateDedupeKeys.length > 0) extras.templateDedupeKeys = templateDedupeKeys;
+                        if (monsterLevelDelta !== 0) extras.levelAdjustment = monsterLevelDelta;
+                        return storeAddSnapshotToEncounter(
+                          prev,
+                          targetId,
+                          formatMonster,
+                          selectedId,
+                          Object.keys(extras).length > 0 ? extras : undefined
+                        );
+                      });
+                      setMessage(`Added “${formatMonster.name}” to encounter “${encLabel}”.`);
+                    }}
                     style={{
-                      ...centerIdentityTitleStyle,
-                      flex: "1 1 auto",
-                      minWidth: 0,
-                      overflowWrap: "anywhere"
+                      flexShrink: 0,
+                      marginLeft: "auto",
+                      alignSelf: "center"
                     }}
                   >
-                    <span>{viewMonster.name}</span>
-                    {viewMonster.alignment?.name ? (
-                      <>
-                        {" "}
-                        <span
-                          {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${viewMonster.alignment.name}`)}
-                          style={{
-                            cursor: "help",
-                            borderBottom: "1px dotted var(--text-muted)",
-                            fontWeight: 700,
-                            letterSpacing: "0.02em",
-                            color: "var(--text-primary)"
-                          }}
-                        >
-                          ({viewMonster.alignment.name})
-                        </span>
-                      </>
-                    ) : null}
+                    Add to encounter
+                  </button>
+                ) : null}
+              </div>
+              {isRenderableCardValue(viewMonster.tactics) ? (
+                <div style={centerSubsectionPanelStyle}>
+                  <h3 style={sectionTitleStyle}>Tactics</h3>
+                  <div style={{ ...richTextBodyPrimary.paragraphStyle, whiteSpace: "pre-wrap" }}>
+                    {renderGlossaryAwareText(
+                      String(viewMonster.tactics),
+                      commonDescriptiveGlossaryPhrases,
+                      startGlossaryHover,
+                      leaveGlossaryHover,
+                      "tactics",
+                      shouldHighlightGlossaryTerm
+                    )}
                   </div>
-                  {viewerTab === "monsters" ? (
-                    <button
-                      type="button"
-                      disabled={!formatMonster || !selectedId || !encounterStore.activeEncounterId}
-                      title={
-                        !formatMonster || !selectedId
-                          ? "Select a monster and wait for the sheet to load"
-                          : "Adds the creature as shown (templates + level adjustment) to the encounter selected above"
+                  {viewerTab === "createMonster" ? (
+                    <TemplateJsonSnippetEditor
+                      summaryLabel="JSON"
+                      value={viewMonster.tactics ?? ""}
+                      onValidCommit={(parsed) =>
+                        commitCreateMonsterDraftPatch((base) => {
+                          if (typeof parsed === "string") {
+                            return { ...base, tactics: parsed };
+                          }
+                          if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && "tactics" in parsed) {
+                            return { ...base, tactics: String((parsed as { tactics?: unknown }).tactics ?? "") };
+                          }
+                          return base;
+                        })
                       }
-                      onClick={() => {
-                        if (!formatMonster || !selectedId) return;
-                        const encLabel = encounterActive?.name?.trim() || "encounter";
-                        const templateDedupeKeys = templatePreviewIdxsToDedupeKeys(
-                          monsterTemplatePreviewIdxs,
-                          templateRows
-                        );
-                        setEncounterStore((prev) => {
-                          const targetId = prev.activeEncounterId;
-                          if (!targetId) return prev;
-                          const extras: EncounterSnapshotExtras = {};
-                          if (templateDedupeKeys.length > 0) extras.templateDedupeKeys = templateDedupeKeys;
-                          if (monsterLevelDelta !== 0) extras.levelAdjustment = monsterLevelDelta;
-                          return storeAddSnapshotToEncounter(
-                            prev,
-                            targetId,
-                            formatMonster,
-                            selectedId,
-                            Object.keys(extras).length > 0 ? extras : undefined
-                          );
-                        });
-                        setMessage(`Added “${formatMonster.name}” to encounter “${encLabel}”.`);
-                      }}
-                      style={{
-                        flexShrink: 0,
-                        marginLeft: "auto",
-                        alignSelf: "center"
-                      }}
-                    >
-                      Add to encounter
-                    </button>
+                    />
                   ) : null}
                 </div>
-                <div style={centerMetaLineStyle}>
-                  <span
-                    {...glossaryTooltipUi.hoverA11y("glossaryTerm:Level")}
-                    style={glossaryLinkUnderline}
-                  >
-                    Level
-                  </span>{" "}
-                  {formatValue(viewMonster.level)}
-                  {viewerTab === "monsters" && effectiveMonsterLevelDelta !== 0 && sheetMonster ? (
+              ) : null}
+              <MonsterStatBlockCard
+                monster={viewMonster}
+                statBlockKeyPrefix={`sheet-${selectedId ?? "monster"}`}
+                glossaryTooltipUi={glossaryTooltipUi}
+                startGlossaryHover={startGlossaryHover}
+                leaveGlossaryHover={leaveGlossaryHover}
+                shouldHighlightGlossaryTerm={shouldHighlightGlossaryTerm}
+                powersPresentation={viewerTab === "createMonster" ? "panel" : "statBlock"}
+                powersShowJson={viewerTab === "createMonster"}
+                livePowerJsonEditing={viewerTab === "createMonster"}
+                onPowerJsonCommit={
+                  viewerTab === "createMonster"
+                    ? (powerIndex, parsed) =>
+                        commitCreateMonsterDraftPatch((base) => {
+                          if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return base;
+                          const powers = [...(base.powers ?? [])];
+                          powers[powerIndex] = parsed as MonsterPower;
+                          return { ...base, powers };
+                        })
+                    : undefined
+                }
+                levelAnnotation={
+                  viewerTab === "monsters" && effectiveMonsterLevelDelta !== 0 && sheetMonster ? (
                     <span style={{ color: "var(--text-secondary)", fontSize: "0.85em", marginLeft: "0.28rem" }}>
                       (base {formatValue(sheetMonster.level)})
                     </span>
-                  ) : null}{" "}
-                  {isRenderableCardValue(viewMonster.groupRole) ? (
-                    <>
-                      <span
-                        {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${String(viewMonster.groupRole)}`)}
-                        style={glossaryLinkUnderline}
-                      >
-                        {String(viewMonster.groupRole)}
-                      </span>{" "}
-                    </>
-                  ) : null}
-                  <span
-                    {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${viewMonster.role || "Role"}`)}
-                    style={glossaryLinkUnderline}
-                  >
-                    {viewMonster.role || ""}
-                  </span>
-                </div>
-                <div style={centerMetaLineStyle}>
-                  <span
-                    {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${viewMonster.size || "Size"}`)}
-                    style={glossaryLinkUnderline}
-                  >
-                    {viewMonster.size || "Unknown size"}
-                  </span>{" "}
-                  <span style={centerBulletStyle} aria-hidden>
-                    •
-                  </span>{" "}
-                  <span
-                    {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${viewMonster.origin || "Origin"}`)}
-                    style={glossaryLinkUnderline}
-                  >
-                    {viewMonster.origin || "Unknown origin"}
-                  </span>{" "}
-                  <span style={centerBulletStyle} aria-hidden>
-                    •
-                  </span>{" "}
-                  <span
-                    {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${viewMonster.type || "Type"}`)}
-                    style={glossaryLinkUnderline}
-                  >
-                    {viewMonster.type || "Unknown type"}
-                  </span>{" "}
-                  {Array.isArray(viewMonster.keywords) && viewMonster.keywords.length > 0
-                    ? viewMonster.keywords.map((kw, idx) => (
-                        <span key={`monster-header-kw-${idx}-${String(kw)}`}>
-                          <span style={centerBulletStyle} aria-hidden>
-                            •
-                          </span>{" "}
-                          <span
-                            {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${String(kw)}`)}
-                            style={glossaryLinkUnderline}
-                          >
-                            {titleCaseWords(String(kw))}
-                          </span>{" "}
-                        </span>
-                      ))
-                    : null}
-                  <span style={centerBulletStyle} aria-hidden>
-                    •
-                  </span>{" "}
-                  <span
-                    {...glossaryTooltipUi.hoverA11y("glossaryTerm:Experience")}
-                    style={glossaryLinkUnderline}
-                  >
-                    XP
-                  </span>{" "}
-                  {formatValue(viewMonster.xp)}
-                </div>
-                {(() => {
-                  const on = (viewMonster.stats?.otherNumbers ?? {}) as Record<string, unknown>;
-                  const skillsBlock = (viewMonster.stats?.skills ?? {}) as Record<string, unknown>;
-                  const pick = (candidates: string[]): string => {
-                    const lower = new Map(Object.entries(on).map(([k, v]) => [k.toLowerCase(), v]));
-                    for (const c of candidates) {
-                      const v = lower.get(c.toLowerCase());
-                      if (v !== undefined && v !== null && String(v).trim() !== "") {
-                        return formatValue(v as string | number | boolean | undefined | null);
-                      }
-                    }
-                    return "-";
-                  };
-                  const initiative = pick(["initiative"]);
-                  const hitPoints = pick(["hp", "hitPoints", "hit points"]);
-                  const perceptionFromSkills = pickFromStatBlock(skillsBlock, ["perception"]);
-                  const perception =
-                    perceptionFromSkills !== "-" ? perceptionFromSkills : pick(["perception"]);
-                  const actionPts = pick(["actionPoints", "action points"]);
-                  const saves = pick(["savingThrows", "saving throws"]);
-                  const defensesBlock = (viewMonster.stats?.defenses ?? {}) as Record<string, unknown>;
-                  const pickDefense = (candidates: string[]): string => {
-                    const lower = new Map(Object.entries(defensesBlock).map(([k, v]) => [k.toLowerCase(), v]));
-                    for (const c of candidates) {
-                      const v = lower.get(c.toLowerCase());
-                      if (v !== undefined && v !== null && String(v).trim() !== "") {
-                        return formatValue(v as string | number | boolean | undefined | null);
-                      }
-                    }
-                    return "-";
-                  };
-                  const ac = pickDefense(["ac", "AC"]);
-                  const fortitude = pickDefense(["fortitude", "Fortitude"]);
-                  const reflex = pickDefense(["reflex", "Reflex"]);
-                  const will = pickDefense(["will", "Will"]);
-                  const regenerationRaw = viewMonster.regeneration;
-                  let regenerationVal: string | null = null;
-                  if (regenerationRaw !== undefined && regenerationRaw !== null && String(regenerationRaw).trim() !== "") {
-                    const numeric =
-                      typeof regenerationRaw === "number"
-                        ? regenerationRaw
-                        : Number(String(regenerationRaw).replace(/,/g, "").trim());
-                    const include =
-                      Number.isFinite(numeric) ? numeric !== 0 : true;
-                    if (include) {
-                      regenerationVal = formatValue(
-                        regenerationRaw as string | number | boolean | undefined | null
-                      );
-                    }
-                  }
-                  type QuickStatRow = { label: string; glossary: MonsterGlossaryHoverKey; val: string };
-                  const col1: QuickStatRow[] = [];
-                  const col2: QuickStatRow[] = [];
-                  const col3: QuickStatRow[] = [];
-                  if (hitPoints !== "-") {
-                    col1.push({ label: "Hit Points", glossary: "glossaryTerm:Hit Points", val: hitPoints });
-                  }
-                  if (initiative !== "-") {
-                    col1.push({
-                      label: "Initiative",
-                      glossary: "glossaryTerm:Initiative",
-                      val: formatLeadingPlusIfPositive(initiative)
-                    });
-                  }
-                  if (perception !== "-") {
-                    col1.push({
-                      label: "Perception",
-                      glossary: "glossaryTerm:Perception",
-                      val: formatLeadingPlusIfPositive(perception)
-                    });
-                  }
-                  const standardQuickDefenseKeys = new Set(["ac", "fortitude", "reflex", "will"]);
-                  if (ac !== "-") col2.push({ label: "AC", glossary: "glossaryTerm:AC", val: ac });
-                  if (fortitude !== "-") {
-                    col2.push({ label: "Fortitude", glossary: "glossaryTerm:Fortitude", val: fortitude });
-                  }
-                  if (reflex !== "-") col2.push({ label: "Reflex", glossary: "glossaryTerm:Reflex", val: reflex });
-                  if (will !== "-") col2.push({ label: "Will", glossary: "glossaryTerm:Will", val: will });
-                  for (const [defKey, rawVal] of Object.entries(defensesBlock)) {
-                    if (standardQuickDefenseKeys.has(defKey.trim().toLowerCase())) continue;
-                    if (rawVal === undefined || rawVal === null || String(rawVal).trim() === "") continue;
-                    const formatted = formatValue(
-                      rawVal as string | number | boolean | undefined | null
-                    );
-                    if (formatted === "-") continue;
-                    const defenseLabel =
-                      /\s/.test(defKey) || defKey.includes("_")
-                        ? titleCaseWords(defKey.replace(/_/g, " "))
-                        : formatMonsterStatLabelForDisplay(defKey);
-                    col2.push({
-                      label: defenseLabel,
-                      glossary: "glossaryTerm:Defenses",
-                      val: formatLeadingPlusIfPositive(formatted)
-                    });
-                  }
-                  if (regenerationVal !== null) {
-                    col3.push({
-                      label: "Regeneration",
-                      glossary: "glossaryTerm:Regeneration",
-                      val: regenerationVal
-                    });
-                  }
-                  if (includeUnlessZeroNumeric(actionPts)) {
-                    col3.push({ label: "Action Points", glossary: "glossaryTerm:Action Points", val: actionPts });
-                  }
-                  if (includeUnlessZeroNumeric(saves)) {
-                    col3.push({
-                      label: "Saving Throws",
-                      glossary: "glossaryTerm:Saving Throws",
-                      val: formatLeadingPlusIfPositive(saves)
-                    });
-                  }
-                  if (col1.length === 0 && col2.length === 0 && col3.length === 0) return null;
-                  const renderQuickStatColumn = (rows: QuickStatRow[], colKey: string) => (
-                    <div key={colKey} style={centerQuickStatsColumnGridStyle}>
-                      {rows.flatMap((r) => [
-                        <span
-                          key={`${colKey}-${r.label}-l`}
-                          {...glossaryTooltipUi.hoverA11y(r.glossary)}
-                          style={{
-                            ...microLabelStyle,
-                            cursor: "help",
-                            borderBottom: "1px dotted var(--text-muted)",
-                            width: "fit-content",
-                            alignSelf: "center"
-                          }}
-                        >
-                          {r.label}
-                        </span>,
-                        <span key={`${colKey}-${r.label}-v`} style={centerQuickStatValueStyle}>
-                          {r.val}
-                        </span>
-                      ])}
-                    </div>
-                  );
-                  return (
-                    <div style={centerQuickStatsThreeColumnsStyle}>
-                      {renderQuickStatColumn(col1, "c1")}
-                      {renderQuickStatColumn(col2, "c2")}
-                      {renderQuickStatColumn(col3, "c3")}
-                    </div>
-                  );
-                })()}
-              </div>
+                  ) : undefined
+                }
+                cardExtraClassName="monster-stat-block-card--sheet"
+              />
 
               {viewerTab === "createMonster" ? (
                 <TemplateJsonSnippetEditor
@@ -4733,193 +5280,6 @@ export function MonsterEditorApp({
                 />
               ) : null}
 
-              {(() => {
-                const movementEntries = extractMovementEntries(viewMonster);
-                const showPhasing = viewMonster.phasing === true;
-                const otherNumbers = viewMonster.stats?.otherNumbers ?? {};
-                const otherMap = otherNumbers as Record<string, unknown>;
-                const skillsMap = (viewMonster.stats?.skills ?? {}) as Record<string, unknown>;
-                const bloodied = formatValue(otherMap.bloodied as string | number | boolean | undefined | null);
-                const initiativeFlow = pickFromStatBlock(otherMap, ["initiative"]);
-                const perceptionFromSkillsFlow = pickFromStatBlock(skillsMap, ["perception"]);
-                const perceptionFlow =
-                  perceptionFromSkillsFlow !== "-"
-                    ? perceptionFromSkillsFlow
-                    : pickFromStatBlock(otherMap, ["perception"]);
-                return (
-                  <>
-                    <div style={centerStatFlowSectionStyle}>
-                      {bloodied !== "-" ? (
-                        <div style={centerFlowLineStyle}>
-                          <strong style={centerFlowLabelStrongStyle}>Bloodied:</strong>
-                          {bloodied}
-                        </div>
-                      ) : null}
-                      {initiativeFlow !== "-" ? (
-                        <div style={centerFlowLineStyle}>
-                          <strong style={centerFlowLabelStrongStyle}>Initiative:</strong>{" "}
-                          {formatLeadingPlusIfPositive(initiativeFlow)}
-                        </div>
-                      ) : null}
-                      {perceptionFlow !== "-" ? (
-                        <div style={centerFlowLineStyle}>
-                          <strong style={centerFlowLabelStrongStyle}>Perception:</strong>{" "}
-                          {formatLeadingPlusIfPositive(perceptionFlow)}
-                        </div>
-                      ) : null}
-                      {(movementEntries.length > 0 || showPhasing) ? (
-                        <div style={centerFlowLineStyle}>
-                          <strong style={centerFlowLabelStrongStyle}>Movement:</strong>{" "}
-                          {movementEntries.length > 0
-                            ? movementEntries.map((entry, idx) => (
-                                <span key={`flow-mv-${idx}-${entry.type}`}>
-                                  {idx > 0 ? ", " : null}
-                                  <span
-                                    {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${entry.type}`)}
-                                    style={glossaryLinkUnderline}
-                                  >
-                                    {entry.type}
-                                  </span>{" "}
-                                  {String(entry.value)}
-                                </span>
-                              ))
-                            : null}
-                          {showPhasing ? (
-                            <>
-                              {movementEntries.length > 0 ? "; " : null}
-                              <span {...glossaryTooltipUi.hoverA11y("glossaryTerm:Phasing")} style={glossaryLinkUnderline}>
-                                Phasing
-                              </span>
-                            </>
-                          ) : null}
-                        </div>
-                      ) : null}
-                      {(Array.isArray(viewMonster.immunities) && viewMonster.immunities.length > 0) ? (
-                        <div style={centerFlowLineStyle}>
-                          <strong style={centerFlowLabelStrongStyle}>Immunities:</strong>{" "}
-                          {(() => {
-                            const segments: string[] = [];
-                            for (const imm of viewMonster.immunities ?? []) {
-                              segments.push(...splitCommaListSegments(String(imm ?? "")));
-                            }
-                            return segments.map((text, idx) => (
-                              <span key={`flow-imm-${idx}`}>
-                                {idx > 0 ? ", " : null}
-                                {immunitySegmentEligibleForGlossaryHover(text) ? (
-                                  <span
-                                    {...glossaryTooltipUi.hoverA11y(buildGlossaryHoverKeyForTerm(text))}
-                                    style={glossaryLinkUnderline}
-                                  >
-                                    {text}
-                                  </span>
-                                ) : (
-                                  <span>{text}</span>
-                                )}
-                              </span>
-                            ));
-                          })()}
-                        </div>
-                      ) : null}
-                      {(Array.isArray(viewMonster.resistances) && viewMonster.resistances.length > 0) ? (
-                        <div style={centerFlowLineStyle}>
-                          <strong style={centerFlowLabelStrongStyle}>Resistances:</strong>{" "}
-                          {viewMonster.resistances.map((resistance, idx) => {
-                            const r = resistance as Record<string, unknown>;
-                            const name = String(r.name ?? "").trim();
-                            const rawAmount = r.amount;
-                            const amount = typeof rawAmount === "number" ? rawAmount : Number(rawAmount);
-                            const amountPart = Number.isFinite(amount) && amount !== 0 ? `${amount} ` : "";
-                            const detailsPart = String(r.details ?? "").trim();
-                            return (
-                              <span key={`flow-res-${idx}`}>
-                                {idx > 0 ? ", " : null}
-                                {amountPart}
-                                {name ? (
-                                  <span
-                                    {...glossaryTooltipUi.hoverA11y(buildGlossaryHoverKeyForTerm(name, { tryDamageTypeEntry: true }))}
-                                    style={glossaryLinkUnderline}
-                                  >
-                                    {name}
-                                  </span>
-                                ) : (
-                                  weaknessLine(r)
-                                )}
-                                {detailsPart ? ` ${detailsPart}` : ""}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      ) : null}
-                      {(() => {
-                        const entries =
-                          Array.isArray(viewMonster.senses) && viewMonster.senses.length > 0
-                            ? viewMonster.senses
-                                .map((sense) => {
-                                  const name = String(sense.name ?? "").trim();
-                                  if (!name) return null;
-                                  const displayName = name.charAt(0).toUpperCase() + name.slice(1);
-                                  const normalizedRange = String(sense.range ?? "").trim();
-                                  const rangePart =
-                                    normalizedRange !== "" && normalizedRange !== "0"
-                                      ? normalizedRange
-                                      : "";
-                                  return { name, displayName, rangePart };
-                                })
-                                .filter(
-                                  (e): e is { name: string; displayName: string; rangePart: string } =>
-                                    e !== null
-                                )
-                            : [];
-                        if (entries.length === 0) return null;
-                        return (
-                          <div style={centerFlowLineStyle}>
-                            <strong style={centerFlowLabelStrongStyle}>Senses:</strong>{" "}
-                            {entries.map((entry, idx) => (
-                              <span key={`flow-sense-${idx}-${entry.name}`}>
-                                {idx > 0 ? ", " : null}
-                                <span
-                                  {...glossaryTooltipUi.hoverA11y(buildGlossaryHoverKeyForTerm(entry.name, { tryTitleCaseVariant: true }))}
-                                  style={glossaryLinkUnderline}
-                                >
-                                  {entry.displayName}
-                                </span>
-                                {entry.rangePart ? ` ${entry.rangePart}` : null}
-                              </span>
-                            ))}
-                          </div>
-                        );
-                      })()}
-                      {(Array.isArray(viewMonster.weaknesses) && viewMonster.weaknesses.length > 0) ? (
-                        <div style={centerFlowLineStyle}>
-                          <strong style={centerFlowLabelStrongStyle}>Vulnerabilities:</strong>{" "}
-                          {viewMonster.weaknesses.map((weakness, idx) => {
-                            const w = weakness as Record<string, unknown>;
-                            const name = String(w.name ?? "").trim();
-                            const rawAmount = w.amount;
-                            const amount = typeof rawAmount === "number" ? rawAmount : Number(rawAmount);
-                            const amountPart = Number.isFinite(amount) && amount !== 0 ? `${amount} ` : "";
-                            const detailsPart = String(w.details ?? "").trim();
-                            return (
-                              <span key={`flow-weak-${idx}`}>
-                                {idx > 0 ? ", " : null}
-                                {amountPart}
-                                {name ? (
-                                  <span
-                                    {...glossaryTooltipUi.hoverA11y(buildGlossaryHoverKeyForTerm(name, { tryDamageTypeEntry: true }))}
-                                    style={glossaryLinkUnderline}
-                                  >
-                                    {name}
-                                  </span>
-                                ) : (
-                                  weaknessLine(w)
-                                )}
-                                {detailsPart ? ` ${detailsPart}` : ""}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      ) : null}
-                    </div>
                     {viewerTab === "createMonster" ? (
                       <TemplateJsonSnippetEditor
                         summaryLabel="JSON (defenses, senses, languages)"
@@ -4938,569 +5298,23 @@ export function MonsterEditorApp({
                         }
                       />
                     ) : null}
-                    <details style={centerDetailsBlockStyle}>
-                      <summary style={detailsSummaryStyle}>Detailed Stats</summary>
-                      <div style={{ marginTop: "0.5rem", display: "grid", gap: "0.4rem" }}>
-                        {Object.entries(viewMonster.stats)
-                          .filter(
-                            ([label]) =>
-                              label !== "attackBonuses" && label !== "otherNumbers" && label !== "defenses"
-                          )
-                          .sort(([labelA], [labelB]) => {
-                            const orderA = statsDisplayOrder(labelA);
-                            const orderB = statsDisplayOrder(labelB);
-                            if (orderA !== orderB) return orderA - orderB;
-                            return 0;
-                          })
-                          .map(([label, block]) => (
-                            <div key={label} style={statPanelStyle}>
-                              <h3 style={sectionTitleStyle}>{formatMonsterStatLabelForDisplay(label)}</h3>
-                              <div
-                                style={{
-                                  marginTop: "0.4rem",
-                                  fontSize: "0.8125rem",
-                                  lineHeight: 1.45,
-                                  color: "var(--text-secondary)",
-                                  display: "grid",
-                                  gap: "0.22rem"
-                                }}
-                              >
-                                {Object.keys(block).filter((k) => !(label === "otherNumbers" && k === "movement")).length === 0
-                                  ? "No values"
-                                  : Object.entries(block)
-                                      .filter(([k]) => !(label === "otherNumbers" && k === "movement"))
-                                      .map(([k, v], idx) => (
-                                        <div
-                                          key={k}
-                                          style={{
-                                            display: "grid",
-                                            gridTemplateColumns: "1fr auto",
-                                            alignItems: "center",
-                                            columnGap: "0.5rem",
-                                            fontVariantNumeric: "tabular-nums",
-                                            padding: "0.28rem 0.4rem",
-                                            borderRadius: "0.25rem",
-                                            backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)"
-                                          }}
-                                        >
-                                          <span
-                                            onMouseEnter={(event) =>
-                                              startGlossaryHover(event, `glossaryTerm:${monsterStatGlossaryTermForKey(k)}`)
-                                            }
-                                            onMouseLeave={leaveGlossaryHover}
-                                            style={{
-                                              cursor: "help",
-                                              borderBottom: "1px dotted var(--text-muted)",
-                                              color: "var(--text-primary)",
-                                              fontWeight: 600,
-                                              width: "fit-content"
-                                            }}
-                                          >
-                                            {formatMonsterStatLabelForDisplay(k)}
-                                          </span>
-                                          {renderStatValue(v, startGlossaryHover, leaveGlossaryHover)}
-                                        </div>
-                                      ))}
-                              </div>
-                            </div>
-                          ))}
-                        {Array.isArray(viewMonster.languages) && viewMonster.languages.length > 0 ? (
-                          <div style={statPanelStyle}>
-                            <h3 style={sectionTitleStyle}>Languages</h3>
-                            <div
-                              style={{
-                                marginTop: "0.4rem",
-                                fontSize: "0.8125rem",
-                                lineHeight: 1.45,
-                                color: "var(--text-secondary)"
-                              }}
-                            >
-                              {renderTagList(viewMonster.languages)}
-                            </div>
-                          </div>
-                        ) : null}
-                        {Array.isArray(viewMonster.sourceBooks) && viewMonster.sourceBooks.length > 0 ? (
-                          <div style={statPanelStyle}>
-                            <h3 style={sectionTitleStyle}>Sources</h3>
-                            <div
-                              style={{
-                                marginTop: "0.4rem",
-                                fontSize: "0.8125rem",
-                                lineHeight: 1.45,
-                                color: "var(--text-secondary)"
-                              }}
-                            >
-                              {viewMonster.sourceBooks.join(", ")}
-                            </div>
-                          </div>
-                        ) : null}
-                      </div>
-                    </details>
-                  </>
-                );
-              })()}
 
-              {isRenderableCardValue(viewMonster.tactics) ? (
+              {Array.isArray(viewMonster.sourceBooks) && viewMonster.sourceBooks.length > 0 ? (
                 <div style={centerSubsectionPanelStyle}>
-                  <h3 style={sectionTitleStyle}>Tactics</h3>
-                  <div style={{ ...richTextBodyPrimary.paragraphStyle, whiteSpace: "pre-wrap" }}>
-                    {renderGlossaryAwareText(
-                      String(viewMonster.tactics),
-                      commonDescriptiveGlossaryPhrases,
-                      startGlossaryHover,
-                      leaveGlossaryHover,
-                      "tactics",
-                      shouldHighlightGlossaryTerm
-                    )}
-                  </div>
-                  {viewerTab === "createMonster" ? (
-                    <TemplateJsonSnippetEditor
-                      summaryLabel="JSON"
-                      value={viewMonster.tactics ?? ""}
-                      onValidCommit={(parsed) =>
-                        commitCreateMonsterDraftPatch((base) => {
-                          if (typeof parsed === "string") {
-                            return { ...base, tactics: parsed };
-                          }
-                          if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && "tactics" in parsed) {
-                            return { ...base, tactics: String((parsed as { tactics?: unknown }).tactics ?? "") };
-                          }
-                          return base;
-                        })
-                      }
-                    />
-                  ) : null}
-                </div>
-              ) : null}
-
-              {displayedAuras.length > 0 ? (
-                <div style={centerSubsectionPanelStyle}>
-                  <h3 style={sectionTitleStyle}>Auras</h3>
-                  <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.2rem" }}>
-                    {displayedAuras.map((aura, idx) => (
-                      <div
-                        key={`aura-${idx}`}
-                        style={{
-                          ...bodyPrimary,
-                          display: "grid",
-                          gap: "0.2rem",
-                          padding: "0.22rem 0.35rem",
-                          borderRadius: "0.25rem",
-                          backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)"
-                        }}
-                      >
-                        <div>
-                          {(() => {
-                            const name = String(aura.name ?? "").trim();
-                            const details = String(aura.details ?? "").trim();
-                            const rangeValue = aura.range;
-                            const rangeText =
-                              rangeValue !== undefined && rangeValue !== null && String(rangeValue).trim() !== ""
-                                ? `Range ${String(rangeValue).trim()}`
-                                : "";
-                            const detailParts = splitByGlossaryPhrases(details, traitDetailGlossaryPhrases);
-                            const badges = renderTraitMetaBadges(aura);
-                            const stripeColor = idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)";
-                            return (
-                              <div
-                                style={{
-                                  display: "grid",
-                                  gridTemplateColumns: auraHasAnyTags
-                                    ? `minmax(10rem, ${auraHeadingColumnWidthCh}ch) 1px max-content 1px minmax(0, 1fr)`
-                                    : `minmax(10rem, ${auraHeadingColumnWidthCh}ch) 1px minmax(0, 1fr)`,
-                                  columnGap: "0.18rem",
-                                  alignItems: "start"
-                                }}
-                              >
-                                <span
-                                  style={{
-                                    padding: "0.2rem 0.35rem",
-                                    borderRadius: "0.25rem",
-                                    backgroundColor: stripeColor,
-                                    fontWeight: 600,
-                                    lineHeight: 1.25
-                                  }}
-                                >
-                                  <div style={{ display: "grid", gap: "0.08rem" }}>
-                                    <strong>{name || "Aura"}</strong>
-                                    {rangeText ? (
-                                      <span
-                                        onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:range")}
-                                        onMouseLeave={leaveGlossaryHover}
-                                        style={{
-                                          color: "var(--text-secondary)",
-                                          fontSize: "0.76rem",
-                                          fontWeight: 600,
-                                          width: "fit-content",
-                                          ...(shouldHighlightGlossaryTerm("range") ? glossaryLinkUnderline : {})
-                                        }}
-                                      >
-                                        {rangeText}
-                                      </span>
-                                    ) : null}
-                                  </div>
-                                </span>
-                                <span
-                                  aria-hidden="true"
-                                  style={{
-                                    alignSelf: "stretch",
-                                    justifySelf: "center",
-                                    width: "1px",
-                                    backgroundColor: "var(--panel-border)"
-                                  }}
-                                />
-                                {auraHasAnyTags ? (
-                                  <>
-                                    <span style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem", paddingTop: "0.12rem" }}>
-                                      {badges.length > 0
-                                        ? badges.map((badge) =>
-                                        shouldHighlightGlossaryTerm(badge) ? (
-                                          <span
-                                            key={`aura-${idx}-${badge}`}
-                                            onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${badge}`)}
-                                            onMouseLeave={leaveGlossaryHover}
-                                            style={sheetTagPillStyle}
-                                          >
-                                            {badge}
-                                          </span>
-                                        ) : (
-                                          <span key={`aura-${idx}-${badge}`} style={{ ...sheetTagPillStyle, cursor: "default" }}>
-                                            {badge}
-                                          </span>
-                                        )
-                                      )
-                                        : null}
-                                    </span>
-                                    <span
-                                      aria-hidden="true"
-                                      style={{
-                                        alignSelf: "stretch",
-                                        justifySelf: "center",
-                                        width: "1px",
-                                        backgroundColor: "var(--panel-border)"
-                                      }}
-                                    />
-                                  </>
-                                ) : null}
-                                <span
-                                  style={{
-                                    padding: "0.2rem 0.32rem",
-                                    borderRadius: "0.25rem",
-                                    backgroundColor: stripeColor,
-                                    minHeight: "1.5rem",
-                                    lineHeight: 1.25
-                                  }}
-                                >
-                                  {detailParts.map((part, partIdx) =>
-                                    part.glossaryTerm && shouldHighlightGlossaryTerm(part.glossaryTerm) ? (
-                                      <span
-                                        key={`aura-${idx}-detail-${partIdx}`}
-                                        onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${part.glossaryTerm}`)}
-                                        onMouseLeave={leaveGlossaryHover}
-                                        style={glossaryLinkUnderline}
-                                      >
-                                        {part.text}
-                                      </span>
-                                    ) : (
-                                      <span key={`aura-${idx}-detail-${partIdx}`}>{part.text}</span>
-                                    )
-                                  )}
-                                </span>
-                              </div>
-                            );
-                          })()}
-                        </div>
-                        {viewerTab === "createMonster" ? (
-                          <TemplateJsonSnippetEditor
-                            summaryLabel="JSON"
-                            value={aura}
-                            onValidCommit={(parsed) =>
-                              commitCreateMonsterDraftPatch((base) => {
-                                if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return base;
-                                const auras = [...(base.auras ?? [])];
-                                auras[idx] = parsed as MonsterTrait;
-                                return { ...base, auras };
-                              })
-                            }
-                          />
-                        ) : null}
-                      </div>
-                    ))}
+                  <h3 style={sectionTitleStyle}>Sources</h3>
+                  <div
+                    style={{
+                      marginTop: "0.35rem",
+                      fontSize: "0.8125rem",
+                      lineHeight: 1.45,
+                      color: "var(--text-secondary)"
+                    }}
+                  >
+                    {viewMonster.sourceBooks.join(", ")}
                   </div>
                 </div>
               ) : null}
 
-              {displayedTraits.length > 0 ? (
-                <div style={centerSubsectionPanelStyle}>
-                  <h3 style={sectionTitleStyle}>Traits</h3>
-                  <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.2rem" }}>
-                    {(() => {
-                      const normalizeTraitSig = (value: unknown): string =>
-                        String(value ?? "").trim().toLowerCase();
-                      const auraSignaturesForTraits = new Set(
-                        displayedAuras.map((aura) =>
-                          [
-                            normalizeTraitSig(aura.name),
-                            normalizeTraitSig(aura.range),
-                            normalizeTraitSig(aura.details)
-                          ].join("||")
-                        )
-                      );
-                      const traitsToShow = (viewMonster.traits ?? [])
-                        .map((trait, sourceIndex) => ({ trait, sourceIndex }))
-                        .filter(({ trait }) => {
-                          const signature = [
-                            normalizeTraitSig(trait.name),
-                            normalizeTraitSig(trait.range),
-                            normalizeTraitSig(trait.details)
-                          ].join("||");
-                          return !auraSignaturesForTraits.has(signature);
-                        });
-                      return traitsToShow.map(({ trait, sourceIndex }, idx) => (
-                      <div
-                        key={`trait-${sourceIndex}`}
-                        style={{
-                          ...bodyPrimary,
-                          display: "grid",
-                          gap: "0.2rem",
-                          padding: "0.22rem 0.35rem",
-                          borderRadius: "0.25rem",
-                          backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)"
-                        }}
-                      >
-                        <div>
-                          {(() => {
-                            const name = String(trait.name ?? "").trim();
-                            const details = String(trait.details ?? "").trim();
-                            const rangeValue = trait.range;
-                            const rangeText = shouldShowTraitRangeLabel(rangeValue)
-                              ? `Range ${String(rangeValue).trim()}`
-                              : "";
-                            const detailParts = splitByGlossaryPhrases(details, traitDetailGlossaryPhrases);
-                            const badges = renderTraitMetaBadges(trait);
-                            const stripeColor = idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)";
-                            return (
-                              <div
-                                style={{
-                                  display: "grid",
-                                  gridTemplateColumns: traitHasAnyTags
-                                    ? `minmax(10rem, ${traitHeadingColumnWidthCh}ch) 1px max-content 1px minmax(0, 1fr)`
-                                    : `minmax(10rem, ${traitHeadingColumnWidthCh}ch) 1px minmax(0, 1fr)`,
-                                  columnGap: "0.18rem",
-                                  alignItems: "start"
-                                }}
-                              >
-                                <span
-                                  style={{
-                                    padding: "0.2rem 0.35rem",
-                                    borderRadius: "0.25rem",
-                                    backgroundColor: stripeColor,
-                                    fontWeight: 600,
-                                    lineHeight: 1.25
-                                  }}
-                                >
-                                  <div style={{ display: "grid", gap: "0.08rem" }}>
-                                    <strong>{name || "Trait"}</strong>
-                                    {rangeText ? (
-                                      <span
-                                        onMouseEnter={(event) => startGlossaryHover(event, "glossaryTerm:range")}
-                                        onMouseLeave={leaveGlossaryHover}
-                                        style={{
-                                          color: "var(--text-secondary)",
-                                          fontSize: "0.76rem",
-                                          fontWeight: 600,
-                                          width: "fit-content",
-                                          ...(shouldHighlightGlossaryTerm("range") ? glossaryLinkUnderline : {})
-                                        }}
-                                      >
-                                        {rangeText}
-                                      </span>
-                                    ) : null}
-                                  </div>
-                                </span>
-                                <span
-                                  aria-hidden="true"
-                                  style={{
-                                    alignSelf: "stretch",
-                                    justifySelf: "center",
-                                    width: "1px",
-                                    backgroundColor: "var(--panel-border)"
-                                  }}
-                                />
-                                {traitHasAnyTags ? (
-                                  <>
-                                    <span style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem", paddingTop: "0.12rem" }}>
-                                      {badges.length > 0
-                                        ? badges.map((badge) =>
-                                        shouldHighlightGlossaryTerm(badge) ? (
-                                          <span
-                                            key={`trait-${idx}-${badge}`}
-                                            onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${badge}`)}
-                                            onMouseLeave={leaveGlossaryHover}
-                                            style={sheetTagPillStyle}
-                                          >
-                                            {badge}
-                                          </span>
-                                        ) : (
-                                          <span key={`trait-${idx}-${badge}`} style={{ ...sheetTagPillStyle, cursor: "default" }}>
-                                            {badge}
-                                          </span>
-                                        )
-                                      )
-                                        : null}
-                                    </span>
-                                    <span
-                                      aria-hidden="true"
-                                      style={{
-                                        alignSelf: "stretch",
-                                        justifySelf: "center",
-                                        width: "1px",
-                                        backgroundColor: "var(--panel-border)"
-                                      }}
-                                    />
-                                  </>
-                                ) : null}
-                                <span
-                                  style={{
-                                    padding: "0.2rem 0.32rem",
-                                    borderRadius: "0.25rem",
-                                    backgroundColor: stripeColor,
-                                    minHeight: "1.5rem",
-                                    lineHeight: 1.25
-                                  }}
-                                >
-                                  {detailParts.map((part, partIdx) =>
-                                    part.glossaryTerm && shouldHighlightGlossaryTerm(part.glossaryTerm) ? (
-                                      <span
-                                        key={`trait-${idx}-detail-${partIdx}`}
-                                        onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${part.glossaryTerm}`)}
-                                        onMouseLeave={leaveGlossaryHover}
-                                        style={glossaryLinkUnderline}
-                                      >
-                                        {part.text}
-                                      </span>
-                                    ) : (
-                                      <span key={`trait-${idx}-detail-${partIdx}`}>{part.text}</span>
-                                    )
-                                  )}
-                                </span>
-                              </div>
-                            );
-                          })()}
-                        </div>
-                        {viewerTab === "createMonster" ? (
-                          <TemplateJsonSnippetEditor
-                            summaryLabel="JSON"
-                            value={trait}
-                            onValidCommit={(parsed) =>
-                              commitCreateMonsterDraftPatch((base) => {
-                                if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return base;
-                                const traits = [...(base.traits ?? [])];
-                                traits[sourceIndex] = parsed as MonsterTrait;
-                                return { ...base, traits };
-                              })
-                            }
-                          />
-                        ) : null}
-                      </div>
-                    ));
-                    })()}
-                  </div>
-                </div>
-              ) : null}
-
-              {(() => {
-                const rawItems = viewMonster.items ?? [];
-                const hasVisible = rawItems.some((raw) => Object.keys(sectionObject(raw)).length > 0);
-                if (!hasVisible) return null;
-                return (
-                  <div style={centerSubsectionPanelStyle}>
-                    <h3 style={sectionTitleStyle}>Items</h3>
-                    <div style={{ marginTop: "0.4rem", display: "grid", gap: "0.35rem" }}>
-                      {rawItems.flatMap((rawItem, sourceIndex) => {
-                        const item = sectionObject(rawItem);
-                        if (Object.keys(item).length === 0) return [];
-                        const quantity = item.quantity;
-                        const name = String(item.name ?? "").trim();
-                        const description = String(item.description ?? "").trim();
-                        return [
-                          <div
-                            key={`item-${sourceIndex}`}
-                            style={{
-                              border: "1px solid var(--panel-border)",
-                              borderRadius: "0.3rem",
-                              padding: "0.4rem",
-                              backgroundColor: "var(--surface-1)"
-                            }}
-                          >
-                            <div style={bodyPrimary}>
-                              <strong>{name || "Item"}</strong>
-                              {quantity !== undefined && quantity !== null && quantity !== "" ? ` x${quantity}` : ""}
-                            </div>
-                            {isRenderableCardValue(description) ? (
-                              <details style={{ marginTop: "0.22rem" }}>
-                                <summary style={detailsSummaryStyle}>Description</summary>
-                                <div
-                                  style={{
-                                    fontSize: "0.8rem",
-                                    color: "var(--text-primary)",
-                                    margin: "0.24rem 0 0 0",
-                                    whiteSpace: "pre-wrap"
-                                  }}
-                                >
-                                  {renderGlossaryAwareText(
-                                    description,
-                                    commonDescriptiveGlossaryPhrases,
-                                    startGlossaryHover,
-                                    leaveGlossaryHover,
-                                    `item-${sourceIndex}-description`,
-                                    shouldHighlightGlossaryTerm
-                                  )}
-                                </div>
-                              </details>
-                            ) : null}
-                            {viewerTab === "createMonster" ? (
-                              <TemplateJsonSnippetEditor
-                                summaryLabel="JSON"
-                                value={rawItem}
-                                onValidCommit={(parsed) =>
-                                  commitCreateMonsterDraftPatch((base) => {
-                                    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return base;
-                                    const itemsNext = [...(base.items ?? [])];
-                                    itemsNext[sourceIndex] =
-                                      parsed as NonNullable<MonsterEntryFile["items"]>[number];
-                                    return { ...base, items: itemsNext };
-                                  })
-                                }
-                              />
-                            ) : null}
-                          </div>
-                        ];
-                      })}
-                    </div>
-                  </div>
-                );
-              })()}
-
-              <MonsterPowersPanels
-                powers={viewMonster.powers}
-                startGlossaryHover={startGlossaryHover}
-                leaveGlossaryHover={leaveGlossaryHover}
-                shouldHighlightGlossaryTerm={shouldHighlightGlossaryTerm}
-                showJson={viewerTab === "createMonster"}
-                livePowerJsonEditing={viewerTab === "createMonster"}
-                onPowerJsonCommit={
-                  viewerTab === "createMonster"
-                    ? (powerIndex, parsed) =>
-                        commitCreateMonsterDraftPatch((base) => {
-                          if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return base;
-                          const powers = [...(base.powers ?? [])];
-                          powers[powerIndex] = parsed as MonsterPower;
-                          return { ...base, powers };
-                        })
-                    : undefined
-                }
-              />
                   </>
                 );
               })()}
@@ -5687,6 +5501,40 @@ export function MonsterEditorApp({
                         </button>
                       </div>
                     )}
+                    {encounterActive && encounterRoster.length > 0 ? (
+                      <div
+                        style={{
+                          flexShrink: 0,
+                          display: "flex",
+                          justifyContent: "flex-end",
+                          margin: "0 0 0.35rem 0",
+                          minWidth: 0
+                        }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setEncounterRosterStatCardsExpandAll((prev) => !prev)}
+                          aria-pressed={encounterRosterStatCardsExpandAll}
+                          title={
+                            encounterRosterStatCardsExpandAll
+                              ? "Show name strips only; hover a row to open its stat block"
+                              : "Open every creature stat block on this roster"
+                          }
+                          style={{
+                            fontSize: "0.72rem",
+                            padding: "0.2rem 0.45rem",
+                            lineHeight: 1.3,
+                            borderRadius: "0.25rem",
+                            border: "1px solid var(--panel-border)",
+                            backgroundColor: "var(--surface-0)",
+                            color: "var(--text-primary)",
+                            cursor: "pointer"
+                          }}
+                        >
+                          {encounterRosterStatCardsExpandAll ? "Collapse stat cards" : "Expand all stat cards"}
+                        </button>
+                      </div>
+                    ) : null}
                     {!encounterActive ? (
                       <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", margin: 0 }}>
                         Select an encounter above.
@@ -5697,6 +5545,7 @@ export function MonsterEditorApp({
                       </p>
                     ) : (
                       <ul
+                        className="encounter-roster-monster-list"
                         onDragEnd={() => {
                           setEncounterRosterDraggingIndex(null);
                           setEncounterRosterDragOverIndex(null);
@@ -5723,6 +5572,24 @@ export function MonsterEditorApp({
                           return (
                             <li
                               key={row.rosterInstanceId}
+                              onClick={(event) => {
+                                const t = event.target as HTMLElement;
+                                if (!rosterSelectId) return;
+                                if (t.closest("[data-encounter-roster-toolbar]")) return;
+                                if (t.closest("a, button, input, textarea, select")) return;
+                                setSelectedId(rosterSelectId);
+                                const fromKeys = dedupeKeysToTemplatePreviewIdxs(row.templateDedupeKeys, templateRows);
+                                if (fromKeys.length > 0) {
+                                  setMonsterTemplatePreviewIdxs(fromKeys);
+                                } else {
+                                  const fromSnap = templatePreviewIdxsFromSnapshot(row.snapshot, templateRows);
+                                  setMonsterTemplatePreviewIdxs(fromSnap.length > 0 ? fromSnap : []);
+                                }
+                                const la = row.levelAdjustment;
+                                setMonsterLevelDelta(
+                                  typeof la === "number" && Number.isFinite(la) ? Math.trunc(la) : 0
+                                );
+                              }}
                               onDragOver={(event) => {
                                 event.preventDefault();
                                 event.dataTransfer.dropEffect = "move";
@@ -5753,11 +5620,27 @@ export function MonsterEditorApp({
                                 boxShadow: isDropTarget ? "inset 0 0 0 2px var(--panel-border-strong)" : undefined
                               }}
                             >
+                              <div style={{ minWidth: 0 }}>
+                                <EncounterRosterMonsterStatBlock
+                                  statBlockKeyPrefix={`roster-${row.rosterInstanceId}`}
+                                  monster={m}
+                                  glossaryTooltipUi={glossaryTooltipUi}
+                                  startGlossaryHover={startGlossaryHover}
+                                  leaveGlossaryHover={leaveGlossaryHover}
+                                  shouldHighlightGlossaryTerm={shouldHighlightGlossaryTerm}
+                                  expandAll={encounterRosterStatCardsExpandAll}
+                                />
+                              </div>
                               <div
+                                data-encounter-roster-toolbar
                                 style={{
+                                  marginTop: "0.35rem",
                                   display: "flex",
-                                  gap: "0.35rem",
-                                  alignItems: "flex-start",
+                                  flexWrap: "wrap",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  gap: "0.45rem",
+                                  width: "100%",
                                   minWidth: 0
                                 }}
                               >
@@ -5775,7 +5658,6 @@ export function MonsterEditorApp({
                                     cursor: "grab",
                                     flexShrink: 0,
                                     padding: "0.12rem 0.2rem",
-                                    marginTop: "0.06rem",
                                     color: "var(--text-muted)",
                                     fontSize: "0.95rem",
                                     lineHeight: 1,
@@ -5785,60 +5667,17 @@ export function MonsterEditorApp({
                                 >
                                   ⋮⋮
                                 </span>
-                                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (!rosterSelectId) return;
-                                      setSelectedId(rosterSelectId);
-                                      const fromKeys = dedupeKeysToTemplatePreviewIdxs(row.templateDedupeKeys, templateRows);
-                                      if (fromKeys.length > 0) {
-                                        setMonsterTemplatePreviewIdxs(fromKeys);
-                                      } else {
-                                        const fromSnap = templatePreviewIdxsFromSnapshot(row.snapshot, templateRows);
-                                        setMonsterTemplatePreviewIdxs(fromSnap.length > 0 ? fromSnap : []);
-                                      }
-                                      const la = row.levelAdjustment;
-                                      setMonsterLevelDelta(
-                                        typeof la === "number" && Number.isFinite(la) ? Math.trunc(la) : 0
-                                      );
-                                    }}
-                                    style={{
-                                      display: "block",
-                                      width: "100%",
-                                      maxWidth: "100%",
-                                      margin: 0,
-                                      padding: 0,
-                                      border: "none",
-                                      background: "transparent",
-                                      cursor: "pointer",
-                                      textAlign: "left",
-                                      font: "inherit",
-                                      color: "inherit",
-                                      minWidth: 0,
-                                      overflowWrap: "anywhere"
-                                    }}
-                                  >
-                                    <div style={{ fontWeight: 700, color: "var(--text-primary)" }}>{m.name}</div>
-                                    <div style={{ color: "var(--text-muted)", overflowWrap: "anywhere" }}>
-                                      L{m.level} · {m.role} · HP {monsterQuickHp(m)} · AC {monsterQuickAc(m)} · XP{" "}
-                                      {monsterXpDisplay(m)}
-                                    </div>
-                                  </button>
-                                  <div style={{ marginTop: "0.35rem", display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const id = encounterStore.activeEncounterId;
-                                        if (!id) return;
-                                        if (!window.confirm(`Remove ${m.name} from this encounter?`)) return;
-                                        setEncounterStore((prev) => storeRemoveRosterAt(prev, id, idx));
-                                      }}
-                                    >
-                                      Remove
-                                    </button>
-                                  </div>
-                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const id = encounterStore.activeEncounterId;
+                                    if (!id) return;
+                                    if (!window.confirm(`Remove ${m.name} from this encounter?`)) return;
+                                    setEncounterStore((prev) => storeRemoveRosterAt(prev, id, idx));
+                                  }}
+                                >
+                                  Remove
+                                </button>
                               </div>
                             </li>
                           );
