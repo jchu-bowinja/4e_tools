@@ -116,6 +116,9 @@ import {
   mergeEncounterPrintBreakIdsForDedupedCards
 } from "../encounterBuilder/encounterPrintRosterComposition";
 import {
+  EncounterGeneratorPanel
+} from "../encounterBuilder/EncounterGeneratorPanel";
+import {
   loadEncounterStore,
   saveEncounterStore,
   stringifyEncounterStoreForExport,
@@ -773,7 +776,6 @@ const statEmptyPlaceholder: CSSProperties = { fontWeight: 700, fontSize: "0.8rem
 const outcomeEntryTitleStyle: CSSProperties = { fontSize: "0.78rem", fontWeight: 700, color: "var(--text-primary)" };
 
 type MonsterPowerActionBucket = "standard" | "move" | "minor" | "free" | "triggered" | "other";
-type MonsterPowerColorBucket = "atWill" | "encounter" | "daily" | "other";
 
 function usageAccentColor(bucket: MonsterPowerActionBucket): string {
   if (bucket === "standard") return "var(--power-accent-atwill-bar)";
@@ -831,6 +833,51 @@ function usageAccentCardStyle(bucket: MonsterPowerActionBucket): {
   };
 }
 
+/**
+ * Rounded, beveled shell for each monster power (character builder power cards: 8px radius, left accent
+ * follows the curve; list spacing uses ~0.45rem gaps).
+ */
+function monsterPowerCardShellStyle(bucket: MonsterPowerActionBucket): CSSProperties {
+  const accent = usageAccentCardStyle(bucket);
+  const bar = usageAccentColor(bucket);
+  return {
+    border: accent.border,
+    borderLeft: accent.borderLeft,
+    borderRadius: "8px",
+    padding: 0,
+    backgroundColor: accent.backgroundColor,
+    boxShadow: [
+      `inset 0 0 0 1px color-mix(in srgb, ${bar} 40%, transparent)`,
+      "inset 0 1px 0 color-mix(in srgb, var(--text-primary) 10%, transparent)",
+      "inset 0 -1px 0 color-mix(in srgb, var(--text-primary) 7%, transparent)",
+      "0 2px 6px color-mix(in srgb, var(--text-primary) 7%, transparent)"
+    ].join(", "),
+    height: "100%",
+    boxSizing: "border-box",
+    display: "flex",
+    flexDirection: "column",
+    overflow: "hidden"
+  };
+}
+
+/** Title / usage block at top of a power card (shell supplies action-type background). */
+function monsterPowerCardTitleBlockStyle(): CSSProperties {
+  return {
+    padding: "0.5rem 0.65rem 0.32rem",
+    flexShrink: 0
+  };
+}
+
+function monsterPowerCardBodyPaddingStyle(): CSSProperties {
+  return {
+    padding: "0.35rem 0.65rem 0.55rem",
+    flex: "1 1 auto",
+    minHeight: 0,
+    display: "flex",
+    flexDirection: "column"
+  };
+}
+
 function classifyMonsterPowerUsageBucket(action: string | undefined, trigger: string | undefined): MonsterPowerActionBucket {
   const normalizedAction = String(action || "").toLowerCase();
   const normalizedTrigger = String(trigger || "").toLowerCase();
@@ -860,54 +907,6 @@ function usageBucketStatBlockLabel(bucket: MonsterPowerActionBucket): string {
   if (bucket === "free") return "Free actions";
   if (bucket === "triggered") return "Triggered actions";
   return "Other";
-}
-
-function classifyMonsterPowerColorBucket(usage: string | undefined): MonsterPowerColorBucket {
-  const normalized = String(usage || "").toLowerCase();
-  if (normalized.includes("at-will") || normalized.includes("at will")) return "atWill";
-  if (normalized.includes("encounter")) return "encounter";
-  if (normalized.includes("daily")) return "daily";
-  return "other";
-}
-
-function usageColorAccentColor(bucket: MonsterPowerColorBucket): string {
-  if (bucket === "atWill") return "var(--power-accent-atwill-bar)";
-  if (bucket === "encounter") return "var(--power-accent-encounter-bar)";
-  if (bucket === "daily") return "var(--power-accent-daily-bar)";
-  return "var(--text-secondary)";
-}
-
-function usageColorAccentCardStyle(bucket: MonsterPowerColorBucket): {
-  border: string;
-  borderLeft: string;
-  backgroundColor: string;
-} {
-  if (bucket === "atWill") {
-    return {
-      border: "1px solid var(--power-accent-atwill-border)",
-      borderLeft: "6px solid var(--power-accent-atwill-bar)",
-      backgroundColor: "var(--power-accent-atwill-bg)"
-    };
-  }
-  if (bucket === "encounter") {
-    return {
-      border: "1px solid var(--power-accent-encounter-border)",
-      borderLeft: "6px solid var(--power-accent-encounter-bar)",
-      backgroundColor: "var(--power-accent-encounter-bg)"
-    };
-  }
-  if (bucket === "daily") {
-    return {
-      border: "1px solid var(--power-accent-daily-border)",
-      borderLeft: "6px solid var(--power-accent-daily-bar)",
-      backgroundColor: "var(--power-accent-daily-bg)"
-    };
-  }
-  return {
-    border: "1px solid var(--panel-border)",
-    borderLeft: "6px solid var(--text-secondary)",
-    backgroundColor: "var(--surface-1)"
-  };
 }
 
 function formatValue(value: string | number | boolean | undefined | null): string {
@@ -1587,7 +1586,7 @@ function MonsterPowersPanels({
         isStatBlock
           ? {
               display: "grid",
-              gap: "0.3rem",
+              gap: "0.45rem",
               margin: 0,
               padding: 0,
               border: "none",
@@ -1606,7 +1605,7 @@ function MonsterPowersPanels({
         style={{
           marginTop: isStatBlock ? 0 : "0.5rem",
           display: "grid",
-          gap: isStatBlock ? "0.28rem" : "0.6rem"
+          gap: isStatBlock ? "0.45rem" : "0.6rem"
         }}
       >
         {powers.length === 0 ? (
@@ -1618,7 +1617,7 @@ function MonsterPowersPanels({
           const bucketPowers = groupedPowers[bucket];
           if (bucketPowers.length === 0) return null;
           return (
-            <div key={bucket} style={{ display: "grid", gap: isStatBlock ? 0 : "0.4rem" }}>
+            <div key={bucket} style={{ display: "grid", gap: isStatBlock ? "0.45rem" : "0.4rem" }}>
               {isStatBlock && !statBlockHideBucketHeads ? (
                 <div className="monster-stat-block-section-head">{usageBucketStatBlockLabel(bucket)}</div>
               ) : !isStatBlock ? (
@@ -1627,82 +1626,76 @@ function MonsterPowersPanels({
               <div
                 style={{
                   display: "grid",
-                  gap: isStatBlock ? 0 : "0.45rem",
+                  gap: "0.45rem",
                   gridTemplateColumns: "minmax(0, 1fr)",
                   alignItems: "stretch"
                 }}
               >
                 {bucketPowers.map(({ power, sourceIndex }, index) => {
-                  const colorBucket = classifyMonsterPowerColorBucket(power.usage);
-                  const accent = usageColorAccentCardStyle(colorBucket);
                   const cardModel = buildMonsterPowerCardViewModel(power);
                   const rawPower = powers[sourceIndex] ?? power;
-                  const shellStyle: CSSProperties = isStatBlock
-                    ? {
-                        border: "none",
-                        borderLeft: "none",
-                        borderRadius: 0,
-                        padding: "0.38rem 0.55rem",
-                        backgroundColor:
-                          index % 2 === 0
-                            ? "var(--monster-stat-block-stripe-a)"
-                            : "var(--monster-stat-block-stripe-b)",
-                        boxShadow: "none",
-                        height: "100%",
-                        boxSizing: "border-box",
-                        display: "flex",
-                        flexDirection: "column"
-                      }
-                    : {
-                        border: accent.border,
-                        borderLeft: accent.borderLeft,
-                        borderRadius: "8px",
-                        padding: "0.55rem 0.65rem",
-                        backgroundColor: accent.backgroundColor,
-                        boxShadow: `inset 0 0 0 1px ${usageColorAccentColor(colorBucket)}33`,
-                        height: "100%",
-                        boxSizing: "border-box",
-                        display: "flex",
-                        flexDirection: "column"
-                      };
+                  const shellStyle = monsterPowerCardShellStyle(bucket);
                   return (
                     <div key={`${bucket}-${power.name}-${sourceIndex}-${index}`} style={shellStyle}>
-                      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: "0.35rem" }}>
-                        <strong>{power.name || `Power ${index + 1}`}</strong>
-                        {power.isBasic ? <span style={{ ...sheetTagPillStyle, cursor: "default" }}>Basic Attack</span> : null}
-                      </div>
-                      {cardModel.usagePrimaryParts.length > 0 ? (
-                        <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginTop: "0.12rem" }}>
-                          {cardModel.usagePrimaryParts.map((part, partIdx) => (
-                            <span key={`${power.name}-${index}-usage-${part}`}>
-                              <span
-                                onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${part}`)}
-                                onMouseLeave={leaveGlossaryHover}
-                                style={{
-                                  fontWeight: 700,
-                                  color: "var(--text-primary)",
-                                  cursor: "help",
-                                  borderBottom: "1px dotted var(--text-muted)",
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.03em"
-                                }}
-                              >
-                                {part}
-                              </span>
-                              {partIdx < cardModel.usagePrimaryParts.length - 1 ? (
-                                <span style={{ color: "var(--text-muted)", margin: "0 0.1rem" }}>•</span>
-                              ) : null}
-                            </span>
-                          ))}
-                          {cardModel.usageDetailsLines.length > 0 ? (
-                            <span style={{ ...metaSecondary, fontWeight: 400 }}>
-                              {"("}
-                              {cardModel.usageDetailsLines.join(" ")}
-                              {")"}
-                            </span>
-                          ) : null}
+                      <div style={monsterPowerCardTitleBlockStyle()}>
+                        {isStatBlock && statBlockHideBucketHeads ? (
+                          <div
+                            className="monster-stat-block-muted"
+                            style={{
+                              fontSize: "0.68rem",
+                              fontWeight: 700,
+                              textTransform: "uppercase",
+                              letterSpacing: "0.05em",
+                              marginBottom: "0.1rem"
+                            }}
+                          >
+                            {usageBucketLabel(bucket)}
+                          </div>
+                        ) : null}
+                        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: "0.35rem" }}>
+                          <strong style={{ fontSize: "1.0625rem", lineHeight: 1.3 }}>{power.name || `Power ${index + 1}`}</strong>
+                          {power.isBasic ? <span style={{ ...sheetTagPillStyle, cursor: "default" }}>Basic Attack</span> : null}
                         </div>
-                      ) : null}
+                        {cardModel.usagePrimaryParts.length > 0 ? (
+                          <div
+                            style={{
+                              fontSize: "0.8rem",
+                              color: "var(--text-secondary)",
+                              marginTop: "0.1rem"
+                            }}
+                          >
+                            {cardModel.usagePrimaryParts.map((part, partIdx) => (
+                              <span key={`${power.name}-${index}-usage-${part}`}>
+                                <span
+                                  onMouseEnter={(event) => startGlossaryHover(event, `glossaryTerm:${part}`)}
+                                  onMouseLeave={leaveGlossaryHover}
+                                  style={{
+                                    fontWeight: 700,
+                                    color: "var(--text-primary)",
+                                    cursor: "help",
+                                    borderBottom: "1px dotted var(--text-muted)",
+                                    textTransform: "uppercase",
+                                    letterSpacing: "0.03em"
+                                  }}
+                                >
+                                  {part}
+                                </span>
+                                {partIdx < cardModel.usagePrimaryParts.length - 1 ? (
+                                  <span style={{ color: "var(--text-muted)", margin: "0 0.1rem" }}>•</span>
+                                ) : null}
+                              </span>
+                            ))}
+                            {cardModel.usageDetailsLines.length > 0 ? (
+                              <span style={{ ...metaSecondary, fontWeight: 400 }}>
+                                {"("}
+                                {cardModel.usageDetailsLines.join(" ")}
+                                {")"}
+                              </span>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
+                      <div style={monsterPowerCardBodyPaddingStyle()}>
                       {cardModel.attackLineParts.length > 0 ? (
                         <div
                           style={{
@@ -1726,8 +1719,15 @@ function MonsterPowersPanels({
                         </div>
                       ) : null}
                       {cardModel.keywordTokens.length > 0 ? (
-                        <div style={{ ...bodySecondary, color: "var(--text-muted)", marginBottom: "0.25rem" }}>
-                          <strong>Keywords:</strong>{" "}
+                        <div
+                          style={{
+                            fontSize: "0.75rem",
+                            lineHeight: 1.35,
+                            color: "var(--text-muted)",
+                            marginBottom: "0.25rem"
+                          }}
+                        >
+                          Keywords:{" "}
                           {cardModel.keywordTokens.map((keyword, idx) => (
                             <span key={`${power.name}-${index}-kw-${keyword}`}>
                               <span
@@ -1973,6 +1973,7 @@ function MonsterPowersPanels({
                           <TemplateJsonCollapsible summaryLabel="JSON" value={rawPower} />
                         )
                       ) : null}
+                      </div>
                     </div>
                   );
                 })}
@@ -5753,13 +5754,32 @@ export function MonsterEditorApp({
               <div
                 style={{
                   display: "flex",
-                  justifyContent: "flex-end",
+                  justifyContent: "space-between",
                   alignItems: "center",
                   marginBottom: "0.45rem",
                   gap: "0.5rem",
                   minWidth: 0
                 }}
               >
+                {viewerTab === "monsters" ? (
+                  <div
+                    style={{
+                      minWidth: 0,
+                      flex: "1 1 auto",
+                      fontWeight: 700,
+                      fontSize: "1.05rem",
+                      lineHeight: 1.25,
+                      color: "var(--text-primary)",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      paddingRight: "0.35rem"
+                    }}
+                    title={String(viewMonster.name ?? "").trim() || undefined}
+                  >
+                    {String(viewMonster.name ?? "").trim() || "—"}
+                  </div>
+                ) : null}
                 {viewerTab === "monsters" ? (
                   <button
                     type="button"
@@ -5794,7 +5814,6 @@ export function MonsterEditorApp({
                     }}
                     style={{
                       flexShrink: 0,
-                      marginLeft: "auto",
                       alignSelf: "center"
                     }}
                   >
@@ -6190,13 +6209,24 @@ export function MonsterEditorApp({
                         </button>
                       </div>
                     ) : null}
+                    {encounterActive ? (
+                      <EncounterGeneratorPanel
+                        indexRows={indexRows}
+                        encounterStore={encounterStore}
+                        onStoreChange={(next) => {
+                          setEncounterStore(next);
+                          saveEncounterStore(next);
+                        }}
+                      />
+                    ) : null}
                     {!encounterActive ? (
                       <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", margin: 0 }}>
                         Select an encounter above.
                       </p>
                     ) : encounterRoster.length === 0 ? (
                       <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", margin: 0 }}>
-                        No creatures yet. Use <strong>Add to encounter</strong> on the stat block.
+                        No creatures yet. Use <strong>Add to encounter</strong> on the stat block, or{" "}
+                        <strong>Encounter builder</strong> above.
                       </p>
                     ) : (
                       <ul
