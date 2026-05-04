@@ -649,6 +649,738 @@ textarea:hover {
   color: var(--text-secondary);
 }
 
+/* Encounter print sheet: full stat blocks without scroll cap; may fragment across columns */
+.monster-stat-block-card.monster-stat-block-card--print {
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+/* Encounter print preview (modal) */
+.print-encounter-preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20040;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem;
+  box-sizing: border-box;
+}
+
+.print-encounter-preview-backdrop {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  /* Must stay identical on :hover/:active or UA button styles replace the tint and the app behind looks blank. */
+  background: color-mix(in srgb, #000 48%, transparent) !important;
+}
+
+.print-encounter-preview-backdrop:hover,
+.print-encounter-preview-backdrop:active,
+.print-encounter-preview-backdrop:focus,
+.print-encounter-preview-backdrop:focus-visible {
+  background: color-mix(in srgb, #000 48%, transparent) !important;
+  outline: none;
+}
+
+.print-encounter-preview-dialog {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 52rem);
+  max-height: min(92vh, 48rem);
+  overflow: hidden;
+  border-radius: var(--ui-panel-radius, 0.35rem);
+  border: 1px solid var(--panel-border-strong);
+  background: var(--surface-0);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
+}
+
+/*
+ * Dark UI theme: preview stat blocks and power cards inherited dark-mode tokens on light “paper” /
+ * cream surfaces → illegible contrast. Force the same light variable palette as printed output
+ * (#print-encounter-sheet @media print) for the whole modal so preview matches paper.
+ */
+@media screen {
+  :root[data-theme="dark"] .print-encounter-preview-dialog {
+    color-scheme: light;
+    --app-background: #e7dfcf;
+    --app-foreground: #2c241a;
+    --character-sheet-background: linear-gradient(180deg, #f8f1df 0%, #efe4cb 100%);
+    --surface-0: #f8f1df;
+    --surface-1: #f1e8d2;
+    --surface-2: #e7dcc2;
+    --surface-3: #d6c7a7;
+    --panel-border: #b8a98b;
+    --panel-border-strong: #8f7c5e;
+    --text-primary: #2c241a;
+    --text-secondary: #3b2f21;
+    --text-muted: #5a4a35;
+    --text-subtle: #766247;
+    --status-danger: #991b1b;
+    --status-success: #14532d;
+    --status-warning: #78350f;
+    --status-info: #075985;
+    --character-sheet-foreground: #211d15;
+    --power-accent-atwill-bar: #166534;
+    --power-accent-atwill-bg: #f0fdf4;
+    --power-accent-atwill-border: #86efac;
+    --power-accent-encounter-bar: #b91c1c;
+    --power-accent-encounter-bg: #fef2f2;
+    --power-accent-encounter-border: #fca5a5;
+    --power-accent-daily-bar: #111827;
+    --power-accent-daily-bg: #f3f4f6;
+    --power-accent-daily-border: #94a3b8;
+    --power-accent-move-bar: #0369a1;
+    --power-accent-move-bg: #f0f9ff;
+    --power-accent-move-border: #7dd3fc;
+    --power-accent-free-bar: #7c3aed;
+    --power-accent-free-bg: #f5f3ff;
+    --power-accent-free-border: #c4b5fd;
+    --power-expended-opacity: 0.8;
+    --table-stripe-even: var(--surface-1);
+    --table-stripe-odd: var(--surface-0);
+    --link-color: #5f3b16;
+    --link-color-hover: #4b2e10;
+    --focus-outline: #7a4b1a;
+    --button-border: var(--panel-border);
+    --button-background: var(--surface-0);
+    --button-foreground: var(--text-primary);
+    --inset-section-bg: var(--surface-3);
+    --inset-section-border: var(--panel-border);
+    --inset-section-highlight: rgba(255, 255, 255, 0.12);
+    --control-hover-bg: color-mix(in srgb, var(--button-background) 86%, var(--surface-2) 14%);
+    --control-active-bg: color-mix(in srgb, var(--button-background) 78%, var(--surface-2) 22%);
+    --monster-stat-block-header-bg: #3d4728;
+    --monster-stat-block-header-fg: #faf8f2;
+    --monster-stat-block-subheader-bg: #d4c9a4;
+    --monster-stat-block-subheader-fg: #1a150d;
+    --monster-stat-block-section-bg: #556b3a;
+    --monster-stat-block-edge: #5a4f38;
+    --monster-stat-block-body: #faf6ee;
+    --monster-stat-block-stripe-a: #faf6ee;
+    --monster-stat-block-stripe-b: #ebe4d8;
+    --monster-stat-block-gloss-underline: rgba(44, 36, 26, 0.38);
+    color: var(--text-primary);
+  }
+
+  :root[data-theme="dark"] .print-encounter-preview-dialog input,
+  :root[data-theme="dark"] .print-encounter-preview-dialog select,
+  :root[data-theme="dark"] .print-encounter-preview-dialog textarea {
+    background-color: var(--surface-0);
+    color: var(--text-primary);
+    border-color: var(--panel-border);
+  }
+
+  :root[data-theme="dark"] .print-encounter-preview-dialog .print-encounter-preview-btn--primary {
+    background: var(--text-primary);
+    color: var(--surface-0);
+    border-color: var(--panel-border-strong);
+  }
+}
+
+.print-encounter-preview-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid var(--panel-border);
+  background: var(--surface-1);
+}
+
+.print-encounter-preview-toolbar-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.print-encounter-preview-toolbar-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.65rem;
+  flex: 1 1 12rem;
+  justify-content: center;
+  min-width: 0;
+}
+
+.print-encounter-preview-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  font-size: 0.76rem;
+  color: var(--text-primary);
+}
+
+.print-encounter-preview-field-text {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.print-encounter-preview-field--toggle {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.3rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.print-encounter-preview-field--toggle input {
+  margin: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.print-encounter-preview-select {
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 600;
+  max-width: 10rem;
+  padding: 0.22rem 0.4rem;
+  border-radius: 0.22rem;
+  border: 1px solid var(--panel-border);
+  background: var(--surface-0);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.print-encounter-preview-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+
+.print-encounter-preview-btn {
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 0.28rem 0.55rem;
+  border-radius: 0.25rem;
+  border: 1px solid var(--panel-border);
+  background: var(--surface-0);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.print-encounter-preview-btn--primary {
+  border-color: var(--panel-border-strong);
+  background: var(--text-primary);
+  color: var(--surface-0);
+}
+
+.print-encounter-preview-scroll {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0.65rem 0.75rem;
+  background: var(--surface-2);
+}
+
+.print-encounter-preview-hint {
+  margin: 0 0 0.55rem 0;
+  font-size: 0.76rem;
+  line-height: 1.35;
+  color: var(--text-secondary);
+}
+
+.print-encounter-preview-blocks {
+  position: relative;
+  min-width: 0;
+}
+
+/* Single source of truth for window.print — positioned off-screen during on-screen preview */
+@media screen {
+  #print-encounter-sheet.print-encounter-sheet--offscreen {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    width: 8.5in;
+    max-width: 8.5in;
+    margin: 0;
+    pointer-events: none;
+  }
+
+  #print-encounter-sheet.print-encounter-sheet--offscreen.print-encounter-root--preview-landscape {
+    width: 11in;
+    max-width: 11in;
+  }
+
+  /* Single-column strip: multicol with fixed height overflows horizontally, so we measure a 1-col auto-height flow. */
+  .print-encounter-measure-strip {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    width: 8.5in;
+    max-width: 8.5in;
+    pointer-events: none;
+    visibility: hidden;
+  }
+
+  .print-encounter-measure-strip.print-encounter-measure-strip--landscape {
+    width: 11in;
+    max-width: 11in;
+  }
+
+  .print-encounter-measure-root {
+    column-count: 1 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    box-shadow: none !important;
+  }
+}
+
+/* Stacked “paper” frames; each clip one page-tall window of the same flow */
+.print-encounter-preview-page-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
+  width: 100%;
+}
+
+.print-encounter-preview-page-shell {
+  overflow: hidden;
+  width: 100%;
+  max-width: 8.5in;
+  box-sizing: border-box;
+  border: 1px solid var(--panel-border-strong);
+  border-radius: 0.25rem;
+  background: #fff;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+}
+
+.print-encounter-preview-page-shell.print-encounter-preview-page-shell--landscape {
+  max-width: 11in;
+}
+
+.print-encounter-root.print-encounter-root--preview.print-encounter-preview-mirror-sheet {
+  box-shadow: none;
+}
+
+/* Single-column preview: tall auto-height flow so frames window vertical slices (matches measure strip). */
+.print-encounter-root.print-encounter-root--preview.print-encounter-preview-mirror-sheet.print-encounter-preview-mirror-sheet--paged-flow {
+  column-count: 1 !important;
+  height: auto !important;
+  min-height: 0 !important;
+  overflow: visible;
+}
+
+.print-encounter-preview-card-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.55rem;
+  margin-bottom: 0.4rem;
+  padding: 0.28rem 0.4rem;
+  border-radius: 0.22rem;
+  border: 1px solid var(--panel-border);
+  background: var(--surface-1);
+  font-size: 0.74rem;
+}
+
+.print-encounter-preview-drag-handle {
+  cursor: grab;
+  flex-shrink: 0;
+  padding: 0.08rem 0.2rem;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  line-height: 1;
+  user-select: none;
+  border-radius: 0.2rem;
+}
+
+.print-encounter-preview-card-controls-move {
+  display: inline-flex;
+  gap: 0.15rem;
+}
+
+.print-encounter-preview-icon-btn {
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  min-width: 1.45rem;
+  padding: 0.15rem 0.25rem;
+  border-radius: 0.2rem;
+  border: 1px solid var(--panel-border);
+  background: var(--surface-0);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.print-encounter-preview-icon-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.print-encounter-preview-column-break-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0;
+  cursor: pointer;
+  font-weight: 600;
+  user-select: none;
+}
+
+.print-encounter-preview-column-break-label input:disabled + span {
+  opacity: 0.45;
+}
+
+/* Sheet body inside preview — column count + card font set inline (matches print) */
+.print-encounter-root.print-encounter-root--preview {
+  position: relative;
+  width: 100%;
+  max-width: 8.5in;
+  margin: 0 auto;
+  padding: 0.45rem 0.5rem 0.65rem;
+  box-sizing: border-box;
+  background: #fff;
+  color: var(--text-primary);
+  column-gap: 0.55rem;
+  /* Same as print: definite height so column-fill:auto fills col 1 then col 2 (not balanced columns). */
+  height: var(--encounter-print-guide-period, calc(11in - 0.7in));
+  column-fill: auto;
+  -webkit-column-fill: auto;
+  overflow: visible;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+.print-encounter-root.print-encounter-root--preview-landscape {
+  max-width: 11in;
+}
+
+/* Named pages: encounter sheet assigns `page` on `.print-encounter-root` so orientation is user-controlled */
+@page encounter-portrait {
+  size: portrait;
+  margin: 0.35in;
+}
+
+@page encounter-landscape {
+  size: landscape;
+  margin: 0.35in;
+}
+
+.print-encounter-root.print-encounter-root--preview .monster-stat-block-card.monster-stat-block-card--print {
+  font-size: 0.72rem;
+}
+
+.print-encounter-header {
+  margin-bottom: 0.65rem;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.print-encounter-title {
+  margin: 0 0 0.18rem 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.print-encounter-meta {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.print-encounter-meta-title {
+  display: block;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
+  margin-bottom: 0.12rem;
+}
+
+.print-encounter-meta-creature-list {
+  margin: 0.12rem 0 0.35rem 0;
+  padding-left: 1.15rem;
+  list-style: disc;
+  line-height: 1.45;
+}
+
+.print-encounter-meta-creature-list li {
+  margin: 0.05rem 0;
+}
+
+.print-encounter-meta-empty {
+  margin: 0.2rem 0 0.35rem 0;
+  font-size: inherit;
+  color: var(--text-muted);
+}
+
+.print-encounter-meta-xp {
+  margin: 0.15rem 0 0 0;
+  font-size: inherit;
+  color: var(--text-secondary);
+}
+
+.print-encounter-meta-xp-label {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.print-encounter-meta-note {
+  color: var(--text-muted);
+}
+
+.print-encounter-block {
+  margin-bottom: 1rem;
+}
+
+.print-encounter-block:last-child {
+  margin-bottom: 0;
+}
+
+.print-encounter-block.print-encounter-block--column-break {
+  break-before: column;
+  -webkit-column-break-before: always;
+}
+
+.print-encounter-block.print-encounter-block--page-break {
+  break-before: page;
+  page-break-before: always;
+}
+
+@media screen {
+  /* margin-top for page alignment comes from inline preview styles; keep only the indicator stripe */
+  .print-encounter-root.print-encounter-root--preview .print-encounter-block.print-encounter-block--page-break {
+    padding-top: 0.45rem;
+    border-top: 2px dashed rgba(20, 90, 200, 0.45);
+  }
+}
+
+@media print {
+  @page {
+    margin: 0.35in;
+  }
+
+  /*
+   * The encounter sheet is portaled to body after #root. visibility:hidden on #root still leaves its full
+   * document height in the print layout, which paginates as one or more blank pages before the sheet.
+   */
+  body.print-encounter-active #root {
+    display: none !important;
+  }
+
+  body.print-encounter-active .print-encounter-preview-hint,
+  body.print-encounter-active .print-encounter-preview-toolbar,
+  body.print-encounter-active .print-encounter-preview-card-controls,
+  body.print-encounter-active .print-encounter-preview-page-stack,
+  body.print-encounter-active .print-encounter-measure-strip {
+    display: none !important;
+  }
+
+  /* Modal flex + overflow hidden collapse in print; unclip so the sheet can paint and paginate. */
+  body.print-encounter-active .print-encounter-preview-backdrop {
+    display: none !important;
+  }
+
+  body.print-encounter-active .print-encounter-preview-overlay {
+    position: static !important;
+    display: block !important;
+    padding: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  body.print-encounter-active .print-encounter-preview-dialog {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  body.print-encounter-active .print-encounter-preview-scroll {
+    flex: none !important;
+    min-height: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+
+  body.print-encounter-active .print-encounter-preview-blocks {
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  body.print-encounter-active * {
+    visibility: hidden;
+  }
+
+  body.print-encounter-active #print-encounter-sheet,
+  body.print-encounter-active #print-encounter-sheet * {
+    visibility: visible !important;
+  }
+
+  /*
+   * In-flow for print: only the sheet remains in the blocks box; absolute + zero-height parents produced blank output.
+   * Use column-fill:auto (not balance) so break-before:column / page on roster sections are honored; balance reflow
+   * suppresses those breaks in Chromium/Firefox multi-column layout.
+   */
+  body.print-encounter-active #print-encounter-sheet {
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0.35rem 0.5rem 0.75rem !important;
+    /* column-count + gap: from inline style (preview toolbar) */
+    column-gap: 0.55rem;
+    height: auto !important;
+    max-height: none !important;
+    column-fill: auto !important;
+    -webkit-column-fill: auto !important;
+    overflow: visible !important;
+    box-sizing: border-box;
+    /*
+     * Default printed encounter to light palette (:root) even when the app UI is in dark mode.
+     * Values mirror the global :root block so cards/header resolve the same vars as on-screen light theme.
+     */
+    color-scheme: light;
+    --app-background: #e7dfcf;
+    --app-foreground: #2c241a;
+    --character-sheet-background: linear-gradient(180deg, #f8f1df 0%, #efe4cb 100%);
+    --surface-0: #f8f1df;
+    --surface-1: #f1e8d2;
+    --surface-2: #e7dcc2;
+    --surface-3: #d6c7a7;
+    --panel-border: #b8a98b;
+    --panel-border-strong: #8f7c5e;
+    --text-primary: #2c241a;
+    --text-secondary: #3b2f21;
+    --text-muted: #5a4a35;
+    --text-subtle: #766247;
+    --status-danger: #991b1b;
+    --status-success: #14532d;
+    --status-warning: #78350f;
+    --status-info: #075985;
+    --character-sheet-foreground: #211d15;
+    --power-accent-atwill-bar: #166534;
+    --power-accent-atwill-bg: #f0fdf4;
+    --power-accent-atwill-border: #86efac;
+    --power-accent-encounter-bar: #b91c1c;
+    --power-accent-encounter-bg: #fef2f2;
+    --power-accent-encounter-border: #fca5a5;
+    --power-accent-daily-bar: #111827;
+    --power-accent-daily-bg: #f3f4f6;
+    --power-accent-daily-border: #94a3b8;
+    --power-accent-move-bar: #0369a1;
+    --power-accent-move-bg: #f0f9ff;
+    --power-accent-move-border: #7dd3fc;
+    --power-accent-free-bar: #7c3aed;
+    --power-accent-free-bg: #f5f3ff;
+    --power-accent-free-border: #c4b5fd;
+    --power-expended-opacity: 0.8;
+    --table-stripe-even: var(--surface-1);
+    --table-stripe-odd: var(--surface-0);
+    --link-color: #5f3b16;
+    --link-color-hover: #4b2e10;
+    --focus-outline: #7a4b1a;
+    --button-border: var(--panel-border);
+    --button-background: var(--surface-0);
+    --button-foreground: var(--text-primary);
+    --inset-section-bg: var(--surface-3);
+    --inset-section-border: var(--panel-border);
+    --inset-section-highlight: rgba(255, 255, 255, 0.12);
+    --ui-panel-radius: 0.45rem;
+    --ui-section-radius: 0.5rem;
+    --ui-panel-shadow: 0 1px 2px rgba(40, 30, 10, 0.08);
+    --control-radius: 6px;
+    --control-padding-y: 0.38rem;
+    --control-padding-x: 0.62rem;
+    --control-shadow: 0 1px 1px rgba(24, 18, 10, 0.08);
+    --control-hover-bg: color-mix(in srgb, var(--button-background) 86%, var(--surface-2) 14%);
+    --control-active-bg: color-mix(in srgb, var(--button-background) 78%, var(--surface-2) 22%);
+    --monster-stat-block-header-bg: #3d4728;
+    --monster-stat-block-header-fg: #faf8f2;
+    --monster-stat-block-subheader-bg: #d4c9a4;
+    --monster-stat-block-subheader-fg: #1a150d;
+    --monster-stat-block-section-bg: #556b3a;
+    --monster-stat-block-edge: #5a4f38;
+    --monster-stat-block-body: #faf6ee;
+    --monster-stat-block-stripe-a: #faf6ee;
+    --monster-stat-block-stripe-b: #ebe4d8;
+    --monster-stat-block-gloss-underline: rgba(44, 36, 26, 0.38);
+    background: var(--surface-0) !important;
+    color: var(--text-primary);
+    box-shadow: none !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  body.print-encounter-active .print-encounter-header {
+    column-span: all;
+    margin-bottom: 0.5rem !important;
+    padding-bottom: 0.4rem !important;
+  }
+
+  /* Green title + type/XP bar stay together; body of card may still fragment across columns */
+  body.print-encounter-active .monster-stat-block-card__heading {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    -webkit-column-break-inside: avoid;
+  }
+
+  /* Allow long stat blocks to split across columns when taller than the column */
+  body.print-encounter-active .print-encounter-block {
+    margin-bottom: 0.65rem !important;
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  body.print-encounter-active .print-encounter-block.print-encounter-block--column-break {
+    break-before: column !important;
+    page-break-before: auto !important;
+    -webkit-column-break-before: always !important;
+    -moz-column-break-before: always !important;
+  }
+
+  body.print-encounter-active .print-encounter-block.print-encounter-block--page-break {
+    break-before: page !important;
+    page-break-before: always !important;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    border-top: none !important;
+    /* Page wins if both flags set; reset column-break hints */
+    -webkit-column-break-before: auto !important;
+    -moz-column-break-before: auto !important;
+  }
+
+  body.print-encounter-active .print-encounter-block .monster-stat-block-card.monster-stat-block-card--print {
+    break-inside: auto;
+    page-break-inside: auto;
+    -webkit-column-break-inside: auto;
+  }
+
+  body.print-encounter-active .monster-stat-block-card.monster-stat-block-card--print {
+    font-size: 0.72rem;
+    max-width: 100%;
+  }
+
+  body.print-encounter-active .monster-stat-block-card {
+    box-shadow: none !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

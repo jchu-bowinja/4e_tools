@@ -10,6 +10,9 @@ Backlog for monster data, power cards, templates, and monster-facing UI (includi
     - Additional attack entries (`attacks[1..n]`) with their own name/range/bonuses and hit/miss/effect blocks.
   - Rendering also deduplicates repeated outcome text between primary and secondary attack sections to reduce noise.
 
+- [ ] Nested powers
+  - Extend parsing, data model, and card rendering for powers that embed or chain additional powers (beyond the existing nested-attack pattern), including edge cases in source text and editor preview parity.
+
 - [ ] Check for unrendered monster data (for example, traits)
   - Audit generated monster JSON against card output to identify fields that exist in data but are not rendered yet.
 

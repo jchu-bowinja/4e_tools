@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -9,6 +10,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type ReactNode
 } from "react";
+import { createPortal } from "react-dom";
 import type { RulesIndex } from "../../rules/models";
 import { STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE } from "../../ui/glossaryTooltip";
 import { useGlossaryTooltip } from "../../ui/useGlossaryTooltip";
@@ -81,6 +83,7 @@ import { formatMonsterTemplateStatAdjustmentLines } from "./monsterTemplateStats
 import {
   applyMonsterTemplateToEntry,
   computeTemplateApplicationDelta,
+  traitSignature,
   type TemplateApplicationDelta
 } from "./applyMonsterTemplate";
 import {
@@ -108,6 +111,11 @@ import {
   parseMonsterXpToNumber
 } from "../encounterBuilder/encounterMonsterQuickSummary";
 import {
+  buildEncounterPrintCreatureListLines,
+  encounterPrintCreatureGroupKey,
+  mergeEncounterPrintBreakIdsForDedupedCards
+} from "../encounterBuilder/encounterPrintRosterComposition";
+import {
   loadEncounterStore,
   saveEncounterStore,
   stringifyEncounterStoreForExport,
@@ -120,6 +128,7 @@ import {
   storeRenameEncounter,
   storeSetActiveEncounter,
   type EncounterSnapshotExtras,
+  type EncounterRosterRow,
   type EncounterStore
 } from "../encounterBuilder/encounterStorage";
 
@@ -1976,6 +1985,12 @@ function MonsterPowersPanels({
   );
 }
 
+/** When true, show “(Leader)” after the role in the title bar (skip if the role string already includes it). */
+function monsterTitleShowLeaderSuffix(isLeader: boolean | undefined, role: string | undefined | null): boolean {
+  if (isLeader !== true) return false;
+  return !/\(leader\)/i.test(String(role ?? "").trim());
+}
+
 type EncounterRosterGlossaryTooltipUi = Pick<ReturnType<typeof useGlossaryTooltip>, "hoverA11y">;
 
 function MonsterStatBlockCard({
@@ -2072,9 +2087,13 @@ function MonsterStatBlockCard({
       : [];
   const senseLine = senseEntries.join(", ");
   const typeLine = formatMonsterCreatureTypeLine(monster) || "—";
+  const auraSignatures = new Set((monster.auras ?? []).map(traitSignature));
   const traitEntries: Array<{ kind: "aura" | "trait"; idx: number; trait: MonsterTrait }> = [];
   (monster.auras ?? []).forEach((trait, idx) => traitEntries.push({ kind: "aura", idx, trait }));
-  (monster.traits ?? []).forEach((trait, idx) => traitEntries.push({ kind: "trait", idx, trait }));
+  (monster.traits ?? []).forEach((trait, idx) => {
+    if (auraSignatures.has(traitSignature(trait))) return;
+    traitEntries.push({ kind: "trait", idx, trait });
+  });
   const abilityScoresRaw = monster.stats?.abilityScores as Record<string, unknown> | undefined;
   const ABBR_ORDER = ["STR", "DEX", "WIS", "CON", "INT", "CHA"] as const;
   const abilityCells: Array<{ abbrev: string; score: number; mod: number } | null> = ABBR_ORDER.map((abbrev) => {
@@ -2114,40 +2133,50 @@ function MonsterStatBlockCard({
   const cardClass = ["monster-stat-block-card", cardExtraClassName].filter(Boolean).join(" ").trim();
   return (
     <div className={cardClass}>
-      <div className="monster-stat-block-card__title">
-        <div className="monster-stat-block-card__title-name">{monster.name || "—"}</div>
-        <div className="monster-stat-block-card__title-right">
-          <span {...glossaryTooltipUi.hoverA11y("glossaryTerm:Level")} className="monster-stat-block-gloss">
-            Level
-          </span>{" "}
-          {formatValue(monster.level)}
-          {levelAnnotation}
-          {isRenderableCardValue(monster.groupRole) ? (
-            <>
-              {" "}
-              <span
-                {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${String(monster.groupRole)}`)}
-                className="monster-stat-block-gloss"
-              >
-                {String(monster.groupRole)}
-              </span>
-            </>
-          ) : null}{" "}
-          <span
-            {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${monster.role || "Role"}`)}
-            className="monster-stat-block-gloss"
-          >
-            {monster.role || ""}
-          </span>
+      <div className="monster-stat-block-card__heading">
+        <div className="monster-stat-block-card__title">
+          <div className="monster-stat-block-card__title-name">{monster.name || "—"}</div>
+          <div className="monster-stat-block-card__title-right">
+            <span {...glossaryTooltipUi.hoverA11y("glossaryTerm:Level")} className="monster-stat-block-gloss">
+              Level
+            </span>{" "}
+            {formatValue(monster.level)}
+            {levelAnnotation}
+            {isRenderableCardValue(monster.groupRole) ? (
+              <>
+                {" "}
+                <span
+                  {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${String(monster.groupRole)}`)}
+                  className="monster-stat-block-gloss"
+                >
+                  {String(monster.groupRole)}
+                </span>
+              </>
+            ) : null}{" "}
+            <span
+              {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${monster.role || "Role"}`)}
+              className="monster-stat-block-gloss"
+            >
+              {monster.role || ""}
+            </span>
+            {monsterTitleShowLeaderSuffix(monster.isLeader, monster.role) ? (
+              <>
+                {" "}
+                <span {...glossaryTooltipUi.hoverA11y("glossaryTerm:Leader")} className="monster-stat-block-gloss">
+                  (Leader)
+                </span>
+              </>
+            ) : null}
+          </div>
         </div>
-      </div>
-      <div className="monster-stat-block-card__sub">
-        <div className="monster-stat-block-card__sub-left">{typeLine}</div>
-        <div className="monster-stat-block-card__sub-right">
-          <span {...glossaryTooltipUi.hoverA11y("glossaryTerm:Experience")} className="monster-stat-block-gloss">
-            XP
-          </span>{" "}
-          {formatValue(monster.xp)}
+        <div className="monster-stat-block-card__sub">
+          <div className="monster-stat-block-card__sub-left">{typeLine}</div>
+          <div className="monster-stat-block-card__sub-right">
+            <span {...glossaryTooltipUi.hoverA11y("glossaryTerm:Experience")} className="monster-stat-block-gloss">
+              XP
+            </span>{" "}
+            {formatValue(monster.xp)}
+          </div>
         </div>
       </div>
 
@@ -2528,6 +2557,14 @@ function EncounterRosterMonsterStatBlock({
             >
               {monster.role || ""}
             </span>
+            {monsterTitleShowLeaderSuffix(monster.isLeader, monster.role) ? (
+              <>
+                {" "}
+                <span {...glossaryTooltipUi.hoverA11y("glossaryTerm:Leader")} className="monster-stat-block-gloss">
+                  (Leader)
+                </span>
+              </>
+            ) : null}
           </div>
         </div>
       </div>
@@ -2626,6 +2663,14 @@ function MonsterTemplateFormattedView({
     if (mechanical !== null && mechanical.length > 0) return mechanical;
     return record.statLines ?? [];
   }, [record.stats, record.statLines]);
+
+  /** Traits that are already listed under Auras are omitted (same signature as template merge/dedup). */
+  const templateTraitsForDisplay = useMemo(() => {
+    const auraSigs = new Set((record.auras ?? []).map(traitSignature));
+    return (record.traits ?? [])
+      .map((trait, originalIdx) => ({ trait, originalIdx }))
+      .filter(({ trait }) => !auraSigs.has(traitSignature(trait)));
+  }, [record.auras, record.traits]);
 
   const templatePowersForDisplay = useMemo(() => {
     const primary = record.powers ?? [];
@@ -2854,26 +2899,26 @@ function MonsterTemplateFormattedView({
           </>
         ) : null}
 
-        {(record.traits ?? []).length > 0 ? (
+        {templateTraitsForDisplay.length > 0 ? (
           <>
             <div className="monster-stat-block-section-head">Traits</div>
             <div className="monster-stat-block-traits">
-              {(record.traits ?? []).map((trait, idx) => {
+              {templateTraitsForDisplay.map(({ trait, originalIdx }, displayIdx) => {
                 const auraCount = (record.auras ?? []).length;
                 const traitNameRaw = String(trait.name ?? "").trim();
                 const traitName = traitNameRaw || "Trait";
                 const traitBadges = renderTraitMetaBadges(trait);
                 return (
                   <div
-                    key={`${glossaryKeyPrefix}-trait-${idx}`}
+                    key={`${glossaryKeyPrefix}-trait-${originalIdx}`}
                     className="monster-stat-block-trait-row"
-                    data-stripe={(auraCount + idx) % 2 === 0 ? "even" : "odd"}
+                    data-stripe={(auraCount + displayIdx) % 2 === 0 ? "even" : "odd"}
                   >
                     <div className="monster-stat-block-trait-title">
                       <strong>{traitName}</strong>
                       {traitBadges.length > 0
                         ? traitBadges.map((badge) => (
-                            <span key={`${glossaryKeyPrefix}-trait-${idx}-b-${badge}`} className="monster-stat-block-trait-badge">
+                            <span key={`${glossaryKeyPrefix}-trait-${originalIdx}-b-${badge}`} className="monster-stat-block-trait-badge">
                               {badge}
                             </span>
                           ))
@@ -2885,7 +2930,7 @@ function MonsterTemplateFormattedView({
                         commonDescriptiveGlossaryPhrases,
                         startGlossaryHover,
                         leaveGlossaryHover,
-                        `${glossaryKeyPrefix}-trait-${idx}`,
+                        `${glossaryKeyPrefix}-trait-${originalIdx}`,
                         shouldHighlightGlossaryTerm
                       )}
                     </div>
@@ -2898,7 +2943,7 @@ function MonsterTemplateFormattedView({
                             onTemplateSnippetCommit((base) => {
                               if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return base;
                               const traits = [...(base.traits ?? [])];
-                              traits[idx] = parsed as MonsterTrait;
+                              traits[originalIdx] = parsed as MonsterTrait;
                               return { ...base, traits };
                             })
                           }
@@ -2987,6 +3032,279 @@ const MONSTER_GLOSSARY_TOOLTIP_ID = "monster-glossary-tooltip";
 /** Native DnD payload for encounter roster reorder (index as decimal string). */
 const ENCOUNTER_ROSTER_INDEX_DRAG_MIME = "text/plain";
 
+const ENCOUNTER_PRINT_COLUMN_OPTIONS = [1, 2, 3] as const;
+
+/** Native DnD payload: index in the print preview order list (decimal string). */
+const ENCOUNTER_PRINT_PREVIEW_ORDER_DRAG_MIME = "text/plain";
+
+/** Align “new page” blocks to preview page height (single-column measure strip only; print still uses CSS page-break). */
+function computeEncounterPrintPreviewPageBreakMargins(
+  measureRoot: HTMLElement,
+  pageH: number,
+  pageBreakIds: Set<string>
+): Record<string, number> {
+  if (pageH <= 0 || pageBreakIds.size === 0) return {};
+  const rootRect = measureRoot.getBoundingClientRect();
+  const blocks = [...measureRoot.querySelectorAll("[data-encounter-print-roster-id]")] as HTMLElement[];
+  const out: Record<string, number> = {};
+  for (const block of blocks) {
+    const id = block.dataset.encounterPrintRosterId;
+    if (!id || !pageBreakIds.has(id)) continue;
+    const top = block.getBoundingClientRect().top - rootRect.top;
+    let target = Math.ceil(top / pageH) * pageH;
+    if (target <= top + 0.75) target += pageH;
+    const extra = Math.max(0, target - top);
+    if (extra > 0.25) out[id] = Math.round(extra * 100) / 100;
+  }
+  return out;
+}
+
+function EncounterPrintPreviewSheetMarkup({
+  encounterTitle,
+  includeEncounterHeader,
+  encounterPrintCreatureListLines,
+  encounterRosterXpTotals,
+  encounterPrintRowsOrdered,
+  columnBreakBeforeIdSet,
+  pageBreakBeforeIdSet,
+  /** Preview-only; omit on `#print-encounter-sheet` so print uses CSS page breaks only. */
+  previewPageBreakMarginTopPx,
+  statBlockKeyPrefix,
+  pageIndex,
+  interactive,
+  encounterPrintPreviewDraggingIndex,
+  encounterPrintPreviewDragOverIndex,
+  setEncounterPrintPreviewDragOverIndex,
+  setEncounterPrintPreviewDraggingIndex,
+  reorderEncounterPrintOrder,
+  moveEncounterPrintOrder,
+  toggleEncounterPrintColumnBreakGroup,
+  toggleEncounterPrintPageBreakGroup,
+  glossaryTooltipUi,
+  startGlossaryHover,
+  leaveGlossaryHover,
+  shouldHighlightGlossaryTerm,
+  formatXpInteger
+}: {
+  encounterTitle: string;
+  encounterPrintCreatureListLines: string[];
+  encounterRosterXpTotals: { sum: number; parsed: number; total: number };
+  encounterPrintRowsOrdered: EncounterRosterRow[];
+  columnBreakBeforeIdSet: Set<string>;
+  pageBreakBeforeIdSet: Set<string>;
+  previewPageBreakMarginTopPx?: Record<string, number>;
+  statBlockKeyPrefix: string;
+  pageIndex: number;
+  interactive: boolean;
+  encounterPrintPreviewDraggingIndex: number | null;
+  encounterPrintPreviewDragOverIndex: number | null;
+  setEncounterPrintPreviewDragOverIndex: (v: number | null) => void;
+  setEncounterPrintPreviewDraggingIndex: (v: number | null) => void;
+  reorderEncounterPrintOrder: (fromIndex: number, toIndex: number) => void;
+  moveEncounterPrintOrder: (index: number, direction: -1 | 1) => void;
+  toggleEncounterPrintColumnBreakGroup: (row: EncounterRosterRow) => void;
+  toggleEncounterPrintPageBreakGroup: (row: EncounterRosterRow) => void;
+  glossaryTooltipUi: EncounterRosterGlossaryTooltipUi;
+  startGlossaryHover: (event: ReactMouseEvent<HTMLElement>, key: MonsterGlossaryHoverKey) => void;
+  leaveGlossaryHover: () => void;
+  shouldHighlightGlossaryTerm: (term: string) => boolean;
+  formatXpInteger: (n: number) => string;
+}): JSX.Element {
+  const encounterPrintCardRows = useMemo(() => {
+    const memberGroups = new Map<string, EncounterRosterRow[]>();
+    for (const r of encounterPrintRowsOrdered) {
+      const k = encounterPrintCreatureGroupKey(r);
+      const arr = memberGroups.get(k) ?? [];
+      arr.push(r);
+      memberGroups.set(k, arr);
+    }
+    const seen = new Set<string>();
+    const out: Array<{
+      row: EncounterRosterRow;
+      sourceIndex: number;
+      columnBreak: boolean;
+      pageBreak: boolean;
+    }> = [];
+    encounterPrintRowsOrdered.forEach((row, sourceIndex) => {
+      const k = encounterPrintCreatureGroupKey(row);
+      if (seen.has(k)) return;
+      seen.add(k);
+      const members = memberGroups.get(k) ?? [row];
+      const columnBreak = members.some((m) => columnBreakBeforeIdSet.has(m.rosterInstanceId));
+      const pageBreak = members.some((m) => pageBreakBeforeIdSet.has(m.rosterInstanceId));
+      out.push({ row, sourceIndex, columnBreak, pageBreak });
+    });
+    return out;
+  }, [encounterPrintRowsOrdered, columnBreakBeforeIdSet, pageBreakBeforeIdSet]);
+
+  const lastIdx = encounterPrintRowsOrdered.length - 1;
+  return (
+    <>
+      {includeEncounterHeader ? (
+        <header className="print-encounter-header">
+          <h1 className="print-encounter-title">{encounterTitle}</h1>
+          <div className="print-encounter-meta">
+            <span className="print-encounter-meta-title">Creatures:</span>
+            {encounterPrintCreatureListLines.length > 0 ? (
+              <ul className="print-encounter-meta-creature-list">
+                {encounterPrintCreatureListLines.map((line, i) => (
+                  <li key={i}>{line}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="print-encounter-meta-empty">No creatures</p>
+            )}
+            {encounterRosterXpTotals.parsed > 0 ? (
+              <p className="print-encounter-meta-xp">
+                <span className="print-encounter-meta-xp-label">Total XP:</span>
+                {"  "}
+                {formatXpInteger(encounterRosterXpTotals.sum)}
+                {encounterRosterXpTotals.parsed < encounterRosterXpTotals.total ? (
+                  <span className="print-encounter-meta-note">
+                    {" "}
+                    ({encounterRosterXpTotals.parsed} of {encounterRosterXpTotals.total} with numeric XP)
+                  </span>
+                ) : null}
+              </p>
+            ) : null}
+          </div>
+        </header>
+      ) : null}
+      {encounterPrintCardRows.map(({ row, sourceIndex: idx, columnBreak, pageBreak }) => {
+        const isDropTarget =
+          interactive &&
+          encounterPrintPreviewDragOverIndex === idx &&
+          encounterPrintPreviewDraggingIndex !== null &&
+          encounterPrintPreviewDraggingIndex !== idx;
+        const previewBreakMt = previewPageBreakMarginTopPx?.[row.rosterInstanceId];
+        return (
+          <section
+            key={`${row.rosterInstanceId}-pg${pageIndex}`}
+            data-encounter-print-roster-id={row.rosterInstanceId}
+            className={
+              "print-encounter-block" +
+              (columnBreak ? " print-encounter-block--column-break" : "") +
+              (pageBreak ? " print-encounter-block--page-break" : "")
+            }
+            onDragOver={
+              interactive
+                ? (event) => {
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                    setEncounterPrintPreviewDragOverIndex(idx);
+                  }
+                : undefined
+            }
+            onDrop={
+              interactive
+                ? (event) => {
+                    event.preventDefault();
+                    const raw = event.dataTransfer.getData(ENCOUNTER_PRINT_PREVIEW_ORDER_DRAG_MIME).trim();
+                    const fromIndex = Number.parseInt(raw, 10);
+                    if (Number.isNaN(fromIndex) || fromIndex === idx) {
+                      setEncounterPrintPreviewDragOverIndex(null);
+                      return;
+                    }
+                    reorderEncounterPrintOrder(fromIndex, idx);
+                    setEncounterPrintPreviewDragOverIndex(null);
+                  }
+                : undefined
+            }
+            style={{
+              opacity: interactive && encounterPrintPreviewDraggingIndex === idx ? 0.55 : 1,
+              boxShadow: isDropTarget ? "inset 0 0 0 2px var(--panel-border-strong)" : undefined,
+              borderRadius: "0.22rem",
+              ...(typeof previewBreakMt === "number" && previewBreakMt > 0
+                ? { marginTop: previewBreakMt }
+                : {})
+            }}
+          >
+            {interactive ? (
+              <div className="print-encounter-preview-card-controls" onClick={(e) => e.stopPropagation()}>
+                <span
+                  draggable
+                  tabIndex={0}
+                  aria-label="Drag to reorder in printout"
+                  title="Drag to reorder"
+                  onDragStart={(event) => {
+                    event.dataTransfer.setData(ENCOUNTER_PRINT_PREVIEW_ORDER_DRAG_MIME, String(idx));
+                    event.dataTransfer.effectAllowed = "move";
+                    setEncounterPrintPreviewDraggingIndex(idx);
+                  }}
+                  className="print-encounter-preview-drag-handle"
+                >
+                  ⋮⋮
+                </span>
+                <div className="print-encounter-preview-card-controls-move">
+                  <button
+                    type="button"
+                    className="print-encounter-preview-icon-btn"
+                    aria-label="Move up in printout"
+                    title="Move up"
+                    disabled={idx === 0}
+                    onClick={() => moveEncounterPrintOrder(idx, -1)}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    className="print-encounter-preview-icon-btn"
+                    aria-label="Move down in printout"
+                    title="Move down"
+                    disabled={idx >= lastIdx}
+                    onClick={() => moveEncounterPrintOrder(idx, 1)}
+                  >
+                    ↓
+                  </button>
+                </div>
+                <label className="print-encounter-preview-column-break-label">
+                  <input
+                    type="checkbox"
+                    checked={columnBreak}
+                    disabled={idx === 0}
+                    onChange={() => toggleEncounterPrintColumnBreakGroup(row)}
+                    aria-label={
+                      idx === 0
+                        ? "First creature already starts at the top"
+                        : "Start this creature at the top of the next column"
+                    }
+                  />
+                  <span>New column</span>
+                </label>
+                <label className="print-encounter-preview-column-break-label">
+                  <input
+                    type="checkbox"
+                    checked={pageBreak}
+                    disabled={idx === 0}
+                    onChange={() => toggleEncounterPrintPageBreakGroup(row)}
+                    aria-label={
+                      idx === 0
+                        ? "First creature already starts the document"
+                        : "Start this creature on a new printed page"
+                    }
+                  />
+                  <span>New page</span>
+                </label>
+              </div>
+            ) : null}
+            <MonsterStatBlockCard
+              monster={row.snapshot}
+              statBlockKeyPrefix={`${statBlockKeyPrefix}-${row.rosterInstanceId}`}
+              glossaryTooltipUi={glossaryTooltipUi}
+              startGlossaryHover={startGlossaryHover}
+              leaveGlossaryHover={leaveGlossaryHover}
+              shouldHighlightGlossaryTerm={shouldHighlightGlossaryTerm}
+              powersPresentation="statBlock"
+              powersShowJson={false}
+              cardExtraClassName="monster-stat-block-card--print"
+            />
+          </section>
+        );
+      })}
+    </>
+  );
+}
+
 export function MonsterEditorApp({
   index,
   tooltipGlossary
@@ -3044,7 +3362,101 @@ export function MonsterEditorApp({
   const [pinnedMonsterListColumnWidthPx, setPinnedMonsterListColumnWidthPx] = useState<number | null>(null);
   const [encounterRosterDraggingIndex, setEncounterRosterDraggingIndex] = useState<number | null>(null);
   const [encounterRosterDragOverIndex, setEncounterRosterDragOverIndex] = useState<number | null>(null);
+  const [encounterPrintPreviewOpen, setEncounterPrintPreviewOpen] = useState(false);
+  const [encounterPrintOrderedIds, setEncounterPrintOrderedIds] = useState<string[]>([]);
+  const [encounterPrintColumnBreakBeforeIdSet, setEncounterPrintColumnBreakBeforeIdSet] = useState<Set<string>>(
+    () => new Set()
+  );
+  const [encounterPrintPageBreakBeforeIdSet, setEncounterPrintPageBreakBeforeIdSet] = useState<Set<string>>(
+    () => new Set()
+  );
+  const [encounterPrintPreviewPageHeightPx, setEncounterPrintPreviewPageHeightPx] = useState(0);
+  /** When using 2+ columns, each preview “page” steps horizontally across the multicol flow. */
+  const [encounterPrintPreviewPageWidthPx, setEncounterPrintPreviewPageWidthPx] = useState(0);
+  const [encounterPrintPreviewPageBreakMarginTopPx, setEncounterPrintPreviewPageBreakMarginTopPx] = useState<
+    Record<string, number>
+  >({});
+  const [encounterPrintPreviewPageCount, setEncounterPrintPreviewPageCount] = useState(1);
+  const [encounterPrintPreviewDraggingIndex, setEncounterPrintPreviewDraggingIndex] = useState<number | null>(null);
+  const [encounterPrintPreviewDragOverIndex, setEncounterPrintPreviewDragOverIndex] = useState<number | null>(null);
+  const [encounterPrintColumnCount, setEncounterPrintColumnCount] = useState<number>(2);
+  const [encounterPrintPageOrientation, setEncounterPrintPageOrientation] = useState<"portrait" | "landscape">(
+    "portrait"
+  );
+  /** Off-screen sheet + preview mirrors: encounter name, creature-summary line, XP (toggle together). */
+  const [encounterPrintPreviewIncludeEncounterHeader, setEncounterPrintPreviewIncludeEncounterHeader] =
+    useState(true);
   const monsterListColumnRef = useRef<HTMLDivElement | null>(null);
+  const printPreviewScrollRef = useRef<HTMLDivElement | null>(null);
+  const printPreviewHintRef = useRef<HTMLParagraphElement | null>(null);
+  const printEncounterSheetRef = useRef<HTMLDivElement | null>(null);
+  /** Single-column, auto-height flow used only to measure total scroll height for paged preview (multicol overflow is horizontal). */
+  const printEncounterMeasureRootRef = useRef<HTMLDivElement | null>(null);
+  /** First stacked preview frame’s multicol root: must match translateX step width (modal is narrower than the off-screen print sheet). */
+  const printPreviewMulticolViewportRef = useRef<HTMLDivElement | null>(null);
+  const printEncounterPreviewBlocksRef = useRef<HTMLDivElement | null>(null);
+  /** Latest ordered roster for print measure (merge duplicate stat-card breaks onto canonical ids). */
+  const encounterPrintRowsOrderedRef = useRef<EncounterRosterRow[]>([]);
+
+  const encounterPrintGuidePeriod = useMemo(
+    () => (encounterPrintPageOrientation === "landscape" ? "calc(8.5in - 0.7in)" : "calc(11in - 0.7in)"),
+    [encounterPrintPageOrientation]
+  );
+
+  const encounterPrintRootStyle = useMemo((): CSSProperties => {
+    return {
+      columnCount: encounterPrintColumnCount,
+      ["--encounter-print-guide-period" as string]: encounterPrintGuidePeriod,
+      page: encounterPrintPageOrientation === "landscape" ? "encounter-landscape" : "encounter-portrait"
+    };
+  }, [encounterPrintColumnCount, encounterPrintGuidePeriod, encounterPrintPageOrientation]);
+
+  const measureEncounterPrintPreviewPagination = useCallback((): void => {
+    if (encounterPrintColumnCount > 1) {
+      const viewport = printPreviewMulticolViewportRef.current;
+      const sheet = printEncounterSheetRef.current;
+      const root = viewport ?? sheet;
+      if (!root) return;
+      const vw = root.clientWidth;
+      const vh = root.offsetHeight;
+      if (vh <= 0 || vw <= 0) return;
+      const totalW = root.scrollWidth;
+      const pages = Math.min(40, Math.max(1, Math.ceil(totalW / vw)));
+      setEncounterPrintPreviewPageHeightPx(vh);
+      setEncounterPrintPreviewPageWidthPx(vw);
+      setEncounterPrintPreviewPageCount(pages);
+      setEncounterPrintPreviewPageBreakMarginTopPx({});
+      return;
+    }
+
+    const sheet = printEncounterSheetRef.current;
+    const measureRoot = printEncounterMeasureRootRef.current;
+    if (!sheet || !measureRoot) return;
+    const pageH = sheet.offsetHeight;
+    if (pageH <= 0) return;
+    setEncounterPrintPreviewPageBreakMarginTopPx(
+      computeEncounterPrintPreviewPageBreakMargins(
+        measureRoot,
+        pageH,
+        mergeEncounterPrintBreakIdsForDedupedCards(
+          encounterPrintRowsOrderedRef.current,
+          encounterPrintPageBreakBeforeIdSet
+        )
+      )
+    );
+    requestAnimationFrame(() => {
+      const sh = printEncounterSheetRef.current;
+      const mr = printEncounterMeasureRootRef.current;
+      if (!sh || !mr) return;
+      const ph = sh.offsetHeight;
+      if (ph <= 0) return;
+      const totalH = Math.max(mr.scrollHeight, ph);
+      const pages = Math.min(40, Math.max(1, Math.ceil(totalH / ph)));
+      setEncounterPrintPreviewPageHeightPx(ph);
+      setEncounterPrintPreviewPageWidthPx(0);
+      setEncounterPrintPreviewPageCount(pages);
+    });
+  }, [encounterPrintColumnCount, encounterPrintPageBreakBeforeIdSet]);
 
   const collapseEncounterRosterPanel = useCallback(() => {
     const w = monsterListColumnRef.current?.offsetWidth;
@@ -3250,6 +3662,32 @@ export function MonsterEditorApp({
     }
     return { sum, parsed, total: encounterRoster.length };
   }, [encounterRoster]);
+
+  const encounterRosterByInstanceId = useMemo(() => {
+    const m = new Map<string, EncounterRosterRow>();
+    for (const row of encounterRoster) {
+      m.set(row.rosterInstanceId, row);
+    }
+    return m;
+  }, [encounterRoster]);
+
+  const encounterRosterIdKey = useMemo(
+    () => encounterRoster.map((r) => r.rosterInstanceId).join("\n"),
+    [encounterRoster]
+  );
+
+  const encounterPrintRowsOrdered = useMemo((): EncounterRosterRow[] => {
+    return encounterPrintOrderedIds
+      .map((id) => encounterRosterByInstanceId.get(id))
+      .filter((row): row is EncounterRosterRow => row !== undefined);
+  }, [encounterPrintOrderedIds, encounterRosterByInstanceId]);
+
+  encounterPrintRowsOrderedRef.current = encounterPrintRowsOrdered;
+
+  const encounterPrintCreatureListLines = useMemo(
+    () => buildEncounterPrintCreatureListLines(encounterPrintRowsOrdered),
+    [encounterPrintRowsOrdered]
+  );
 
   const customMonsterIdSet = useMemo(
     () => new Set(readCustomMonsterEntries().map((m) => m.id)),
@@ -3502,16 +3940,8 @@ export function MonsterEditorApp({
 
   const displayedTraits = useMemo(() => {
     if (!formatMonster || !Array.isArray(formatMonster.traits)) return [];
-    const normalize = (value: unknown): string => String(value ?? "").trim().toLowerCase();
-    const auraSignatures = new Set(
-      displayedAuras.map((aura) =>
-        [normalize(aura.name), normalize(aura.range), normalize(aura.details)].join("||")
-      )
-    );
-    return formatMonster.traits.filter((trait) => {
-      const signature = [normalize(trait.name), normalize(trait.range), normalize(trait.details)].join("||");
-      return !auraSignatures.has(signature);
-    });
+    const auraSignatures = new Set(displayedAuras.map(traitSignature));
+    return formatMonster.traits.filter((trait) => !auraSignatures.has(traitSignature(trait)));
   }, [formatMonster, displayedAuras]);
 
   const auraHeadingColumnWidthCh = useMemo(() => {
@@ -3707,6 +4137,210 @@ export function MonsterEditorApp({
     },
     [index, tooltipGlossary]
   );
+
+  const closeEncounterPrintPreview = useCallback(() => {
+    setEncounterPrintPreviewOpen(false);
+  }, []);
+
+  const openEncounterPrintPreview = useCallback(() => {
+    setEncounterPrintOrderedIds(encounterRoster.map((r) => r.rosterInstanceId));
+    setEncounterPrintColumnBreakBeforeIdSet(new Set());
+    setEncounterPrintPageBreakBeforeIdSet(new Set());
+    setEncounterPrintPreviewDraggingIndex(null);
+    setEncounterPrintPreviewDragOverIndex(null);
+    setEncounterPrintPreviewOpen(true);
+  }, [encounterRoster]);
+
+  const reorderEncounterPrintOrder = useCallback((fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return;
+    setEncounterPrintOrderedIds((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  }, []);
+
+  const moveEncounterPrintOrder = useCallback((index: number, direction: -1 | 1) => {
+    setEncounterPrintOrderedIds((prev) => {
+      const j = index + direction;
+      if (j < 0 || j >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[j]] = [next[j]!, next[index]!];
+      return next;
+    });
+  }, []);
+
+  const toggleEncounterPrintColumnBreakGroup = useCallback(
+    (canonicalRow: EncounterRosterRow) => {
+      const k = encounterPrintCreatureGroupKey(canonicalRow);
+      const members = encounterPrintRowsOrdered.filter((r) => encounterPrintCreatureGroupKey(r) === k);
+      setEncounterPrintColumnBreakBeforeIdSet((prev) => {
+        const anyOn = members.some((m) => prev.has(m.rosterInstanceId));
+        const next = new Set(prev);
+        if (anyOn) for (const m of members) next.delete(m.rosterInstanceId);
+        else for (const m of members) next.add(m.rosterInstanceId);
+        return next;
+      });
+    },
+    [encounterPrintRowsOrdered]
+  );
+
+  const toggleEncounterPrintPageBreakGroup = useCallback(
+    (canonicalRow: EncounterRosterRow) => {
+      const k = encounterPrintCreatureGroupKey(canonicalRow);
+      const members = encounterPrintRowsOrdered.filter((r) => encounterPrintCreatureGroupKey(r) === k);
+      setEncounterPrintPageBreakBeforeIdSet((prev) => {
+        const anyOn = members.some((m) => prev.has(m.rosterInstanceId));
+        const next = new Set(prev);
+        if (anyOn) for (const m of members) next.delete(m.rosterInstanceId);
+        else for (const m of members) next.add(m.rosterInstanceId);
+        return next;
+      });
+    },
+    [encounterPrintRowsOrdered]
+  );
+
+  useEffect(() => {
+    if (!encounterPrintPreviewOpen) return;
+    setEncounterPrintOrderedIds((prev) => {
+      const valid = new Set(encounterRoster.map((r) => r.rosterInstanceId));
+      const kept = prev.filter((id) => valid.has(id));
+      for (const row of encounterRoster) {
+        if (!kept.includes(row.rosterInstanceId)) {
+          kept.push(row.rosterInstanceId);
+        }
+      }
+      return kept;
+    });
+  }, [encounterPrintPreviewOpen, encounterRoster, encounterRosterIdKey]);
+
+  useEffect(() => {
+    if (!encounterPrintPreviewOpen) return;
+    const valid = new Set(encounterRoster.map((r) => r.rosterInstanceId));
+    setEncounterPrintColumnBreakBeforeIdSet((prev) => {
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (valid.has(id)) next.add(id);
+      }
+      return next;
+    });
+  }, [encounterPrintPreviewOpen, encounterRoster, encounterRosterIdKey]);
+
+  useEffect(() => {
+    if (!encounterPrintPreviewOpen) return;
+    const valid = new Set(encounterRoster.map((r) => r.rosterInstanceId));
+    setEncounterPrintPageBreakBeforeIdSet((prev) => {
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (valid.has(id)) next.add(id);
+      }
+      return next;
+    });
+  }, [encounterPrintPreviewOpen, encounterRoster, encounterRosterIdKey]);
+
+  useLayoutEffect(() => {
+    if (!encounterPrintPreviewOpen) {
+      setEncounterPrintPreviewPageHeightPx(0);
+      setEncounterPrintPreviewPageWidthPx(0);
+      setEncounterPrintPreviewPageBreakMarginTopPx({});
+      setEncounterPrintPreviewPageCount(1);
+      return;
+    }
+    const measure = measureEncounterPrintPreviewPagination;
+    measure();
+    const sheet = printEncounterSheetRef.current;
+    const measureRoot = printEncounterMeasureRootRef.current;
+    const scroll = printPreviewScrollRef.current;
+    const blocks = printEncounterPreviewBlocksRef.current;
+    const ro = new ResizeObserver(() => {
+      requestAnimationFrame(measure);
+    });
+    if (sheet) ro.observe(sheet);
+    if (measureRoot) ro.observe(measureRoot);
+    if (encounterPrintColumnCount > 1 && printPreviewMulticolViewportRef.current) {
+      ro.observe(printPreviewMulticolViewportRef.current);
+    }
+    if (scroll) ro.observe(scroll);
+    if (blocks) ro.observe(blocks);
+    let mo: MutationObserver | undefined;
+    if (sheet) {
+      mo = new MutationObserver(() => {
+        requestAnimationFrame(measure);
+      });
+      mo.observe(sheet, { subtree: true, childList: true, characterData: true, attributes: true });
+    }
+    let moMeasure: MutationObserver | undefined;
+    if (measureRoot) {
+      moMeasure = new MutationObserver(() => {
+        requestAnimationFrame(measure);
+      });
+      moMeasure.observe(measureRoot, { subtree: true, childList: true, characterData: true, attributes: true });
+    }
+    window.addEventListener("resize", measure);
+    const t1 = window.setTimeout(measure, 80);
+    const t2 = window.setTimeout(measure, 200);
+    const t3 = window.setTimeout(measure, 500);
+    return () => {
+      ro.disconnect();
+      mo?.disconnect();
+      moMeasure?.disconnect();
+      window.removeEventListener("resize", measure);
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+      window.clearTimeout(t3);
+    };
+  }, [
+    encounterPrintPreviewOpen,
+    measureEncounterPrintPreviewPagination,
+    encounterPrintGuidePeriod,
+    encounterPrintColumnCount,
+    encounterPrintPageOrientation,
+    encounterPrintRowsOrdered,
+    encounterPrintPreviewIncludeEncounterHeader
+  ]);
+
+  const confirmEncounterPrint = useCallback(() => {
+    document.body.classList.add("print-encounter-active");
+    const onAfterPrint = (): void => {
+      document.body.classList.remove("print-encounter-active");
+      printEncounterSheetRef.current?.setAttribute("aria-hidden", "true");
+      setEncounterPrintPreviewOpen(false);
+    };
+    window.addEventListener("afterprint", onAfterPrint, { once: true });
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        window.print();
+      });
+    });
+  }, []);
+
+  /** aria-hidden on the off-screen sheet hides duplicate content from assistive tech; strip it for printing so engines print all nodes. */
+  useEffect(() => {
+    if (!encounterPrintPreviewOpen) return;
+    const onBeforePrint = (): void => {
+      if (!document.body.classList.contains("print-encounter-active")) return;
+      printEncounterSheetRef.current?.removeAttribute("aria-hidden");
+    };
+    const onAfterPrint = (): void => {
+      printEncounterSheetRef.current?.setAttribute("aria-hidden", "true");
+    };
+    window.addEventListener("beforeprint", onBeforePrint);
+    window.addEventListener("afterprint", onAfterPrint);
+    return () => {
+      window.removeEventListener("beforeprint", onBeforePrint);
+      window.removeEventListener("afterprint", onAfterPrint);
+    };
+  }, [encounterPrintPreviewOpen]);
+
+  useEffect(() => {
+    if (!encounterPrintPreviewOpen) return;
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === "Escape") closeEncounterPrintPreview();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [encounterPrintPreviewOpen, closeEncounterPrintPreview]);
 
   const createDraftTemplateRecord = useMemo((): MonsterTemplateRecord | null => {
     if (viewerTab !== "createTemplate") return null;
@@ -5506,11 +6140,32 @@ export function MonsterEditorApp({
                         style={{
                           flexShrink: 0,
                           display: "flex",
+                          flexWrap: "wrap",
                           justifyContent: "flex-end",
+                          gap: "0.35rem",
                           margin: "0 0 0.35rem 0",
                           minWidth: 0
                         }}
                       >
+                        <button
+                          type="button"
+                          onClick={openEncounterPrintPreview}
+                          disabled={encounterPrintPreviewOpen}
+                          title="Preview encounter stat blocks, then print"
+                          style={{
+                            fontSize: "0.72rem",
+                            padding: "0.2rem 0.45rem",
+                            lineHeight: 1.3,
+                            borderRadius: "0.25rem",
+                            border: "1px solid var(--panel-border)",
+                            backgroundColor: "var(--surface-0)",
+                            color: "var(--text-primary)",
+                            cursor: encounterPrintPreviewOpen ? "default" : "pointer",
+                            opacity: encounterPrintPreviewOpen ? 0.65 : 1
+                          }}
+                        >
+                          Print encounter
+                        </button>
                         <button
                           type="button"
                           onClick={() => setEncounterRosterStatCardsExpandAll((prev) => !prev)}
@@ -6101,6 +6756,260 @@ export function MonsterEditorApp({
           </details>
         ) : null}
       </div>
+
+      {encounterPrintPreviewOpen && encounterActive && encounterRoster.length > 0
+        ? createPortal(
+            <div
+              className="print-encounter-preview-overlay"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Encounter print preview"
+            >
+              <button
+                type="button"
+                className="print-encounter-preview-backdrop"
+                aria-label="Close preview"
+                tabIndex={-1}
+                onClick={closeEncounterPrintPreview}
+              />
+              <div className="print-encounter-preview-dialog">
+                <div className="print-encounter-preview-toolbar">
+                  <span className="print-encounter-preview-toolbar-label">Print preview</span>
+                  <div className="print-encounter-preview-toolbar-options" aria-label="Print layout">
+                    <label className="print-encounter-preview-field">
+                      <span className="print-encounter-preview-field-text">Columns</span>
+                      <select
+                        className="print-encounter-preview-select"
+                        value={encounterPrintColumnCount}
+                        onChange={(e) => setEncounterPrintColumnCount(Number(e.target.value))}
+                        aria-label="Number of columns"
+                      >
+                        {ENCOUNTER_PRINT_COLUMN_OPTIONS.map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="print-encounter-preview-field">
+                      <span className="print-encounter-preview-field-text">Paper</span>
+                      <select
+                        className="print-encounter-preview-select"
+                        value={encounterPrintPageOrientation}
+                        onChange={(e) =>
+                          setEncounterPrintPageOrientation(e.target.value === "landscape" ? "landscape" : "portrait")
+                        }
+                        aria-label="Printed page orientation"
+                      >
+                        <option value="portrait">Portrait</option>
+                        <option value="landscape">Landscape</option>
+                      </select>
+                    </label>
+                    <label
+                      className="print-encounter-preview-field print-encounter-preview-field--toggle"
+                      title="Encounter name (title), creature summary list, and total XP"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={encounterPrintPreviewIncludeEncounterHeader}
+                        onChange={(e) => setEncounterPrintPreviewIncludeEncounterHeader(e.target.checked)}
+                      />
+                      <span>Encounter header</span>
+                    </label>
+                  </div>
+                  <div className="print-encounter-preview-toolbar-actions">
+                    <button type="button" className="print-encounter-preview-btn" onClick={closeEncounterPrintPreview}>
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="print-encounter-preview-btn print-encounter-preview-btn--primary"
+                      onClick={confirmEncounterPrint}
+                    >
+                      Print…
+                    </button>
+                  </div>
+                </div>
+                <div ref={printPreviewScrollRef} className="print-encounter-preview-scroll">
+                  <p ref={printPreviewHintRef} className="print-encounter-preview-hint">
+                    Drag <span aria-hidden>⋮⋮</span> or use the arrows on the first page to reorder. With one column,
+                    stacked frames step downward; with two or three columns, frames step sideways across the same multicol
+                    flow as print (US Letter, 0.35&quot; margins). Compare with Print… / PDF.
+                  </p>
+                  <div
+                    ref={printEncounterPreviewBlocksRef}
+                    className="print-encounter-preview-blocks"
+                    style={{ ["--encounter-print-guide-period" as string]: encounterPrintGuidePeriod }}
+                    onDragEnd={() => {
+                      setEncounterPrintPreviewDraggingIndex(null);
+                      setEncounterPrintPreviewDragOverIndex(null);
+                    }}
+                  >
+                    <div
+                      id="print-encounter-sheet"
+                      ref={printEncounterSheetRef}
+                      className={
+                        "print-encounter-root print-encounter-root--preview print-encounter-sheet--offscreen" +
+                        (encounterPrintPageOrientation === "landscape"
+                          ? " print-encounter-root--preview-landscape"
+                          : "")
+                      }
+                      style={encounterPrintRootStyle}
+                      aria-hidden
+                    >
+                      <EncounterPrintPreviewSheetMarkup
+                        encounterTitle={encounterActive.name.trim() || "Encounter"}
+                        includeEncounterHeader={encounterPrintPreviewIncludeEncounterHeader}
+                        encounterPrintCreatureListLines={encounterPrintCreatureListLines}
+                        encounterRosterXpTotals={encounterRosterXpTotals}
+                        encounterPrintRowsOrdered={encounterPrintRowsOrdered}
+                        columnBreakBeforeIdSet={encounterPrintColumnBreakBeforeIdSet}
+                        pageBreakBeforeIdSet={encounterPrintPageBreakBeforeIdSet}
+                        statBlockKeyPrefix="print-encounter"
+                        pageIndex={0}
+                        interactive
+                        encounterPrintPreviewDraggingIndex={encounterPrintPreviewDraggingIndex}
+                        encounterPrintPreviewDragOverIndex={encounterPrintPreviewDragOverIndex}
+                        setEncounterPrintPreviewDragOverIndex={setEncounterPrintPreviewDragOverIndex}
+                        setEncounterPrintPreviewDraggingIndex={setEncounterPrintPreviewDraggingIndex}
+                        reorderEncounterPrintOrder={reorderEncounterPrintOrder}
+                        moveEncounterPrintOrder={moveEncounterPrintOrder}
+                        toggleEncounterPrintColumnBreakGroup={toggleEncounterPrintColumnBreakGroup}
+                        toggleEncounterPrintPageBreakGroup={toggleEncounterPrintPageBreakGroup}
+                        glossaryTooltipUi={glossaryTooltipUi}
+                        startGlossaryHover={startGlossaryHover}
+                        leaveGlossaryHover={leaveGlossaryHover}
+                        shouldHighlightGlossaryTerm={shouldHighlightGlossaryTerm}
+                        formatXpInteger={formatXpInteger}
+                      />
+                    </div>
+                    <div
+                      className={
+                        "print-encounter-measure-strip" +
+                        (encounterPrintPageOrientation === "landscape"
+                          ? " print-encounter-measure-strip--landscape"
+                          : "")
+                      }
+                      aria-hidden
+                    >
+                      <div
+                        ref={printEncounterMeasureRootRef}
+                        className={
+                          "print-encounter-root print-encounter-root--preview print-encounter-measure-root" +
+                          (encounterPrintPageOrientation === "landscape"
+                            ? " print-encounter-root--preview-landscape"
+                            : "")
+                        }
+                        style={encounterPrintRootStyle}
+                      >
+                        <EncounterPrintPreviewSheetMarkup
+                          encounterTitle={encounterActive.name.trim() || "Encounter"}
+                          includeEncounterHeader={encounterPrintPreviewIncludeEncounterHeader}
+                          encounterPrintCreatureListLines={encounterPrintCreatureListLines}
+                          encounterRosterXpTotals={encounterRosterXpTotals}
+                          encounterPrintRowsOrdered={encounterPrintRowsOrdered}
+                          columnBreakBeforeIdSet={encounterPrintColumnBreakBeforeIdSet}
+                          pageBreakBeforeIdSet={encounterPrintPageBreakBeforeIdSet}
+                          previewPageBreakMarginTopPx={encounterPrintPreviewPageBreakMarginTopPx}
+                          statBlockKeyPrefix="measure-encounter"
+                          pageIndex={0}
+                          interactive={false}
+                          encounterPrintPreviewDraggingIndex={encounterPrintPreviewDraggingIndex}
+                          encounterPrintPreviewDragOverIndex={encounterPrintPreviewDragOverIndex}
+                          setEncounterPrintPreviewDragOverIndex={setEncounterPrintPreviewDragOverIndex}
+                          setEncounterPrintPreviewDraggingIndex={setEncounterPrintPreviewDraggingIndex}
+                          reorderEncounterPrintOrder={reorderEncounterPrintOrder}
+                          moveEncounterPrintOrder={moveEncounterPrintOrder}
+                          toggleEncounterPrintColumnBreakGroup={toggleEncounterPrintColumnBreakGroup}
+                          toggleEncounterPrintPageBreakGroup={toggleEncounterPrintPageBreakGroup}
+                          glossaryTooltipUi={glossaryTooltipUi}
+                          startGlossaryHover={startGlossaryHover}
+                          leaveGlossaryHover={leaveGlossaryHover}
+                          shouldHighlightGlossaryTerm={shouldHighlightGlossaryTerm}
+                          formatXpInteger={formatXpInteger}
+                        />
+                      </div>
+                    </div>
+                    <div className="print-encounter-preview-page-stack" aria-label="Paged print preview">
+                      {Array.from({ length: encounterPrintPreviewPageCount }).map((_, pageIndex) => {
+                        const h = Math.max(1, encounterPrintPreviewPageHeightPx);
+                        const w = Math.max(1, encounterPrintPreviewPageWidthPx);
+                        const multicolPaging = encounterPrintColumnCount > 1;
+                        const shiftTransform = multicolPaging
+                          ? `translateX(-${pageIndex * w}px)`
+                          : `translateY(-${pageIndex * h}px)`;
+                        return (
+                          <div
+                            key={`print-preview-page-${pageIndex}`}
+                            className={
+                              "print-encounter-preview-page-shell" +
+                              (encounterPrintPageOrientation === "landscape"
+                                ? " print-encounter-preview-page-shell--landscape"
+                                : "")
+                            }
+                            style={{
+                              height: encounterPrintPreviewPageHeightPx > 0 ? h : undefined,
+                              minHeight: "var(--encounter-print-guide-period)"
+                            }}
+                          >
+                            <div
+                              className="print-encounter-preview-page-shift"
+                              style={{ transform: shiftTransform }}
+                            >
+                              <div
+                                ref={
+                                  multicolPaging && pageIndex === 0 ? printPreviewMulticolViewportRef : undefined
+                                }
+                                className={
+                                  "print-encounter-root print-encounter-root--preview print-encounter-preview-mirror-sheet" +
+                                  (encounterPrintColumnCount === 1
+                                    ? " print-encounter-preview-mirror-sheet--paged-flow"
+                                    : "") +
+                                  (encounterPrintPageOrientation === "landscape"
+                                    ? " print-encounter-root--preview-landscape"
+                                    : "")
+                                }
+                                style={encounterPrintRootStyle}
+                              >
+                                <EncounterPrintPreviewSheetMarkup
+                                  encounterTitle={encounterActive.name.trim() || "Encounter"}
+                                  includeEncounterHeader={encounterPrintPreviewIncludeEncounterHeader}
+                                  encounterPrintCreatureListLines={encounterPrintCreatureListLines}
+                                  encounterRosterXpTotals={encounterRosterXpTotals}
+                                  encounterPrintRowsOrdered={encounterPrintRowsOrdered}
+                                  columnBreakBeforeIdSet={encounterPrintColumnBreakBeforeIdSet}
+                                  pageBreakBeforeIdSet={encounterPrintPageBreakBeforeIdSet}
+                                  previewPageBreakMarginTopPx={encounterPrintPreviewPageBreakMarginTopPx}
+                                  statBlockKeyPrefix={`pv${pageIndex}`}
+                                  pageIndex={pageIndex}
+                                  interactive
+                                  encounterPrintPreviewDraggingIndex={encounterPrintPreviewDraggingIndex}
+                                  encounterPrintPreviewDragOverIndex={encounterPrintPreviewDragOverIndex}
+                                  setEncounterPrintPreviewDragOverIndex={setEncounterPrintPreviewDragOverIndex}
+                                  setEncounterPrintPreviewDraggingIndex={setEncounterPrintPreviewDraggingIndex}
+                                  reorderEncounterPrintOrder={reorderEncounterPrintOrder}
+                                  moveEncounterPrintOrder={moveEncounterPrintOrder}
+                                  toggleEncounterPrintColumnBreakGroup={toggleEncounterPrintColumnBreakGroup}
+                                  toggleEncounterPrintPageBreakGroup={toggleEncounterPrintPageBreakGroup}
+                                  glossaryTooltipUi={glossaryTooltipUi}
+                                  startGlossaryHover={startGlossaryHover}
+                                  leaveGlossaryHover={leaveGlossaryHover}
+                                  shouldHighlightGlossaryTerm={shouldHighlightGlossaryTerm}
+                                  formatXpInteger={formatXpInteger}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
 
       {glossaryTooltipUi.showPanel && glossaryTooltipUi.hoverKey && glossaryTooltipUi.panelPos && (
         <div
