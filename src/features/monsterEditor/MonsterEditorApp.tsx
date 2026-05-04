@@ -135,6 +135,9 @@ import {
   type EncounterStore
 } from "../encounterBuilder/encounterStorage";
 
+/** Turn on to show DMG-style roster generator above the encounter list (`EncounterGeneratorPanel`). */
+const SHOW_ENCOUNTER_BUILDER_PANEL = false;
+
 /** Matches CharacterSheetApp: panels, section titles, labels, and body scale. */
 const panelStyle: CSSProperties = {
   backgroundColor: "var(--surface-0)",
@@ -6209,7 +6212,7 @@ export function MonsterEditorApp({
                         </button>
                       </div>
                     ) : null}
-                    {encounterActive ? (
+                    {SHOW_ENCOUNTER_BUILDER_PANEL && encounterActive ? (
                       <EncounterGeneratorPanel
                         indexRows={indexRows}
                         encounterStore={encounterStore}
@@ -6225,8 +6228,7 @@ export function MonsterEditorApp({
                       </p>
                     ) : encounterRoster.length === 0 ? (
                       <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", margin: 0 }}>
-                        No creatures yet. Use <strong>Add to encounter</strong> on the stat block, or{" "}
-                        <strong>Encounter builder</strong> above.
+                        No creatures yet. Use <strong>Add to encounter</strong> on the stat block.
                       </p>
                     ) : (
                       <ul
