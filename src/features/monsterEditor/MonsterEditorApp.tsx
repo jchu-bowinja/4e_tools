@@ -2020,9 +2020,9 @@ function MonsterStatBlockCard({
       speedParts.push(`${entry.type} ${String(entry.value)}`);
     }
   }
-  const speedLine =
+  const speedValue =
     speedParts.length > 0
-      ? `Speed ${speedParts.join(", ")}${showPhasing ? "; phasing" : ""}`
+      ? `${speedParts.join(", ")}${showPhasing ? "; phasing" : ""}`
       : showPhasing
         ? "Phasing"
         : "";
@@ -2218,25 +2218,29 @@ function MonsterStatBlockCard({
             </div>
           </div>
         ) : null}
-        {speedLine || senseLine ? (
-          <div className="monster-stat-block-vitals__row">
-            <div className="monster-stat-block-vitals__cell">{speedLine || null}</div>
-            <div className="monster-stat-block-vitals__cell monster-stat-block-vitals__cell--right">
-              {senseLine
-                ? senseEntries.map((text, idx) => (
-                    <span key={`${statBlockKeyPrefix}-sense-${idx}`}>
-                      {idx > 0 ? ", " : null}
-                      <span
-                        {...glossaryTooltipUi.hoverA11y(
-                          buildGlossaryHoverKeyForTerm(text, { tryTitleCaseVariant: true })
-                        )}
-                        className="monster-stat-block-gloss"
-                      >
-                        {text}
-                      </span>
-                    </span>
-                  ))
-                : null}
+        {speedValue ? (
+          <div className="monster-stat-block-vitals__row monster-stat-block-vitals__row--label-value">
+            <span className="monster-stat-block-k monster-stat-block-vitals__label-col">Speed</span>
+            <div className="monster-stat-block-vitals__value-col">{speedValue}</div>
+          </div>
+        ) : null}
+        {senseLine ? (
+          <div className="monster-stat-block-vitals__row monster-stat-block-vitals__row--label-value">
+            <span className="monster-stat-block-k monster-stat-block-vitals__label-col">Senses</span>
+            <div className="monster-stat-block-vitals__value-col">
+              {senseEntries.map((text, idx) => (
+                <span key={`${statBlockKeyPrefix}-sense-${idx}`}>
+                  {idx > 0 ? ", " : null}
+                  <span
+                    {...glossaryTooltipUi.hoverA11y(
+                      buildGlossaryHoverKeyForTerm(text, { tryTitleCaseVariant: true })
+                    )}
+                    className="monster-stat-block-gloss"
+                  >
+                    {text}
+                  </span>
+                </span>
+              ))}
             </div>
           </div>
         ) : null}
