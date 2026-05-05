@@ -102,13 +102,13 @@ function appendNestedOutcomeLines(
     for (const entry of nestedRaw) {
       if (typeof entry === "string") {
         const text = normalizeSemicolonWhitespace(entry.trim());
-        if (isRenderableCardValue(text)) lines.push({ label: "NESTED ATTACK", text, indentLevel });
+        if (isRenderableCardValue(text)) lines.push({ label: "ATTACK", text, indentLevel });
         continue;
       }
       const mini = entry as MonsterPowerOutcome;
       const head = normalizeSemicolonWhitespace(String(mini.description || "").trim());
       if (isRenderableCardValue(head)) {
-        lines.push({ label: "NESTED ATTACK", text: head, indentLevel });
+        lines.push({ label: "ATTACK", text: head, indentLevel });
       }
       appendNestedOutcomeLines(lines, { ...mini, description: undefined, nestedAttackDescriptions: undefined }, indentLevel + 1);
     }
@@ -213,6 +213,17 @@ function dedupeLabeledLines(lines: MonsterPowerCardLine[]): MonsterPowerCardLine
   return deduped;
 }
 
+function normalizeSecondaryOutcomeCompareText(text: string): string {
+  const normalized = normalizeSemicolonWhitespace(String(text || "").trim()).toLowerCase();
+  if (!isRenderableCardValue(normalized)) return "";
+  const withoutLeadingDicePrefix = normalized.replace(/^(?:\d+d\d+(?:\s*[+\-]\s*\d+)?|\d+)\s+/i, "").trim();
+  const withoutLeadingGenericDamage = withoutLeadingDicePrefix.replace(
+    /^[a-z]+(?:\s+(?:and\s+)?[a-z]+){0,5}\s+damage,\s+and\s+/i,
+    ""
+  );
+  return withoutLeadingGenericDamage.trim();
+}
+
 export function buildMonsterPowerCardViewModel(power: MonsterPower): MonsterPowerCardViewModel {
   const primaryAttack = power.attacks?.[0];
   const attackBonusLine = renderAttackBonusLine(power, primaryAttack);
@@ -301,11 +312,18 @@ export function buildMonsterPowerCardViewModel(power: MonsterPower): MonsterPowe
         .flatMap((attack) => attack.outcomeLines.map((line) => normalizeSemicolonWhitespace(String(line.text || "").trim()).toLowerCase()))
         .filter((text) => isRenderableCardValue(text))
     );
+    const secondaryOutcomeCompareTexts = new Set(
+      [...secondaryOutcomeTexts].map((text) => normalizeSecondaryOutcomeCompareText(text)).filter((text) => isRenderableCardValue(text))
+    );
     outcomeLines = outcomeLines.filter((line) => {
-      if (line.label !== "NESTED ATTACK") return true;
+      if (line.label !== "ATTACK") return true;
       const normalizedText = normalizeSemicolonWhitespace(String(line.text || "").trim()).toLowerCase();
       if (!isRenderableCardValue(normalizedText)) return true;
-      return !secondaryOutcomeTexts.has(normalizedText);
+      if (secondaryOutcomeTexts.has(normalizedText)) return false;
+      const normalizedCompareText = normalizeSecondaryOutcomeCompareText(normalizedText);
+      if (!isRenderableCardValue(normalizedCompareText)) return true;
+      if (secondaryOutcomeCompareTexts.has(normalizedCompareText)) return false;
+      return true;
     });
   }
 

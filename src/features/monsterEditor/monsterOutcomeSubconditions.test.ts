@@ -150,9 +150,81 @@ describe("buildMonsterPowerCardViewModel ongoing line", () => {
       ]
     };
     const vm = buildMonsterPowerCardViewModel(power);
-    const nestedAttack = vm.outcomeLines.find((line) => line.label === "NESTED ATTACK");
+    const nestedAttack = vm.outcomeLines.find((line) => line.label === "ATTACK");
     const nestedFailedSave = vm.outcomeLines.find((line) => line.label === "FAILED SAVE" && line.indentLevel != null);
     expect(nestedAttack?.indentLevel).toBe(1);
     expect(nestedFailedSave?.indentLevel).toBe(2);
+  });
+
+  it("drops duplicate ATTACK lines when secondary HIT already carries same effect text", () => {
+    const repeatedTail =
+      "the target is slowed (save ends). Whenever the target ends its turn more than 5 squares away from the primary target while it is slowed, it takes 5 lightning damage and the mage knocks the target prone.";
+    const power: MonsterPower = {
+      name: "Brilliant Chains",
+      usage: "Encounter",
+      action: "Standard",
+      keywords: "Implement lightning",
+      description: "",
+      attacks: [
+        {
+          kind: "MonsterAttack",
+          name: "Primary Attack",
+          targets: "one creature",
+          hit: {
+            description: "1d8 + 4 lightning damage, and the mage makes a secondary attack.",
+            nestedAttackDescriptions: [`lightning damage, and ${repeatedTail}`]
+          }
+        },
+        {
+          kind: "MonsterAttack",
+          name: "Secondary Attack",
+          targets: "two creatures within 5 squares of the primary target",
+          hit: {
+            description: `4 lightning damage, and ${repeatedTail}`
+          }
+        }
+      ]
+    };
+    const vm = buildMonsterPowerCardViewModel(power);
+    expect(vm.outcomeLines.some((line) => line.label === "ATTACK")).toBe(false);
+    expect(vm.secondaryAttacks[0]?.outcomeLines.some((line) => line.label === "HIT")).toBe(true);
+  });
+
+  it("drops duplicate ATTACK lines for multi-type damage summaries mirrored by secondary HIT", () => {
+    const power: MonsterPower = {
+      name: "Chaotic Tome",
+      usage: "At-Will",
+      action: "Standard",
+      keywords: "",
+      description: "",
+      attacks: [
+        {
+          kind: "MonsterAttack",
+          name: "Effect",
+          effect: {
+            description: "Roll a d6 to determine which of the following powers Rort uses:",
+            nestedAttackDescriptions: [
+              "lightning and necrotic damage, and the target is dazed (save ends).",
+              "acid and fire damage."
+            ]
+          }
+        },
+        {
+          kind: "MonsterAttack",
+          name: "Attack",
+          hit: {
+            description: "1d8 + 3 lightning and necrotic damage, and the target is dazed (save ends)."
+          }
+        },
+        {
+          kind: "MonsterAttack",
+          name: "Attack",
+          hit: { description: "2d10 + 3 acid and fire damage." }
+        }
+      ]
+    };
+    const vm = buildMonsterPowerCardViewModel(power);
+    expect(vm.outcomeLines.some((line) => line.label === "ATTACK")).toBe(false);
+    expect(vm.secondaryAttacks).toHaveLength(2);
   });
 });

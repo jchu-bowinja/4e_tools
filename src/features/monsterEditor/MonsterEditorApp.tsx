@@ -1200,63 +1200,6 @@ function renderAttackOutcome(
         </div>
       ) : null}
       {damageSummary ? <div style={captionMuted}>{damageSummary}</div> : null}
-      {outcome.nestedAttackDescriptions?.length ? (
-        <div style={{ ...bodySecondary, marginTop: "0.15rem" }}>
-          {outcome.nestedAttackDescriptions.map((textOrMini, idx) => (
-            <div key={`${label}-nested-${idx}`} style={{ marginTop: idx ? "0.35rem" : undefined }}>
-              {typeof textOrMini === "string" ? (
-                renderGlossaryAwareText(
-                  textOrMini,
-                  commonDescriptiveGlossaryPhrases,
-                  startGlossaryHover,
-                  leaveGlossaryHover,
-                  `${label}-nested-${idx}`,
-                  shouldHighlightTerm
-                )
-              ) : (
-                <>
-                  {textOrMini.description ? (
-                    <div style={{ ...richTextBodyPrimary.paragraphStyle, whiteSpace: "pre-wrap" }}>
-                      {renderGlossaryAwareText(
-                        textOrMini.description,
-                        commonDescriptiveGlossaryPhrases,
-                        startGlossaryHover,
-                        leaveGlossaryHover,
-                        `${label}-nested-${idx}-desc`,
-                        shouldHighlightTerm
-                      )}
-                    </div>
-                  ) : null}
-                  {textOrMini.aftereffects?.length ? (
-                    <div style={{ marginTop: "0.18rem" }}>
-                      <div style={microLabelStyle}>Aftereffects</div>
-                      {textOrMini.aftereffects.map((entry, j) =>
-                        renderOutcomeEntry(entry, j, "Aftereffect", startGlossaryHover, leaveGlossaryHover, shouldHighlightTerm)
-                      )}
-                    </div>
-                  ) : null}
-                  {textOrMini.sustains?.length ? (
-                    <div style={{ marginTop: "0.18rem" }}>
-                      <div style={microLabelStyle}>Sustains</div>
-                      {textOrMini.sustains.map((entry, j) =>
-                        renderOutcomeEntry(entry, j, "Sustain", startGlossaryHover, leaveGlossaryHover, shouldHighlightTerm)
-                      )}
-                    </div>
-                  ) : null}
-                  {textOrMini.failedSavingThrows?.length ? (
-                    <div style={{ marginTop: "0.18rem" }}>
-                      <div style={microLabelStyle}>Failed Saving Throws</div>
-                      {textOrMini.failedSavingThrows.map((entry, j) =>
-                        renderOutcomeEntry(entry, j, "Failed Save", startGlossaryHover, leaveGlossaryHover, shouldHighlightTerm)
-                      )}
-                    </div>
-                  ) : null}
-                </>
-              )}
-            </div>
-          ))}
-        </div>
-      ) : null}
       {outcome.aftereffects?.length ? (
         <div style={{ marginTop: "0.18rem" }}>
           <div style={microLabelStyle}>Aftereffects</div>
