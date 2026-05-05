@@ -55,9 +55,16 @@ function renderDamageExpression(outcome?: MonsterPowerOutcome, fallbackExpressio
   return "";
 }
 
+type MonsterPowerCardLine = {
+  label: string;
+  text: string;
+  indentLevel?: number;
+};
+
 function appendNestedOutcomeLines(
-  lines: Array<{ label: string; text: string }>,
-  outcome: MonsterPowerOutcome | undefined
+  lines: MonsterPowerCardLine[],
+  outcome: MonsterPowerOutcome | undefined,
+  indentLevel = 1
 ): void {
   if (!outcome) return;
   const outcomeEntryDescription = (entry: MonsterPowerOutcomeEntry): string => {
@@ -74,42 +81,42 @@ function appendNestedOutcomeLines(
       ?.map((entry) => outcomeEntryDescription(entry))
       .filter((text) => isRenderableCardValue(text)) ?? [];
   for (const aftereffect of aftereffectLines) {
-    lines.push({ label: "AFTEREFFECT", text: aftereffect });
+    lines.push({ label: "AFTEREFFECT", text: aftereffect, indentLevel });
   }
   const sustainLines =
     outcome.sustains
       ?.map((entry) => outcomeEntryDescription(entry))
       .filter((text) => isRenderableCardValue(text)) ?? [];
   for (const sustain of sustainLines) {
-    lines.push({ label: "SUSTAIN", text: sustain });
+    lines.push({ label: "SUSTAIN", text: sustain, indentLevel });
   }
   const failedSaveLines =
     outcome.failedSavingThrows
       ?.map((entry) => outcomeEntryDescription(entry))
       .filter((text) => isRenderableCardValue(text)) ?? [];
   for (const failedSave of failedSaveLines) {
-    lines.push({ label: "FAILED SAVE", text: failedSave });
+    lines.push({ label: "FAILED SAVE", text: failedSave, indentLevel });
   }
   const nestedRaw = outcome.nestedAttackDescriptions;
   if (nestedRaw?.length) {
     for (const entry of nestedRaw) {
       if (typeof entry === "string") {
         const text = normalizeSemicolonWhitespace(entry.trim());
-        if (isRenderableCardValue(text)) lines.push({ label: "NESTED ATTACK", text });
+        if (isRenderableCardValue(text)) lines.push({ label: "NESTED ATTACK", text, indentLevel });
         continue;
       }
       const mini = entry as MonsterPowerOutcome;
       const head = normalizeSemicolonWhitespace(String(mini.description || "").trim());
       if (isRenderableCardValue(head)) {
-        lines.push({ label: "NESTED ATTACK", text: head });
+        lines.push({ label: "NESTED ATTACK", text: head, indentLevel });
       }
-      appendNestedOutcomeLines(lines, { ...mini, description: undefined, nestedAttackDescriptions: undefined });
+      appendNestedOutcomeLines(lines, { ...mini, description: undefined, nestedAttackDescriptions: undefined }, indentLevel + 1);
     }
   }
 }
 
-function renderCompactAttackOutcomeLines(attack: MonsterPowerAttack | undefined): Array<{ label: string; text: string }> {
-  const lines: Array<{ label: string; text: string }> = [];
+function renderCompactAttackOutcomeLines(attack: MonsterPowerAttack | undefined): MonsterPowerCardLine[] {
+  const lines: MonsterPowerCardLine[] = [];
   if (isRenderableCardValue(attack?.targets)) {
     lines.push({ label: "TARGET", text: normalizeSemicolonWhitespace(String(attack?.targets).trim()) });
   }
@@ -138,8 +145,8 @@ function renderCompactAttackOutcomeLines(attack: MonsterPowerAttack | undefined)
 function renderCompactOutcomeLines(
   power: MonsterPower,
   attack: MonsterPowerAttack | undefined
-): Array<{ label: string; text: string }> {
-  const lines: Array<{ label: string; text: string }> = [];
+): MonsterPowerCardLine[] {
+  const lines: MonsterPowerCardLine[] = [];
   if (isRenderableCardValue(power.trigger)) {
     lines.push({ label: "TRIGGER", text: normalizeSemicolonWhitespace(String(power.trigger).trim()) });
   }
@@ -176,27 +183,32 @@ export type MonsterPowerCardViewModel = {
   usageDetailsLines: string[];
   attackLineParts: string[];
   keywordTokens: string[];
-  outcomeLines: Array<{ label: string; text: string }>;
+  outcomeLines: MonsterPowerCardLine[];
   secondaryAttacks: Array<{
     name: string;
     attackLineParts: string[];
-    outcomeLines: Array<{ label: string; text: string }>;
+    outcomeLines: MonsterPowerCardLine[];
   }>;
   descriptionText: string;
   ongoingText: string;
 };
 
-function dedupeLabeledLines(lines: Array<{ label: string; text: string }>): Array<{ label: string; text: string }> {
+function dedupeLabeledLines(lines: MonsterPowerCardLine[]): MonsterPowerCardLine[] {
   const seen = new Set<string>();
-  const deduped: Array<{ label: string; text: string }> = [];
+  const deduped: MonsterPowerCardLine[] = [];
   for (const line of lines) {
     const normalizedLabel = normalizeSemicolonWhitespace(String(line.label || "").trim()).toLowerCase();
     const normalizedText = normalizeSemicolonWhitespace(String(line.text || "").trim()).toLowerCase();
     if (!normalizedLabel || !normalizedText) continue;
-    const key = `${normalizedLabel}::${normalizedText}`;
+    const normalizedIndent = Math.max(0, Number(line.indentLevel) || 0);
+    const key = `${normalizedLabel}::${normalizedText}::${normalizedIndent}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    deduped.push({ label: String(line.label).trim(), text: String(line.text).trim() });
+    deduped.push({
+      label: String(line.label).trim(),
+      text: String(line.text).trim(),
+      indentLevel: normalizedIndent > 0 ? normalizedIndent : undefined
+    });
   }
   return deduped;
 }

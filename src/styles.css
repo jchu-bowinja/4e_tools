@@ -598,6 +598,7 @@ textarea:hover {
 
 .monster-stat-block-powers {
   border-bottom: 1px solid color-mix(in srgb, var(--panel-border) 55%, transparent);
+  font-size: 0.76rem;
 }
 
 .monster-stat-block-muted {

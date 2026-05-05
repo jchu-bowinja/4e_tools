@@ -125,4 +125,34 @@ describe("buildMonsterPowerCardViewModel ongoing line", () => {
     expect(vm.attackLineParts.join(" ")).toContain("3 vs ac");
     expect(vm.attackLineParts.join(" ")).not.toContain("level + 3");
   });
+
+  it("keeps nested attack outcomes grouped by indentation depth", () => {
+    const power: MonsterPower = {
+      name: "Chain Lightning",
+      usage: "Recharge",
+      action: "Standard",
+      keywords: "Lightning",
+      description: "",
+      attacks: [
+        {
+          kind: "MonsterAttack",
+          name: "Primary",
+          hit: {
+            description: "2d8 lightning damage.",
+            nestedAttackDescriptions: [
+              {
+                description: "Secondary target takes 1d8 lightning damage.",
+                failedSavingThrows: [{ description: "Target is dazed (save ends)." }]
+              }
+            ]
+          }
+        }
+      ]
+    };
+    const vm = buildMonsterPowerCardViewModel(power);
+    const nestedAttack = vm.outcomeLines.find((line) => line.label === "NESTED ATTACK");
+    const nestedFailedSave = vm.outcomeLines.find((line) => line.label === "FAILED SAVE" && line.indentLevel != null);
+    expect(nestedAttack?.indentLevel).toBe(1);
+    expect(nestedFailedSave?.indentLevel).toBe(2);
+  });
 });

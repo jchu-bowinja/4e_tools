@@ -902,6 +902,11 @@ function usageBucketLabel(bucket: MonsterPowerActionBucket): string {
   return "Other";
 }
 
+function formatPowerUsageLabel(raw: string): string {
+  const lower = String(raw ?? "").toLowerCase();
+  return lower.replace(/(^|[\s/-])([a-z])/g, (_m, lead: string, letter: string) => `${lead}${letter.toUpperCase()}`);
+}
+
 /** 4e stat-block section titles (`.monster-stat-block-section-head` applies `text-transform: uppercase`). */
 function usageBucketStatBlockLabel(bucket: MonsterPowerActionBucket): string {
   if (bucket === "standard") return "Standard actions";
@@ -1638,6 +1643,9 @@ function MonsterPowersPanels({
                   const cardModel = buildMonsterPowerCardViewModel(power);
                   const rawPower = powers[sourceIndex] ?? power;
                   const shellStyle = monsterPowerCardShellStyle(bucket);
+                  const powerNameFontSize = isStatBlock ? "0.86rem" : "1.0625rem";
+                  const powerMetaFontSize = isStatBlock ? "0.74rem" : "0.8rem";
+                  const powerKeywordFontSize = isStatBlock ? "0.74rem" : "0.75rem";
                   return (
                     <div key={`${bucket}-${power.name}-${sourceIndex}-${index}`} style={shellStyle}>
                       <div style={monsterPowerCardTitleBlockStyle()}>
@@ -1647,7 +1655,7 @@ function MonsterPowersPanels({
                             style={{
                               fontSize: "0.68rem",
                               fontWeight: 700,
-                              textTransform: "uppercase",
+                              textTransform: "capitalize",
                               letterSpacing: "0.05em",
                               marginBottom: "0.1rem"
                             }}
@@ -1656,13 +1664,13 @@ function MonsterPowersPanels({
                           </div>
                         ) : null}
                         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: "0.35rem" }}>
-                          <strong style={{ fontSize: "1.0625rem", lineHeight: 1.3 }}>{power.name || `Power ${index + 1}`}</strong>
+                          <strong style={{ fontSize: powerNameFontSize, lineHeight: 1.3 }}>{power.name || `Power ${index + 1}`}</strong>
                           {power.isBasic ? <span style={{ ...sheetTagPillStyle, cursor: "default" }}>Basic Attack</span> : null}
                         </div>
                         {cardModel.usagePrimaryParts.length > 0 ? (
                           <div
                             style={{
-                              fontSize: "0.8rem",
+                              fontSize: powerMetaFontSize,
                               color: "var(--text-secondary)",
                               marginTop: "0.1rem"
                             }}
@@ -1677,11 +1685,11 @@ function MonsterPowersPanels({
                                     color: "var(--text-primary)",
                                     cursor: "help",
                                     borderBottom: "1px dotted var(--text-muted)",
-                                    textTransform: "uppercase",
+                                    textTransform: "capitalize",
                                     letterSpacing: "0.03em"
                                   }}
                                 >
-                                  {part}
+                                  {formatPowerUsageLabel(part)}
                                 </span>
                                 {partIdx < cardModel.usagePrimaryParts.length - 1 ? (
                                   <span style={{ color: "var(--text-muted)", margin: "0 0.1rem" }}>•</span>
@@ -1702,7 +1710,7 @@ function MonsterPowersPanels({
                       {cardModel.attackLineParts.length > 0 ? (
                         <div
                           style={{
-                            fontSize: "0.8rem",
+                            fontSize: powerMetaFontSize,
                             color: "var(--text-secondary)",
                             marginTop: "0.05rem",
                             display: "flex",
@@ -1724,7 +1732,7 @@ function MonsterPowersPanels({
                       {cardModel.keywordTokens.length > 0 ? (
                         <div
                           style={{
-                            fontSize: "0.75rem",
+                            fontSize: powerKeywordFontSize,
                             lineHeight: 1.35,
                             color: "var(--text-muted)",
                             marginBottom: "0.25rem"
@@ -1754,9 +1762,9 @@ function MonsterPowersPanels({
                           <div key={`${power.name}-${index}-${line.label}-${line.text}`}>
                             <div
                               style={{
-                                fontSize: "0.8rem",
+                                fontSize: powerMetaFontSize,
                                 color: "var(--text-primary)",
-                                marginLeft: line.label === "FAILED SAVE" ? "0.95rem" : 0
+                                marginLeft: `${(line.label === "FAILED SAVE" ? 0.95 : 0) + (line.indentLevel ?? 0) * 0.7}rem`
                               }}
                             >
                               {(() => {
@@ -1806,7 +1814,7 @@ function MonsterPowersPanels({
                               })()}
                             </div>
                             {line.label === "HIT" && isRenderableCardValue(cardModel.ongoingText) ? (
-                              <div style={{ marginTop: "0.04rem", fontSize: "0.8rem", color: "var(--text-primary)" }}>
+                              <div style={{ marginTop: "0.04rem", fontSize: powerMetaFontSize, color: "var(--text-primary)" }}>
                                 <strong>ONGOING:</strong>{" "}
                                 {renderGlossaryAwareText(
                                   cardModel.ongoingText,
@@ -1867,7 +1875,7 @@ function MonsterPowersPanels({
                                     style={{
                                       fontSize: "0.8rem",
                                       color: "var(--text-primary)",
-                                      marginLeft: line.label === "FAILED SAVE" ? "0.95rem" : 0
+                                      marginLeft: `${(line.label === "FAILED SAVE" ? 0.95 : 0) + (line.indentLevel ?? 0) * 0.7}rem`
                                     }}
                                   >
                                     {(() => {
