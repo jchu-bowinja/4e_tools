@@ -696,6 +696,13 @@ function shouldShowTraitRangeLabel(rangeValue: unknown): boolean {
   return !(typeof n === "number" && Number.isFinite(n) && n === 0);
 }
 
+function formatTraitBodyTextWithRange(trait: MonsterTrait): string {
+  const details = String(trait.details ?? "").trim();
+  const rangeLabel = shouldShowTraitRangeLabel(trait.range) ? `Range: ${String(trait.range).trim()}` : "";
+  if (rangeLabel && details) return `${rangeLabel}; ${details}`;
+  return rangeLabel || details;
+}
+
 function readStoredViewerTab(): MonsterViewerTab {
   try {
     const stored = window.localStorage.getItem(MONSTER_VIEWER_TAB_KEY);
@@ -2382,7 +2389,7 @@ function MonsterStatBlockCard({
                   </div>
                   <div className="monster-stat-block-trait-body">
                     {renderGlossaryAwareText(
-                      String(trait.details ?? ""),
+                      formatTraitBodyTextWithRange(trait),
                       commonDescriptiveGlossaryPhrases,
                       startGlossaryHover,
                       leaveGlossaryHover,
@@ -2589,6 +2596,29 @@ function formatTemplateCardXpLine(record: MonsterTemplateRecord): string | null 
 
 function splitTemplateStatAdjustmentLine(line: string): { label: string; body: string } {
   const trimmed = line.trim();
+  const knownLabels = [
+    "Temporary Hit Points",
+    "Saving Throws",
+    "Action Points",
+    "Hit Points",
+    "Defenses",
+    "Initiative",
+    "Skills",
+    "Senses",
+    "Speed",
+    "Resist",
+    "Immune",
+    "Vulnerable"
+  ];
+  for (const knownLabel of knownLabels) {
+    if (trimmed.length <= knownLabel.length) continue;
+    const head = trimmed.slice(0, knownLabel.length);
+    if (head.localeCompare(knownLabel, undefined, { sensitivity: "accent" }) !== 0) continue;
+    const nextChar = trimmed.charAt(knownLabel.length);
+    if (nextChar !== " " && nextChar !== "\t") continue;
+    const body = trimmed.slice(knownLabel.length).trim();
+    if (body) return { label: head, body };
+  }
   const m = trimmed.match(/^([A-Za-z]+)\s+(.*)$/);
   if (m) return { label: m[1], body: m[2] };
   return { label: "", body: trimmed };
@@ -2825,7 +2855,7 @@ function MonsterTemplateFormattedView({
                     </div>
                     <div className="monster-stat-block-trait-body">
                       {renderGlossaryAwareText(
-                        String(aura.details ?? ""),
+                        formatTraitBodyTextWithRange(aura),
                         commonDescriptiveGlossaryPhrases,
                         startGlossaryHover,
                         leaveGlossaryHover,
@@ -2885,7 +2915,7 @@ function MonsterTemplateFormattedView({
                     </div>
                     <div className="monster-stat-block-trait-body">
                       {renderGlossaryAwareText(
-                        String(trait.details ?? ""),
+                        formatTraitBodyTextWithRange(trait),
                         commonDescriptiveGlossaryPhrases,
                         startGlossaryHover,
                         leaveGlossaryHover,

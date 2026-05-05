@@ -1,0 +1,362 @@
+{
+  "generatedAt": "2026-05-05T15:51:12.098126+00:00",
+  "summary": {
+    "pdfCount": 4,
+    "skippedPdfCount": 0,
+    "templatesKept": 37,
+    "sanityRejectedCount": 0,
+    "entriesFlaggedForReviewCount": 8,
+    "booksWithReviewFlags": 3
+  },
+  "byBook": [
+    {
+      "sourceBook": "D&D 4E - Dungeon Master's Guide 2.pdf",
+      "pdfReadError": null,
+      "templatesKeptCount": 6,
+      "sanityRejectedCount": 0,
+      "entriesFlaggedForReview": [
+        {
+          "templateName": "Cursed Guardian",
+          "pageStart": 127,
+          "issueReasons": [
+            "uncategorizedAbilities"
+          ],
+          "uncategorizedAbilities": [
+            {
+              "abilityName": "cursed guardian that is dominated is instead dazed for",
+              "usage": "At-Will",
+              "action": ""
+            },
+            {
+              "abilityName": "dragontouched destroyer is fused with the power",
+              "usage": "At-Will",
+              "action": ""
+            },
+            {
+              "abilityName": "dragontouched destroyer is a brute in mind",
+              "usage": "At-Will",
+              "action": ""
+            }
+          ],
+          "metrics": {
+            "rawTextLength": 2272,
+            "traitsCount": 5,
+            "aurasCount": 1,
+            "powersCount": 5
+          },
+          "sourceBook": "D&D 4E - Dungeon Master's Guide 2.pdf"
+        },
+        {
+          "templateName": "Hellbound Soldier",
+          "pageStart": 128,
+          "issueReasons": [
+            "warning:noParsedAbilities"
+          ],
+          "extractionWarnings": [
+            "noParsedAbilities"
+          ],
+          "metrics": {
+            "rawTextLength": 565,
+            "traitsCount": 0,
+            "aurasCount": 0,
+            "powersCount": 0
+          },
+          "sourceBook": "D&D 4E - Dungeon Master's Guide 2.pdf"
+        },
+        {
+          "templateName": "Spectral Assassin",
+          "pageStart": 131,
+          "issueReasons": [
+            "uncategorizedAbilities"
+          ],
+          "uncategorizedAbilities": [
+            {
+              "abilityName": "spectral assassin deals 2d6 extra damage against any",
+              "usage": "At-Will",
+              "action": ""
+            }
+          ],
+          "metrics": {
+            "rawTextLength": 1156,
+            "traitsCount": 3,
+            "aurasCount": 0,
+            "powersCount": 2
+          },
+          "sourceBook": "D&D 4E - Dungeon Master's Guide 2.pdf"
+        }
+      ],
+      "sanityRejectedTemplates": []
+    },
+    {
+      "sourceBook": "D&D 4E - Dungeon Master's Guide.pdf",
+      "pdfReadError": null,
+      "templatesKeptCount": 16,
+      "sanityRejectedCount": 0,
+      "entriesFlaggedForReview": [
+        {
+          "templateName": "Death Knight",
+          "pageStart": 177,
+          "issueReasons": [
+            "relatedFlavorText"
+          ],
+          "relatedFlavorTextCount": 6,
+          "metrics": {
+            "rawTextLength": 1527,
+            "traitsCount": 2,
+            "aurasCount": 1,
+            "powersCount": 1
+          },
+          "sourceBook": "D&D 4E - Dungeon Master's Guide.pdf"
+        },
+        {
+          "templateName": "Death Master",
+          "pageStart": 178,
+          "issueReasons": [
+            "relatedFlavorText"
+          ],
+          "relatedFlavorTextCount": 1,
+          "metrics": {
+            "rawTextLength": 629,
+            "traitsCount": 1,
+            "aurasCount": 1,
+            "powersCount": 1
+          },
+          "sourceBook": "D&D 4E - Dungeon Master's Guide.pdf"
+        },
+        {
+          "templateName": "Lich",
+          "pageStart": 175,
+          "issueReasons": [
+            "warning:noParsedAbilities"
+          ],
+          "extractionWarnings": [
+            "noParsedAbilities"
+          ],
+          "metrics": {
+            "rawTextLength": 770,
+            "traitsCount": 0,
+            "aurasCount": 0,
+            "powersCount": 0
+          },
+          "sourceBook": "D&D 4E - Dungeon Master's Guide.pdf"
+        }
+      ],
+      "sanityRejectedTemplates": []
+    },
+    {
+      "sourceBook": "D&D 4E - Neverwinter Campaign Setting.pdf",
+      "pdfReadError": null,
+      "templatesKeptCount": 3,
+      "sanityRejectedCount": 0,
+      "entriesFlaggedForReview": [],
+      "sanityRejectedTemplates": []
+    },
+    {
+      "sourceBook": "D&D 4E - Open Grave - Secrets of the Undead OCR.pdf",
+      "pdfReadError": null,
+      "templatesKeptCount": 12,
+      "sanityRejectedCount": 0,
+      "entriesFlaggedForReview": [
+        {
+          "templateName": "Level 14",
+          "pageStart": 91,
+          "issueReasons": [
+            "warning:longRawText",
+            "warning:highAbilityCount"
+          ],
+          "extractionWarnings": [
+            "longRawText",
+            "highAbilityCount"
+          ],
+          "metrics": {
+            "rawTextLength": 4290,
+            "traitsCount": 24,
+            "aurasCount": 1,
+            "powersCount": 4
+          },
+          "sourceBook": "D&D 4E - Open Grave - Secrets of the Undead OCR.pdf"
+        },
+        {
+          "templateName": "Spirit Possessed",
+          "pageStart": 218,
+          "issueReasons": [
+            "uncategorizedAbilities"
+          ],
+          "uncategorizedAbilities": [
+            {
+              "abilityName": "Spirit Transfer",
+              "usage": "At-Will",
+              "action": ""
+            }
+          ],
+          "metrics": {
+            "rawTextLength": 2093,
+            "traitsCount": 3,
+            "aurasCount": 0,
+            "powersCount": 4
+          },
+          "sourceBook": "D&D 4E - Open Grave - Secrets of the Undead OCR.pdf"
+        }
+      ],
+      "sanityRejectedTemplates": []
+    }
+  ],
+  "entriesFlaggedForReview": [
+    {
+      "templateName": "Cursed Guardian",
+      "pageStart": 127,
+      "issueReasons": [
+        "uncategorizedAbilities"
+      ],
+      "uncategorizedAbilities": [
+        {
+          "abilityName": "cursed guardian that is dominated is instead dazed for",
+          "usage": "At-Will",
+          "action": ""
+        },
+        {
+          "abilityName": "dragontouched destroyer is fused with the power",
+          "usage": "At-Will",
+          "action": ""
+        },
+        {
+          "abilityName": "dragontouched destroyer is a brute in mind",
+          "usage": "At-Will",
+          "action": ""
+        }
+      ],
+      "metrics": {
+        "rawTextLength": 2272,
+        "traitsCount": 5,
+        "aurasCount": 1,
+        "powersCount": 5
+      },
+      "sourceBook": "D&D 4E - Dungeon Master's Guide 2.pdf"
+    },
+    {
+      "templateName": "Hellbound Soldier",
+      "pageStart": 128,
+      "issueReasons": [
+        "warning:noParsedAbilities"
+      ],
+      "extractionWarnings": [
+        "noParsedAbilities"
+      ],
+      "metrics": {
+        "rawTextLength": 565,
+        "traitsCount": 0,
+        "aurasCount": 0,
+        "powersCount": 0
+      },
+      "sourceBook": "D&D 4E - Dungeon Master's Guide 2.pdf"
+    },
+    {
+      "templateName": "Spectral Assassin",
+      "pageStart": 131,
+      "issueReasons": [
+        "uncategorizedAbilities"
+      ],
+      "uncategorizedAbilities": [
+        {
+          "abilityName": "spectral assassin deals 2d6 extra damage against any",
+          "usage": "At-Will",
+          "action": ""
+        }
+      ],
+      "metrics": {
+        "rawTextLength": 1156,
+        "traitsCount": 3,
+        "aurasCount": 0,
+        "powersCount": 2
+      },
+      "sourceBook": "D&D 4E - Dungeon Master's Guide 2.pdf"
+    },
+    {
+      "templateName": "Death Knight",
+      "pageStart": 177,
+      "issueReasons": [
+        "relatedFlavorText"
+      ],
+      "relatedFlavorTextCount": 6,
+      "metrics": {
+        "rawTextLength": 1527,
+        "traitsCount": 2,
+        "aurasCount": 1,
+        "powersCount": 1
+      },
+      "sourceBook": "D&D 4E - Dungeon Master's Guide.pdf"
+    },
+    {
+      "templateName": "Death Master",
+      "pageStart": 178,
+      "issueReasons": [
+        "relatedFlavorText"
+      ],
+      "relatedFlavorTextCount": 1,
+      "metrics": {
+        "rawTextLength": 629,
+        "traitsCount": 1,
+        "aurasCount": 1,
+        "powersCount": 1
+      },
+      "sourceBook": "D&D 4E - Dungeon Master's Guide.pdf"
+    },
+    {
+      "templateName": "Lich",
+      "pageStart": 175,
+      "issueReasons": [
+        "warning:noParsedAbilities"
+      ],
+      "extractionWarnings": [
+        "noParsedAbilities"
+      ],
+      "metrics": {
+        "rawTextLength": 770,
+        "traitsCount": 0,
+        "aurasCount": 0,
+        "powersCount": 0
+      },
+      "sourceBook": "D&D 4E - Dungeon Master's Guide.pdf"
+    },
+    {
+      "templateName": "Level 14",
+      "pageStart": 91,
+      "issueReasons": [
+        "warning:longRawText",
+        "warning:highAbilityCount"
+      ],
+      "extractionWarnings": [
+        "longRawText",
+        "highAbilityCount"
+      ],
+      "metrics": {
+        "rawTextLength": 4290,
+        "traitsCount": 24,
+        "aurasCount": 1,
+        "powersCount": 4
+      },
+      "sourceBook": "D&D 4E - Open Grave - Secrets of the Undead OCR.pdf"
+    },
+    {
+      "templateName": "Spirit Possessed",
+      "pageStart": 218,
+      "issueReasons": [
+        "uncategorizedAbilities"
+      ],
+      "uncategorizedAbilities": [
+        {
+          "abilityName": "Spirit Transfer",
+          "usage": "At-Will",
+          "action": ""
+        }
+      ],
+      "metrics": {
+        "rawTextLength": 2093,
+        "traitsCount": 3,
+        "aurasCount": 0,
+        "powersCount": 4
+      },
+      "sourceBook": "D&D 4E - Open Grave - Secrets of the Undead OCR.pdf"
+    }
+  ]
+}

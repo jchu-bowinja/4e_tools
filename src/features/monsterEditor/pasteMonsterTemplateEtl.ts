@@ -259,7 +259,7 @@ function extractDamageExpressions(text: string): string[] {
 }
 
 function titleCaseKeywordToken(s: string): string {
-  const t = s.trim();
+  const t = s.trim().replace(/^(?:and|or)\s+/i, "").replace(/[.;:]+$/g, "");
   if (!t) return "";
   return t
     .split(/\s+/)
@@ -274,7 +274,7 @@ function parseKeywordDirectiveLine(line: string): string[] {
   const m = t.match(/^Keywords?\s*:?\s*(.+)$/i);
   if (!m?.[1]) return [];
   return m[1]
-    .split(/\s*,\s*|\s+and\s+/i)
+    .split(/\s*,\s*|\s+and\s+|\s+or\s+/i)
     .map((x) => titleCaseKeywordToken(x))
     .filter(Boolean);
 }

@@ -449,7 +449,8 @@ def _parse_recharge_details(text: str) -> str:
 
 
 def _title_case_keyword_token(s: str) -> str:
-    s = str(s or "").strip()
+    s = re.sub(r"^(?:and|or)\s+", "", str(s or "").strip(), flags=re.IGNORECASE)
+    s = re.sub(r"[.;:]+$", "", s)
     if not s:
         return ""
     parts: List[str] = []
@@ -471,7 +472,7 @@ def _parse_keyword_directive_line(line: str) -> List[str]:
     if not tail:
         return []
     out: List[str] = []
-    for p in re.split(r",\s*|\s+and\s+", tail, flags=re.IGNORECASE):
+    for p in re.split(r",\s*|\s+and\s+|\s+or\s+", tail, flags=re.IGNORECASE):
         tok = _title_case_keyword_token(p.strip())
         if tok:
             out.append(tok)

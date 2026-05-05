@@ -618,8 +618,14 @@ function normName(value: unknown): string {
     .toLowerCase();
 }
 
+function normRange(value: unknown): string {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase();
+}
+
 export function traitSignature(trait: MonsterTrait): string {
-  return [normName(trait.name), String(trait.range ?? ""), normName(trait.details)].join("|");
+  return [normName(trait.name), normRange(trait.range), normName(trait.details)].join("|");
 }
 
 export function powerSignature(power: MonsterPower): string {

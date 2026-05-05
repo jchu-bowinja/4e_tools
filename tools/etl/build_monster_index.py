@@ -339,6 +339,27 @@ def _title_case_damage_keyword_phrase(raw: str) -> str:
     return " ".join(parts)
 
 
+def _normalize_keyword_token(raw: str) -> str:
+    token = re.sub(r"^(?:and|or)\s+", "", str(raw or "").strip(), flags=re.IGNORECASE)
+    token = re.sub(r"[.;:]+$", "", token).strip()
+    return _normalize_text(token)
+
+
+def _split_and_normalize_keywords(raw: str) -> List[str]:
+    out: List[str] = []
+    seen = set()
+    for part in re.split(r"[;,]|\s+and\s+|\s+or\s+", str(raw or ""), flags=re.IGNORECASE):
+        token = _normalize_keyword_token(part)
+        if not token:
+            continue
+        low = token.lower()
+        if low in seen:
+            continue
+        seen.add(low)
+        out.append(token)
+    return out
+
+
 def _tail_matches_resistance_damage_keyword(tail: str) -> bool:
     """
     Only promote when the text after the number is clearly a damage keyword (not a sentence).
@@ -534,7 +555,7 @@ def _extract_traits_and_auras(root: ET.Element) -> Dict[str, List[Dict[str, Any]
         keyword_section = _find_first_section(node, "Keywords")
         if keyword_section is not None:
             keyword_names = _extract_reference_names_from_section(node, "Keywords")
-            keywords = [keyword for keyword in keyword_names if keyword]
+            keywords = [kw for kw in (_normalize_keyword_token(keyword) for keyword in keyword_names) if kw]
 
         trait_entry: Dict[str, Any] = {}
         if name:
@@ -963,14 +984,10 @@ def _extract_powers(root: ET.Element) -> List[Dict[str, Any]]:
         keyword_names: List[str] = []
         keyword_section = _find_first_section(node, "Keywords")
         if keyword_section is not None:
-            keyword_names = _extract_reference_names(keyword_section)
-        keyword_tokens = [
-            _normalize_text(token)
-            for token in re.split(r"[;,]", keywords)
-            if _normalize_text(token)
-        ]
+            keyword_names = [kw for kw in (_normalize_keyword_token(name) for name in _extract_reference_names(keyword_section)) if kw]
+        keyword_tokens = _split_and_normalize_keywords(keywords)
         for keyword_name in keyword_names:
-            normalized_keyword_name = _normalize_text(keyword_name)
+            normalized_keyword_name = _normalize_keyword_token(keyword_name)
             if normalized_keyword_name and normalized_keyword_name.lower() not in {
                 token.lower() for token in keyword_tokens
             }:

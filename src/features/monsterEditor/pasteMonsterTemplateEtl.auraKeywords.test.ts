@@ -43,6 +43,21 @@ describe("template aura/trait keywords", () => {
     expect(aura!.keywords?.sort()).toEqual(["Fear"]);
   });
 
+  it("normalizes Oxford-comma aura keywords that include or", () => {
+    const block = `Dragonborn Annihilator Elite Soldier
+Humanoid XP Elite
+Hit Points +8 per level + Constitution score
+POWERS
+Tiamat's Favor (Acid, Cold, Fire, Lightning, or Poison) aura 5
+Any enemy that starts its turn within the aura takes 20 damage of one of the following types: acid, cold, fire, lightning, or poison.`;
+    const r = parsePastedMonsterTemplateTextLocal(block, "Dragonborn Annihilator");
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const aura = r.template.auras?.find((a) => String(a.name).includes("Tiamat's Favor"));
+    expect(aura).toBeDefined();
+    expect(aura!.keywords?.sort()).toEqual(["Acid", "Cold", "Fire", "Lightning", "Poison"]);
+  });
+
   it("parses numbered section-style template blocks", () => {
     const block = `Spawn of Kyuss
 A spawn of Kyuss is created when an infection from a
