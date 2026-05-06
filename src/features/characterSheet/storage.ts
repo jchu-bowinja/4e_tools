@@ -8,6 +8,28 @@ function clampInt(value: unknown, min: number, max: number, fallback: number): n
   return Math.max(min, Math.min(max, Number.isNaN(n) ? fallback : n));
 }
 
+function clampBonusField(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  return Math.max(-99, Math.min(99, Math.trunc(value)));
+}
+
+function normalizeMagicItemBonuses(raw: unknown): CharacterSheetState["magicItemBonuses"] {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const o = raw as Record<string, unknown>;
+  const out: NonNullable<CharacterSheetState["magicItemBonuses"]> = {};
+  const ac = clampBonusField(o.ac);
+  const fortitude = clampBonusField(o.fortitude);
+  const reflex = clampBonusField(o.reflex);
+  const will = clampBonusField(o.will);
+  const attack = clampBonusField(o.attack);
+  if (ac !== undefined) out.ac = ac;
+  if (fortitude !== undefined) out.fortitude = fortitude;
+  if (reflex !== undefined) out.reflex = reflex;
+  if (will !== undefined) out.will = will;
+  if (attack !== undefined) out.attack = attack;
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 function normalizeState(input: unknown): CharacterSheetState {
   const fallback = createDefaultCharacterSheetState();
   if (!input || typeof input !== "object") {
@@ -43,7 +65,8 @@ function normalizeState(input: unknown): CharacterSheetState {
     },
     featIds: Array.isArray(v.featIds) ? v.featIds.filter((id): id is string => typeof id === "string") : [],
     trainedSkillIds: Array.isArray(v.trainedSkillIds) ? v.trainedSkillIds.filter((id): id is string => typeof id === "string") : [],
-    level: clampInt(v.level, 1, 30, fallback.level)
+    level: clampInt(v.level, 1, 30, fallback.level),
+    magicItemBonuses: normalizeMagicItemBonuses(v.magicItemBonuses)
   };
   return next;
 }

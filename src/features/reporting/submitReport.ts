@@ -40,7 +40,7 @@ export interface SubmitReportOptions {
 }
 
 /**
- * Validates form input client-side, builds payload with metadata, POSTs to /api/reports.
+ * Validates form input client-side, builds payload with metadata, POSTs to `VITE_REPORTS_ENDPOINT` when set, otherwise `/api/reports`.
  */
 export async function submitReport(
   input: ReportFormInput,
@@ -58,10 +58,14 @@ export async function submitReport(
 
   const payload: ReportPayload = buildReportPayload(input, meta);
   const doFetch = options.fetchImpl ?? fetch;
+  const endpoint =
+    typeof import.meta.env.VITE_REPORTS_ENDPOINT === "string" && import.meta.env.VITE_REPORTS_ENDPOINT.trim().length > 0
+      ? import.meta.env.VITE_REPORTS_ENDPOINT.trim()
+      : "/api/reports";
 
   let res: Response;
   try {
-    res = await doFetch("/api/reports", {
+    res = await doFetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json; charset=utf-8" },
       body: JSON.stringify(payload),

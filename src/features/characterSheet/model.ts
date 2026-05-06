@@ -37,6 +37,14 @@ export interface CharacterSheetState {
   themeId?: string;
   paragonPathId?: string;
   epicDestinyId?: string;
+  /** Same optional enhancement bonuses as `CharacterBuild.magicItemBonuses`. */
+  magicItemBonuses?: {
+    ac?: number;
+    fortitude?: number;
+    reflex?: number;
+    will?: number;
+    attack?: number;
+  };
   abilityScores: AbilityScores;
   trainedSkillIds: string[];
   featIds?: string[];

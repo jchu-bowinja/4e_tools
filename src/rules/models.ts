@@ -270,6 +270,17 @@ export interface CharacterBuild {
    * Values are power ids; `powerIds` should stay in sync (see `orderedPowerIdsFromSlots` in rules).
    */
   classPowerSlots?: Record<string, string>;
+  /**
+   * Manual enhancement bonuses from magic items (not tied to the item catalog).
+   * Defense values stack on computed AC / Fortitude / Reflex / Will; attack applies to weapon and implement previews.
+   */
+  magicItemBonuses?: {
+    ac?: number;
+    fortitude?: number;
+    reflex?: number;
+    will?: number;
+    attack?: number;
+  };
 }
 
 export interface ValidationResult {

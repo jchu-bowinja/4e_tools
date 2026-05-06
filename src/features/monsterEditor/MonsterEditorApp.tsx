@@ -3346,9 +3346,7 @@ export function MonsterEditorApp({
   const [encounterNameEditOpen, setEncounterNameEditOpen] = useState(false);
   const [encounterNameEditKind, setEncounterNameEditKind] = useState<"new" | "rename">("rename");
   const [encounterNameEditValue, setEncounterNameEditValue] = useState("");
-  const [encounterRosterPanelCollapsed, setEncounterRosterPanelCollapsed] = useState(false);
   const [encounterRosterStatCardsExpandAll, setEncounterRosterStatCardsExpandAll] = useState(false);
-  const [pinnedMonsterListColumnWidthPx, setPinnedMonsterListColumnWidthPx] = useState<number | null>(null);
   const [encounterRosterDraggingIndex, setEncounterRosterDraggingIndex] = useState<number | null>(null);
   const [encounterRosterDragOverIndex, setEncounterRosterDragOverIndex] = useState<number | null>(null);
   const [encounterPrintPreviewOpen, setEncounterPrintPreviewOpen] = useState(false);
@@ -3447,18 +3445,6 @@ export function MonsterEditorApp({
     });
   }, [encounterPrintColumnCount, encounterPrintPageBreakBeforeIdSet]);
 
-  const collapseEncounterRosterPanel = useCallback(() => {
-    const w = monsterListColumnRef.current?.offsetWidth;
-    if (typeof w === "number" && w > 0) {
-      setPinnedMonsterListColumnWidthPx(w);
-    }
-    setEncounterRosterPanelCollapsed(true);
-  }, []);
-
-  const expandEncounterRosterPanel = useCallback(() => {
-    setPinnedMonsterListColumnWidthPx(null);
-    setEncounterRosterPanelCollapsed(false);
-  }, []);
   const glossaryTooltipUi = useGlossaryTooltip({
     tooltipId: MONSTER_GLOSSARY_TOOLTIP_ID,
     resetDeps: [selectedId, viewerTab, selectedTemplateIdx, monsterTemplatePreviewIdxs.join(",")]
@@ -3517,22 +3503,10 @@ export function MonsterEditorApp({
   }, [encounterStore.activeEncounterId]);
 
   useEffect(() => {
-    if (encounterRosterPanelCollapsed) setEncounterNameEditOpen(false);
-  }, [encounterRosterPanelCollapsed]);
-
-  useEffect(() => {
     setEncounterRosterDraggingIndex(null);
     setEncounterRosterDragOverIndex(null);
     setEncounterRosterStatCardsExpandAll(false);
   }, [encounterStore.activeEncounterId]);
-
-  useEffect(() => {
-    if (encounterRosterPanelCollapsed) {
-      setEncounterRosterDraggingIndex(null);
-      setEncounterRosterDragOverIndex(null);
-      setEncounterRosterStatCardsExpandAll(false);
-    }
-  }, [encounterRosterPanelCollapsed]);
 
   useEffect(() => {
     writeStoredSelectedMonsterId(selectedId);
@@ -4537,6 +4511,41 @@ export function MonsterEditorApp({
             gap: "0.5rem"
           }}
         >
+          {indexRows.length === 0 ? (
+            <div
+              role="status"
+              style={{
+                padding: "0.45rem 0.55rem",
+                borderRadius: "0.28rem",
+                backgroundColor: "var(--surface-2)",
+                border: "1px solid var(--panel-border)",
+                fontSize: "0.84rem",
+                lineHeight: 1.45,
+                color: "var(--text-primary)"
+              }}
+            >
+              <strong>No monsters in the index.</strong> Run{" "}
+              <code style={{ fontSize: "0.9em" }}>npm run etl:monsters -- &lt;folder-or-xml&gt; generated</code> after rules ETL so{" "}
+              <code style={{ fontSize: "0.9em" }}>generated/monsters/</code> exists, then refresh. You can still{" "}
+              <strong>Import monsters</strong> from JSON into this browser.
+            </div>
+          ) : filteredRows.length === 0 ? (
+            <div
+              role="status"
+              style={{
+                padding: "0.45rem 0.55rem",
+                borderRadius: "0.28rem",
+                backgroundColor: "var(--surface-2)",
+                border: "1px solid var(--panel-border)",
+                fontSize: "0.84rem",
+                lineHeight: 1.45,
+                color: "var(--text-primary)"
+              }}
+            >
+              <strong>No monsters match the current filters.</strong> Clear the name or level search, set role to “All roles”, or
+              widen the level range.
+            </div>
+          ) : null}
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
             <input
               value={nameQuery}
@@ -5229,7 +5238,7 @@ export function MonsterEditorApp({
         </div>
       )}
 
-      {viewerTab === "monsters" && !encounterRosterPanelCollapsed ? (
+      {viewerTab === "monsters" ? (
         <div
           style={{
             ...panelStyle,
@@ -5383,6 +5392,14 @@ export function MonsterEditorApp({
           >
             Export encounter
           </button>
+          <button
+            type="button"
+            onClick={openEncounterPrintPreview}
+            disabled={!encounterActive || encounterRoster.length === 0 || encounterPrintPreviewOpen}
+            title="Preview encounter stat blocks, then print"
+          >
+            Print encounter
+          </button>
           <button type="button" onClick={() => {
             if (!encounterStore.activeEncounterId || !encounterActive) return;
             if (
@@ -5404,11 +5421,7 @@ export function MonsterEditorApp({
           display: "grid",
           gridTemplateColumns:
             viewerTab === "monsters"
-              ? encounterRosterPanelCollapsed
-                ? pinnedMonsterListColumnWidthPx != null
-                  ? `minmax(0, ${pinnedMonsterListColumnWidthPx}px) minmax(0, 1fr) minmax(0, 2.75rem)`
-                  : "minmax(0, 0.7fr) minmax(0, 1fr) minmax(0, 2.75rem)"
-                : "minmax(0, 0.7fr) minmax(0, 1.45fr) minmax(200px, 0.72fr)"
+              ? "minmax(0, 0.7fr) minmax(0, 1.45fr) minmax(200px, 0.72fr)"
               : viewerTab === "templates"
                 ? "minmax(0, 0.7fr) minmax(0, 1.45fr)"
                 : "minmax(0, 0.9fr) minmax(0, 2.1fr)",
@@ -5967,7 +5980,7 @@ export function MonsterEditorApp({
               <div
                 style={{
                   ...sheetPanel,
-                  padding: encounterRosterPanelCollapsed ? "0.35rem 0.2rem" : "0.75rem",
+                  padding: "0.75rem",
                   minHeight: 0,
                   minWidth: 0,
                   maxHeight: "97.5vh",
@@ -5977,38 +5990,7 @@ export function MonsterEditorApp({
                   flexDirection: "column"
                 }}
               >
-                {encounterRosterPanelCollapsed ? (
-                  <button
-                    type="button"
-                    className="encounter-roster-disclosure-btn encounter-roster-disclosure-btn--expandLeft"
-                    aria-expanded={false}
-                    title="Show encounter"
-                    aria-label={`Show encounter${encounterActive ? ` for ${encounterActive.name}` : ""}${encounterRoster.length > 0 ? `, ${encounterRoster.length} creature(s)` : ""}`}
-                    onClick={expandEncounterRosterPanel}
-                    style={{
-                      alignSelf: "center",
-                      flex: "0 0 auto",
-                      margin: 0,
-                      width: "1.65rem",
-                      height: "1.65rem",
-                      padding: 0,
-                      boxSizing: "border-box",
-                      border: "1px solid var(--panel-border)",
-                      borderRadius: "0.28rem",
-                      backgroundColor: "var(--surface-0)",
-                      color: "var(--text-secondary)",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center"
-                    }}
-                  >
-                    <span className="template-json-collapsible-arrow" aria-hidden>
-                      ▶
-                    </span>
-                  </button>
-                ) : (
-                  <>
+                <>
                     {encounterActive ? (
                       <div
                         style={{
@@ -6037,12 +6019,13 @@ export function MonsterEditorApp({
                         </div>
                         <div
                           style={{
-                            display: "flex",
-                            flexDirection: "row",
-                            alignItems: "center",
-                            gap: "0.35rem",
                             flex: "0 1 auto",
-                            minWidth: 0
+                            minWidth: 0,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "flex-end",
+                            gap: "0.35rem",
+                            flexWrap: "wrap"
                           }}
                         >
                           <div
@@ -6073,128 +6056,29 @@ export function MonsterEditorApp({
                               </span>
                             )}
                           </div>
-                          <button
-                            type="button"
-                            className="encounter-roster-disclosure-btn"
-                            aria-expanded={true}
-                            title="Hide encounter"
-                            aria-label="Hide encounter"
-                            onClick={collapseEncounterRosterPanel}
-                            style={{
-                              flexShrink: 0,
-                              margin: 0,
-                              padding: 0,
-                              boxSizing: "border-box",
-                              width: "1.65rem",
-                              height: "1.65rem",
-                              border: "1px solid var(--panel-border)",
-                              borderRadius: "0.28rem",
-                              backgroundColor: "var(--surface-0)",
-                              color: "var(--text-secondary)",
-                              cursor: "pointer",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center"
-                            }}
-                          >
-                            <span className="template-json-collapsible-arrow" aria-hidden>
-                              ▶
-                            </span>
-                          </button>
+                          {encounterRoster.length > 0 ? (
+                            <button
+                              type="button"
+                              className="encounter-roster-stat-cards-expand-btn"
+                              onClick={() => setEncounterRosterStatCardsExpandAll((prev) => !prev)}
+                              aria-pressed={encounterRosterStatCardsExpandAll}
+                              aria-label={
+                                encounterRosterStatCardsExpandAll
+                                  ? "Collapse all encounter stat cards to name strips"
+                                  : "Expand all encounter stat blocks on this roster"
+                              }
+                              title={
+                                encounterRosterStatCardsExpandAll
+                                  ? "Show name strips only; hover a row to open its stat block"
+                                  : "Open every creature stat block on this roster"
+                              }
+                            >
+                              <span className="template-json-collapsible-arrow" aria-hidden>
+                                ▶
+                              </span>
+                            </button>
+                          ) : null}
                         </div>
-                      </div>
-                    ) : (
-                      <div
-                        style={{
-                          flexShrink: 0,
-                          display: "flex",
-                          justifyContent: "flex-end",
-                          margin: "0 0 0.5rem 0"
-                        }}
-                      >
-                        <button
-                          type="button"
-                          className="encounter-roster-disclosure-btn"
-                          aria-expanded={true}
-                          title="Hide encounter"
-                          aria-label="Hide encounter"
-                          onClick={collapseEncounterRosterPanel}
-                          style={{
-                            flexShrink: 0,
-                            margin: 0,
-                            padding: 0,
-                            boxSizing: "border-box",
-                            width: "1.65rem",
-                            height: "1.65rem",
-                            border: "1px solid var(--panel-border)",
-                            borderRadius: "0.28rem",
-                            backgroundColor: "var(--surface-0)",
-                            color: "var(--text-secondary)",
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center"
-                          }}
-                        >
-                          <span className="template-json-collapsible-arrow" aria-hidden>
-                            ▶
-                          </span>
-                        </button>
-                      </div>
-                    )}
-                    {encounterActive && encounterRoster.length > 0 ? (
-                      <div
-                        style={{
-                          flexShrink: 0,
-                          display: "flex",
-                          flexWrap: "wrap",
-                          justifyContent: "flex-end",
-                          gap: "0.35rem",
-                          margin: "0 0 0.35rem 0",
-                          minWidth: 0
-                        }}
-                      >
-                        <button
-                          type="button"
-                          onClick={openEncounterPrintPreview}
-                          disabled={encounterPrintPreviewOpen}
-                          title="Preview encounter stat blocks, then print"
-                          style={{
-                            fontSize: "0.72rem",
-                            padding: "0.2rem 0.45rem",
-                            lineHeight: 1.3,
-                            borderRadius: "0.25rem",
-                            border: "1px solid var(--panel-border)",
-                            backgroundColor: "var(--surface-0)",
-                            color: "var(--text-primary)",
-                            cursor: encounterPrintPreviewOpen ? "default" : "pointer",
-                            opacity: encounterPrintPreviewOpen ? 0.65 : 1
-                          }}
-                        >
-                          Print encounter
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEncounterRosterStatCardsExpandAll((prev) => !prev)}
-                          aria-pressed={encounterRosterStatCardsExpandAll}
-                          title={
-                            encounterRosterStatCardsExpandAll
-                              ? "Show name strips only; hover a row to open its stat block"
-                              : "Open every creature stat block on this roster"
-                          }
-                          style={{
-                            fontSize: "0.72rem",
-                            padding: "0.2rem 0.45rem",
-                            lineHeight: 1.3,
-                            borderRadius: "0.25rem",
-                            border: "1px solid var(--panel-border)",
-                            backgroundColor: "var(--surface-0)",
-                            color: "var(--text-primary)",
-                            cursor: "pointer"
-                          }}
-                        >
-                          {encounterRosterStatCardsExpandAll ? "Collapse stat cards" : "Expand all stat cards"}
-                        </button>
                       </div>
                     ) : null}
                     {SHOW_ENCOUNTER_BUILDER_PANEL && encounterActive ? (
@@ -6357,7 +6241,6 @@ export function MonsterEditorApp({
                       </ul>
                     )}
                   </>
-                )}
               </div>
             ) : null}
             </>

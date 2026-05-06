@@ -82,7 +82,8 @@ export function summarizeMainWeaponAttack(
   level: number,
   scores: Record<Ability, number>,
   weapon: Weapon | undefined,
-  classWeaponProficienciesText: string | null | undefined
+  classWeaponProficienciesText: string | null | undefined,
+  magicItemAttackBonus?: number
 ): WeaponAttackSummary | null {
   if (!weapon) return null;
   const abilityCode = weaponAttackAbility(weapon);
@@ -90,7 +91,9 @@ export function summarizeMainWeaponAttack(
   const half = Math.floor(level / 2);
   const mod = abilityMod(scores[abilityCode] ?? 10);
   const pb = weapon.proficiencyBonus ?? 0;
-  const attackBonus = half + mod + (prof ? pb : -2);
+  const itemBonus =
+    typeof magicItemAttackBonus === "number" && Number.isFinite(magicItemAttackBonus) ? magicItemAttackBonus : 0;
+  const attackBonus = half + mod + (prof ? pb : -2) + itemBonus;
   return {
     attackBonus,
     abilityCode,
@@ -109,12 +112,15 @@ export function summarizeImplementAttack(
   scores: Record<Ability, number>,
   cls: ClassDef | undefined,
   implement: Implement | undefined,
-  classImplementText: string | null | undefined
+  classImplementText: string | null | undefined,
+  magicItemAttackBonus?: number
 ): ImplementAttackSummary | null {
   if (!implement) return null;
   const prof = isProficientWithImplement(implement, classImplementText);
   const half = Math.floor(level / 2);
   const mod = maxKeyAbilityModifier(cls, scores);
-  const attackBonus = half + mod + (prof ? IMPL_PROF_BONUS : -2);
+  const itemBonus =
+    typeof magicItemAttackBonus === "number" && Number.isFinite(magicItemAttackBonus) ? magicItemAttackBonus : 0;
+  const attackBonus = half + mod + (prof ? IMPL_PROF_BONUS : -2) + itemBonus;
   return { attackBonus, proficient: prof };
 }

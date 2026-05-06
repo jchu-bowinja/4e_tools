@@ -2,6 +2,24 @@ import { Armor, CharacterBuild, ClassDef, Race } from "./models";
 import type { AcBreakdown } from "./defenseCalculator";
 import { bodyArmorSpeedPenalty, computeAcBreakdown, totalArmorCheckPenalty } from "./defenseCalculator";
 
+function finiteBonus(n: unknown): number {
+  return typeof n === "number" && Number.isFinite(n) ? n : 0;
+}
+
+/** Applies optional manual magic-item-style enhancement bonuses to computed defenses. */
+export function applyMagicItemDefenseBonuses(
+  defenses: DerivedStats["defenses"],
+  bonuses: CharacterBuild["magicItemBonuses"] | undefined
+): DerivedStats["defenses"] {
+  if (!bonuses) return defenses;
+  return {
+    ac: defenses.ac + finiteBonus(bonuses.ac),
+    fortitude: defenses.fortitude + finiteBonus(bonuses.fortitude),
+    reflex: defenses.reflex + finiteBonus(bonuses.reflex),
+    will: defenses.will + finiteBonus(bonuses.will)
+  };
+}
+
 export interface DerivedStats {
   maxHp: number;
   healingSurgesPerDay: number;
@@ -58,7 +76,7 @@ export function computeDerivedStats(
   const acBreakdown = computeAcBreakdown(dexMod, intMod, armor, shield);
   const armorCheckPenalty = totalArmorCheckPenalty(armor, shield);
 
-  const defenses = {
+  const defensesBase = {
     ac: acBreakdown.total,
     fortitude:
       baseFort +
@@ -73,6 +91,7 @@ export function computeDerivedStats(
       Math.max(abilityMod(wis), abilityMod(cha)) +
       (classDefenseBonuses?.Will || 0)
   };
+  const defenses = applyMagicItemDefenseBonuses(defensesBase, build.magicItemBonuses);
 
   return {
     maxHp,

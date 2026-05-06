@@ -318,13 +318,32 @@ textarea:hover {
   transform: rotate(90deg);
 }
 
-/* Monster editor encounter roster: same ▶ disclosure glyph as JSON <details> (scaled for icon-only control) */
-.encounter-roster-disclosure-btn .template-json-collapsible-arrow {
-  font-size: 0.7rem;
+/* Encounter roster: expand/collapse all — ▶ rotated to point left when collapsed, down when expanded */
+button.encounter-roster-stat-cards-expand-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0.12rem;
+  border: none;
+  border-radius: 0.2rem;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
 }
 
-.encounter-roster-disclosure-btn--expandLeft .template-json-collapsible-arrow {
+button.encounter-roster-stat-cards-expand-btn:focus-visible {
+  outline: 2px solid var(--panel-border);
+  outline-offset: 2px;
+}
+
+button.encounter-roster-stat-cards-expand-btn .template-json-collapsible-arrow {
+  font-size: 0.7rem;
   transform: rotate(180deg);
+}
+
+button.encounter-roster-stat-cards-expand-btn[aria-pressed="true"] .template-json-collapsible-arrow {
+  transform: rotate(90deg);
 }
 
 /* Encounter roster: stat block collapsed to name until hover */

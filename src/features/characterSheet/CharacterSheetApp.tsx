@@ -519,6 +519,24 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     setSheet((prev) => mutator(prev));
   }
 
+  function setSheetMagicBonusField(field: keyof NonNullable<CharacterSheetState["magicItemBonuses"]>, raw: string): void {
+    updateSheet((prev) => {
+      const t = raw.trim();
+      let n: number | undefined;
+      if (t !== "") {
+        const parsed = Number.parseInt(t, 10);
+        if (Number.isFinite(parsed)) n = Math.max(-99, Math.min(99, parsed));
+      }
+      const cur = { ...(prev.magicItemBonuses ?? {}) };
+      if (n === undefined) delete cur[field];
+      else cur[field] = n;
+      return {
+        ...prev,
+        magicItemBonuses: Object.keys(cur).length === 0 ? undefined : cur
+      };
+    });
+  }
+
   function addInventoryItem(item: InventoryItem): void {
     updateSheet((prev) => ({ ...prev, inventory: [...prev.inventory, item] }));
   }
@@ -1005,6 +1023,51 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     );
   }
 
+  function renderMagicItemBonusesPanel(): JSX.Element {
+    return (
+      <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.4rem", backgroundColor: "var(--surface-1)" }}>
+        <div style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--text-secondary)", marginBottom: "0.35rem" }}>
+          ITEM ENHANCEMENT BONUSES
+        </div>
+        <p style={{ margin: "0 0 0.4rem 0", fontSize: "0.74rem", color: "var(--text-muted)", lineHeight: 1.4 }}>
+          Optional flat bonuses (e.g. magic armor, amulet, weapon). Included in defenses above and in export JSON.
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(72px, 1fr))", gap: "0.35rem" }}>
+          {(
+            [
+              ["ac", "AC"],
+              ["fortitude", "Fort"],
+              ["reflex", "Ref"],
+              ["will", "Will"],
+              ["attack", "Atk"]
+            ] as const
+          ).map(([key, short]) => (
+            <label key={key} style={{ fontSize: "0.72rem", color: "var(--text-secondary)" }}>
+              {short}
+              <input
+                type="number"
+                inputMode="numeric"
+                value={sheet.magicItemBonuses?.[key] ?? ""}
+                onChange={(e) => setSheetMagicBonusField(key, e.target.value)}
+                placeholder="0"
+                style={{
+                  display: "block",
+                  width: "100%",
+                  marginTop: "0.12rem",
+                  padding: "0.12rem 0.22rem",
+                  fontSize: "0.8rem",
+                  borderRadius: "0.22rem",
+                  border: "1px solid var(--panel-border)",
+                  boxSizing: "border-box"
+                }}
+              />
+            </label>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   function renderStatusPanel(): JSX.Element {
     return (
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "0.45rem", alignItems: "start" }}>
@@ -1012,6 +1075,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         <div style={{ display: "grid", gap: "0.45rem", alignContent: "start" }}>
           {renderSpeedInitiativePanel()}
           {renderDefensesPanel()}
+          {renderMagicItemBonusesPanel()}
         </div>
         {renderConditionsPanel()}
       </div>

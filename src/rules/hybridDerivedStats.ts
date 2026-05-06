@@ -1,6 +1,7 @@
 import type { CharacterBuild, HybridClassDef, Race } from "./models";
 import type { DerivedStats } from "./statCalculator";
 import type { Armor } from "./models";
+import { applyMagicItemDefenseBonuses } from "./statCalculator";
 import { computeAcBreakdown, bodyArmorSpeedPenalty, totalArmorCheckPenalty } from "./defenseCalculator";
 
 /** Parse "+1 Will" style lines into defense bonuses (same as standard class validator). */
@@ -84,8 +85,9 @@ export function computeHybridDerivedStats(
   const mergeDef = { ...hybridDefenseBonuses };
   const acBreakdown = computeAcBreakdown(dexMod, intMod, armor, shield);
   const armorCheckPenalty = totalArmorCheckPenalty(armor, shield);
+  const initiative = Math.floor(build.level / 2) + dexMod;
 
-  const defenses = {
+  const defensesBase = {
     ac: acBreakdown.total,
     fortitude:
       baseFort +
@@ -97,12 +99,14 @@ export function computeHybridDerivedStats(
       (mergeDef.Reflex || 0),
     will: baseWill + Math.max(abilityMod(wis), abilityMod(cha)) + (mergeDef.Will || 0)
   };
+  const defenses = applyMagicItemDefenseBonuses(defensesBase, build.magicItemBonuses);
 
   return {
     maxHp,
     healingSurgesPerDay,
     surgeValue,
     speed,
+    initiative,
     armorCheckPenalty,
     defenses,
     acBreakdown
