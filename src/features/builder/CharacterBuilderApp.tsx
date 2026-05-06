@@ -619,7 +619,18 @@ function HybridClassDetailPanel(props: {
 const abilities: Array<keyof CharacterBuild["abilityScores"]> = ["STR", "CON", "DEX", "INT", "WIS", "CHA"];
 const PHYSICAL_ABILITIES: Ability[] = ["STR", "CON", "DEX"];
 const MENTAL_ABILITIES: Ability[] = ["INT", "WIS", "CHA"];
-type BuilderTab = "race" | "class" | "abilities" | "skills" | "feats" | "powers" | "paths" | "equipment" | "summary";
+type BuilderTab =
+  | "race"
+  | "class"
+  | "abilities"
+  | "skills"
+  | "feats"
+  | "powers"
+  | "theme"
+  | "paragonPath"
+  | "epicDestiny"
+  | "equipment"
+  | "summary";
 
 function abilityModifier(score: number): number {
   return Math.floor((score - 10) / 2);
@@ -958,6 +969,14 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     glossaryTermLookupCacheRef.current.clear();
   }, [tooltipGlossary, index]);
 
+  useEffect(() => {
+    setActiveTab((tab) => {
+      if (tab === "paragonPath" && build.level < 11) return "theme";
+      if (tab === "epicDestiny" && build.level < 21) return build.level >= 11 ? "paragonPath" : "theme";
+      return tab;
+    });
+  }, [build.level]);
+
   function glossaryContent(key: BuilderGlossaryKey): JSX.Element {
     const resolved = resolveUiGlossaryHoverPlainText(
       key,
@@ -1107,13 +1126,28 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       ensureSelectedEntityInFiltered(filterRulesEntitiesByQuery(implementsSorted, implementSearch), build.implementId, implementsSorted),
     [implementsSorted, implementSearch, build.implementId]
   );
+  const magicItemAttackBonus = build.magicItemBonuses?.attack;
   const mainWeaponSummary = useMemo(
-    () => summarizeMainWeaponAttack(build.level, effectiveAbilityScores, selectedMainWeapon, classWeaponProfText),
-    [build.level, effectiveAbilityScores, selectedMainWeapon, classWeaponProfText]
+    () =>
+      summarizeMainWeaponAttack(
+        build.level,
+        effectiveAbilityScores,
+        selectedMainWeapon,
+        classWeaponProfText,
+        magicItemAttackBonus
+      ),
+    [build.level, effectiveAbilityScores, selectedMainWeapon, classWeaponProfText, magicItemAttackBonus]
   );
   const offHandWeaponSummary = useMemo(
-    () => summarizeMainWeaponAttack(build.level, effectiveAbilityScores, selectedOffHandWeapon, classWeaponProfText),
-    [build.level, effectiveAbilityScores, selectedOffHandWeapon, classWeaponProfText]
+    () =>
+      summarizeMainWeaponAttack(
+        build.level,
+        effectiveAbilityScores,
+        selectedOffHandWeapon,
+        classWeaponProfText,
+        magicItemAttackBonus
+      ),
+    [build.level, effectiveAbilityScores, selectedOffHandWeapon, classWeaponProfText, magicItemAttackBonus]
   );
   const implementAttackSummary = useMemo(
     () =>
@@ -1122,9 +1156,10 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         effectiveAbilityScores,
         hybridBaseClassDefA || selectedClass,
         selectedImplement,
-        classImplementProfText
+        classImplementProfText,
+        magicItemAttackBonus
       ),
-    [build.level, effectiveAbilityScores, hybridBaseClassDefA, selectedClass, selectedImplement, classImplementProfText]
+    [build.level, effectiveAbilityScores, hybridBaseClassDefA, selectedClass, selectedImplement, classImplementProfText, magicItemAttackBonus]
   );
   const multiclassFeatIdList = useMemo(() => multiclassFeatIds(index, build), [index, build]);
 
@@ -1397,19 +1432,25 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     return { legal: reasons.length === 0, reasons };
   }
 
-  function mapErrorToTab(message: string): BuilderTab {
+  /** Which builder tab owns this validation message (for status dots and error buckets). */
+  function resolveValidationErrorTab(message: string): BuilderTab {
     const m = message.toLowerCase();
+    if (m.startsWith("theme:") || m.includes("selected theme is not")) {
+      return "theme";
+    }
     if (
-      m.startsWith("theme:") ||
       m.startsWith("paragon path:") ||
-      m.startsWith("epic destiny:") ||
       m.includes("paragon path can only") ||
+      m.includes("selected paragon path is not")
+    ) {
+      return "paragonPath";
+    }
+    if (
+      m.startsWith("epic destiny:") ||
       m.includes("epic destiny can only") ||
-      m.includes("selected theme is not") ||
-      m.includes("selected paragon path is not") ||
       m.includes("selected epic destiny is not")
     ) {
-      return "paths";
+      return "epicDestiny";
     }
     if (m === "choose a race." || m.startsWith("race:")) return "race";
     if (m === "choose a class.") return "class";
@@ -1427,13 +1468,33 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     return "summary";
   }
 
+  /** Tab to open when jumping from an error (respects tier locks when those tabs are hidden). */
+  function navigateToTabForError(message: string): BuilderTab {
+    const t = resolveValidationErrorTab(message);
+    if (t === "paragonPath" && build.level < 11) return "theme";
+    if (t === "epicDestiny" && build.level < 21) return build.level >= 11 ? "paragonPath" : "theme";
+    return t;
+  }
+
   const tabStatuses = useMemo(() => {
     const errorsByTab = legality.errors.reduce<Record<BuilderTab, number>>(
       (acc, e) => {
-        acc[mapErrorToTab(e)] += 1;
+        acc[resolveValidationErrorTab(e)] += 1;
         return acc;
       },
-      { race: 0, class: 0, abilities: 0, skills: 0, feats: 0, powers: 0, paths: 0, equipment: 0, summary: 0 }
+      {
+        race: 0,
+        class: 0,
+        abilities: 0,
+        skills: 0,
+        feats: 0,
+        powers: 0,
+        theme: 0,
+        paragonPath: 0,
+        epicDestiny: 0,
+        equipment: 0,
+        summary: 0
+      }
     );
 
     const requiresRacialChoice = raceAbilityBonusInfo.chooseOne.length > 0 && !build.racialAbilityChoice;
@@ -1452,7 +1513,9 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       feats:
         errorsByTab.feats === 0 && build.featIds.length === expectedFeatCount ? "complete" : "incomplete",
       powers: classReady && errorsByTab.powers === 0 ? "complete" : "incomplete",
-      paths: errorsByTab.paths === 0 ? "complete" : "incomplete",
+      theme: errorsByTab.theme === 0 ? "complete" : "incomplete",
+      paragonPath: errorsByTab.paragonPath === 0 ? "complete" : "incomplete",
+      epicDestiny: errorsByTab.epicDestiny === 0 ? "complete" : "incomplete",
       equipment: errorsByTab.equipment === 0 ? "complete" : "incomplete",
       summary: legality.errors.length === 0 ? "complete" : "incomplete"
     };
@@ -1487,6 +1550,28 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     const pruned = pruneStalePowerSelections(index, next);
     setBuild(pruned);
     saveBuild(pruned);
+  }
+
+  function parseOptionalBonus(raw: string): number | undefined {
+    const t = raw.trim();
+    if (t === "") return undefined;
+    const n = Number.parseInt(t, 10);
+    if (!Number.isFinite(n)) return undefined;
+    return Math.max(-99, Math.min(99, n));
+  }
+
+  function setMagicItemBonusField(field: keyof NonNullable<CharacterBuild["magicItemBonuses"]>, raw: string): void {
+    const n = parseOptionalBonus(raw);
+    const cur = { ...(build.magicItemBonuses ?? {}) };
+    if (n === undefined) {
+      delete cur[field];
+    } else {
+      cur[field] = n;
+    }
+    updateBuild({
+      ...build,
+      magicItemBonuses: Object.keys(cur).length === 0 ? undefined : cur
+    });
   }
 
   function refreshSavedCharacters(): void {
@@ -1681,7 +1766,9 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               ["skills", "Skills"],
               ["feats", "Feats"],
               ["powers", "Powers"],
-              ["paths", "Theme & paths"],
+              ["theme", "Theme"],
+              ...(build.level >= 11 ? ([["paragonPath", "Paragon path"]] as [BuilderTab, string][]) : []),
+              ...(build.level >= 21 ? ([["epicDestiny", "Epic destiny"]] as [BuilderTab, string][]) : []),
               ["equipment", "Equipment"],
               ["summary", "Summary"]
             ].map(([id, label]) => (
@@ -1732,7 +1819,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 <li key={r}>
                   <button
                     type="button"
-                    onClick={() => setActiveTab(mapErrorToTab(r))}
+                    onClick={() => setActiveTab(navigateToTabForError(r))}
                     style={{ border: "none", background: "transparent", textDecoration: "underline", cursor: "pointer", padding: 0, color: "var(--text-secondary)" }}
                   >
                     {r}
@@ -1743,7 +1830,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               <li key={e}>
                 <button
                   type="button"
-                  onClick={() => setActiveTab(mapErrorToTab(e))}
+                  onClick={() => setActiveTab(navigateToTabForError(e))}
                   style={{ border: "none", background: "transparent", textDecoration: "underline", cursor: "pointer", padding: 0, color: "var(--text-secondary)" }}
                 >
                   {e}
@@ -3259,7 +3346,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               Each <strong>class</strong> slot is a separate choice. The list for a slot only includes <strong>class</strong> powers whose{" "}
               <strong>printed level</strong> is at most that slot&apos;s gain level (for example, the 3rd-level encounter slot only lists encounter
               attacks of printed level 3 or lower). Search filters the lists. Paragon path and epic destiny powers are shown below when you have
-              selected them on the Paths tab; they are extra powers on top of your class schedule, not chosen into these class slots.
+              selected them on their tabs; they are extra powers on top of your class schedule, not chosen into these class slots.
             </p>
             {legality.powerSlotRules && (
               <p style={{ margin: "0 0 0.65rem 0", fontSize: "0.82rem", color: "var(--text-secondary)" }}>
@@ -3561,16 +3648,14 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
           </div>
         )}
 
-        {activeTab === "paths" && (
+        {activeTab === "theme" && (
           <div>
-            <h3 style={sectionTitleStyle}>Theme, paragon path, and epic destiny</h3>
+            <h3 style={sectionTitleStyle}>Theme</h3>
             <p style={{ margin: "0.25rem 0 0.75rem 0", color: "var(--text-muted)", fontSize: "0.88rem", lineHeight: 1.45 }}>
-              Themes are optional packages with prerequisites. Paragon paths require <strong>level 11+</strong>; epic destinies require{" "}
-              <strong>level 21+</strong>. Dropping level clears a path or destiny that is no longer legal.
+              Themes are optional packages with prerequisites.
             </p>
 
             <section style={{ marginBottom: "1.25rem" }}>
-              <h4 style={subsectionTitleStyle}>Theme</h4>
               <label style={{ display: "block", fontSize: "0.88rem", marginBottom: "0.4rem" }}>
                 Search themes
                 <input
@@ -3669,13 +3754,21 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   <p style={{ margin: "0 0 0.45rem 0", fontSize: "0.78rem", color: "var(--text-muted)" }}>
                     These are granted when your level reaches each power&apos;s printed level (same list as on the Powers tab).
                   </p>
-                  <div>{themeGrantedPowers.map((p) => renderPowerCardWithSelections(p, `paths-theme-${p.id}`))}</div>
+                  <div>{themeGrantedPowers.map((p) => renderPowerCardWithSelections(p, `theme-tab-${p.id}`))}</div>
                 </div>
               )}
             </section>
+          </div>
+        )}
+
+        {activeTab === "paragonPath" && build.level >= 11 && (
+          <div>
+            <h3 style={sectionTitleStyle}>Paragon path</h3>
+            <p style={{ margin: "0.25rem 0 0.75rem 0", color: "var(--text-muted)", fontSize: "0.88rem", lineHeight: 1.45 }}>
+              Paragon paths require <strong>level 11+</strong>. Dropping level clears a path that is no longer legal.
+            </p>
 
             <section style={{ marginBottom: "1.25rem" }}>
-              <h4 style={subsectionTitleStyle}>Paragon path</h4>
               {build.level < 11 && (
                 <p style={{ margin: "0 0 0.5rem 0", fontSize: "0.85rem", color: "var(--status-warning)" }}>Set level to 11 or higher to choose a paragon path.</p>
               )}
@@ -3778,9 +3871,17 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 </details>
               )}
             </section>
+          </div>
+        )}
+
+        {activeTab === "epicDestiny" && build.level >= 21 && (
+          <div>
+            <h3 style={sectionTitleStyle}>Epic destiny</h3>
+            <p style={{ margin: "0.25rem 0 0.75rem 0", color: "var(--text-muted)", fontSize: "0.88rem", lineHeight: 1.45 }}>
+              Epic destinies require <strong>level 21+</strong>. Dropping level clears a destiny that is no longer legal.
+            </p>
 
             <section>
-              <h4 style={subsectionTitleStyle}>Epic destiny</h4>
               {build.level < 21 && (
                 <p style={{ margin: "0 0 0.5rem 0", fontSize: "0.85rem", color: "var(--status-warning)" }}>Set level to 21 or higher to choose an epic destiny.</p>
               )}
@@ -4005,6 +4106,121 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   ))}
                 </select>
               </label>
+              <div style={{ marginTop: "0.35rem", paddingTop: "0.55rem", borderTop: "1px solid var(--panel-border)" }}>
+                <p
+                  style={{
+                    margin: "0 0 0.35rem 0",
+                    fontSize: "0.76rem",
+                    fontWeight: 700,
+                    letterSpacing: "0.04em",
+                    color: "var(--text-secondary)",
+                    textTransform: "uppercase"
+                  }}
+                >
+                  Magic item enhancement bonuses
+                </p>
+                <p style={{ margin: "0 0 0.45rem 0", fontSize: "0.78rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
+                  Optional flat bonuses from enhancements (e.g. armor, neck, weapon). Same fields sync when you use{" "}
+                  <strong>Save for Character Sheet</strong>.
+                </p>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "0.45rem" }}>
+                  <label style={{ fontSize: "0.82rem" }}>
+                    AC
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={build.magicItemBonuses?.ac ?? ""}
+                      onChange={(e) => setMagicItemBonusField("ac", e.target.value)}
+                      placeholder="0"
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        marginTop: "0.2rem",
+                        padding: "0.28rem 0.35rem",
+                        borderRadius: "6px",
+                        border: "1px solid var(--panel-border)",
+                        boxSizing: "border-box"
+                      }}
+                    />
+                  </label>
+                  <label style={{ fontSize: "0.82rem" }}>
+                    Fortitude
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={build.magicItemBonuses?.fortitude ?? ""}
+                      onChange={(e) => setMagicItemBonusField("fortitude", e.target.value)}
+                      placeholder="0"
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        marginTop: "0.2rem",
+                        padding: "0.28rem 0.35rem",
+                        borderRadius: "6px",
+                        border: "1px solid var(--panel-border)",
+                        boxSizing: "border-box"
+                      }}
+                    />
+                  </label>
+                  <label style={{ fontSize: "0.82rem" }}>
+                    Reflex
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={build.magicItemBonuses?.reflex ?? ""}
+                      onChange={(e) => setMagicItemBonusField("reflex", e.target.value)}
+                      placeholder="0"
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        marginTop: "0.2rem",
+                        padding: "0.28rem 0.35rem",
+                        borderRadius: "6px",
+                        border: "1px solid var(--panel-border)",
+                        boxSizing: "border-box"
+                      }}
+                    />
+                  </label>
+                  <label style={{ fontSize: "0.82rem" }}>
+                    Will
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={build.magicItemBonuses?.will ?? ""}
+                      onChange={(e) => setMagicItemBonusField("will", e.target.value)}
+                      placeholder="0"
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        marginTop: "0.2rem",
+                        padding: "0.28rem 0.35rem",
+                        borderRadius: "6px",
+                        border: "1px solid var(--panel-border)",
+                        boxSizing: "border-box"
+                      }}
+                    />
+                  </label>
+                  <label style={{ fontSize: "0.82rem" }}>
+                    Attack rolls
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={build.magicItemBonuses?.attack ?? ""}
+                      onChange={(e) => setMagicItemBonusField("attack", e.target.value)}
+                      placeholder="0"
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        marginTop: "0.2rem",
+                        padding: "0.28rem 0.35rem",
+                        borderRadius: "6px",
+                        border: "1px solid var(--panel-border)",
+                        boxSizing: "border-box"
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
         )}
