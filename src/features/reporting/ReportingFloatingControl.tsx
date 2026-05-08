@@ -54,7 +54,7 @@ export function ReportingFloatingControl(props: {
   const openerRef = useRef<HTMLElement | null>(null);
 
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<ReportFormInput>(() => emptyReportForm("feedback"));
+  const [form, setForm] = useState<ReportFormInput>(() => emptyReportForm("enhancement"));
   const [submitState, setSubmitState] = useState<"idle" | "submitting" | "success">("idle");
   const [formErrors, setFormErrors] = useState<Partial<Record<keyof ReportFormInput, string>>>({});
   const [banner, setBanner] = useState<{ kind: "error" | "info"; text: string } | null>(null);
@@ -80,7 +80,7 @@ export function ReportingFloatingControl(props: {
       setSubmitState("idle");
       setBanner(null);
       setFormErrors({});
-      setForm(emptyReportForm("feedback"));
+      setForm(emptyReportForm("enhancement"));
       openerRef.current?.focus?.();
       openerRef.current = null;
     }
@@ -191,7 +191,7 @@ export function ReportingFloatingControl(props: {
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={dialogId}
-        title="Submit feedback or a bug report"
+        title="Submit feedback or report an issue"
         onClick={() => {
           openerRef.current = document.activeElement as HTMLElement | null;
           setBanner(null);
@@ -228,12 +228,12 @@ export function ReportingFloatingControl(props: {
       >
         <div style={{ maxHeight: "calc(min(90vh, 560px) - 2.5rem)", overflowY: "auto" }}>
           <h2 id={titleId} style={{ margin: "0 0 0.75rem", fontSize: "1.15rem" }}>
-            Feedback &amp; bug reports
+            Feedback &amp; issues
           </h2>
 
           <p style={{ margin: "0 0 0.85rem", color: colors.mutedText, fontSize: "0.95rem", lineHeight: 1.45 }}>
-            Submit feedback or bug reports. Reports include this page&apos;s route, app version, and browser metadata to
-            help reproduce issues.
+            Choose a type so we can apply the right GitHub label. Reports include this page&apos;s route, app version, and
+            browser metadata to help triage.
           </p>
 
           {banner ? (
@@ -257,7 +257,7 @@ export function ReportingFloatingControl(props: {
 
           <form onSubmit={(e) => void handleSubmit(e)}>
             <div style={fieldStyle}>
-              <label htmlFor={`${dialogId}-category`}>Type</label>
+              <label htmlFor={`${dialogId}-category`}>Type (GitHub label)</label>
               <select
                 id={`${dialogId}-category`}
                 value={form.category}
@@ -270,8 +270,10 @@ export function ReportingFloatingControl(props: {
                   color: colors.text
                 }}
               >
-                <option value="feedback">Feedback</option>
-                <option value="bug">Bug report</option>
+                <option value="bug">Bug</option>
+                <option value="enhancement">Enhancement</option>
+                <option value="documentation">Documentation</option>
+                <option value="question">Question</option>
               </select>
             </div>
 

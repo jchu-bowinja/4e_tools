@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { parseReportBodyJson } from "../../../src/features/reporting/validatePayload";
 
 const base = {
-  category: "feedback",
+  category: "enhancement",
   title: "Title",
   description: "Description text",
   hashRoute: "#/monsters",
@@ -12,11 +12,11 @@ const base = {
 };
 
 describe("parseReportBodyJson", () => {
-  it("parses feedback payload", () => {
+  it("parses enhancement payload", () => {
     const r = parseReportBodyJson(base);
     expect(r.status).toBe(200);
     if (r.status !== 200) return;
-    expect(r.payload.category).toBe("feedback");
+    expect(r.payload.category).toBe("enhancement");
     expect(r.payload.title).toBe("Title");
   });
 
@@ -47,8 +47,17 @@ describe("parseReportBodyJson", () => {
     expect(parseReportBodyJson({ ...base, category: "other" }).status).toBe(400);
   });
 
+  it("rejects legacy feedback category", () => {
+    expect(parseReportBodyJson({ ...base, category: "feedback" }).status).toBe(400);
+  });
+
   it("rejects suggestion category (no longer supported)", () => {
     expect(parseReportBodyJson({ ...base, category: "suggestion" }).status).toBe(400);
+  });
+
+  it("parses documentation and question", () => {
+    expect(parseReportBodyJson({ ...base, category: "documentation" }).status).toBe(200);
+    expect(parseReportBodyJson({ ...base, category: "question" }).status).toBe(200);
   });
 
   it("fills createdAt when missing", () => {

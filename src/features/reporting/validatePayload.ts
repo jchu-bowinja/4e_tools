@@ -21,7 +21,7 @@ function asOptionalString(v: unknown, max: number): string | null {
 }
 
 function asCategory(v: unknown): ReportCategory | null {
-  if (v === "feedback" || v === "bug") return v;
+  if (v === "bug" || v === "enhancement" || v === "documentation" || v === "question") return v;
   return null;
 }
 
@@ -63,7 +63,7 @@ export function parseReportBodyJson(json: unknown): ParseReportBodyError | Parse
       body: {
         ok: false,
         error: "validation_failed",
-        fields: { category: "Must be feedback or bug." }
+        fields: { category: "Must be bug, enhancement, documentation, or question." }
       }
     };
   }

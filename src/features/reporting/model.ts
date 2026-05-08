@@ -1,9 +1,10 @@
 /**
- * Shared contract for user reports (feedback, bugs).
+ * Shared contract for user reports.
+ * Categories align with default GitHub issue labels (bug, enhancement, documentation, question).
  * Used by the report modal and POST /api/reports.
  */
 
-export type ReportCategory = "feedback" | "bug";
+export type ReportCategory = "bug" | "enhancement" | "documentation" | "question";
 
 export type BugSeverity = "low" | "medium" | "high" | "critical";
 
@@ -33,7 +34,7 @@ export const REPORT_OPTIONAL_TEXT_MAX = 4000;
 
 export type ReportFieldErrors = Partial<Record<keyof ReportFormInput, string>>;
 
-export function emptyReportForm(category: ReportCategory = "feedback"): ReportFormInput {
+export function emptyReportForm(category: ReportCategory = "enhancement"): ReportFormInput {
   return {
     category,
     title: "",
@@ -119,4 +120,19 @@ export function buildReportPayload(
     appVersion: meta.appVersion,
     createdAt: meta.createdAt ?? new Date().toISOString()
   };
+}
+
+const NON_BUG_ISSUE_BRACKET: Record<Exclude<ReportCategory, "bug">, string> = {
+  enhancement: "Enhancement",
+  documentation: "Documentation",
+  question: "Question"
+};
+
+/** Title line for a GitHub issue (category bracket + optional bug severity). */
+export function formatReportIssueTitle(payload: Pick<ReportPayload, "category" | "title" | "severity">): string {
+  if (payload.category === "bug") {
+    const sevTag = payload.severity ? `:${payload.severity}` : "";
+    return `[Bug${sevTag}] ${payload.title}`;
+  }
+  return `[${NON_BUG_ISSUE_BRACKET[payload.category]}] ${payload.title}`;
 }

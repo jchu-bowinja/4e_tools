@@ -15,10 +15,10 @@ describe("reporting model", () => {
     ).toBeGreaterThan(0);
   });
 
-  it("accepts valid minimal feedback form", () => {
+  it("accepts valid minimal non-bug form", () => {
     expect(
       Object.keys(
-        validateReportForm({ ...emptyReportForm("feedback"), title: "Hi", description: "Body" })
+        validateReportForm({ ...emptyReportForm("question"), title: "Hi", description: "Body" })
       ).length
     ).toBe(0);
   });
@@ -65,10 +65,10 @@ describe("reporting model", () => {
     expect(bug.stepsToReproduce).toBe("s");
     expect(bug.severity).toBe("low");
 
-    const fb = buildReportPayload(
-      { ...emptyReportForm("feedback"), title: "f", description: "d" },
+    const doc = buildReportPayload(
+      { ...emptyReportForm("documentation"), title: "f", description: "d" },
       { hashRoute: "#/", userAgent: "u", appVersion: "v" }
     );
-    expect(fb).not.toHaveProperty("stepsToReproduce");
+    expect(doc).not.toHaveProperty("stepsToReproduce");
   });
 });

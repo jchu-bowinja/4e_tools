@@ -1,0 +1,26 @@
+# Netlify build + routing config.
+#
+# When building from Git, Netlify runs `npm run build` and serves `dist/`.
+# The `/api/reports` redirect maps the dev-server route the client already
+# uses (see `submitReport.ts`) onto the serverless function in
+# `netlify/functions/reports.ts`, so no client code changes are needed.
+#
+# Required env vars (set under Site configuration → Environment variables):
+#   GITHUB_REPO    "owner/repo" of the issue tracker that should receive reports
+#   GITHUB_TOKEN   fine-grained PAT scoped to that repo with Issues: Read & write
+# Optional:
+#   GITHUB_LABELS  comma-separated extra labels (in addition to type label; must exist)
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[[redirects]]
+  from = "/api/reports"
+  to = "/.netlify/functions/reports"
+  status = 200
+  force = true
