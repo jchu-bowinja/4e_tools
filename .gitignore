@@ -15,10 +15,6 @@ combined.*.merged.xml
 *.monster
 out_json/
 
-# Normalized rules text derived from extracts
-generated/
-generated_*/
-
 # Reference books (copyrighted)
 *.pdf
 
