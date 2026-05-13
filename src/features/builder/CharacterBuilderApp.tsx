@@ -14,7 +14,7 @@ import {
 } from "../../rules/models";
 import { defaultBuild } from "./defaultBuild";
 import { deleteSavedCharacterById, loadBuild, loadSavedCharacters, saveBuild, saveBuildToSavedCharacters } from "./storage";
-import { computeHybridDerivedStats, mergeHybridProficiencyLines, parseHybridDefenseBonuses } from "../../rules/hybridDerivedStats";
+import { mergeHybridProficiencyLines } from "../../rules/hybridDerivedStats";
 import {
   buildHybridPowerSlotDefinitions,
   hybridPowerPoolUnion,
@@ -22,8 +22,7 @@ import {
   powerAllowedForHybridSlot,
   reconcileHybridClassPowerSlotsForBuild
 } from "../../rules/hybridPowerSlots";
-import { computeDerivedStats } from "../../rules/statCalculator";
-import { aggregateSupportPassiveDefenseBonuses } from "../../rules/supportStatAdds";
+import { computeBuilderLikeDerivedStats } from "../../rules/derivedStatsFromBuild";
 import { resolveFeatOptions } from "../../rules/optionResolver";
 import { applyAsiBonusesToScores, isHumanRace, requiredAsiMilestonesUpTo, totalFeatSlots } from "../../rules/advancement";
 import {
@@ -906,45 +905,19 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     [scoresAfterLevel, build.racialAbilityChoice, raceAbilityBonusInfo]
   );
   const effectiveBuild = useMemo(() => ({ ...build, abilityScores: effectiveAbilityScores }), [build, effectiveAbilityScores]);
-  const supportPassiveDefense = useMemo(
-    () => aggregateSupportPassiveDefenseBonuses(index, effectiveBuild),
-    [index, effectiveBuild]
-  );
   const legality = useMemo(() => validateCharacterBuild(index, build), [index, build]);
-  const derived = useMemo(() => {
-    if (isHybridBuild && selectedHybridA && selectedHybridB) {
-      return computeHybridDerivedStats(
+  const derived = useMemo(
+    () =>
+      computeBuilderLikeDerivedStats(
+        index,
         effectiveBuild,
         selectedRace,
-        selectedHybridA,
-        selectedHybridB,
         selectedArmor,
         selectedShield,
-        parseHybridDefenseBonuses(selectedHybridA, selectedHybridB),
-        supportPassiveDefense
-      );
-    }
-    return computeDerivedStats(
-      effectiveBuild,
-      selectedRace,
-      selectedClass,
-      selectedArmor,
-      selectedShield,
-      legality.classDefenseBonuses,
-      supportPassiveDefense
-    );
-  }, [
-    effectiveBuild,
-    selectedRace,
-    selectedClass,
-    selectedArmor,
-    selectedShield,
-    legality.classDefenseBonuses,
-    isHybridBuild,
-    selectedHybridA,
-    selectedHybridB,
-    supportPassiveDefense
-  ]);
+        { legality }
+      ),
+    [index, effectiveBuild, selectedRace, selectedArmor, selectedShield, legality]
+  );
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 1380px)");

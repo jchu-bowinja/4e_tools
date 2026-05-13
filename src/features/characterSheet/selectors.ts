@@ -2,10 +2,7 @@ import { attackPowerBucketFromUsage } from "../../rules/classPowerSlots";
 import { getPowersForOwnerId } from "../../rules/classPowersQuery";
 import { autoGrantedClassPowers, collectPowerIdsFromRacialTrait } from "../../rules/grantedPowersQuery";
 import { parseRacialTraitIdsFromRace } from "../../rules/racialTraits";
-import { computeDerivedStats } from "../../rules/statCalculator";
-import { computeHybridDerivedStats, parseHybridDefenseBonuses } from "../../rules/hybridDerivedStats";
-import { aggregateSupportPassiveDefenseBonuses } from "../../rules/supportStatAdds";
-import { parseClassDefenseBonusesFromClassDef } from "../../rules/parseClassDefenseBonuses";
+import { computeBuilderLikeDerivedStats } from "../../rules/derivedStatsFromBuild";
 import type { Armor, CharacterBuild, ClassDef, Power, Race, RacialTrait, RulesIndex } from "../../rules/models";
 import type { CharacterSheetState, EquipmentSlot, InventoryItem } from "./model";
 
@@ -96,32 +93,7 @@ export function computeSheetDerivedData(state: CharacterSheetState, index: Rules
   );
 
   const build = toBuildLikeState(state);
-  const supportPassiveDefense = aggregateSupportPassiveDefenseBonuses(index, build);
-  const isHybrid = build.characterStyle === "hybrid" && Boolean(build.hybridClassIdA && build.hybridClassIdB);
-  const hybridA = isHybrid ? index.hybridClasses?.find((h) => h.id === build.hybridClassIdA) : undefined;
-  const hybridB = isHybrid ? index.hybridClasses?.find((h) => h.id === build.hybridClassIdB) : undefined;
-
-  const derived =
-    isHybrid && hybridA && hybridB
-      ? computeHybridDerivedStats(
-          build,
-          race,
-          hybridA,
-          hybridB,
-          armor,
-          shield,
-          parseHybridDefenseBonuses(hybridA, hybridB),
-          supportPassiveDefense
-        )
-      : computeDerivedStats(
-          build,
-          race,
-          cls,
-          armor,
-          shield,
-          parseClassDefenseBonusesFromClassDef(cls),
-          supportPassiveDefense
-        );
+  const derived = computeBuilderLikeDerivedStats(index, build, race, armor, shield);
   return {
     race,
     cls,

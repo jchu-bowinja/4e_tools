@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { computeSkillSheetRows } from "../../src/rules/skillCalculator";
-import { computeDerivedStats } from "../../src/rules/statCalculator";
+import { computeBuilderLikeDerivedStats } from "../../src/rules/derivedStatsFromBuild";
 import { summarizeImplementAttack, summarizeMainWeaponAttack } from "../../src/rules/weaponAttack";
-import type { CharacterBuild, RulesIndex } from "../../src/rules/models";
 
 describe("combat preview integration", () => {
   it("computes derived, attack preview, and skill sheet values together", () => {
@@ -21,15 +20,22 @@ describe("combat preview integration", () => {
     const cls = { keyAbilities: "Intelligence, Strength", hitPointsAt1: 12, hitPointsPerLevel: 5, healingSurgesBase: 7 } as never;
     const race = { speed: 6 } as never;
 
-    const derived = computeDerivedStats(build, race, cls, chainmail, heavyShield, undefined);
-    const weapon = summarizeMainWeaponAttack(build.level, build.abilityScores, sword, "Military Melee");
-    const implement = summarizeImplementAttack(build.level, build.abilityScores, cls, orb, "Orb");
-    const index = {
+    const index: RulesIndex = {
       skills: [
         { id: "skill_arcana", name: "Arcana", keyAbility: "Intelligence", slug: "arcana", raw: {} },
         { id: "skill_athletics", name: "Athletics", keyAbility: "Strength", slug: "athletics", raw: {} }
-      ]
-    } as never as RulesIndex;
+      ],
+      feats: [],
+      themes: [],
+      paragonPaths: [],
+      epicDestinies: [],
+      hybridClasses: []
+    } as never;
+    const derived = computeBuilderLikeDerivedStats(index, build, race, chainmail, heavyShield, {
+      legality: { classDefenseBonuses: undefined }
+    });
+    const weapon = summarizeMainWeaponAttack(build.level, build.abilityScores, sword, "Military Melee");
+    const implement = summarizeImplementAttack(build.level, build.abilityScores, cls, orb, "Orb");
     const rows = computeSkillSheetRows(index, build.level, build.abilityScores, new Set(build.trainedSkillIds), derived.armorCheckPenalty);
 
     expect(derived.armorCheckPenalty).toBe(3);
