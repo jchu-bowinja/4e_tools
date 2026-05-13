@@ -77,6 +77,19 @@ export interface PowerSelectionGroup {
   options: HybridTalentClassFeatureOption[];
 }
 
+/** Flattened Character Builder `rules.statadd` entry (ETL + runtime). */
+export interface StatAddEntry {
+  name: string;
+  value: string;
+  condition?: string;
+  wearing?: string;
+  requires?: string;
+  type?: string;
+}
+
+/** Parsed `specific['Bonus to Defense']` sums (ETL uses lowercase keys). */
+export type NadBonusesFromSpecific = Partial<Record<"fortitude" | "reflex" | "will", number>>;
+
 export interface Feat extends RulesEntity {
   tier?: string | null;
   category?: string | null;
@@ -85,6 +98,10 @@ export interface Feat extends RulesEntity {
   prereqsRaw?: string | null;
   prereqSummary?: string | null;
   prereqTokens: PrereqToken[];
+  /** ETL: flattened `rules.statadd` from the compendium row. */
+  statAdds?: StatAddEntry[];
+  /** ETL: parsed `Bonus to Defense` in specific, when present. */
+  nadBonusesFromSpecific?: NadBonusesFromSpecific;
   raw: Record<string, unknown>;
 }
 
@@ -156,6 +173,8 @@ export interface RacialTrait extends RulesEntity {
 export interface Theme extends RulesEntity {
   prereqsRaw?: string | null;
   prereqTokens: PrereqToken[];
+  statAdds?: StatAddEntry[];
+  nadBonusesFromSpecific?: NadBonusesFromSpecific;
   raw: Record<string, unknown>;
 }
 
@@ -163,6 +182,8 @@ export interface Theme extends RulesEntity {
 export interface ParagonPath extends RulesEntity {
   prereqsRaw?: string | null;
   prereqTokens: PrereqToken[];
+  statAdds?: StatAddEntry[];
+  nadBonusesFromSpecific?: NadBonusesFromSpecific;
   raw: Record<string, unknown>;
 }
 
@@ -170,6 +191,8 @@ export interface ParagonPath extends RulesEntity {
 export interface EpicDestiny extends RulesEntity {
   prereqsRaw?: string | null;
   prereqTokens: PrereqToken[];
+  statAdds?: StatAddEntry[];
+  nadBonusesFromSpecific?: NadBonusesFromSpecific;
   raw: Record<string, unknown>;
 }
 

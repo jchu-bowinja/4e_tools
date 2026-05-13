@@ -87,5 +87,27 @@ describe("computeDerivedStats", () => {
     expect(stats.defenses.reflex).toBe(10 + 3 + 1);
     expect(stats.defenses.will).toBe(10 + 3 + 0);
   });
+
+  it("merges support passive defense (feats / theme / path / destiny) into totals", () => {
+    const heavyArmor = {
+      armorBonus: 6,
+      armorCategory: "Chain",
+      armorType: "Heavy",
+      speedPenalty: 1
+    } as never;
+    const support = { ac: 1, fortitude: 0, reflex: 0, will: 2 };
+    const stats = computeDerivedStats(
+      baseBuild,
+      { speed: 6 } as never,
+      undefined,
+      heavyArmor,
+      undefined,
+      undefined,
+      support
+    );
+    expect(stats.defenses.ac).toBe(17);
+    expect(stats.acBreakdown.supportAcBonus).toBe(1);
+    expect(stats.defenses.will).toBe(12);
+  });
 });
 

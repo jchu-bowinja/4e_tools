@@ -11,6 +11,7 @@ describe("defenseCalculator", () => {
     const bd = computeAcBreakdown(4, 3, armor, undefined, 1);
     expect(bd.halfLevel).toBe(0);
     expect(bd.abilityBonus).toBe(0);
+    expect(bd.supportAcBonus).toBe(0);
     expect(bd.total).toBe(16);
     expect(classifyBodyArmor(armor)).toBe("heavy");
   });
@@ -23,6 +24,7 @@ describe("defenseCalculator", () => {
     } as never;
     const bd = computeAcBreakdown(4, 3, armor, undefined, 10);
     expect(bd.halfLevel).toBe(5);
+    expect(bd.supportAcBonus).toBe(0);
     expect(bd.total).toBe(21);
   });
 
@@ -35,6 +37,18 @@ describe("defenseCalculator", () => {
     const bd = computeAcBreakdown(4, 3, armor, undefined, 1);
     expect(bd.abilityLabel).toBe("INT");
     expect(bd.abilityBonus).toBe(3);
+    expect(bd.supportAcBonus).toBe(0);
     expect(bd.total).toBe(15);
+  });
+
+  it("adds unconditional support AC from feats / theme / path / destiny", () => {
+    const armor = {
+      armorBonus: 2,
+      armorCategory: "Cloth",
+      armorType: "Light"
+    } as never;
+    const bd = computeAcBreakdown(4, 3, armor, undefined, 1, 2);
+    expect(bd.supportAcBonus).toBe(2);
+    expect(bd.total).toBe(17);
   });
 });

@@ -28,6 +28,8 @@ export interface AcBreakdown {
   shieldBonus: number;
   abilityBonus: number;
   abilityLabel: "INT" | "DEX" | "max DEX/INT" | "—";
+  /** Unconditional AC from feat / theme / paragon / epic ETL `statAdds` (not armor or shield). */
+  supportAcBonus: number;
   total: number;
 }
 
@@ -44,7 +46,8 @@ export function computeAcBreakdown(
   intMod: number,
   bodyArmor: Armor | undefined,
   shield: Armor | undefined,
-  characterLevel = 1
+  characterLevel = 1,
+  supportAcBonus = 0
 ): AcBreakdown {
   const base = 10;
   const halfLevel = Math.floor(characterLevel / 2);
@@ -78,7 +81,8 @@ export function computeAcBreakdown(
       abilityLabel = "max DEX/INT";
   }
 
-  const total = base + halfLevel + armorBonus + shieldBonus + abilityBonus;
+  const extraAc = typeof supportAcBonus === "number" && Number.isFinite(supportAcBonus) ? supportAcBonus : 0;
+  const total = base + halfLevel + armorBonus + shieldBonus + abilityBonus + extraAc;
   return {
     base,
     halfLevel,
@@ -86,6 +90,7 @@ export function computeAcBreakdown(
     shieldBonus,
     abilityBonus,
     abilityLabel,
+    supportAcBonus: extraAc,
     total
   };
 }

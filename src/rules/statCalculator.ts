@@ -1,6 +1,7 @@
 import { Armor, CharacterBuild, ClassDef, Race } from "./models";
 import type { AcBreakdown } from "./defenseCalculator";
 import { bodyArmorSpeedPenalty, computeAcBreakdown, totalArmorCheckPenalty } from "./defenseCalculator";
+import type { PassiveDefenseBonuses } from "./supportStatAdds";
 
 function finiteBonus(n: unknown): number {
   return typeof n === "number" && Number.isFinite(n) ? n : 0;
@@ -41,13 +42,16 @@ function abilityMod(score: number): number {
   return Math.floor((score - 10) / 2);
 }
 
+const emptySupportDefense: PassiveDefenseBonuses = { ac: 0, fortitude: 0, reflex: 0, will: 0 };
+
 export function computeDerivedStats(
   build: CharacterBuild,
   race: Race | undefined,
   cls: ClassDef | undefined,
   armor: Armor | undefined,
   shield: Armor | undefined,
-  classDefenseBonuses?: Partial<Record<"Fortitude" | "Reflex" | "Will", number>>
+  classDefenseBonuses?: Partial<Record<"Fortitude" | "Reflex" | "Will", number>>,
+  supportPassiveDefense?: PassiveDefenseBonuses
 ): DerivedStats {
   const con = build.abilityScores.CON || 10;
   const dex = build.abilityScores.DEX || 10;
@@ -74,7 +78,8 @@ export function computeDerivedStats(
   const baseRef = 10;
   const baseWill = 10;
 
-  const acBreakdown = computeAcBreakdown(dexMod, intMod, armor, shield, build.level);
+  const sp = supportPassiveDefense ?? emptySupportDefense;
+  const acBreakdown = computeAcBreakdown(dexMod, intMod, armor, shield, build.level, sp.ac);
   const armorCheckPenalty = totalArmorCheckPenalty(armor, shield);
 
   const defensesBase = {
@@ -83,17 +88,20 @@ export function computeDerivedStats(
       baseFort +
       halfLevel +
       Math.max(abilityMod(str), abilityMod(con)) +
-      (classDefenseBonuses?.Fortitude || 0),
+      (classDefenseBonuses?.Fortitude || 0) +
+      sp.fortitude,
     reflex:
       baseRef +
       halfLevel +
       Math.max(dexMod, intMod) +
-      (classDefenseBonuses?.Reflex || 0),
+      (classDefenseBonuses?.Reflex || 0) +
+      sp.reflex,
     will:
       baseWill +
       halfLevel +
       Math.max(abilityMod(wis), abilityMod(cha)) +
-      (classDefenseBonuses?.Will || 0)
+      (classDefenseBonuses?.Will || 0) +
+      sp.will
   };
   const defenses = applyMagicItemDefenseBonuses(defensesBase, build.magicItemBonuses);
 

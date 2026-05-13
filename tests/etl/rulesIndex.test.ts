@@ -9,7 +9,7 @@ describe.skipIf(!existsSync(rulesIndexPath))("generated rules index", () => {
     const data = JSON.parse(raw) as {
       races: unknown[];
       classes: unknown[];
-      feats: unknown[];
+      feats: Array<{ id?: string; statAdds?: unknown[] }>;
       powers: unknown[];
       skills: unknown[];
       languages: unknown[];
@@ -43,6 +43,11 @@ describe.skipIf(!existsSync(rulesIndexPath))("generated rules index", () => {
     expect((data.hybridClasses ?? []).length).toBeGreaterThan(0);
     expect(data.autoGrantedPowerIdsByClassId?.["ID_FMP_CLASS_2"]).toContain("ID_FMP_POWER_1455");
     expect(data.autoGrantedSkillTrainingNamesBySupportId?.["ID_FMP_CLASS_9"]).toContain("Arcana");
+
+    const ironWill = data.feats.find((f) => f.id === "ID_FMP_FEAT_148");
+    if (ironWill && Array.isArray(ironWill.statAdds)) {
+      expect(ironWill.statAdds.length).toBeGreaterThan(0);
+    }
   });
 
   it("has non-empty ids/names for entities relied on by runtime rules", () => {

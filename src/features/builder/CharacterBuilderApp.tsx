@@ -23,6 +23,7 @@ import {
   reconcileHybridClassPowerSlotsForBuild
 } from "../../rules/hybridPowerSlots";
 import { computeDerivedStats } from "../../rules/statCalculator";
+import { aggregateSupportPassiveDefenseBonuses } from "../../rules/supportStatAdds";
 import { resolveFeatOptions } from "../../rules/optionResolver";
 import { applyAsiBonusesToScores, isHumanRace, requiredAsiMilestonesUpTo, totalFeatSlots } from "../../rules/advancement";
 import {
@@ -905,6 +906,10 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     [scoresAfterLevel, build.racialAbilityChoice, raceAbilityBonusInfo]
   );
   const effectiveBuild = useMemo(() => ({ ...build, abilityScores: effectiveAbilityScores }), [build, effectiveAbilityScores]);
+  const supportPassiveDefense = useMemo(
+    () => aggregateSupportPassiveDefenseBonuses(index, effectiveBuild),
+    [index, effectiveBuild]
+  );
   const legality = useMemo(() => validateCharacterBuild(index, build), [index, build]);
   const derived = useMemo(() => {
     if (isHybridBuild && selectedHybridA && selectedHybridB) {
@@ -915,10 +920,19 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         selectedHybridB,
         selectedArmor,
         selectedShield,
-        parseHybridDefenseBonuses(selectedHybridA, selectedHybridB)
+        parseHybridDefenseBonuses(selectedHybridA, selectedHybridB),
+        supportPassiveDefense
       );
     }
-    return computeDerivedStats(effectiveBuild, selectedRace, selectedClass, selectedArmor, selectedShield, legality.classDefenseBonuses);
+    return computeDerivedStats(
+      effectiveBuild,
+      selectedRace,
+      selectedClass,
+      selectedArmor,
+      selectedShield,
+      legality.classDefenseBonuses,
+      supportPassiveDefense
+    );
   }, [
     effectiveBuild,
     selectedRace,
@@ -928,7 +942,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     legality.classDefenseBonuses,
     isHybridBuild,
     selectedHybridA,
-    selectedHybridB
+    selectedHybridB,
+    supportPassiveDefense
   ]);
 
   useEffect(() => {
@@ -4568,6 +4583,9 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   Ability ({derived.acBreakdown.abilityLabel}){" "}
                   {derived.acBreakdown.abilityLabel === "—" ? "—" : `${derived.acBreakdown.abilityBonus >= 0 ? "+" : ""}${derived.acBreakdown.abilityBonus}`}
                 </span>
+                {derived.acBreakdown.supportAcBonus > 0 && (
+                  <span>Feats / theme / path / destiny +{derived.acBreakdown.supportAcBonus}</span>
+                )}
               </div>
             </details>
             {derived.armorCheckPenalty > 0 && (

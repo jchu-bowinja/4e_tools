@@ -3,6 +3,9 @@ import type { DerivedStats } from "./statCalculator";
 import type { Armor } from "./models";
 import { applyMagicItemDefenseBonuses } from "./statCalculator";
 import { computeAcBreakdown, bodyArmorSpeedPenalty, totalArmorCheckPenalty } from "./defenseCalculator";
+import type { PassiveDefenseBonuses } from "./supportStatAdds";
+
+const emptySupportDefense: PassiveDefenseBonuses = { ac: 0, fortitude: 0, reflex: 0, will: 0 };
 
 /** Parse "+1 Will" style lines into defense bonuses (same as standard class validator). */
 export function parseHybridDefenseBonuses(
@@ -59,7 +62,8 @@ export function computeHybridDerivedStats(
   hB: HybridClassDef | undefined,
   armor: Armor | undefined,
   shield: Armor | undefined,
-  hybridDefenseBonuses?: Partial<Record<"Fortitude" | "Reflex" | "Will", number>>
+  hybridDefenseBonuses?: Partial<Record<"Fortitude" | "Reflex" | "Will", number>>,
+  supportPassiveDefense?: PassiveDefenseBonuses
 ): DerivedStats {
   const con = build.abilityScores.CON || 10;
   const dex = build.abilityScores.DEX || 10;
@@ -84,7 +88,8 @@ export function computeHybridDerivedStats(
   const halfLevel = Math.floor(build.level / 2);
 
   const mergeDef = { ...hybridDefenseBonuses };
-  const acBreakdown = computeAcBreakdown(dexMod, intMod, armor, shield, build.level);
+  const sp = supportPassiveDefense ?? emptySupportDefense;
+  const acBreakdown = computeAcBreakdown(dexMod, intMod, armor, shield, build.level, sp.ac);
   const armorCheckPenalty = totalArmorCheckPenalty(armor, shield);
   const initiative = halfLevel + dexMod;
 
@@ -94,17 +99,20 @@ export function computeHybridDerivedStats(
       baseFort +
       halfLevel +
       Math.max(abilityMod(str), abilityMod(con)) +
-      (mergeDef.Fortitude || 0),
+      (mergeDef.Fortitude || 0) +
+      sp.fortitude,
     reflex:
       baseRef +
       halfLevel +
       Math.max(dexMod, intMod) +
-      (mergeDef.Reflex || 0),
+      (mergeDef.Reflex || 0) +
+      sp.reflex,
     will:
       baseWill +
       halfLevel +
       Math.max(abilityMod(wis), abilityMod(cha)) +
-      (mergeDef.Will || 0)
+      (mergeDef.Will || 0) +
+      sp.will
   };
   const defenses = applyMagicItemDefenseBonuses(defensesBase, build.magicItemBonuses);
 

@@ -50,6 +50,23 @@ describe("hybrid derived stats helpers", () => {
     const derived = computeHybridDerivedStats(build, undefined, a, b, undefined, undefined);
     expect(derived.healingSurgesPerDay).toBe(11);
   });
+
+  it("adds support passive defense bonuses", () => {
+    const a = hStub({ hitPointsAt1: 12, hitPointsPerLevel: 5, healingSurgesBase: 7 });
+    const b = hStub({ hitPointsAt1: 14, hitPointsPerLevel: 5, healingSurgesBase: 7 });
+    const build = {
+      level: 1,
+      abilityScores: { STR: 10, CON: 18, DEX: 10, INT: 10, WIS: 10, CHA: 10 }
+    } as never;
+    const base = computeHybridDerivedStats(build, undefined, a, b, undefined, undefined);
+    const withSupport = computeHybridDerivedStats(build, undefined, a, b, undefined, undefined, undefined, {
+      ac: 0,
+      fortitude: 0,
+      reflex: 0,
+      will: 3
+    });
+    expect(withSupport.defenses.will).toBe(base.defenses.will + 3);
+  });
 });
 
 describe("hybrid skills", () => {

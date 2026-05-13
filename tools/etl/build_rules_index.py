@@ -811,6 +811,64 @@ def _feat_metadata(feat: Dict[str, Any], prereq_tokens: List[Dict[str, Any]]) ->
     }
 
 
+def _normalize_statadd_entry_attrs(attrs: Dict[str, Any]) -> Dict[str, Any]:
+    """Flatten Character Builder statadd attrs for JSON (feats, themes, paths, destinies)."""
+    out: Dict[str, Any] = {
+        "name": str(attrs.get("name") or "").strip(),
+        "value": str(attrs.get("value") or "").strip(),
+    }
+    for key in ("condition", "wearing", "requires", "type"):
+        v = attrs.get(key)
+        if v is not None and str(v).strip():
+            out[key] = str(v).strip()
+    return out
+
+
+def extract_stat_adds_from_rules(rules: Any) -> List[Dict[str, Any]]:
+    """rules.statadd from a compendium row (feat, theme, paragon path, epic destiny, etc.)."""
+    if not isinstance(rules, dict):
+        return []
+    raw_list = rules.get("statadd")
+    if not isinstance(raw_list, list):
+        return []
+    out: List[Dict[str, Any]] = []
+    for item in raw_list:
+        if not isinstance(item, dict):
+            continue
+        attrs = item.get("attrs")
+        if not isinstance(attrs, dict):
+            continue
+        normalized = _normalize_statadd_entry_attrs(attrs)
+        if normalized.get("name") or normalized.get("value"):
+            out.append(normalized)
+    return out
+
+
+def parse_nad_bonuses_from_bonus_to_defense_field(specific: Any) -> Dict[str, int]:
+    """Parse specific['Bonus to Defense'] e.g. '+1 Fortitude, +1 Reflex' -> {fortitude: 1, reflex: 1}."""
+    if not isinstance(specific, dict):
+        return {}
+    text = str(specific.get("Bonus to Defense") or "")
+    sums: Dict[str, int] = {}
+    for m in re.finditer(r"([+-]\d+)\s*(Fortitude|Reflex|Will)\b", text, re.IGNORECASE):
+        k = m.group(2).lower()
+        if k not in ("fortitude", "reflex", "will"):
+            continue
+        sums[k] = sums.get(k, 0) + int(m.group(1))
+    return sums
+
+
+def support_entity_stat_bonuses(row: Dict[str, Any]) -> Dict[str, Any]:
+    """statAdds + optional nadBonusesFromSpecific for support entities (feat, theme, path, destiny)."""
+    rules = row.get("rules") or {}
+    stat_adds = extract_stat_adds_from_rules(rules)
+    nad = parse_nad_bonuses_from_bonus_to_defense_field(row.get("specific") or {})
+    out: Dict[str, Any] = {"statAdds": stat_adds}
+    if nad:
+        out["nadBonusesFromSpecific"] = nad
+    return out
+
+
 def _rules_element_to_row(elem: ET.Element) -> Dict[str, Any]:
     row: Dict[str, Any] = {
         "internal_id": elem.attrib.get("internal-id"),
@@ -1090,6 +1148,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
                 "tags": feat_meta["tags"],
                 "prereqSummary": feat_meta["prereqSummary"],
                 "raw": feat,
+                **support_entity_stat_bonuses(feat),
             }
         )
 
@@ -1249,6 +1308,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
                 "prereqsRaw": row.get("prereqs"),
                 "prereqTokens": parse.tokens,
                 "raw": row,
+                **support_entity_stat_bonuses(row),
             }
         )
 
@@ -1274,6 +1334,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
                 "prereqsRaw": row.get("prereqs"),
                 "prereqTokens": parse.tokens,
                 "raw": row,
+                **support_entity_stat_bonuses(row),
             }
         )
 
@@ -1299,6 +1360,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
                 "prereqsRaw": row.get("prereqs"),
                 "prereqTokens": parse.tokens,
                 "raw": row,
+                **support_entity_stat_bonuses(row),
             }
         )
 
