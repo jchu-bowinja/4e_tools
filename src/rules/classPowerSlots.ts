@@ -43,14 +43,20 @@ function ordinalWord(n: number): string {
   return `${n}th`;
 }
 
-/** Matches attack-power grouping used by the builder and validator. */
-export function attackPowerBucketFromUsage(usage: string | null | undefined): "atWill" | "encounter" | "daily" {
-  if (!usage) return "encounter";
+/** Classifies attack power usage for slot totals; `other` is not counted toward PHB-style at-will / encounter / daily quotas. */
+export function attackPowerSlotKindFromUsage(usage: string | null | undefined): "atWill" | "encounter" | "daily" | "other" {
+  if (!usage || !String(usage).trim()) return "other";
   const lower = usage.toLowerCase();
   if (lower.includes("at-will")) return "atWill";
   if (lower.includes("encounter")) return "encounter";
   if (lower.includes("daily")) return "daily";
-  return "encounter";
+  return "other";
+}
+
+/** Matches attack-power grouping used by the builder UI filters; nonstandard usage maps to encounter for display grouping. */
+export function attackPowerBucketFromUsage(usage: string | null | undefined): "atWill" | "encounter" | "daily" {
+  const k = attackPowerSlotKindFromUsage(usage);
+  return k === "other" ? "encounter" : k;
 }
 
 export function buildClassPowerSlotDefinitions(level: number, bonusThirdClassAtWill: boolean): ClassPowerSlotDef[] {

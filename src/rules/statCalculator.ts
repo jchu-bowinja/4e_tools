@@ -64,7 +64,8 @@ export function computeDerivedStats(
 
   const dexMod = abilityMod(dex);
   const intMod = abilityMod(int);
-  const initiative = Math.floor(build.level / 2) + dexMod;
+  const halfLevel = Math.floor(build.level / 2);
+  const initiative = halfLevel + dexMod;
   const raceSpeed = race?.speed ?? 6;
   const spdPen = bodyArmorSpeedPenalty(armor);
   const speed = Math.max(0, raceSpeed - spdPen);
@@ -73,21 +74,24 @@ export function computeDerivedStats(
   const baseRef = 10;
   const baseWill = 10;
 
-  const acBreakdown = computeAcBreakdown(dexMod, intMod, armor, shield);
+  const acBreakdown = computeAcBreakdown(dexMod, intMod, armor, shield, build.level);
   const armorCheckPenalty = totalArmorCheckPenalty(armor, shield);
 
   const defensesBase = {
     ac: acBreakdown.total,
     fortitude:
       baseFort +
+      halfLevel +
       Math.max(abilityMod(str), abilityMod(con)) +
       (classDefenseBonuses?.Fortitude || 0),
     reflex:
       baseRef +
+      halfLevel +
       Math.max(dexMod, intMod) +
       (classDefenseBonuses?.Reflex || 0),
     will:
       baseWill +
+      halfLevel +
       Math.max(abilityMod(wis), abilityMod(cha)) +
       (classDefenseBonuses?.Will || 0)
   };

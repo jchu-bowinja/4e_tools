@@ -3,6 +3,8 @@ import { getPowersForOwnerId } from "../../rules/classPowersQuery";
 import { autoGrantedClassPowers, collectPowerIdsFromRacialTrait } from "../../rules/grantedPowersQuery";
 import { parseRacialTraitIdsFromRace } from "../../rules/racialTraits";
 import { computeDerivedStats } from "../../rules/statCalculator";
+import { computeHybridDerivedStats, parseHybridDefenseBonuses } from "../../rules/hybridDerivedStats";
+import { parseClassDefenseBonusesFromClassDef } from "../../rules/parseClassDefenseBonuses";
 import type { Armor, CharacterBuild, ClassDef, Power, Race, RacialTrait, RulesIndex } from "../../rules/models";
 import type { CharacterSheetState, EquipmentSlot, InventoryItem } from "./model";
 
@@ -62,6 +64,9 @@ export function toBuildLikeState(state: CharacterSheetState): CharacterBuild {
     level: state.level,
     raceId: state.raceId,
     classId: state.classId,
+    characterStyle: state.characterStyle,
+    hybridClassIdA: state.hybridClassIdA,
+    hybridClassIdB: state.hybridClassIdB,
     themeId: state.themeId,
     paragonPathId: state.paragonPathId,
     epicDestinyId: state.epicDestinyId,
@@ -89,7 +94,23 @@ export function computeSheetDerivedData(state: CharacterSheetState, index: Rules
     (item) => String(item.armorType || "").toLowerCase().includes("shield")
   );
 
-  const derived = computeDerivedStats(toBuildLikeState(state), race, cls, armor, shield);
+  const build = toBuildLikeState(state);
+  const isHybrid = build.characterStyle === "hybrid" && Boolean(build.hybridClassIdA && build.hybridClassIdB);
+  const hybridA = isHybrid ? index.hybridClasses?.find((h) => h.id === build.hybridClassIdA) : undefined;
+  const hybridB = isHybrid ? index.hybridClasses?.find((h) => h.id === build.hybridClassIdB) : undefined;
+
+  const derived =
+    isHybrid && hybridA && hybridB
+      ? computeHybridDerivedStats(
+          build,
+          race,
+          hybridA,
+          hybridB,
+          armor,
+          shield,
+          parseHybridDefenseBonuses(hybridA, hybridB)
+        )
+      : computeDerivedStats(build, race, cls, armor, shield, parseClassDefenseBonusesFromClassDef(cls));
   return {
     race,
     cls,
@@ -172,6 +193,9 @@ export function sheetStateFromBuild(build: CharacterBuild, index: RulesIndex): C
     level: build.level,
     raceId: build.raceId,
     classId: build.classId,
+    characterStyle: build.characterStyle,
+    hybridClassIdA: build.hybridClassIdA,
+    hybridClassIdB: build.hybridClassIdB,
     themeId: build.themeId,
     paragonPathId: build.paragonPathId,
     epicDestinyId: build.epicDestinyId,

@@ -81,23 +81,30 @@ export function computeHybridDerivedStats(
   const baseFort = 10;
   const baseRef = 10;
   const baseWill = 10;
+  const halfLevel = Math.floor(build.level / 2);
 
   const mergeDef = { ...hybridDefenseBonuses };
-  const acBreakdown = computeAcBreakdown(dexMod, intMod, armor, shield);
+  const acBreakdown = computeAcBreakdown(dexMod, intMod, armor, shield, build.level);
   const armorCheckPenalty = totalArmorCheckPenalty(armor, shield);
-  const initiative = Math.floor(build.level / 2) + dexMod;
+  const initiative = halfLevel + dexMod;
 
   const defensesBase = {
     ac: acBreakdown.total,
     fortitude:
       baseFort +
+      halfLevel +
       Math.max(abilityMod(str), abilityMod(con)) +
       (mergeDef.Fortitude || 0),
     reflex:
       baseRef +
+      halfLevel +
       Math.max(dexMod, intMod) +
       (mergeDef.Reflex || 0),
-    will: baseWill + Math.max(abilityMod(wis), abilityMod(cha)) + (mergeDef.Will || 0)
+    will:
+      baseWill +
+      halfLevel +
+      Math.max(abilityMod(wis), abilityMod(cha)) +
+      (mergeDef.Will || 0)
   };
   const defenses = applyMagicItemDefenseBonuses(defensesBase, build.magicItemBonuses);
 

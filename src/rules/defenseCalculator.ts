@@ -22,6 +22,8 @@ export function classifyBodyArmor(armor: Armor | undefined): BodyArmorKind {
 
 export interface AcBreakdown {
   base: number;
+  /** One-half character level (floor), included in 4e AC like other defenses. */
+  halfLevel: number;
   armorBonus: number;
   shieldBonus: number;
   abilityBonus: number;
@@ -34,16 +36,18 @@ function n(x: number | null | undefined): number {
 }
 
 /**
- * Core 4e AC: heavy armor uses no ability bonus; light cloth uses Intelligence; leather/hide use Dexterity;
- * no body armor uses the better of Dex or Int (unarmored / bracers-style defense).
+ * Core 4e AC: 10 + one-half level + armor + shield + ability (heavy: no ability bonus; cloth: Int;
+ * leather/hide: Dex; unarmored: max of Dex or Int).
  */
 export function computeAcBreakdown(
   dexMod: number,
   intMod: number,
   bodyArmor: Armor | undefined,
-  shield: Armor | undefined
+  shield: Armor | undefined,
+  characterLevel = 1
 ): AcBreakdown {
   const base = 10;
+  const halfLevel = Math.floor(characterLevel / 2);
   const shieldBonus = n(shield?.armorBonus);
   const body = bodyArmor && !String(bodyArmor.armorType || "").toLowerCase().includes("shield") ? bodyArmor : undefined;
   const armorBonus = n(body?.armorBonus);
@@ -74,9 +78,10 @@ export function computeAcBreakdown(
       abilityLabel = "max DEX/INT";
   }
 
-  const total = base + armorBonus + shieldBonus + abilityBonus;
+  const total = base + halfLevel + armorBonus + shieldBonus + abilityBonus;
   return {
     base,
+    halfLevel,
     armorBonus,
     shieldBonus,
     abilityBonus,

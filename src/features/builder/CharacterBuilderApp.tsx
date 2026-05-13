@@ -4557,10 +4557,11 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             <details style={{ marginTop: "0.45rem", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
               <summary style={detailsSummaryStyle}>AC breakdown</summary>
               <p style={{ margin: "0.25rem 0 0 0", color: "var(--text-muted)" }}>
-                AC = 10 + armor + shield + best of DEX/INT when allowed by armor.
+                AC = 10 + one-half level + armor + shield + ability when allowed by armor.
               </p>
               <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.15rem", fontVariantNumeric: "tabular-nums" }}>
                 <span>Base {derived.acBreakdown.base}</span>
+                <span>Half level +{derived.acBreakdown.halfLevel}</span>
                 <span>Armor +{derived.acBreakdown.armorBonus}</span>
                 <span>Shield +{derived.acBreakdown.shieldBonus}</span>
                 <span>

@@ -1,11 +1,30 @@
 import { describe, expect, it } from "vitest";
 import {
+  attackPowerBucketFromUsage,
+  attackPowerSlotKindFromUsage,
   buildClassPowerSlotDefinitions,
   orderedPowerIdsFromSlots,
   powerPrintedLevelEligibleForSlot,
   upcomingClassPowerSlotMilestones
 } from "../../src/rules/classPowerSlots";
-import { Power } from "../../src/rules/models";
+describe("attackPowerSlotKindFromUsage", () => {
+  it("classifies standard PHB usage strings", () => {
+    expect(attackPowerSlotKindFromUsage("At-Will")).toBe("atWill");
+    expect(attackPowerSlotKindFromUsage("Encounter")).toBe("encounter");
+    expect(attackPowerSlotKindFromUsage("Daily")).toBe("daily");
+  });
+
+  it("returns other for blank or nonstandard usage", () => {
+    expect(attackPowerSlotKindFromUsage(null)).toBe("other");
+    expect(attackPowerSlotKindFromUsage("")).toBe("other");
+    expect(attackPowerSlotKindFromUsage("Recharge 5 6")).toBe("other");
+  });
+
+  it("maps other to encounter only in attackPowerBucketFromUsage", () => {
+    expect(attackPowerBucketFromUsage("Recharge 5 6")).toBe("encounter");
+    expect(attackPowerBucketFromUsage(null)).toBe("encounter");
+  });
+});
 
 describe("buildClassPowerSlotDefinitions", () => {
   it("gives two at-will slots at level 1 for non-human", () => {

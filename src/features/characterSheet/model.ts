@@ -1,4 +1,4 @@
-import type { Ability } from "../../rules/models";
+import type { Ability, CharacterStyle } from "../../rules/models";
 
 export type AbilityScores = Record<Ability, number>;
 
@@ -34,6 +34,10 @@ export interface CharacterSheetState {
   level: number;
   raceId?: string;
   classId?: string;
+  /** When set with hybrid class ids, derived stats use hybrid rules (matches builder). */
+  characterStyle?: CharacterStyle;
+  hybridClassIdA?: string;
+  hybridClassIdB?: string;
   themeId?: string;
   paragonPathId?: string;
   epicDestinyId?: string;

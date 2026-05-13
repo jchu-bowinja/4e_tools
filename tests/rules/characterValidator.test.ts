@@ -143,6 +143,35 @@ describe("validateCharacterBuild", () => {
     expect(result.errors).toEqual([]);
   });
 
+  it("does not treat auto-granted trained skills as off-list class skills", () => {
+    const idx: RulesIndex = {
+      ...index,
+      skills: [
+        ...index.skills,
+        { id: "sk_arc", name: "Arcana", slug: "arcana", keyAbility: "Intelligence", raw: {} }
+      ],
+      autoGrantedSkillTrainingNamesBySupportId: {
+        class1: ["Arcana"]
+      }
+    };
+    const build = {
+      ...legalLevel1Base,
+      trainedSkillIds: ["s1", "s2", "s3", "sk_arc"]
+    };
+    const result = validateCharacterBuild(idx, build);
+    expect(result.errors.filter((e) => e.includes("class skills list"))).toEqual([]);
+  });
+
+  it("warns when an attack power has nonstandard usage and omits it from slot totals", () => {
+    const idx: RulesIndex = {
+      ...index,
+      powers: index.powers.map((p) => (p.id === "p3" ? { ...p, usage: "Recharge when first bloodied" } : p))
+    };
+    const result = validateCharacterBuild(idx, legalLevel1Base);
+    expect(result.warnings.some((w) => w.includes("nonstandard usage"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("encounter attack"))).toBe(true);
+  });
+
   it("requires and validates racial Power select picks (e.g. Lolthtouched)", () => {
     const traitId = "trait_lolth_test";
     const indexLolth: RulesIndex = {

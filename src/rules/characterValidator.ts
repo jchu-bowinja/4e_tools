@@ -8,7 +8,7 @@ import {
   totalFeatSlots
 } from "./advancement";
 import { CharacterBuild, ClassDef, HybridClassDef, Power, RulesIndex, Skill } from "./models";
-import { buildClassPowerSlotDefinitions, powerPrintedLevelEligibleForSlot } from "./classPowerSlots";
+import { buildClassPowerSlotDefinitions, attackPowerSlotKindFromUsage, powerPrintedLevelEligibleForSlot } from "./classPowerSlots";
 import { getClassPowersForLevelRange, getDilettanteCandidatePowers } from "./classPowersQuery";
 import { evaluatePrereqs, hybridBaseClassNames } from "./prereqEvaluator";
 import {
@@ -18,6 +18,7 @@ import {
 } from "./grantedPowersQuery";
 import { isProficientWithImplement, isProficientWithWeapon } from "./weaponAttack";
 import { mergeHybridProficiencyLines, parseHybridDefenseBonuses } from "./hybridDerivedStats";
+import { parseClassDefenseBonusesFromClassDef } from "./parseClassDefenseBonuses";
 import { collectCharacterPowerIdsForSelections } from "./powerSelections";
 import { hybridCombinedClassSkillNames, expectedHybridTrainedSkillCount } from "./hybridSkills";
 import {
@@ -27,6 +28,7 @@ import {
 } from "./hybridPowerSlots";
 import { getChildTraitIdsForSubrace, getRaceSubraceData } from "./raceSubraces";
 import { getRaceSecondarySelectSlots, selectableStartingLanguages } from "./raceRuleSelects";
+import { autoGrantedTrainedSkillIds } from "./grantedSkillsQuery";
 
 export { getClassPowersForLevelRange };
 
@@ -93,16 +95,6 @@ export function parseClassSkillRules(cls: ClassDef): ClassSkillRules {
 
 export function getLevel1ClassPowerSlotRules(): PowerSlotRules {
   return { atWill: 2, encounter: 1, daily: 1, utility: 0 };
-}
-
-/** Match builder UI: only at-will / encounter / daily buckets (nonstandard usage → encounter). */
-function normalizeUsage(usage: string | null | undefined): "At-Will" | "Encounter" | "Daily" {
-  if (!usage) return "Encounter";
-  const u = usage.toLowerCase();
-  if (u.includes("at-will")) return "At-Will";
-  if (u.includes("encounter")) return "Encounter";
-  if (u.includes("daily")) return "Daily";
-  return "Encounter";
 }
 
 export function getLevel1ClassPowers(index: RulesIndex, build: CharacterBuild): Power[] {
@@ -239,14 +231,7 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
   if (!isHybrid && cls) {
     const specific = (cls.raw.specific as Record<string, unknown> | undefined) || {};
     const armorProficiencies = String(specific["Armor Proficiencies"] || "").toLowerCase();
-    const bonusToDefenseText = String(specific["Bonus to Defense"] || "");
-    classDefenseBonuses = {};
-    const defenseMatches = bonusToDefenseText.matchAll(/([+-]\d+)\s*(Fortitude|Reflex|Will)/gi);
-    for (const match of defenseMatches) {
-      const value = Number(match[1]);
-      const key = match[2] as "Fortitude" | "Reflex" | "Will";
-      classDefenseBonuses[key] = (classDefenseBonuses[key] || 0) + value;
-    }
+    classDefenseBonuses = parseClassDefenseBonusesFromClassDef(cls);
 
     classSkillRules = parseClassSkillRules(cls);
 
@@ -285,6 +270,7 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
     );
     const classSkillLower = new Set(classSkillRules.classSkillNames.map((s) => s.toLowerCase()));
     const trainedLower = trainedSkillNames.map((s) => s.toLowerCase());
+    const autoGrantedSkillIdSet = new Set(autoGrantedTrainedSkillIds(index, build));
 
     for (const required of requiredLower) {
       if (!trainedLower.includes(required)) {
@@ -292,15 +278,26 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
       }
     }
 
-    const optionalSelected = trainedLower.filter((s) => classSkillLower.has(s) && !requiredLower.has(s)).length;
+    const optionalSelected = build.trainedSkillIds.filter((id) => {
+      if (autoGrantedSkillIdSet.has(id)) return false;
+      const name = skillsById.get(id)?.name?.toLowerCase();
+      return Boolean(name && classSkillLower.has(name) && !requiredLower.has(name));
+    }).length;
     const expectedOptional = classSkillRules.chooseAdditionalCount;
     if (optionalSelected !== expectedOptional) {
       errors.push(`Select ${expectedOptional} additional class skills (currently ${optionalSelected}).`);
     }
 
-    const offList = trainedLower.filter((s) => !classSkillLower.has(s) && !requiredLower.has(s));
-    if (offList.length > 0) {
-      errors.push(`Trained skills must come from class skills list: ${offList.join(", ")}.`);
+    const offListNames = build.trainedSkillIds
+      .filter((id) => !autoGrantedSkillIdSet.has(id))
+      .map((id) => skillsById.get(id)?.name)
+      .filter((n): n is string => Boolean(n))
+      .filter((n) => {
+        const s = n.toLowerCase();
+        return !classSkillLower.has(s) && !requiredLower.has(s);
+      });
+    if (offListNames.length > 0) {
+      errors.push(`Trained skills must come from class skills list: ${offListNames.join(", ")}.`);
     }
 
     const selectedArmor = index.armors.find((a) => a.id === build.armorId);
@@ -420,10 +417,15 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
     const selectedUtility = utilityPowers.filter((p) => build.powerIds.includes(p.id));
     const counts = { atWill: 0, encounter: 0, daily: 0 };
     for (const p of selectedAttack) {
-      const usage = normalizeUsage(p.usage);
-      if (usage === "At-Will") counts.atWill += 1;
-      if (usage === "Encounter") counts.encounter += 1;
-      if (usage === "Daily") counts.daily += 1;
+      const bucket = attackPowerSlotKindFromUsage(p.usage);
+      if (bucket === "atWill") counts.atWill += 1;
+      else if (bucket === "encounter") counts.encounter += 1;
+      else if (bucket === "daily") counts.daily += 1;
+      else {
+        warnings.push(
+          `Power "${p.name ?? p.id}" has nonstandard usage "${String(p.usage || "").trim() || "?"}" — not counted toward class at-will / encounter / daily attack slot totals.`
+        );
+      }
     }
 
     if (counts.atWill !== powerSlotRules.atWill) {
@@ -521,6 +523,7 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
     const requiredLowerHy = new Set(classSkillRules.requiredTrainedSkillNames.map((s) => s.toLowerCase()));
     const classSkillLowerHy = new Set(classSkillRules.classSkillNames.map((s) => s.toLowerCase()));
     const trainedLowerHy = trainedSkillNames.map((s) => s.toLowerCase());
+    const autoGrantedSkillIdSetHy = new Set(autoGrantedTrainedSkillIds(index, build));
 
     for (const required of requiredLowerHy) {
       if (!trainedLowerHy.includes(required)) {
@@ -528,16 +531,27 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
       }
     }
 
-    const optionalSelectedHy = trainedLowerHy.filter((s) => classSkillLowerHy.has(s) && !requiredLowerHy.has(s)).length;
+    const optionalSelectedHy = build.trainedSkillIds.filter((id) => {
+      if (autoGrantedSkillIdSetHy.has(id)) return false;
+      const name = skillsById.get(id)?.name?.toLowerCase();
+      return Boolean(name && classSkillLowerHy.has(name) && !requiredLowerHy.has(name));
+    }).length;
     if (optionalSelectedHy !== classSkillRules.chooseAdditionalCount) {
       errors.push(
         `Select exactly ${classSkillRules.chooseAdditionalCount} trained skills from your hybrid class skill lists (currently ${optionalSelectedHy}).`
       );
     }
 
-    const offListHy = trainedLowerHy.filter((s) => !classSkillLowerHy.has(s) && !requiredLowerHy.has(s));
-    if (offListHy.length > 0) {
-      errors.push(`Trained skills must come from hybrid class skills list: ${offListHy.join(", ")}.`);
+    const offListHyNames = build.trainedSkillIds
+      .filter((id) => !autoGrantedSkillIdSetHy.has(id))
+      .map((id) => skillsById.get(id)?.name)
+      .filter((n): n is string => Boolean(n))
+      .filter((n) => {
+        const s = n.toLowerCase();
+        return !classSkillLowerHy.has(s) && !requiredLowerHy.has(s);
+      });
+    if (offListHyNames.length > 0) {
+      errors.push(`Trained skills must come from hybrid class skills list: ${offListHyNames.join(", ")}.`);
     }
 
     const mergedProf = mergeHybridProficiencyLines(hybridA, hybridB);
@@ -663,10 +677,15 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
     const selectedUtilityHy = utilityPowersHy.filter((p) => build.powerIds.includes(p.id));
     const countsHy = { atWill: 0, encounter: 0, daily: 0 };
     for (const p of selectedAttackHy) {
-      const usage = normalizeUsage(p.usage);
-      if (usage === "At-Will") countsHy.atWill += 1;
-      if (usage === "Encounter") countsHy.encounter += 1;
-      if (usage === "Daily") countsHy.daily += 1;
+      const bucket = attackPowerSlotKindFromUsage(p.usage);
+      if (bucket === "atWill") countsHy.atWill += 1;
+      else if (bucket === "encounter") countsHy.encounter += 1;
+      else if (bucket === "daily") countsHy.daily += 1;
+      else {
+        warnings.push(
+          `Power "${p.name ?? p.id}" has nonstandard usage "${String(p.usage || "").trim() || "?"}" — not counted toward hybrid at-will / encounter / daily attack slot totals.`
+        );
+      }
     }
 
     if (countsHy.atWill !== powerSlotRules.atWill) {

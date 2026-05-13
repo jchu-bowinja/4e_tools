@@ -69,5 +69,23 @@ describe("computeDerivedStats", () => {
     expect(stats.acBreakdown.abilityBonus).toBe(1);
     expect(stats.defenses.ac).toBe(12);
   });
+
+  it("adds half level to AC and NAD defenses", () => {
+    const build = { ...baseBuild, level: 6 };
+    const armor = {
+      armorBonus: 2,
+      armorCategory: "Leather",
+      armorType: "Light"
+    } as never;
+    const shield = { armorBonus: 1, armorCategory: "Light Shields", armorType: "Shield" } as never;
+    const stats = computeDerivedStats(build, { speed: 6 } as never, { hitPointsAt1: 15, hitPointsPerLevel: 6, healingSurgesBase: 9 } as never, armor, shield, {
+      Fortitude: 2
+    });
+    expect(stats.acBreakdown.halfLevel).toBe(3);
+    expect(stats.defenses.ac).toBe(17);
+    expect(stats.defenses.fortitude).toBe(10 + 3 + 3 + 2);
+    expect(stats.defenses.reflex).toBe(10 + 3 + 1);
+    expect(stats.defenses.will).toBe(10 + 3 + 0);
+  });
 });
 

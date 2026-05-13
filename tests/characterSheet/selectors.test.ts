@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groupCombatPowers } from "../../src/features/characterSheet/selectors";
+import { computeSheetDerivedData, groupCombatPowers } from "../../src/features/characterSheet/selectors";
 import type { CharacterSheetState } from "../../src/features/characterSheet/model";
 import type { RulesIndex } from "../../src/rules/models";
 
@@ -109,13 +109,15 @@ const state: CharacterSheetState = {
     currentHp: 10,
     tempHp: 0,
     surgesRemaining: 5,
-    deathSaves: 0
+    deathSaves: 0,
+    conditions: []
   },
   inventory: [],
   equipment: {},
   powers: {
     selectedPowerIds: ["power_selected"],
-    expendedPowerIds: []
+    expendedPowerIds: [],
+    manualOrderIds: []
   }
 };
 
@@ -128,5 +130,102 @@ describe("groupCombatPowers", () => {
     expect(grouped.daily.map((power) => power.id)).toContain("ID_FMP_POWER_3");
     expect(grouped.daily.map((power) => power.id)).toContain("power_epic");
     expect(grouped.daily.map((power) => power.id)).toContain("power_theme");
+  });
+});
+
+describe("computeSheetDerivedData", () => {
+  it("includes class Bonus to Defense on NADs like the builder", () => {
+    const fighterClass = {
+      id: "class_fighter",
+      name: "Fighter",
+      slug: "fighter",
+      hitPointsAt1: 15,
+      hitPointsPerLevel: 6,
+      healingSurgesBase: 9,
+      raw: { specific: { "Bonus to Defense": "+2 Fortitude" } }
+    };
+    const idx: RulesIndex = {
+      ...index,
+      classes: [fighterClass as never]
+    };
+    const st: CharacterSheetState = {
+      ...state,
+      level: 1,
+      classId: "class_fighter",
+      abilityScores: { STR: 10, CON: 10, DEX: 10, INT: 10, WIS: 10, CHA: 10 },
+      powers: { selectedPowerIds: [], expendedPowerIds: [], manualOrderIds: [] }
+    };
+    const derived = computeSheetDerivedData(st, idx);
+    expect(derived.defenses.fortitude).toBe(10 + 2);
+  });
+
+  it("uses hybrid defense bonuses when characterStyle is hybrid", () => {
+    const fighterBase = {
+      id: "class_fighter",
+      name: "Fighter",
+      slug: "fighter",
+      hitPointsAt1: 15,
+      hitPointsPerLevel: 6,
+      healingSurgesBase: 9,
+      raw: {}
+    };
+    const clericBase = {
+      id: "class_cleric",
+      name: "Cleric",
+      slug: "cleric",
+      hitPointsAt1: 12,
+      hitPointsPerLevel: 5,
+      healingSurgesBase: 7,
+      raw: {}
+    };
+    const hyA = {
+      id: "hy_ftr",
+      name: "Hybrid Fighter",
+      slug: "hy-ftr",
+      baseClassId: "class_fighter",
+      hitPointsAt1: 15,
+      hitPointsPerLevel: 6,
+      healingSurgesBase: 9,
+      bonusToDefense: "+1 Reflex",
+      raw: {}
+    };
+    const hyB = {
+      id: "hy_clr",
+      name: "Hybrid Cleric",
+      slug: "hy-clr",
+      baseClassId: "class_cleric",
+      hitPointsAt1: 12,
+      hitPointsPerLevel: 5,
+      healingSurgesBase: 7,
+      bonusToDefense: "+1 Reflex",
+      raw: {}
+    };
+    const idx: RulesIndex = {
+      ...index,
+      classes: [fighterBase as never, clericBase as never],
+      hybridClasses: [hyA as never, hyB as never]
+    };
+    const st: CharacterSheetState = {
+      name: "Hybrid",
+      level: 1,
+      raceId: "race_human",
+      characterStyle: "hybrid",
+      hybridClassIdA: "hy_ftr",
+      hybridClassIdB: "hy_clr",
+      abilityScores: { STR: 10, CON: 10, DEX: 10, INT: 10, WIS: 10, CHA: 10 },
+      trainedSkillIds: [],
+      resources: {
+        currentHp: 1,
+        tempHp: 0,
+        surgesRemaining: 1,
+        deathSaves: 0,
+        conditions: []
+      },
+      inventory: [],
+      equipment: {},
+      powers: { selectedPowerIds: [], expendedPowerIds: [], manualOrderIds: [] }
+    };
+    const derived = computeSheetDerivedData(st, idx);
+    expect(derived.defenses.reflex).toBe(10 + 2);
   });
 });
