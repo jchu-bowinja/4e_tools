@@ -60,6 +60,15 @@ const jsonSummaryStyle: CSSProperties = {
   color: "var(--text-primary)"
 };
 
+const detailsSummaryStyle: CSSProperties = {
+  cursor: "pointer",
+  fontSize: "0.82rem",
+  fontWeight: 700,
+  letterSpacing: "0.04em",
+  textTransform: "uppercase",
+  color: "var(--text-secondary)"
+};
+
 const labelStyle: CSSProperties = {
   display: "grid",
   gap: "0.2rem",
@@ -989,6 +998,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   }
 
   function renderDefensesPanel(): JSX.Element {
+    const bd = derived.acBreakdown;
     return (
       <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.4rem", backgroundColor: "var(--surface-0)" }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr auto", rowGap: "0.2rem", columnGap: "0.5rem", fontVariantNumeric: "tabular-nums" }}>
@@ -1027,6 +1037,30 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             </div>
           ))}
         </div>
+        <details style={{ marginTop: "0.45rem", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+          <summary style={detailsSummaryStyle}>AC breakdown</summary>
+          <p style={{ margin: "0.25rem 0 0 0", color: "var(--text-muted)" }}>
+            AC = 10 + one-half level + armor + shield + ability when allowed by armor.
+          </p>
+          <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.15rem", fontVariantNumeric: "tabular-nums" }}>
+            <span>Base {bd.base}</span>
+            <span>Half level +{bd.halfLevel}</span>
+            <span>Armor +{bd.armorBonus}</span>
+            <span>Shield +{bd.shieldBonus}</span>
+            <span>
+              Ability ({bd.abilityLabel}){" "}
+              {bd.abilityLabel === "—" ? "—" : `${bd.abilityBonus >= 0 ? "+" : ""}${bd.abilityBonus}`}
+            </span>
+            {bd.supportAcBonus > 0 && (
+              <span>Feats / theme / path / destiny +{bd.supportAcBonus}</span>
+            )}
+          </div>
+        </details>
+        {derived.armorCheckPenalty > 0 && (
+          <p style={{ margin: "0.45rem 0 0 0", fontSize: "0.82rem", color: "var(--status-warning)" }}>
+            Armor check penalty −{derived.armorCheckPenalty} on untrained Strength / Dexterity skills (see Skills).
+          </p>
+        )}
       </div>
     );
   }

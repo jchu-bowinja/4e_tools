@@ -157,6 +157,7 @@ describe("computeSheetDerivedData", () => {
     };
     const derived = computeSheetDerivedData(st, idx);
     expect(derived.defenses.fortitude).toBe(10 + 2);
+    expect(derived.acBreakdown.total).toBe(derived.defenses.ac);
   });
 
   it("uses hybrid defense bonuses when characterStyle is hybrid", () => {
