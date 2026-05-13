@@ -40,7 +40,8 @@ export function computeSkillSheetRows(
   level: number,
   effectiveAbilityScores: Record<Ability, number>,
   trainedSkillIdSet: Set<string>,
-  armorCheckPenalty = 0
+  armorCheckPenalty = 0,
+  skillFlatBonuses?: Record<string, number>
 ): SkillSheetRow[] {
   const halfLevel = Math.floor(level / 2);
   const rows: SkillSheetRow[] = [];
@@ -52,7 +53,11 @@ export function computeSkillSheetRows(
     rows.push({
       skillId: skill.id,
       name: skill.name,
-      modifier: base + (trained ? 5 : 0) + armorCheckSkillDelta(skill, armorCheckPenalty, trained),
+      modifier:
+        base +
+        (trained ? 5 : 0) +
+        armorCheckSkillDelta(skill, armorCheckPenalty, trained) +
+        (skillFlatBonuses?.[skill.id] ?? 0),
       trained
     });
   }

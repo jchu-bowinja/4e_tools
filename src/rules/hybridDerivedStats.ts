@@ -3,7 +3,8 @@ import type { DerivedStats } from "./statCalculator";
 import type { Armor } from "./models";
 import { applyMagicItemDefenseBonuses } from "./statCalculator";
 import { computeAcBreakdown, bodyArmorSpeedPenalty, totalArmorCheckPenalty } from "./defenseCalculator";
-import type { PassiveDefenseBonuses } from "./supportStatAdds";
+import type { PassiveDefenseBonuses, PassiveOtherBonuses } from "./supportStatAdds";
+import { emptyPassiveOther } from "./supportStatAdds";
 
 const emptySupportDefense: PassiveDefenseBonuses = { ac: 0, fortitude: 0, reflex: 0, will: 0 };
 
@@ -63,7 +64,8 @@ export function computeHybridDerivedStats(
   armor: Armor | undefined,
   shield: Armor | undefined,
   hybridDefenseBonuses?: Partial<Record<"Fortitude" | "Reflex" | "Will", number>>,
-  supportPassiveDefense?: PassiveDefenseBonuses
+  supportPassiveDefense?: PassiveDefenseBonuses,
+  supportPassiveOther?: PassiveOtherBonuses
 ): DerivedStats {
   const con = build.abilityScores.CON || 10;
   const dex = build.abilityScores.DEX || 10;
@@ -73,14 +75,15 @@ export function computeHybridDerivedStats(
   const cha = build.abilityScores.CHA || 10;
 
   const maxHp = hybridHpAtFirstLevel(hA, hB, con) + (build.level - 1) * hybridHpPerLevelGain(hA, hB);
-  const healingSurgesPerDay = hybridHealingSurgesPerDay(hA, hB, con);
+  const o = supportPassiveOther ?? emptyPassiveOther();
+  const healingSurgesPerDay = Math.max(0, hybridHealingSurgesPerDay(hA, hB, con) + o.healingSurgesPerDay);
   const surgeValue = Math.max(1, Math.floor(maxHp / 4));
 
   const dexMod = abilityMod(dex);
   const intMod = abilityMod(int);
   const raceSpeed = race?.speed ?? 6;
   const spdPen = bodyArmorSpeedPenalty(armor);
-  const speed = Math.max(0, raceSpeed - spdPen);
+  const speed = Math.max(0, raceSpeed - spdPen + o.speed);
 
   const baseFort = 10;
   const baseRef = 10;
@@ -91,7 +94,7 @@ export function computeHybridDerivedStats(
   const sp = supportPassiveDefense ?? emptySupportDefense;
   const acBreakdown = computeAcBreakdown(dexMod, intMod, armor, shield, build.level, sp.ac);
   const armorCheckPenalty = totalArmorCheckPenalty(armor, shield);
-  const initiative = halfLevel + dexMod;
+  const initiative = halfLevel + dexMod + o.initiative;
 
   const defensesBase = {
     ac: acBreakdown.total,
@@ -124,7 +127,8 @@ export function computeHybridDerivedStats(
     initiative,
     armorCheckPenalty,
     defenses,
-    acBreakdown
+    acBreakdown,
+    supportPassiveOther: o
   };
 }
 

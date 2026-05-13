@@ -394,8 +394,16 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     [sheet.featIds, featsById]
   );
   const skillRows = useMemo(
-    () => computeSkillSheetRows(index, sheet.level, sheet.abilityScores, new Set(sheet.trainedSkillIds), derived.armorCheckPenalty),
-    [index, sheet.level, sheet.abilityScores, sheet.trainedSkillIds, derived.armorCheckPenalty]
+    () =>
+      computeSkillSheetRows(
+        index,
+        sheet.level,
+        sheet.abilityScores,
+        new Set(sheet.trainedSkillIds),
+        derived.armorCheckPenalty,
+        derived.supportPassiveOther.skillFlatBySkillId
+      ),
+    [index, sheet.level, sheet.abilityScores, sheet.trainedSkillIds, derived.armorCheckPenalty, derived.supportPassiveOther]
   );
 
   useEffect(() => {

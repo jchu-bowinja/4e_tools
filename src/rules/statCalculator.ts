@@ -1,7 +1,8 @@
 import { Armor, CharacterBuild, ClassDef, Race } from "./models";
 import type { AcBreakdown } from "./defenseCalculator";
 import { bodyArmorSpeedPenalty, computeAcBreakdown, totalArmorCheckPenalty } from "./defenseCalculator";
-import type { PassiveDefenseBonuses } from "./supportStatAdds";
+import type { PassiveDefenseBonuses, PassiveOtherBonuses } from "./supportStatAdds";
+import { emptyPassiveOther } from "./supportStatAdds";
 
 function finiteBonus(n: unknown): number {
   return typeof n === "number" && Number.isFinite(n) ? n : 0;
@@ -36,6 +37,8 @@ export interface DerivedStats {
     will: number;
   };
   acBreakdown: AcBreakdown;
+  /** Flat bonuses from support entities' statAdds (initiative, speed, healing surges, skills). */
+  supportPassiveOther: PassiveOtherBonuses;
 }
 
 function abilityMod(score: number): number {
@@ -51,7 +54,8 @@ export function computeDerivedStats(
   armor: Armor | undefined,
   shield: Armor | undefined,
   classDefenseBonuses?: Partial<Record<"Fortitude" | "Reflex" | "Will", number>>,
-  supportPassiveDefense?: PassiveDefenseBonuses
+  supportPassiveDefense?: PassiveDefenseBonuses,
+  supportPassiveOther?: PassiveOtherBonuses
 ): DerivedStats {
   const con = build.abilityScores.CON || 10;
   const dex = build.abilityScores.DEX || 10;
@@ -69,10 +73,11 @@ export function computeDerivedStats(
   const dexMod = abilityMod(dex);
   const intMod = abilityMod(int);
   const halfLevel = Math.floor(build.level / 2);
-  const initiative = halfLevel + dexMod;
+  const o = supportPassiveOther ?? emptyPassiveOther();
+  const initiative = halfLevel + dexMod + o.initiative;
   const raceSpeed = race?.speed ?? 6;
   const spdPen = bodyArmorSpeedPenalty(armor);
-  const speed = Math.max(0, raceSpeed - spdPen);
+  const speed = Math.max(0, raceSpeed - spdPen + o.speed);
 
   const baseFort = 10;
   const baseRef = 10;
@@ -81,6 +86,8 @@ export function computeDerivedStats(
   const sp = supportPassiveDefense ?? emptySupportDefense;
   const acBreakdown = computeAcBreakdown(dexMod, intMod, armor, shield, build.level, sp.ac);
   const armorCheckPenalty = totalArmorCheckPenalty(armor, shield);
+
+  const healingSurgesPerDayAdjusted = Math.max(0, healingSurgesPerDay + o.healingSurgesPerDay);
 
   const defensesBase = {
     ac: acBreakdown.total,
@@ -107,13 +114,14 @@ export function computeDerivedStats(
 
   return {
     maxHp,
-    healingSurgesPerDay,
+    healingSurgesPerDay: healingSurgesPerDayAdjusted,
     surgeValue,
     speed,
     initiative,
     armorCheckPenalty,
     defenses,
-    acBreakdown
+    acBreakdown,
+    supportPassiveOther: o
   };
 }
 

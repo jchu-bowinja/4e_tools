@@ -3,7 +3,7 @@ import type { CharacterLegality } from "./characterValidator";
 import { validateCharacterBuild } from "./characterValidator";
 import { computeHybridDerivedStats, parseHybridDefenseBonuses } from "./hybridDerivedStats";
 import { computeDerivedStats, type DerivedStats } from "./statCalculator";
-import { aggregateSupportPassiveDefenseBonuses } from "./supportStatAdds";
+import { aggregateSupportPassiveDefenseBonuses, aggregateSupportPassiveOtherBonuses } from "./supportStatAdds";
 
 export interface ComputeBuilderLikeDerivedStatsOptions {
   /**
@@ -27,6 +27,7 @@ export function computeBuilderLikeDerivedStats(
   options?: ComputeBuilderLikeDerivedStatsOptions
 ): DerivedStats {
   const supportPassiveDefense = aggregateSupportPassiveDefenseBonuses(index, build);
+  const supportPassiveOther = aggregateSupportPassiveOtherBonuses(index, build);
 
   const hybridA =
     build.characterStyle === "hybrid" && build.hybridClassIdA
@@ -46,7 +47,8 @@ export function computeBuilderLikeDerivedStats(
       armor,
       shield,
       parseHybridDefenseBonuses(hybridA, hybridB),
-      supportPassiveDefense
+      supportPassiveDefense,
+      supportPassiveOther
     );
   }
 
@@ -63,6 +65,7 @@ export function computeBuilderLikeDerivedStats(
     armor,
     shield,
     classDefenseBonuses,
-    supportPassiveDefense
+    supportPassiveDefense,
+    supportPassiveOther
   );
 }

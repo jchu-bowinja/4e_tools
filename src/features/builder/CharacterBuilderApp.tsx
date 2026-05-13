@@ -1050,8 +1050,15 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
 
   const skillSheetRows = useMemo(() => {
     const ids = new Set<string>([...autoGrantedSkillIds, ...build.trainedSkillIds]);
-    return computeSkillSheetRows(index, build.level, effectiveAbilityScores, ids, derived.armorCheckPenalty);
-  }, [index, build.level, effectiveAbilityScores, autoGrantedSkillIds, build.trainedSkillIds, derived.armorCheckPenalty]);
+    return computeSkillSheetRows(
+      index,
+      build.level,
+      effectiveAbilityScores,
+      ids,
+      derived.armorCheckPenalty,
+      derived.supportPassiveOther.skillFlatBySkillId
+    );
+  }, [index, build.level, effectiveAbilityScores, autoGrantedSkillIds, build.trainedSkillIds, derived.armorCheckPenalty, derived.supportPassiveOther]);
 
   function powerKeywordTooltip(keyword: string): string | null {
     return resolveUiGlossaryHoverPlainText(

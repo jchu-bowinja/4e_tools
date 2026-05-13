@@ -36,7 +36,14 @@ describe("combat preview integration", () => {
     });
     const weapon = summarizeMainWeaponAttack(build.level, build.abilityScores, sword, "Military Melee");
     const implement = summarizeImplementAttack(build.level, build.abilityScores, cls, orb, "Orb");
-    const rows = computeSkillSheetRows(index, build.level, build.abilityScores, new Set(build.trainedSkillIds), derived.armorCheckPenalty);
+    const rows = computeSkillSheetRows(
+      index,
+      build.level,
+      build.abilityScores,
+      new Set(build.trainedSkillIds),
+      derived.armorCheckPenalty,
+      derived.supportPassiveOther.skillFlatBySkillId
+    );
 
     expect(derived.armorCheckPenalty).toBe(3);
     expect(weapon?.attackBonus).toBe(3 + 4 + 3);

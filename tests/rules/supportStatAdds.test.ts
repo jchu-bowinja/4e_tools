@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   mergePassiveDefenseBonuses,
+  mergePassiveOtherBonuses,
   nadSpecificToDefensePartial,
-  passiveDefenseBonusesFromStatAdds
+  passiveDefenseBonusesFromStatAdds,
+  passiveOtherBonusesFromStatAdds
 } from "../../src/rules/supportStatAdds";
 import type { StatAddEntry } from "../../src/rules/models";
 
@@ -61,5 +63,58 @@ describe("mergePassiveDefenseBonuses", () => {
         { ac: 0, fortitude: 1, reflex: 0, will: 3 }
       )
     ).toEqual({ ac: 1, fortitude: 1, reflex: 2, will: 3 });
+  });
+});
+
+describe("passiveOtherBonusesFromStatAdds", () => {
+  const skillMap = new Map<string, string>([
+    ["perception", "skill_perception"],
+    ["athletics", "skill_athletics"]
+  ]);
+
+  it("sums initiative misc, speed, healing surges, and skill misc", () => {
+    const adds = [
+      { name: "Initiative Misc", value: "+4" },
+      { name: "Speed", value: "+1" },
+      { name: "Healing Surges", value: "+2" },
+      { name: "Perception Misc", value: "+3" }
+    ];
+    const scores = { STR: 10, CON: 10, DEX: 10, INT: 10, WIS: 10, CHA: 10 };
+    const b = passiveOtherBonusesFromStatAdds(adds, 1, scores, skillMap);
+    expect(b.initiative).toBe(4);
+    expect(b.speed).toBe(1);
+    expect(b.healingSurgesPerDay).toBe(2);
+    expect(b.skillFlatBySkillId.skill_perception).toBe(3);
+  });
+
+  it("adds initiative from +Wisdom modifier", () => {
+    const adds = [{ name: "Initiative", value: "+Wisdom modifier" }];
+    const scores = { STR: 10, CON: 10, DEX: 10, INT: 10, WIS: 14, CHA: 10 };
+    expect(passiveOtherBonusesFromStatAdds(adds, 1, scores, skillMap).initiative).toBe(2);
+  });
+
+  it("skips conditional rows", () => {
+    const adds = [
+      { name: "Speed", value: "+2", condition: "when you charge" },
+      { name: "Speed", value: "+1" }
+    ];
+    const scores = { STR: 10, CON: 10, DEX: 10, INT: 10, WIS: 10, CHA: 10 };
+    expect(passiveOtherBonusesFromStatAdds(adds, 1, scores, skillMap).speed).toBe(1);
+  });
+});
+
+describe("mergePassiveOtherBonuses", () => {
+  it("merges skill maps", () => {
+    expect(
+      mergePassiveOtherBonuses(
+        { initiative: 1, speed: 0, healingSurgesPerDay: 0, skillFlatBySkillId: { a: 2 } },
+        { initiative: 0, speed: 1, healingSurgesPerDay: 1, skillFlatBySkillId: { a: 1, b: 3 } }
+      )
+    ).toEqual({
+      initiative: 1,
+      speed: 1,
+      healingSurgesPerDay: 1,
+      skillFlatBySkillId: { a: 3, b: 3 }
+    });
   });
 });

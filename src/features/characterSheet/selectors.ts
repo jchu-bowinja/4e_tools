@@ -3,6 +3,7 @@ import { getPowersForOwnerId } from "../../rules/classPowersQuery";
 import { autoGrantedClassPowers, collectPowerIdsFromRacialTrait } from "../../rules/grantedPowersQuery";
 import { parseRacialTraitIdsFromRace } from "../../rules/racialTraits";
 import { computeBuilderLikeDerivedStats } from "../../rules/derivedStatsFromBuild";
+import type { PassiveOtherBonuses } from "../../rules/supportStatAdds";
 import type { Armor, CharacterBuild, ClassDef, Power, Race, RacialTrait, RulesIndex } from "../../rules/models";
 import type { CharacterSheetState, EquipmentSlot, InventoryItem } from "./model";
 
@@ -25,6 +26,8 @@ export interface SheetDerivedData {
   };
   armorCheckPenalty: number;
   abilityMods: Record<"STR" | "CON" | "DEX" | "INT" | "WIS" | "CHA", number>;
+  /** Initiative / speed / surge / skill flat bonuses from feat, theme, path, destiny statAdds. */
+  supportPassiveOther: PassiveOtherBonuses;
 }
 
 export interface GroupedPowerCards {
@@ -114,7 +117,8 @@ export function computeSheetDerivedData(state: CharacterSheetState, index: Rules
       INT: abilityMod(state.abilityScores.INT),
       WIS: abilityMod(state.abilityScores.WIS),
       CHA: abilityMod(state.abilityScores.CHA)
-    }
+    },
+    supportPassiveOther: derived.supportPassiveOther
   };
 }
 
