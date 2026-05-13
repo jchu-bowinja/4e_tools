@@ -21,6 +21,9 @@ out_json/
 # ETL / conversion logs
 *.jsonl
 
+# Regenerable feat-rules audit (`tools/etl/list_feat_rules_beyond_statadd.py -o …`)
+generated/feat_heavy_rules.json
+
 # User reports captured by dev-server POST /api/reports
 received_reports/
 debug.log
