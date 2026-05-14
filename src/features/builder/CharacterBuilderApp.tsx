@@ -4434,17 +4434,11 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               Character
             </p>
             <div style={{ display: "grid", gap: "0.25rem" }}>
-              <p
-                style={{ margin: 0, fontSize: "0.88rem" }}
-                {...glossaryTooltipUi.hoverA11y("race")}
-              >
-                <strong>Race:</strong> {selectedRace?.name || "None"}
+              <p style={{ margin: 0, fontSize: "0.88rem" }}>
+                <strong {...glossaryTooltipUi.hoverA11y("race")}>Race:</strong> {selectedRace?.name || "None"}
               </p>
-              <p
-                style={{ margin: 0, fontSize: "0.88rem" }}
-                {...glossaryTooltipUi.hoverA11y("class")}
-              >
-                <strong>Class:</strong>{" "}
+              <p style={{ margin: 0, fontSize: "0.88rem" }}>
+                <strong {...glossaryTooltipUi.hoverA11y("class")}>Class:</strong>{" "}
                 {isHybridBuild && (selectedHybridA || selectedHybridB)
                   ? [selectedHybridA?.name, selectedHybridB?.name].filter(Boolean).join(" + ") || "Hybrid (incomplete)"
                   : selectedClass?.name || "None"}
@@ -4487,11 +4481,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               {build.classSelections?.buildOption && (
                 <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Class Build:</strong> {build.classSelections.buildOption}</p>
               )}
-              <p
-                style={{ margin: 0, fontSize: "0.88rem" }}
-                {...glossaryTooltipUi.hoverA11y("level")}
-              >
-                <strong>Level:</strong> {build.level}
+              <p style={{ margin: 0, fontSize: "0.88rem" }}>
+                <strong {...glossaryTooltipUi.hoverA11y("level")}>Level:</strong> {build.level}
               </p>
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Theme:</strong> {selectedTheme?.name || "None"}</p>
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Paragon Path:</strong> {selectedParagonPath?.name || "None"}</p>
@@ -4518,36 +4509,36 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             </p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "0.3rem 0.75rem" }}>
               <div style={{ display: "grid", gap: "0.3rem" }}>
-                <p
-                  style={{ margin: 0, fontSize: "0.88rem" }}
-                  {...glossaryTooltipUi.hoverA11y("hp")}
-                >
-                  <strong>HP:</strong> {derived.maxHp}
+                <p style={{ margin: 0, fontSize: "0.88rem" }}>
+                  <strong {...glossaryTooltipUi.hoverA11y("hp")}>HP:</strong> {derived.maxHp}
                 </p>
-                <p style={{ margin: 0, fontSize: "0.88rem" }} {...glossaryTooltipUi.hoverA11y("speed")}>
-                  <strong>Speed:</strong> {derived.speed}
+                <p style={{ margin: 0, fontSize: "0.88rem" }}>
+                  <strong {...glossaryTooltipUi.hoverA11y("speed")}>Speed:</strong> {derived.speed}
                 </p>
-                <p style={{ margin: 0, fontSize: "0.88rem" }} {...glossaryTooltipUi.hoverA11y("initiative")}>
-                  <strong>Initiative:</strong> {derived.initiative >= 0 ? `+${derived.initiative}` : derived.initiative}
+                <p style={{ margin: 0, fontSize: "0.88rem" }}>
+                  <strong {...glossaryTooltipUi.hoverA11y("initiative")}>Initiative:</strong>{" "}
+                  {derived.initiative >= 0 ? `+${derived.initiative}` : derived.initiative}
                 </p>
-                <p
-                  style={{ margin: 0, fontSize: "0.88rem" }}
-                  {...glossaryTooltipUi.hoverA11y("surges")}
-                >
-                  <strong>Healing Surges:</strong> {derived.healingSurgesPerDay}
+                <p style={{ margin: 0, fontSize: "0.88rem" }}>
+                  <strong {...glossaryTooltipUi.hoverA11y("surges")}>Healing Surges:</strong> {derived.healingSurgesPerDay}
                 </p>
-                <p
-                  style={{ margin: 0, fontSize: "0.88rem" }}
-                  {...glossaryTooltipUi.hoverA11y("surgeValue")}
-                >
-                  <strong>Surge Value:</strong> {derived.surgeValue}
+                <p style={{ margin: 0, fontSize: "0.88rem" }}>
+                  <strong {...glossaryTooltipUi.hoverA11y("surgeValue")}>Surge Value:</strong> {derived.surgeValue}
                 </p>
               </div>
               <div style={{ display: "grid", gap: "0.3rem" }}>
-                <p style={{ margin: 0, fontSize: "0.88rem" }} {...glossaryTooltipUi.hoverA11y("ac")}><strong>AC:</strong> {derived.defenses.ac}</p>
-                <p style={{ margin: 0, fontSize: "0.88rem" }} {...glossaryTooltipUi.hoverA11y("fortitude")}><strong>Fortitude:</strong> {derived.defenses.fortitude}</p>
-                <p style={{ margin: 0, fontSize: "0.88rem" }} {...glossaryTooltipUi.hoverA11y("reflex")}><strong>Reflex:</strong> {derived.defenses.reflex}</p>
-                <p style={{ margin: 0, fontSize: "0.88rem" }} {...glossaryTooltipUi.hoverA11y("will")}><strong>Will:</strong> {derived.defenses.will}</p>
+                <p style={{ margin: 0, fontSize: "0.88rem" }}>
+                  <strong {...glossaryTooltipUi.hoverA11y("ac")}>AC:</strong> {derived.defenses.ac}
+                </p>
+                <p style={{ margin: 0, fontSize: "0.88rem" }}>
+                  <strong {...glossaryTooltipUi.hoverA11y("fortitude")}>Fortitude:</strong> {derived.defenses.fortitude}
+                </p>
+                <p style={{ margin: 0, fontSize: "0.88rem" }}>
+                  <strong {...glossaryTooltipUi.hoverA11y("reflex")}>Reflex:</strong> {derived.defenses.reflex}
+                </p>
+                <p style={{ margin: 0, fontSize: "0.88rem" }}>
+                  <strong {...glossaryTooltipUi.hoverA11y("will")}>Will:</strong> {derived.defenses.will}
+                </p>
               </div>
             </div>
             <SupportPassiveMotionBreakdown o={derived.supportPassiveOther} summaryStyle={detailsSummaryStyle} />
@@ -4639,8 +4630,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 const score = effectiveAbilityScores[ability];
                 const mod = abilityModifier(score);
                 return (
-                  <p key={ability} style={{ margin: 0, fontSize: "0.88rem" }} {...glossaryTooltipUi.hoverA11y(`ability:${ability}`)}>
-                    <strong>{ability}:</strong> {score} ({formatAbilityMod(mod)})
+                  <p key={ability} style={{ margin: 0, fontSize: "0.88rem" }}>
+                    <strong {...glossaryTooltipUi.hoverA11y(`ability:${ability}`)}>{ability}:</strong> {score} ({formatAbilityMod(mod)})
                   </p>
                 );
               })}

@@ -352,7 +352,9 @@ type GlossaryKey =
   | `powerUsage:encounter`
   | `powerUsage:daily`
   | `ability:${AbilityCode}`
-  | `skill:${string}`;
+  | `skill:${string}`
+  | "shortRest"
+  | "extendedRest";
 const CHARACTER_SHEET_GLOSSARY_TOOLTIP_ID = "character-sheet-glossary-tooltip";
 
 export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesIndex; tooltipGlossary: Record<string, string> }): JSX.Element {
@@ -383,6 +385,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   const [jsonSearchQuery, setJsonSearchQuery] = useState("");
   const [jsonSearchResultIdx, setJsonSearchResultIdx] = useState(0);
   const [jsonSearchJumpTick, setJsonSearchJumpTick] = useState(0);
+  const [shortRestSurgeSpendDraft, setShortRestSurgeSpendDraft] = useState("1");
   const glossaryTooltipUi = useGlossaryTooltip({ tooltipId: CHARACTER_SHEET_GLOSSARY_TOOLTIP_ID });
   const raceHoverTimerRef = useRef<number | null>(null);
   const classHoverTimerRef = useRef<number | null>(null);
@@ -670,6 +673,55 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     });
   }
 
+  function applyShortRest(): void {
+    const encounterIds = new Set(groupedPowers.encounter.map((power) => power.id));
+    updateSheet((prev) => ({
+      ...prev,
+      powers: {
+        ...prev.powers,
+        expendedPowerIds: prev.powers.expendedPowerIds.filter((id) => !encounterIds.has(id))
+      }
+    }));
+  }
+
+  function spendSurgesAfterShortRest(desiredSpend: number): void {
+    const want = Math.max(0, Math.floor(desiredSpend));
+    if (want === 0) return;
+    const perSurge = Math.max(0, derived.surgeValue);
+    const capHp = derived.maxHp;
+    const capSurges = derived.healingSurgesPerDay;
+    updateSheet((prev) => {
+      const spend = Math.min(want, prev.resources.surgesRemaining);
+      if (spend === 0) return prev;
+      const gained = spend * perSurge;
+      return {
+        ...prev,
+        resources: {
+          ...prev.resources,
+          currentHp: Math.min(prev.resources.currentHp + gained, capHp),
+          surgesRemaining: clamp(prev.resources.surgesRemaining - spend, 0, capSurges)
+        }
+      };
+    });
+  }
+
+  function applyLongRest(): void {
+    updateSheet((prev) => ({
+      ...prev,
+      resources: {
+        ...prev.resources,
+        currentHp: derived.maxHp,
+        tempHp: 0,
+        surgesRemaining: derived.healingSurgesPerDay,
+        deathSaves: 0
+      },
+      powers: {
+        ...prev.powers,
+        expendedPowerIds: []
+      }
+    }));
+  }
+
   function getOrderedBucketPowers(bucketPowers: typeof groupedPowers.atWill): typeof groupedPowers.atWill {
     const usedSet = new Set(sheet.powers.expendedPowerIds);
     const manualIndexById = new Map(sheet.powers.manualOrderIds.map((id, idx) => [id, idx]));
@@ -764,10 +816,16 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         >
           <label
             style={{ ...labelStyle, padding: "0.28rem 0.35rem", border: "1px solid var(--panel-border)", borderRadius: "0.3rem", backgroundColor: "var(--surface-1)" }}
-            onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "hp")}
-            onMouseLeave={glossaryTooltipUi.leaveHover}
           >
-            Hit Points
+            <span
+              tabIndex={0}
+              onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "hp")}
+              onMouseLeave={glossaryTooltipUi.leaveHover}
+              onFocus={(event) => glossaryTooltipUi.startHover(event, "hp")}
+              onBlur={glossaryTooltipUi.leaveHover}
+            >
+              Hit Points
+            </span>
             <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexWrap: "wrap" }}>
               <input
                 type="number"
@@ -792,10 +850,16 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           </label>
           <label
             style={{ ...labelStyle, padding: "0.28rem 0.35rem", border: "1px solid var(--panel-border)", borderRadius: "0.3rem", backgroundColor: "var(--surface-0)" }}
-            onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "tempHp")}
-            onMouseLeave={glossaryTooltipUi.leaveHover}
           >
-            Temp HP
+            <span
+              tabIndex={0}
+              onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "tempHp")}
+              onMouseLeave={glossaryTooltipUi.leaveHover}
+              onFocus={(event) => glossaryTooltipUi.startHover(event, "tempHp")}
+              onBlur={glossaryTooltipUi.leaveHover}
+            >
+              Temp HP
+            </span>
             <input
               type="number"
               min={0}
@@ -814,10 +878,16 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           </label>
           <label
             style={{ ...labelStyle, padding: "0.28rem 0.35rem", border: "1px solid var(--panel-border)", borderRadius: "0.3rem", backgroundColor: "var(--surface-1)" }}
-            onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "surges")}
-            onMouseLeave={glossaryTooltipUi.leaveHover}
           >
-            Healing Surges
+            <span
+              tabIndex={0}
+              onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "surges")}
+              onMouseLeave={glossaryTooltipUi.leaveHover}
+              onFocus={(event) => glossaryTooltipUi.startHover(event, "surges")}
+              onBlur={glossaryTooltipUi.leaveHover}
+            >
+              Healing Surges
+            </span>
             <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
               <input
                 type="number"
@@ -843,10 +913,16 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           </label>
           <label
             style={{ ...labelStyle, padding: "0.28rem 0.35rem", border: "1px solid var(--panel-border)", borderRadius: "0.3rem", backgroundColor: "var(--surface-0)" }}
-            onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "deathSaves")}
-            onMouseLeave={glossaryTooltipUi.leaveHover}
           >
-            Death Saves
+            <span
+              tabIndex={0}
+              onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "deathSaves")}
+              onMouseLeave={glossaryTooltipUi.leaveHover}
+              onFocus={(event) => glossaryTooltipUi.startHover(event, "deathSaves")}
+              onBlur={glossaryTooltipUi.leaveHover}
+            >
+              Death Saves
+            </span>
             <DeathSaveCheckboxes
               value={sheet.resources.deathSaves}
               onChange={(next) =>
@@ -860,6 +936,155 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               }
             />
           </label>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "0.35rem",
+            alignItems: "center",
+            paddingTop: "0.15rem",
+            borderTop: "1px solid var(--panel-border)",
+            rowGap: "0.45rem"
+          }}
+        >
+          <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700, marginRight: "0.15rem" }}>
+            Rest
+          </span>
+          <div
+            style={{
+              display: "inline-flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: "0.28rem",
+              paddingLeft: "0.35rem",
+              borderLeft: "1px solid var(--panel-border)"
+            }}
+            title="Spend healing surges to regain hit points (typical after a short rest). Each surge restores your surge value, up to your maximum hit points."
+          >
+            <label
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.22rem",
+                fontSize: "0.72rem",
+                color: "var(--text-secondary)",
+                fontWeight: 600,
+                cursor: "pointer"
+              }}
+            >
+              <span
+                onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "surges")}
+                onMouseLeave={glossaryTooltipUi.leaveHover}
+                onFocus={(event) => glossaryTooltipUi.startHover(event, "surges")}
+                onBlur={glossaryTooltipUi.leaveHover}
+                tabIndex={0}
+              >
+                Spend
+              </span>
+              <input
+                type="number"
+                min={0}
+                max={sheet.resources.surgesRemaining}
+                value={shortRestSurgeSpendDraft}
+                onChange={(e) => setShortRestSurgeSpendDraft(e.target.value)}
+                aria-label="Healing surges to spend"
+                style={{
+                  width: numericInputWidthCh(
+                    Math.max(sheet.resources.surgesRemaining, Number.parseInt(shortRestSurgeSpendDraft, 10) || 0)
+                  ),
+                  textAlign: "center",
+                  fontSize: "0.78rem",
+                  padding: "0.12rem 0.2rem",
+                  borderRadius: "0.22rem",
+                  border: "1px solid var(--panel-border)",
+                  boxSizing: "border-box"
+                }}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                const parsed = Number.parseInt(shortRestSurgeSpendDraft.trim(), 10);
+                const n = Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+                spendSurgesAfterShortRest(n);
+              }}
+              disabled={sheet.resources.surgesRemaining === 0}
+              onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "surgeValue")}
+              onMouseLeave={glossaryTooltipUi.leaveHover}
+              onFocus={(event) => glossaryTooltipUi.startHover(event, "surgeValue")}
+              onBlur={glossaryTooltipUi.leaveHover}
+              style={{
+                fontSize: "0.75rem",
+                padding: "0.2rem 0.45rem",
+                borderRadius: "0.25rem",
+                border: "1px solid var(--panel-border)",
+                backgroundColor: "var(--surface-1)",
+                color: "var(--text-primary)",
+                cursor: sheet.resources.surgesRemaining === 0 ? "not-allowed" : "pointer",
+                fontWeight: 600,
+                opacity: sheet.resources.surgesRemaining === 0 ? 0.55 : 1
+              }}
+            >
+              Heal
+            </button>
+            <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+              +{derived.surgeValue} HP / surge
+            </span>
+          </div>
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              paddingLeft: "0.35rem",
+              marginLeft: "0.05rem",
+              borderLeft: "1px solid var(--panel-border)"
+            }}
+          >
+            <button
+              type="button"
+              onClick={applyShortRest}
+              title="Regain encounter powers (does not change HP or surges)."
+              onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "shortRest")}
+              onMouseLeave={glossaryTooltipUi.leaveHover}
+              onFocus={(event) => glossaryTooltipUi.startHover(event, "shortRest")}
+              onBlur={glossaryTooltipUi.leaveHover}
+              style={{
+                fontSize: "0.75rem",
+                padding: "0.2rem 0.45rem",
+                borderRadius: "0.25rem",
+                border: "1px solid var(--panel-border)",
+                backgroundColor: "var(--surface-1)",
+                color: "var(--text-primary)",
+                cursor: "pointer",
+                fontWeight: 600
+              }}
+            >
+              Short rest
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={applyLongRest}
+            title="Extended rest: full HP, surges, clear expended encounter and daily powers, reset temp HP and death saves."
+            onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "extendedRest")}
+            onMouseLeave={glossaryTooltipUi.leaveHover}
+            onFocus={(event) => glossaryTooltipUi.startHover(event, "extendedRest")}
+            onBlur={glossaryTooltipUi.leaveHover}
+            style={{
+              fontSize: "0.75rem",
+              padding: "0.2rem 0.45rem",
+              borderRadius: "0.25rem",
+              border: "1px solid var(--panel-border-strong, var(--panel-border))",
+              backgroundColor: "var(--surface-2)",
+              color: "var(--text-primary)",
+              cursor: "pointer",
+              fontWeight: 700,
+              marginLeft: "auto"
+            }}
+          >
+            Long rest
+          </button>
         </div>
       </div>
     );
@@ -891,8 +1116,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 {item.label}
               </span>
               <strong
-                onMouseEnter={(event) => glossaryTooltipUi.startHover(event, item.key)}
-                onMouseLeave={glossaryTooltipUi.leaveHover}
                 style={{
                   padding: "0.16rem 0.35rem",
                   borderRadius: "0.25rem",
@@ -1082,8 +1305,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 {item.label}
               </span>
               <strong
-                onMouseEnter={(event) => glossaryTooltipUi.startHover(event, item.key)}
-                onMouseLeave={glossaryTooltipUi.leaveHover}
                 style={{
                   padding: "0.16rem 0.35rem",
                   borderRadius: "0.25rem",
@@ -1375,10 +1596,16 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                     </div>
                   </div>
                   <div style={{ ...labelStyle, gridColumn: "span 3", gap: "0.12rem" }}>
-                    Level
-                    <div
+                    <span
+                      tabIndex={0}
                       onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "level")}
                       onMouseLeave={glossaryTooltipUi.leaveHover}
+                      onFocus={(event) => glossaryTooltipUi.startHover(event, "level")}
+                      onBlur={glossaryTooltipUi.leaveHover}
+                    >
+                      Level
+                    </span>
+                    <div
                       style={{ border: "1px solid var(--panel-border)", backgroundColor: "var(--surface-0)", borderRadius: "0.32rem", padding: "0.24rem 0.45rem", lineHeight: 1.2, textAlign: "left", fontWeight: 800, color: "var(--text-primary)" }}
                     >
                       {sheet.level}
@@ -1401,11 +1628,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   {(["STR", "CON", "DEX", "INT", "WIS", "CHA"] as const).map((ab, idx) => (
                     <div
                       key={ab}
-                      onMouseEnter={(event) => glossaryTooltipUi.startHover(event, `ability:${ab}`)}
-                      onMouseLeave={glossaryTooltipUi.leaveHover}
-                      onFocus={(event) => glossaryTooltipUi.startHover(event, `ability:${ab}`)}
-                      onBlur={glossaryTooltipUi.leaveHover}
-                      tabIndex={0}
                       style={{
                         display: "grid",
                         gridTemplateColumns: "1fr auto",
@@ -1415,6 +1637,11 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                       }}
                     >
                       <span
+                        tabIndex={0}
+                        onMouseEnter={(event) => glossaryTooltipUi.startHover(event, `ability:${ab}`)}
+                        onMouseLeave={glossaryTooltipUi.leaveHover}
+                        onFocus={(event) => glossaryTooltipUi.startHover(event, `ability:${ab}`)}
+                        onBlur={glossaryTooltipUi.leaveHover}
                         style={{
                           fontSize: "0.8rem",
                           color: "var(--text-primary)",
@@ -1627,14 +1854,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                       >
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem" }}>
                           <strong style={{ textDecoration: expended ? "line-through" : "none" }}>{power.name}</strong>
-                          <span
-                            onMouseEnter={(event) => glossaryTooltipUi.startHover(event, `powerUsage:${bucket}`)}
-                            onMouseLeave={glossaryTooltipUi.leaveHover}
-                            onFocus={(event) => glossaryTooltipUi.startHover(event, `powerUsage:${bucket}`)}
-                            onBlur={glossaryTooltipUi.leaveHover}
-                            tabIndex={0}
-                            style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}
-                          >
+                          <span style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>
                             Lv {power.level ?? 0} • {power.usage || "-"}
                           </span>
                         </div>

@@ -42,7 +42,9 @@ export const SHEET_CORE_UI_TERMS: Record<
   | "will"
   | "deathSaves"
   | "skills"
-  | "abilityScores",
+  | "abilityScores"
+  | "shortRest"
+  | "extendedRest",
   string[]
 > = {
   level: ["Level"],
@@ -62,7 +64,9 @@ export const SHEET_CORE_UI_TERMS: Record<
   will: ["Will"],
   deathSaves: ["Death Saving Throw", "Death Save"],
   skills: ["Skills", "Skill"],
-  abilityScores: ["Ability Scores", "Ability Score"]
+  abilityScores: ["Ability Scores", "Ability Score"],
+  shortRest: ["Short Rest"],
+  extendedRest: ["Extended Rest", "Long Rest"]
 };
 
 /** Static glossary keys for summary blocks (character builder — includes race/class placeholders). */
