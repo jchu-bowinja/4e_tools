@@ -104,6 +104,13 @@ State visuals should be consistent across buttons, fields, toggles, and list row
 - Keep overlay spacing and close behavior consistent.
 - Ensure keyboard focus moves into and out of overlays predictably.
 
+#### Glossary and rules tooltips (hover panels)
+
+- Attach glossary or rules-rich **hover tooltips to label copy or other explicit help affordances** (for example field titles, dotted “glossary” tokens, or a dedicated help control).
+- **Do not** wire the same hover glossary behavior to **value `<input>` controls** (number fields, text fields, selects): interacting with or mousing across the field to edit a value should not open glossary panels.
+- When a field needs both glossary context and a compact layout, use a real **`<label htmlFor="…">`** (or adjacent caption text) for the tooltip target and associate the input via `id` / `aria-labelledby` so the glossary remains discoverable without covering the value control.
+- **Do not** put a native HTML **`title`** tooltip on the same element that already opens a **glossary or custom hover panel** for the same content: the browser will show both, which reads as duplicate or conflicting help.
+
 ### Badges, Tags, and Status Indicators
 
 - Use these elements to communicate state, category, or importance, not decoration.
@@ -172,6 +179,7 @@ Use this checklist before merging UI/style/look-and-feel work:
 - [ ] Accessibility basics are met (keyboard navigation, focus visibility, readable contrast).
 - [ ] Any local subapplication variation is documented and intentionally scoped.
 - [ ] Obvious one-off styles were avoided or justified with a clear reason.
+- [ ] Glossary or rules hover tooltips are not attached to raw value inputs; they use labels or explicit help text instead.
 
 ## Update Process
 

@@ -81,6 +81,15 @@ const labelStyle: CSSProperties = {
   letterSpacing: "0.04em"
 };
 
+/** Hit Points / Temp HP / Surges value fields: reduced vertical padding and type size. */
+const resourceStripNumberInputStyle: CSSProperties = {
+  fontSize: "0.74rem",
+  lineHeight: 1.05,
+  padding: "0.04rem 0.2rem",
+  boxSizing: "border-box",
+  borderRadius: "0.18rem"
+};
+
 function usageAccentColor(bucket: "atWill" | "encounter" | "daily" | "utility"): string {
   if (bucket === "atWill") return "var(--power-accent-atwill-bar)";
   if (bucket === "encounter") return "var(--power-accent-encounter-bar)";
@@ -805,17 +814,45 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   }
 
   function renderHitPointsPanel(): JSX.Element {
+    const restClusterStyle: CSSProperties = {
+      minWidth: 0,
+      alignSelf: "stretch",
+      border: "1px solid var(--panel-border)",
+      borderRadius: "0.3rem",
+      padding: "0.2rem 0.32rem",
+      backgroundColor: "var(--surface-1)",
+      display: "flex",
+      flexDirection: "row",
+      flexWrap: "nowrap",
+      alignItems: "center",
+      gap: "0.22rem",
+      overflowX: "auto"
+    };
+
     return (
       <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.5rem", backgroundColor: "var(--surface-0)", display: "grid", gap: "0.35rem" }}>
         <div
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-            gap: "0.35rem"
+            gridTemplateRows: "auto auto",
+            gap: "0.35rem",
+            alignItems: "stretch"
           }}
         >
           <label
-            style={{ ...labelStyle, padding: "0.28rem 0.35rem", border: "1px solid var(--panel-border)", borderRadius: "0.3rem", backgroundColor: "var(--surface-1)" }}
+            style={{
+              ...labelStyle,
+              gridColumn: 1,
+              gridRow: 1,
+              padding: "0.28rem 0.35rem",
+              border: "1px solid var(--panel-border)",
+              borderRadius: "0.3rem",
+              backgroundColor: "var(--surface-1)",
+              display: "grid",
+              alignContent: "start",
+              gap: "0.2rem"
+            }}
           >
             <span
               tabIndex={0}
@@ -842,14 +879,23 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 }
                 style={{
                   width: numericInputWidthCh(sheet.resources.currentHp, derived.maxHp),
-                  textAlign: "center"
+                  textAlign: "center",
+                  ...resourceStripNumberInputStyle
                 }}
               />
               <span style={{ fontWeight: 700, color: "var(--text-secondary)" }}>/ {derived.maxHp}</span>
             </div>
           </label>
           <label
-            style={{ ...labelStyle, padding: "0.28rem 0.35rem", border: "1px solid var(--panel-border)", borderRadius: "0.3rem", backgroundColor: "var(--surface-0)" }}
+            style={{
+              ...labelStyle,
+              gridColumn: 2,
+              gridRow: 1,
+              padding: "0.28rem 0.35rem",
+              border: "1px solid var(--panel-border)",
+              borderRadius: "0.3rem",
+              backgroundColor: "var(--surface-0)"
+            }}
           >
             <span
               tabIndex={0}
@@ -873,11 +919,23 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   }
                 }))
               }
-              style={{ width: numericInputWidthCh(sheet.resources.tempHp), textAlign: "center" }}
+              style={{
+                width: numericInputWidthCh(sheet.resources.tempHp),
+                textAlign: "center",
+                ...resourceStripNumberInputStyle
+              }}
             />
           </label>
           <label
-            style={{ ...labelStyle, padding: "0.28rem 0.35rem", border: "1px solid var(--panel-border)", borderRadius: "0.3rem", backgroundColor: "var(--surface-1)" }}
+            style={{
+              ...labelStyle,
+              gridColumn: 3,
+              gridRow: 1,
+              padding: "0.28rem 0.35rem",
+              border: "1px solid var(--panel-border)",
+              borderRadius: "0.3rem",
+              backgroundColor: "var(--surface-1)"
+            }}
           >
             <span
               tabIndex={0}
@@ -905,14 +963,27 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 }
                 style={{
                   width: numericInputWidthCh(sheet.resources.surgesRemaining, derived.healingSurgesPerDay),
-                  textAlign: "center"
+                  textAlign: "center",
+                  ...resourceStripNumberInputStyle
                 }}
               />
               <span style={{ fontWeight: 700, color: "var(--text-secondary)" }}>/ {derived.healingSurgesPerDay}</span>
             </div>
           </label>
           <label
-            style={{ ...labelStyle, padding: "0.28rem 0.35rem", border: "1px solid var(--panel-border)", borderRadius: "0.3rem", backgroundColor: "var(--surface-0)" }}
+            style={{
+              ...labelStyle,
+              gridColumn: 1,
+              gridRow: 2,
+              padding: "0.28rem 0.35rem",
+              border: "1px solid var(--panel-border)",
+              borderRadius: "0.3rem",
+              backgroundColor: "var(--surface-0)",
+              alignSelf: "stretch",
+              display: "grid",
+              alignContent: "start",
+              gap: "0.2rem"
+            }}
           >
             <span
               tabIndex={0}
@@ -936,72 +1007,27 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               }
             />
           </label>
-        </div>
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "0.35rem",
-            alignItems: "center",
-            paddingTop: "0.15rem",
-            borderTop: "1px solid var(--panel-border)",
-            rowGap: "0.45rem"
-          }}
-        >
-          <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700, marginRight: "0.15rem" }}>
-            Rest
-          </span>
-          <div
-            style={{
-              display: "inline-flex",
-              flexWrap: "wrap",
-              alignItems: "center",
-              gap: "0.28rem",
-              paddingLeft: "0.35rem",
-              borderLeft: "1px solid var(--panel-border)"
-            }}
-            title="Spend healing surges to regain hit points (typical after a short rest). Each surge restores your surge value, up to your maximum hit points."
-          >
-            <label
+          <div style={{ ...restClusterStyle, gridColumn: "2 / span 2", gridRow: 2 }}>
+            <input
+              type="number"
+              min={0}
+              max={sheet.resources.surgesRemaining}
+              value={shortRestSurgeSpendDraft}
+              onChange={(e) => setShortRestSurgeSpendDraft(e.target.value)}
+              aria-label="Healing surges to spend"
               style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.22rem",
-                fontSize: "0.72rem",
-                color: "var(--text-secondary)",
-                fontWeight: 600,
-                cursor: "pointer"
+                width: numericInputWidthCh(
+                  Math.max(sheet.resources.surgesRemaining, Number.parseInt(shortRestSurgeSpendDraft, 10) || 0)
+                ),
+                textAlign: "center",
+                fontSize: "0.74rem",
+                padding: "0.1rem 0.18rem",
+                borderRadius: "0.2rem",
+                border: "1px solid var(--panel-border)",
+                boxSizing: "border-box",
+                flexShrink: 0
               }}
-            >
-              <span
-                onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "surges")}
-                onMouseLeave={glossaryTooltipUi.leaveHover}
-                onFocus={(event) => glossaryTooltipUi.startHover(event, "surges")}
-                onBlur={glossaryTooltipUi.leaveHover}
-                tabIndex={0}
-              >
-                Spend
-              </span>
-              <input
-                type="number"
-                min={0}
-                max={sheet.resources.surgesRemaining}
-                value={shortRestSurgeSpendDraft}
-                onChange={(e) => setShortRestSurgeSpendDraft(e.target.value)}
-                aria-label="Healing surges to spend"
-                style={{
-                  width: numericInputWidthCh(
-                    Math.max(sheet.resources.surgesRemaining, Number.parseInt(shortRestSurgeSpendDraft, 10) || 0)
-                  ),
-                  textAlign: "center",
-                  fontSize: "0.78rem",
-                  padding: "0.12rem 0.2rem",
-                  borderRadius: "0.22rem",
-                  border: "1px solid var(--panel-border)",
-                  boxSizing: "border-box"
-                }}
-              />
-            </label>
+            />
             <button
               type="button"
               onClick={() => {
@@ -1010,81 +1036,102 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 spendSurgesAfterShortRest(n);
               }}
               disabled={sheet.resources.surgesRemaining === 0}
-              onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "surgeValue")}
-              onMouseLeave={glossaryTooltipUi.leaveHover}
-              onFocus={(event) => glossaryTooltipUi.startHover(event, "surgeValue")}
-              onBlur={glossaryTooltipUi.leaveHover}
               style={{
-                fontSize: "0.75rem",
-                padding: "0.2rem 0.45rem",
-                borderRadius: "0.25rem",
+                fontSize: "0.72rem",
+                padding: "0.14rem 0.32rem",
+                borderRadius: "0.22rem",
                 border: "1px solid var(--panel-border)",
-                backgroundColor: "var(--surface-1)",
+                backgroundColor: "var(--surface-0)",
                 color: "var(--text-primary)",
                 cursor: sheet.resources.surgesRemaining === 0 ? "not-allowed" : "pointer",
                 fontWeight: 600,
-                opacity: sheet.resources.surgesRemaining === 0 ? 0.55 : 1
+                opacity: sheet.resources.surgesRemaining === 0 ? 0.55 : 1,
+                flexShrink: 0,
+                whiteSpace: "nowrap"
               }}
             >
               Heal
             </button>
-            <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
-              +{derived.surgeValue} HP / surge
-            </span>
-          </div>
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              paddingLeft: "0.35rem",
-              marginLeft: "0.05rem",
-              borderLeft: "1px solid var(--panel-border)"
-            }}
-          >
-            <button
-              type="button"
-              onClick={applyShortRest}
-              title="Regain encounter powers (does not change HP or surges)."
-              onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "shortRest")}
-              onMouseLeave={glossaryTooltipUi.leaveHover}
-              onFocus={(event) => glossaryTooltipUi.startHover(event, "shortRest")}
-              onBlur={glossaryTooltipUi.leaveHover}
+            <span
               style={{
-                fontSize: "0.75rem",
-                padding: "0.2rem 0.45rem",
-                borderRadius: "0.25rem",
-                border: "1px solid var(--panel-border)",
-                backgroundColor: "var(--surface-1)",
-                color: "var(--text-primary)",
-                cursor: "pointer",
-                fontWeight: 600
+                fontSize: "0.65rem",
+                color: "var(--text-muted)",
+                fontVariantNumeric: "tabular-nums",
+                flexShrink: 0,
+                display: "inline-flex",
+                flexDirection: "column",
+                alignItems: "center",
+                lineHeight: 1.15,
+                textAlign: "center"
+              }}
+              onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "surgeValue")}
+              onMouseLeave={glossaryTooltipUi.leaveHover}
+              onFocus={(event) => glossaryTooltipUi.startHover(event, "surgeValue")}
+              onBlur={glossaryTooltipUi.leaveHover}
+              tabIndex={0}
+            >
+              <span style={{ whiteSpace: "nowrap" }}>+{derived.surgeValue} HP / </span>
+              <span style={{ whiteSpace: "nowrap" }}>surge</span>
+            </span>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.22rem",
+                flexShrink: 0,
+                alignItems: "stretch"
               }}
             >
-              Short rest
-            </button>
+              <button
+                type="button"
+                onClick={applyShortRest}
+                onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "shortRest")}
+                onMouseLeave={glossaryTooltipUi.leaveHover}
+                onFocus={(event) => glossaryTooltipUi.startHover(event, "shortRest")}
+                onBlur={glossaryTooltipUi.leaveHover}
+                style={{
+                  fontSize: "0.72rem",
+                  padding: "0.14rem 0.32rem",
+                  borderRadius: "0.22rem",
+                  border: "1px solid var(--panel-border)",
+                  backgroundColor: "var(--surface-0)",
+                  color: "var(--text-primary)",
+                  cursor: "pointer",
+                  fontWeight: 600,
+                  flexShrink: 0,
+                  whiteSpace: "nowrap",
+                  width: "100%",
+                  boxSizing: "border-box"
+                }}
+              >
+                Short rest
+              </button>
+              <button
+                type="button"
+                onClick={applyLongRest}
+                onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "extendedRest")}
+                onMouseLeave={glossaryTooltipUi.leaveHover}
+                onFocus={(event) => glossaryTooltipUi.startHover(event, "extendedRest")}
+                onBlur={glossaryTooltipUi.leaveHover}
+                style={{
+                  fontSize: "0.72rem",
+                  padding: "0.14rem 0.32rem",
+                  borderRadius: "0.22rem",
+                  border: "1px solid var(--panel-border-strong, var(--panel-border))",
+                  backgroundColor: "var(--surface-2)",
+                  color: "var(--text-primary)",
+                  cursor: "pointer",
+                  fontWeight: 700,
+                  flexShrink: 0,
+                  whiteSpace: "nowrap",
+                  width: "100%",
+                  boxSizing: "border-box"
+                }}
+              >
+                Long rest
+              </button>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={applyLongRest}
-            title="Extended rest: full HP, surges, clear expended encounter and daily powers, reset temp HP and death saves."
-            onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "extendedRest")}
-            onMouseLeave={glossaryTooltipUi.leaveHover}
-            onFocus={(event) => glossaryTooltipUi.startHover(event, "extendedRest")}
-            onBlur={glossaryTooltipUi.leaveHover}
-            style={{
-              fontSize: "0.75rem",
-              padding: "0.2rem 0.45rem",
-              borderRadius: "0.25rem",
-              border: "1px solid var(--panel-border-strong, var(--panel-border))",
-              backgroundColor: "var(--surface-2)",
-              color: "var(--text-primary)",
-              cursor: "pointer",
-              fontWeight: 700,
-              marginLeft: "auto"
-            }}
-          >
-            Long rest
-          </button>
         </div>
       </div>
     );
