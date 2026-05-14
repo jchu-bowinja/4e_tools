@@ -13,13 +13,15 @@ import { loadSavedCharacters, type SavedCharacterEntry } from "../builder/storag
 import { GlossaryTooltipRichText, RulesRichText } from "../builder/RulesRichText";
 import { createDefaultCharacterSheetState } from "./defaultState";
 import type { CharacterSheetState, EquipmentSlot, InventoryItem } from "./model";
-import { canEquipItem, computeSheetDerivedData, groupCombatPowers, sheetStateFromBuild } from "./selectors";
+import { canEquipItem, computeSheetDerivedData, findImplementEquippedFromSheet, findWeaponEquippedInSlot, groupCombatPowers, sheetClassForImplementAttack, sheetImplementProficiencyText, sheetStateFromBuild, sheetWeaponProficiencyText } from "./selectors";
 import { loadCharacterSheetState, saveCharacterSheetState } from "./storage";
 import { resolveUiGlossaryHoverPlainText, termHasPowerKeywordTooltipBody } from "../../data/glossaryHoverResolve";
 import { positionFixedTooltip } from "../../ui/glossaryTooltipPosition";
 import { GLOSSARY_TOOLTIP_OPEN_DELAY_MS, STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE } from "../../ui/glossaryTooltip";
 import { useGlossaryTooltip } from "../../ui/useGlossaryTooltip";
 import { findCaseInsensitiveMatches, scrollTextareaToMatch } from "../../ui/jsonSearch";
+import { summarizeImplementAttack, summarizeMainWeaponAttack } from "../../rules/weaponAttack";
+import { SupportPassiveMotionBreakdown } from "../shared/SupportPassiveMotionBreakdown";
 
 type SheetTab = "overview" | "inventory";
 
@@ -413,6 +415,63 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         derived.supportPassiveOther.skillFlatBySkillId
       ),
     [index, sheet.level, sheet.abilityScores, sheet.trainedSkillIds, derived.armorCheckPenalty, derived.supportPassiveOther]
+  );
+
+  const mainHandWeapon = useMemo(() => findWeaponEquippedInSlot(sheet, index, "mainHand"), [sheet.equipment, sheet.inventory, index]);
+  const offHandWeapon = useMemo(() => findWeaponEquippedInSlot(sheet, index, "offHand"), [sheet.equipment, sheet.inventory, index]);
+  const equippedImplement = useMemo(() => findImplementEquippedFromSheet(sheet, index), [sheet.equipment, sheet.inventory, index]);
+  const sheetWeaponProfText = useMemo(
+    () => sheetWeaponProficiencyText(index, sheet, derived.cls),
+    [index, sheet, derived.cls]
+  );
+  const sheetImplementProfText = useMemo(
+    () => sheetImplementProficiencyText(index, sheet, derived.cls),
+    [index, sheet, derived.cls]
+  );
+  const sheetImplementClass = useMemo(
+    () => sheetClassForImplementAttack(index, sheet, derived.cls),
+    [index, sheet, derived.cls]
+  );
+  const mainWeaponSummary = useMemo(
+    () =>
+      summarizeMainWeaponAttack(
+        sheet.level,
+        sheet.abilityScores,
+        mainHandWeapon,
+        sheetWeaponProfText,
+        sheet.magicItemBonuses?.attack
+      ),
+    [sheet.level, sheet.abilityScores, mainHandWeapon, sheetWeaponProfText, sheet.magicItemBonuses?.attack]
+  );
+  const offHandWeaponSummary = useMemo(
+    () =>
+      summarizeMainWeaponAttack(
+        sheet.level,
+        sheet.abilityScores,
+        offHandWeapon,
+        sheetWeaponProfText,
+        sheet.magicItemBonuses?.attack
+      ),
+    [sheet.level, sheet.abilityScores, offHandWeapon, sheetWeaponProfText, sheet.magicItemBonuses?.attack]
+  );
+  const implementAttackSummary = useMemo(
+    () =>
+      summarizeImplementAttack(
+        sheet.level,
+        sheet.abilityScores,
+        sheetImplementClass,
+        equippedImplement,
+        sheetImplementProfText,
+        sheet.magicItemBonuses?.attack
+      ),
+    [
+      sheet.level,
+      sheet.abilityScores,
+      sheetImplementClass,
+      equippedImplement,
+      sheetImplementProfText,
+      sheet.magicItemBonuses?.attack
+    ]
   );
 
   useEffect(() => {
@@ -847,6 +906,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             </div>
           ))}
         </div>
+        <SupportPassiveMotionBreakdown o={derived.supportPassiveOther} summaryStyle={detailsSummaryStyle} />
       </div>
     );
   }
@@ -1110,6 +1170,52 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     );
   }
 
+  function renderAttackPreviewPanel(): JSX.Element | null {
+    if (!mainWeaponSummary && !offHandWeaponSummary && !implementAttackSummary) return null;
+    return (
+      <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.4rem", backgroundColor: "var(--surface-0)" }}>
+        <div style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--text-secondary)", marginBottom: "0.35rem" }}>
+          ATTACK PREVIEW
+        </div>
+        <div style={{ fontSize: "0.82rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
+          <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.74rem", color: "var(--text-muted)" }}>
+            Half-level + ability + proficiency (or nonproficient −2). Equip weapons in Main / Off hand and an implement in the implement slot.
+          </p>
+          {mainWeaponSummary && mainHandWeapon && (
+            <p style={{ margin: "0.15rem 0" }}>
+              <strong>Weapon (main):</strong> {mainHandWeapon.name} — attack{" "}
+              {mainWeaponSummary.attackBonus >= 0 ? "+" : ""}
+              {mainWeaponSummary.attackBonus} vs AC ({mainWeaponSummary.abilityCode}); damage {mainWeaponSummary.damageNotation}
+              {!mainWeaponSummary.proficient && (
+                <span style={{ color: "var(--status-warning)", marginLeft: "0.25rem" }}>(nonproficient −2 applied in bonus)</span>
+              )}
+            </p>
+          )}
+          {offHandWeaponSummary && offHandWeapon && (
+            <p style={{ margin: "0.15rem 0" }}>
+              <strong>Weapon (off):</strong> {offHandWeapon.name} — attack{" "}
+              {offHandWeaponSummary.attackBonus >= 0 ? "+" : ""}
+              {offHandWeaponSummary.attackBonus} vs AC ({offHandWeaponSummary.abilityCode}); damage {offHandWeaponSummary.damageNotation}
+              {!offHandWeaponSummary.proficient && (
+                <span style={{ color: "var(--status-warning)", marginLeft: "0.25rem" }}>(nonproficient −2 applied in bonus)</span>
+              )}
+            </p>
+          )}
+          {implementAttackSummary && equippedImplement && (
+            <p style={{ margin: "0.15rem 0" }}>
+              <strong>Implement:</strong> {equippedImplement.name} — attack{" "}
+              {implementAttackSummary.attackBonus >= 0 ? "+" : ""}
+              {implementAttackSummary.attackBonus} vs AC (best key ability)
+              {!implementAttackSummary.proficient && (
+                <span style={{ color: "var(--status-warning)", marginLeft: "0.25rem" }}>(nonproficient −2 applied in bonus)</span>
+              )}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   function renderStatusPanel(): JSX.Element {
     return (
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "0.45rem", alignItems: "start" }}>
@@ -1118,6 +1224,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           {renderSpeedInitiativePanel()}
           {renderDefensesPanel()}
           {renderMagicItemBonusesPanel()}
+          {renderAttackPreviewPanel()}
         </div>
         {renderConditionsPanel()}
       </div>

@@ -4,8 +4,9 @@ import { autoGrantedClassPowers, collectPowerIdsFromRacialTrait } from "../../ru
 import { parseRacialTraitIdsFromRace } from "../../rules/racialTraits";
 import { computeBuilderLikeDerivedStats } from "../../rules/derivedStatsFromBuild";
 import type { AcBreakdown } from "../../rules/defenseCalculator";
+import { mergeHybridProficiencyLines } from "../../rules/hybridDerivedStats";
 import type { PassiveOtherBonuses } from "../../rules/supportStatAdds";
-import type { Armor, CharacterBuild, ClassDef, Power, Race, RacialTrait, RulesIndex } from "../../rules/models";
+import type { Armor, CharacterBuild, ClassDef, Implement, Power, Race, RacialTrait, RulesIndex, Weapon } from "../../rules/models";
 import type { CharacterSheetState, EquipmentSlot, InventoryItem } from "./model";
 
 export interface SheetDerivedData {
@@ -123,6 +124,65 @@ export function computeSheetDerivedData(state: CharacterSheetState, index: Rules
     supportPassiveOther: derived.supportPassiveOther,
     acBreakdown: derived.acBreakdown
   };
+}
+
+export function findWeaponEquippedInSlot(
+  state: CharacterSheetState,
+  index: RulesIndex,
+  slot: "mainHand" | "offHand"
+): Weapon | undefined {
+  const itemId = state.equipment[slot];
+  if (!itemId) return undefined;
+  const inv = state.inventory.find((e) => e.id === itemId);
+  if (!inv || inv.kind !== "weapon" || !inv.sourceId) return undefined;
+  return (index.weapons ?? []).find((w) => w.id === inv.sourceId);
+}
+
+export function findImplementEquippedFromSheet(state: CharacterSheetState, index: RulesIndex): Implement | undefined {
+  const itemId = state.equipment.implement;
+  if (!itemId) return undefined;
+  const inv = state.inventory.find((e) => e.id === itemId);
+  if (!inv || inv.kind !== "implement" || !inv.sourceId) return undefined;
+  return (index.implements ?? []).find((imp) => imp.id === inv.sourceId);
+}
+
+export function sheetWeaponProficiencyText(
+  index: RulesIndex,
+  state: CharacterSheetState,
+  cls: ClassDef | undefined
+): string {
+  const hybrid = state.characterStyle === "hybrid" && state.hybridClassIdA && state.hybridClassIdB;
+  const hA = hybrid ? index.hybridClasses?.find((h) => h.id === state.hybridClassIdA) : undefined;
+  const hB = hybrid ? index.hybridClasses?.find((h) => h.id === state.hybridClassIdB) : undefined;
+  if (hybrid && hA && hB) return mergeHybridProficiencyLines(hA, hB).weaponLine;
+  const spec = (cls?.raw?.specific as Record<string, unknown> | undefined) || {};
+  return String(spec["Weapon Proficiencies"] || "");
+}
+
+export function sheetImplementProficiencyText(
+  index: RulesIndex,
+  state: CharacterSheetState,
+  cls: ClassDef | undefined
+): string {
+  const hybrid = state.characterStyle === "hybrid" && state.hybridClassIdA && state.hybridClassIdB;
+  const hA = hybrid ? index.hybridClasses?.find((h) => h.id === state.hybridClassIdA) : undefined;
+  const hB = hybrid ? index.hybridClasses?.find((h) => h.id === state.hybridClassIdB) : undefined;
+  if (hybrid && hA && hB) return mergeHybridProficiencyLines(hA, hB).implementLine;
+  const spec = (cls?.raw?.specific as Record<string, unknown> | undefined) || {};
+  return [spec["Implements"], spec["Implement"]].filter((x): x is string => typeof x === "string").join("; ");
+}
+
+/** Hybrid implement attack uses first hybrid side’s base class key abilities (matches builder). */
+export function sheetClassForImplementAttack(
+  index: RulesIndex,
+  state: CharacterSheetState,
+  cls: ClassDef | undefined
+): ClassDef | undefined {
+  const hybrid = state.characterStyle === "hybrid" && state.hybridClassIdA && state.hybridClassIdB;
+  if (!hybrid) return cls;
+  const hA = index.hybridClasses?.find((h) => h.id === state.hybridClassIdA);
+  const baseId = hA?.baseClassId;
+  return baseId ? index.classes?.find((c) => c.id === baseId) : cls;
 }
 
 function sortPowerCards(list: Power[]): Power[] {

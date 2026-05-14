@@ -63,6 +63,7 @@ import { GlossaryTooltipRichText, RulesRichText } from "./RulesRichText";
 import { NEUTRAL_PAGE_BG } from "../../ui/tokens";
 import { STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE } from "../../ui/glossaryTooltip";
 import { useGlossaryTooltip } from "../../ui/useGlossaryTooltip";
+import { SupportPassiveMotionBreakdown } from "../shared/SupportPassiveMotionBreakdown";
 import { findCaseInsensitiveMatches, scrollTextareaToMatch } from "../../ui/jsonSearch";
 import { resolveUiGlossaryHoverPlainText, termHasPowerKeywordTooltipBody } from "../../data/glossaryHoverResolve";
 import {
@@ -4549,6 +4550,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 <p style={{ margin: 0, fontSize: "0.88rem" }} {...glossaryTooltipUi.hoverA11y("will")}><strong>Will:</strong> {derived.defenses.will}</p>
               </div>
             </div>
+            <SupportPassiveMotionBreakdown o={derived.supportPassiveOther} summaryStyle={detailsSummaryStyle} />
             <details style={{ marginTop: "0.45rem", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
               <summary style={detailsSummaryStyle}>AC breakdown</summary>
               <p style={{ margin: "0.25rem 0 0 0", color: "var(--text-muted)" }}>

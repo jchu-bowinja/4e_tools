@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeSheetDerivedData, groupCombatPowers } from "../../src/features/characterSheet/selectors";
+import { computeSheetDerivedData, findWeaponEquippedInSlot, groupCombatPowers } from "../../src/features/characterSheet/selectors";
 import type { CharacterSheetState } from "../../src/features/characterSheet/model";
 import type { RulesIndex } from "../../src/rules/models";
 
@@ -228,5 +228,40 @@ describe("computeSheetDerivedData", () => {
     };
     const derived = computeSheetDerivedData(st, idx);
     expect(derived.defenses.reflex).toBe(10 + 2);
+  });
+});
+
+describe("findWeaponEquippedInSlot", () => {
+  it("returns rules weapon from equipped inventory main hand", () => {
+    const idx: RulesIndex = {
+      ...index,
+      weapons: [
+        {
+          id: "w_longsword",
+          name: "Longsword",
+          slug: "longsword",
+          weaponCategory: "Military Melee",
+          proficiencyBonus: 3,
+          damage: "1d8",
+          raw: {}
+        } as never
+      ]
+    };
+    const st: CharacterSheetState = {
+      ...state,
+      inventory: [
+        {
+          id: "inv-w1",
+          name: "Longsword",
+          kind: "weapon",
+          quantity: 1,
+          sourceId: "w_longsword",
+          slotHints: ["mainHand", "offHand"]
+        }
+      ],
+      equipment: { mainHand: "inv-w1" }
+    };
+    const w = findWeaponEquippedInSlot(st, idx, "mainHand");
+    expect(w?.id).toBe("w_longsword");
   });
 });
