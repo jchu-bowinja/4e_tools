@@ -1645,6 +1645,43 @@ button.encounter-roster-stat-cards-expand-btn[aria-pressed="true"] .template-jso
   padding-left: 0.1rem;
 }
 
+/* Speed + initiative panel: one shared header, slightly denser than defenses. */
+.stat-score-table--compact .stat-score-table__header {
+  margin-bottom: 0.06rem;
+}
+
+.stat-score-table--compact .stat-score-table__row + .stat-score-table__row {
+  margin-top: 0.04rem;
+}
+
+.stat-score-table--compact .stat-score-table__hdr {
+  padding: 0.08rem 0.1rem;
+  font-size: 0.56rem;
+  line-height: 1.05;
+}
+
+.stat-score-table--compact .stat-score-table__hdr--stack span + span {
+  margin-top: 0.03rem;
+}
+
+.stat-score-table--compact .stat-score-table__bonus,
+.stat-score-table--compact .stat-score-table__comp {
+  padding-top: 0.07rem;
+  padding-bottom: 0.07rem;
+}
+
+.stat-score-table--compact .stat-score-table__stat-label-text,
+.stat-score-table--compact .stat-score-table__stat > span {
+  padding: 0.1rem 0.18rem !important;
+}
+
+.stat-score-table--compact .stat-score-table__bonus span,
+.stat-score-table--compact .stat-score-table__comp span {
+  padding: 0.06rem 0.15rem !important;
+  font-size: 0.72rem !important;
+  line-height: 1.15 !important;
+}
+
 /* Defenses, speed, initiative: anchor total + label; clip component columns on the right. */
 .stat-score-table--prioritize-stat {
   --stat-label-col: minmax(var(--stat-label-block-width, max-content), 1fr);
@@ -1719,17 +1756,7 @@ button.encounter-roster-stat-cards-expand-btn[aria-pressed="true"] .template-jso
   overflow: hidden;
 }
 
-.skill-modifier-table__comp-header {
-  display: grid;
-  grid-template-columns: var(--skill-comp-cols);
-  column-gap: var(--skill-col-gap);
-  align-items: end;
-  align-self: flex-end;
-  width: max-content;
-  max-width: 100%;
-  margin-bottom: 0.08rem;
-}
-
+.skill-modifier-table__header,
 .skill-modifier-table__row {
   display: grid;
   grid-template-columns:
@@ -1744,8 +1771,21 @@ button.encounter-roster-stat-cards-expand-btn[aria-pressed="true"] .template-jso
   align-items: center;
 }
 
+.skill-modifier-table__header {
+  margin-bottom: 0.08rem;
+}
+
 .skill-modifier-table__row + .skill-modifier-table__row {
   margin-top: 0.04rem;
+}
+
+.skill-modifier-table__bonus-hdr {
+  padding-right: var(--skill-bonus-name-gap);
+}
+
+.skill-modifier-table__name-hdr {
+  text-align: left;
+  padding-left: 0.1rem;
 }
 
 .skill-modifier-table__bonus {

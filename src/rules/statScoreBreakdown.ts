@@ -47,6 +47,8 @@ export function motionUnifiedRowValues(
   return out;
 }
 
+export const ABILITY_SCORE_COLUMNS: StatScoreColumnDef[] = [{ key: "score", header: "Score", width: "2.35rem" }];
+
 export const DEFENSE_SCORE_COLUMNS: StatScoreColumnDef[] = [
   { key: "baseHalfLevel", header: ["Base +", "½ Lvl"], width: "2.75rem" },
   { key: "ability", header: "Abil" },

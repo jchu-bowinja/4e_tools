@@ -101,12 +101,18 @@ export function SkillModifierTable({ rows, rowStripe = true, fontSize = "0.78rem
 
   return (
     <div ref={tableRef} className="skill-modifier-table" style={tableStyle}>
-      <div className="skill-modifier-table__comp-header">
-        <HeaderStack lines={["Abil"]} />
-        <HeaderStack lines={["½", "Lvl"]} />
-        <HeaderStack lines={["Trnd", "(+5)"]} />
-        <HeaderStack lines={["Armor", "Penalty"]} />
-        <HeaderStack lines={["Misc"]} />
+      <div className="skill-modifier-table__header">
+        <span className="skill-modifier-table__bonus-hdr skill-modifier-table__hdr">
+          <HeaderStack lines={["Bonus"]} />
+        </span>
+        <span className="skill-modifier-table__name-hdr skill-modifier-table__hdr" aria-hidden="true" />
+        <div className="skill-modifier-table__breakdown-hdr">
+          <HeaderStack lines={["Abil"]} />
+          <HeaderStack lines={["½", "Lvl"]} />
+          <HeaderStack lines={["Trnd", "(+5)"]} />
+          <HeaderStack lines={["Armor", "Penalty"]} />
+          <HeaderStack lines={["Misc"]} />
+        </div>
       </div>
       {rows.map((row, idx) => {
         const stripe =

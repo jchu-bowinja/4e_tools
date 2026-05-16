@@ -11,14 +11,22 @@ import {
 } from "react";
 import type { Armor, Implement, RacialTrait, RulesIndex, Weapon } from "../../rules/models";
 import { resolveRacialTraitsForRace } from "../../rules/racialTraits";
+import {
+  getClassTraitRows,
+  getEpicDestinyTraitRows,
+  getHybridClassTraitRows,
+  getParagonTraitRows,
+  getThemeTraitRows,
+  type TraitDisplayRow
+} from "../../rules/supportTraits";
 import { computeSkillSheetRows } from "../../rules/skillCalculator";
 import {
+  ABILITY_SCORE_COLUMNS,
   buildAcScoreComponents,
   DEFENSE_SCORE_COLUMNS,
   defenseRowValues,
-  MOTION_INITIATIVE_COLUMNS,
-  MOTION_SPEED_COLUMNS,
-  motionRowValues
+  MOTION_SCORE_COLUMNS,
+  motionUnifiedRowValues
 } from "../../rules/statScoreBreakdown";
 import { CollapsibleDisclosure } from "../../ui/CollapsibleDisclosure";
 import { SkillModifierNameContent, SkillModifierTable } from "../../ui/SkillModifierTable";
@@ -82,14 +90,6 @@ const overviewCenterColumnStyle: CSSProperties = {
   overflow: "hidden"
 };
 
-const overviewStatRowStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "minmax(0, 1fr) auto",
-  alignItems: "center",
-  columnGap: "0.5rem",
-  minWidth: 0
-};
-
 const sectionTitleStyle: CSSProperties = {
   margin: 0,
   fontSize: "0.9rem",
@@ -126,6 +126,46 @@ type OverviewCollapsibleSectionProps = {
   onTitleBlur?: () => void;
   children: ReactNode;
 };
+
+function TraitRowsList({ rows, emptyMessage }: { rows: TraitDisplayRow[]; emptyMessage: string }): JSX.Element {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: "0.18rem" }}>
+      {rows.length === 0 ? (
+        <div style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>{emptyMessage}</div>
+      ) : (
+        rows.map((trait, idx) => (
+          <div
+            key={trait.id}
+            style={{
+              fontSize: "0.8rem",
+              lineHeight: 1.2,
+              padding: "0.24rem 0.35rem",
+              borderRadius: "0.25rem",
+              backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)",
+              color: "var(--text-primary)"
+            }}
+          >
+            <div style={{ fontWeight: 700 }}>{trait.name}</div>
+            {typeof trait.shortDescription === "string" && trait.shortDescription.trim() && (
+              <div
+                style={{
+                  marginTop: "0.14rem",
+                  color: "var(--text-secondary)",
+                  fontSize: "0.76rem",
+                  textTransform: "none",
+                  letterSpacing: "normal",
+                  fontWeight: 500
+                }}
+              >
+                {trait.shortDescription}
+              </div>
+            )}
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
 
 function OverviewCollapsibleSection({
   title,
@@ -791,6 +831,36 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     () => (sheet.epicDestinyId ? index.epicDestinies.find((d) => d.id === sheet.epicDestinyId) : undefined),
     [index.epicDestinies, sheet.epicDestinyId]
   );
+  const hybridClassA = useMemo(
+    () =>
+      sheet.characterStyle === "hybrid" && sheet.hybridClassIdA
+        ? index.hybridClasses?.find((h) => h.id === sheet.hybridClassIdA)
+        : undefined,
+    [index.hybridClasses, sheet.characterStyle, sheet.hybridClassIdA]
+  );
+  const hybridClassB = useMemo(
+    () =>
+      sheet.characterStyle === "hybrid" && sheet.hybridClassIdB
+        ? index.hybridClasses?.find((h) => h.id === sheet.hybridClassIdB)
+        : undefined,
+    [index.hybridClasses, sheet.characterStyle, sheet.hybridClassIdB]
+  );
+  const classTraitRows = useMemo(() => {
+    if (sheet.characterStyle === "hybrid" && sheet.hybridClassIdA && sheet.hybridClassIdB) {
+      return getHybridClassTraitRows(hybridClassA, hybridClassB, index);
+    }
+    return getClassTraitRows(derived.cls, index);
+  }, [sheet.characterStyle, sheet.hybridClassIdA, sheet.hybridClassIdB, hybridClassA, hybridClassB, derived.cls, index]);
+  const themeTraitRows = useMemo(() => getThemeTraitRows(selectedTheme, index), [selectedTheme, index]);
+  const paragonTraitRows = useMemo(() => getParagonTraitRows(selectedParagonPath, index), [selectedParagonPath, index]);
+  const epicDestinyTraitRows = useMemo(
+    () => getEpicDestinyTraitRows(selectedEpicDestiny, index),
+    [selectedEpicDestiny, index]
+  );
+  const showClassTraits = sheet.characterStyle === "hybrid" ? Boolean(sheet.hybridClassIdA && sheet.hybridClassIdB) : Boolean(sheet.classId);
+  const showThemeTraits = Boolean(sheet.themeId);
+  const showParagonTraits = Boolean(sheet.paragonPathId && sheet.level >= 11);
+  const showEpicDestinyTraits = Boolean(sheet.epicDestinyId && sheet.level >= 21);
 
   useEffect(() => {
     const build = loadBuild();
@@ -1541,40 +1611,62 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     );
   }
 
+  function renderAbilityScoreLabel(row: StatScoreRowDef, stripe: string): ReactNode {
+    const glossaryKey = row.glossaryKey ?? `ability:${row.rowKey}`;
+    return (
+      <span
+        tabIndex={0}
+        onMouseEnter={(event) => glossaryTooltipUi.startHover(event, glossaryKey)}
+        onMouseLeave={glossaryTooltipUi.leaveHover}
+        onFocus={(event) => glossaryTooltipUi.startHover(event, glossaryKey)}
+        onBlur={glossaryTooltipUi.leaveHover}
+        style={{
+          fontWeight: 700,
+          letterSpacing: "0.04em",
+          color: "var(--text-primary)",
+          padding: "0.12rem 0.2rem",
+          ...(stripe !== "transparent" ? { backgroundColor: stripe, borderRadius: "0.2rem" } : {}),
+          minWidth: 0,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap"
+        }}
+      >
+        {row.label}
+      </span>
+    );
+  }
+
   function renderSpeedInitiativePanel(): JSX.Element {
     return (
-      <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.4rem", backgroundColor: "var(--surface-0)" }}>
-        <div style={{ display: "grid", gap: "0.35rem" }}>
-          <StatScoreTable
-            columns={MOTION_SPEED_COLUMNS}
-            rows={[
-              {
-                rowKey: "speed",
-                label: "Speed",
-                glossaryKey: "speed",
-                total: derived.speed,
-                values: motionRowValues(derived.speedBreakdown.components, MOTION_SPEED_COLUMNS.map((c) => c.key))
-              }
-            ]}
-            rowStripe={false}
-            renderLabel={renderGlossaryStatLabel}
-          />
-          <StatScoreTable
-            columns={MOTION_INITIATIVE_COLUMNS}
-            rows={[
-              {
-                rowKey: "initiative",
-                label: "Initiative",
-                glossaryKey: "initiative",
-                total: derived.initiative,
-                signedTotal: true,
-                values: motionRowValues(derived.initiativeBreakdown.components, MOTION_INITIATIVE_COLUMNS.map((c) => c.key))
-              }
-            ]}
-            rowStripe={false}
-            renderLabel={renderGlossaryStatLabel}
-          />
-        </div>
+      <div
+        className="character-sheet-motion-panel"
+        style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.3rem 0.35rem", backgroundColor: "var(--surface-0)" }}
+      >
+        <StatScoreTable
+          className="stat-score-table--compact"
+          columns={MOTION_SCORE_COLUMNS}
+          bonusHeader={null}
+          statHeader={null}
+          rows={[
+            {
+              rowKey: "speed",
+              label: "Speed",
+              glossaryKey: "speed",
+              total: derived.speed,
+              values: motionUnifiedRowValues(derived.speedBreakdown.components, "speed")
+            },
+            {
+              rowKey: "initiative",
+              label: "Initiative",
+              glossaryKey: "initiative",
+              total: derived.initiative,
+              signedTotal: true,
+              values: motionUnifiedRowValues(derived.initiativeBreakdown.components, "initiative")
+            }
+          ]}
+          renderLabel={renderGlossaryStatLabel}
+        />
       </div>
     );
   }
@@ -2025,50 +2117,19 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 onTitleFocus={(event) => glossaryTooltipUi.startHover(event, "abilityScores")}
                 onTitleBlur={glossaryTooltipUi.leaveHover}
               >
-                <div style={{ display: "grid", gap: "0.2rem", gridTemplateColumns: "minmax(0, 1fr)" }}>
-                  {(["STR", "CON", "DEX", "INT", "WIS", "CHA"] as const).map((ab, idx) => (
-                    <div
-                      key={ab}
-                      style={{
-                        ...overviewStatRowStyle,
-                        fontVariantNumeric: "tabular-nums"
-                      }}
-                    >
-                      <span
-                        tabIndex={0}
-                        onMouseEnter={(event) => glossaryTooltipUi.startHover(event, `ability:${ab}`)}
-                        onMouseLeave={glossaryTooltipUi.leaveHover}
-                        onFocus={(event) => glossaryTooltipUi.startHover(event, `ability:${ab}`)}
-                        onBlur={glossaryTooltipUi.leaveHover}
-                        style={{
-                          fontSize: "0.8rem",
-                          color: "var(--text-primary)",
-                          fontWeight: 700,
-                          letterSpacing: "0.04em",
-                          padding: "0.22rem 0.35rem",
-                          borderRadius: "0.25rem",
-                          backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)"
-                        }}
-                      >
-                        {ab}
-                      </span>
-                      <div
-                        style={{
-                          textAlign: "right",
-                          fontSize: "0.82rem",
-                          padding: "0.22rem 0.35rem",
-                          borderRadius: "0.25rem",
-                          backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)"
-                        }}
-                      >
-                        <strong>{sheet.abilityScores[ab]}</strong>
-                        <span style={{ marginLeft: "0.35rem", color: "var(--status-success)", fontWeight: 700 }}>
-                          ({derived.abilityMods[ab] >= 0 ? `+${derived.abilityMods[ab]}` : derived.abilityMods[ab]})
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <StatScoreTable
+                  columns={ABILITY_SCORE_COLUMNS}
+                  statHeader={null}
+                  rows={(["STR", "CON", "DEX", "INT", "WIS", "CHA"] as const).map((ab) => ({
+                    rowKey: ab,
+                    label: ab,
+                    glossaryKey: `ability:${ab}`,
+                    total: derived.abilityMods[ab],
+                    signedTotal: true,
+                    values: { score: sheet.abilityScores[ab] }
+                  }))}
+                  renderLabel={renderAbilityScoreLabel}
+                />
               </OverviewCollapsibleSection>
               <div style={{ display: "grid", gap: "0.45rem", alignContent: "start" }}>
                 {renderSpeedInitiativePanel()}
@@ -2116,6 +2177,26 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   )}
                 </div>
               </OverviewCollapsibleSection>
+              {showClassTraits && (
+                <OverviewCollapsibleSection title="Class traits">
+                  <TraitRowsList rows={classTraitRows} emptyMessage="No class traits listed." />
+                </OverviewCollapsibleSection>
+              )}
+              {showThemeTraits && (
+                <OverviewCollapsibleSection title="Theme traits">
+                  <TraitRowsList rows={themeTraitRows} emptyMessage="No theme traits listed." />
+                </OverviewCollapsibleSection>
+              )}
+              {showParagonTraits && (
+                <OverviewCollapsibleSection title="Paragon traits">
+                  <TraitRowsList rows={paragonTraitRows} emptyMessage="No paragon traits listed." />
+                </OverviewCollapsibleSection>
+              )}
+              {showEpicDestinyTraits && (
+                <OverviewCollapsibleSection title="Epic destiny traits">
+                  <TraitRowsList rows={epicDestinyTraitRows} emptyMessage="No epic destiny traits listed." />
+                </OverviewCollapsibleSection>
+              )}
               <OverviewCollapsibleSection title="Feats">
                 <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: "0.18rem" }}>
                   {selectedFeatRows.length === 0 ? (

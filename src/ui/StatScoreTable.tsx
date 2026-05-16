@@ -78,6 +78,7 @@ export type StatScoreTableProps = {
   /** When false, only total and row label are shown (no component columns). */
   showComponents?: boolean;
   renderLabel?: (row: StatScoreRowDef, stripe: string) => ReactNode;
+  className?: string;
 };
 
 export function StatScoreTable({
@@ -89,7 +90,8 @@ export function StatScoreTable({
   statHeader = "Stat",
   prioritizeStatLabel = false,
   showComponents = true,
-  renderLabel
+  renderLabel,
+  className
 }: StatScoreTableProps) {
   const tableRef = useRef<HTMLDivElement>(null);
   const [labelBlockWidth, setLabelBlockWidth] = useState<number | null>(null);
@@ -131,7 +133,7 @@ export function StatScoreTable({
   return (
     <div
       ref={tableRef}
-      className={`stat-score-table${prioritizeStatLabel ? " stat-score-table--prioritize-stat" : ""}${showComponents ? "" : " stat-score-table--no-components"}`}
+      className={`stat-score-table${prioritizeStatLabel ? " stat-score-table--prioritize-stat" : ""}${showComponents ? "" : " stat-score-table--no-components"}${className ? ` ${className}` : ""}`}
       style={tableStyle}
     >
       <div className="stat-score-table__header">
