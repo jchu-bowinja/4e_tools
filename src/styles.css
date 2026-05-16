@@ -64,6 +64,8 @@
   --monster-stat-block-stripe-a: #faf6ee;
   --monster-stat-block-stripe-b: #ebe4d8;
   --monster-stat-block-gloss-underline: rgba(44, 36, 26, 0.38);
+  /* Below this width the page scrolls horizontally instead of crushing layout. */
+  --app-min-width: 56rem;
 }
 
 :root[data-theme="dark"] {
@@ -87,10 +89,16 @@
   top: 0.55rem;
 }
 
-html,
+html {
+  min-height: 100%;
+  min-width: var(--app-min-width);
+  overflow-x: auto;
+}
+
 body,
 #root {
   min-height: 100%;
+  min-width: var(--app-min-width);
 }
 
 body {

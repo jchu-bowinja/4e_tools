@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -46,6 +47,45 @@ const sectionInsetStyle: CSSProperties = {
   boxShadow: "inset 0 1px 0 var(--inset-section-highlight, rgba(255, 255, 255, 0.12))"
 };
 
+/** Overview column 2 (feats + HP); wide enough for the rest strip without its own scrollbar. */
+const OVERVIEW_CENTER_COLUMN_MIN_WIDTH = "26rem";
+/** HP panel col 1 (hit points, death saves). */
+const HP_PANEL_PRIMARY_COLUMN_MIN_WIDTH = "7.5rem";
+/** HP panel col 2 (temp HP). */
+const HP_PANEL_TEMP_HP_COLUMN_MIN_WIDTH = "7.5rem";
+/** HP panel col 3 (rest); wider for stacked rest buttons. */
+const HP_PANEL_SIDE_COLUMN_MIN_WIDTH = "8rem";
+
+const overviewSideColumnStyle: CSSProperties = {
+  ...sectionInsetStyle,
+  display: "grid",
+  gap: "0.5rem",
+  alignContent: "start",
+  minWidth: 0,
+  maxWidth: "100%",
+  overflow: "hidden"
+};
+
+const overviewCenterColumnStyle: CSSProperties = {
+  ...sectionInsetStyle,
+  display: "grid",
+  gap: "0.5rem",
+  alignContent: "start",
+  minWidth: 0,
+  width: "100%",
+  maxWidth: "100%",
+  boxSizing: "border-box",
+  overflow: "hidden"
+};
+
+const overviewStatRowStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 1fr) auto",
+  alignItems: "center",
+  columnGap: "0.5rem",
+  minWidth: 0
+};
+
 const sectionTitleStyle: CSSProperties = {
   margin: 0,
   fontSize: "0.9rem",
@@ -89,6 +129,145 @@ const resourceStripNumberInputStyle: CSSProperties = {
   boxSizing: "border-box",
   borderRadius: "0.18rem"
 };
+
+/** HP panel resource labels (Hit Points, Temp HP, Healing Surges, etc.). */
+const hpPanelResourceFieldBoxStyle: CSSProperties = {
+  ...labelStyle,
+  alignSelf: "stretch",
+  padding: "0.28rem 0.35rem",
+  border: "1px solid var(--panel-border)",
+  borderRadius: "0.3rem",
+  backgroundColor: "var(--surface-1)",
+  minWidth: 0
+};
+
+const hpPanelResourceSuffixStyle: CSSProperties = {
+  fontSize: labelStyle.fontSize,
+  fontWeight: 700,
+  color: "var(--text-secondary)",
+  textTransform: "none",
+  letterSpacing: "normal"
+};
+
+const hpPanelResourceHintStyle: CSSProperties = {
+  ...hpPanelResourceSuffixStyle,
+  fontWeight: 600,
+  color: "var(--text-muted)",
+  fontVariantNumeric: "tabular-nums",
+  lineHeight: 1.15,
+  textAlign: "center"
+};
+
+const hpPanelHealButtonStyle: CSSProperties = {
+  fontSize: labelStyle.fontSize,
+  padding: "0.14rem 0.35rem",
+  borderRadius: "0.22rem",
+  border: "1px solid var(--panel-border)",
+  backgroundColor: "var(--surface-0)",
+  color: "var(--text-primary)",
+  cursor: "pointer",
+  fontWeight: labelStyle.fontWeight,
+  textTransform: "none",
+  letterSpacing: "normal",
+  flexShrink: 0,
+  whiteSpace: "nowrap",
+  boxSizing: "border-box"
+};
+
+const healingSurgesLabelStackStyle: CSSProperties = {
+  display: "block",
+  position: "relative",
+  width: "100%",
+  maxWidth: "100%",
+  minWidth: 0
+};
+
+const healingSurgesLabelVisibleStyle: CSSProperties = {
+  display: "block",
+  width: "100%",
+  minWidth: 0,
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  fontSize: labelStyle.fontSize,
+  fontWeight: labelStyle.fontWeight,
+  letterSpacing: labelStyle.letterSpacing,
+  textTransform: labelStyle.textTransform,
+  color: labelStyle.color
+};
+
+const healingSurgesLabelProbeStyle: CSSProperties = {
+  position: "absolute",
+  left: 0,
+  top: 0,
+  visibility: "hidden",
+  pointerEvents: "none",
+  whiteSpace: "nowrap",
+  width: "max-content",
+  maxWidth: "none",
+  fontSize: labelStyle.fontSize,
+  fontWeight: labelStyle.fontWeight,
+  letterSpacing: labelStyle.letterSpacing,
+  textTransform: labelStyle.textTransform
+};
+
+function HealingSurgesFieldLabel({
+  onMouseEnter,
+  onMouseLeave,
+  onFocus,
+  onBlur
+}: {
+  onMouseEnter: (event: ReactMouseEvent<HTMLSpanElement>) => void;
+  onMouseLeave: () => void;
+  onFocus: (event: ReactFocusEvent<HTMLSpanElement>) => void;
+  onBlur: () => void;
+}): JSX.Element {
+  const stackRef = useRef<HTMLSpanElement>(null);
+  const probeRef = useRef<HTMLSpanElement>(null);
+  const [useShortLabel, setUseShortLabel] = useState(false);
+
+  useLayoutEffect(() => {
+    const stack = stackRef.current;
+    const probe = probeRef.current;
+    if (!stack || !probe) return;
+
+    const measure = (): void => {
+      const availableWidth = stack.getBoundingClientRect().width;
+      if (availableWidth <= 0) return;
+      const textWidth = probe.getBoundingClientRect().width;
+      setUseShortLabel(textWidth >= availableWidth - 0.5);
+    };
+
+    measure();
+    const rafId = requestAnimationFrame(measure);
+    const observer = new ResizeObserver(measure);
+    observer.observe(stack);
+    const hostLabel = stack.closest("label");
+    if (hostLabel) observer.observe(hostLabel);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      observer.disconnect();
+    };
+  }, []);
+
+  return (
+    <span ref={stackRef} style={healingSurgesLabelStackStyle}>
+      <span ref={probeRef} aria-hidden style={healingSurgesLabelProbeStyle}>
+        Healing Surges
+      </span>
+      <span
+        tabIndex={0}
+        style={healingSurgesLabelVisibleStyle}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+        onFocus={onFocus}
+        onBlur={onBlur}
+      >
+        {useShortLabel ? "Surges" : "Healing Surges"}
+      </span>
+    </span>
+  );
+}
 
 function usageAccentColor(bucket: "atWill" | "encounter" | "daily" | "utility"): string {
   if (bucket === "atWill") return "var(--power-accent-atwill-bar)";
@@ -317,9 +496,28 @@ function expandJsonIds(
 function DeathSaveCheckboxes(props: { value: number; onChange: (next: number) => void }): JSX.Element {
   const value = clamp(props.value, 0, 3);
   return (
-    <div style={{ display: "flex", gap: "0.35rem", alignItems: "center", marginTop: "0.1rem" }}>
+    <div
+      style={{
+        display: "flex",
+        flexWrap: "wrap",
+        gap: "0.35rem",
+        rowGap: "0.25rem",
+        alignItems: "center",
+        marginTop: "0.1rem"
+      }}
+    >
       {[0, 1, 2].map((idx) => (
-        <label key={idx} style={{ display: "inline-flex", alignItems: "center", gap: "0.2rem", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+        <label
+          key={idx}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.2rem",
+            fontSize: "0.78rem",
+            color: "var(--text-secondary)",
+            flexShrink: 0
+          }}
+        >
           <input
             type="checkbox"
             checked={idx < value}
@@ -607,24 +805,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     setSheet((prev) => mutator(prev));
   }
 
-  function setSheetMagicBonusField(field: keyof NonNullable<CharacterSheetState["magicItemBonuses"]>, raw: string): void {
-    updateSheet((prev) => {
-      const t = raw.trim();
-      let n: number | undefined;
-      if (t !== "") {
-        const parsed = Number.parseInt(t, 10);
-        if (Number.isFinite(parsed)) n = Math.max(-99, Math.min(99, parsed));
-      }
-      const cur = { ...(prev.magicItemBonuses ?? {}) };
-      if (n === undefined) delete cur[field];
-      else cur[field] = n;
-      return {
-        ...prev,
-        magicItemBonuses: Object.keys(cur).length === 0 ? undefined : cur
-      };
-    });
-  }
-
   function addInventoryItem(item: InventoryItem): void {
     updateSheet((prev) => ({ ...prev, inventory: [...prev.inventory, item] }));
   }
@@ -814,27 +994,48 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   }
 
   function renderHitPointsPanel(): JSX.Element {
-    const restClusterStyle: CSSProperties = {
-      minWidth: 0,
+    const hpPanelControlBoxStyle: CSSProperties = {
       alignSelf: "stretch",
       border: "1px solid var(--panel-border)",
       borderRadius: "0.3rem",
       padding: "0.2rem 0.32rem",
       backgroundColor: "var(--surface-1)",
-      display: "flex",
-      flexDirection: "row",
-      flexWrap: "nowrap",
-      alignItems: "center",
-      gap: "0.22rem",
-      overflowX: "auto"
+      minWidth: 0
+    };
+
+    const restButtonStyle: CSSProperties = {
+      ...hpPanelHealButtonStyle,
+      padding: "0.14rem 0.32rem",
+      borderRadius: "0.22rem",
+      border: "1px solid var(--panel-border)",
+      backgroundColor: "var(--surface-0)",
+      color: "var(--text-primary)",
+      cursor: "pointer",
+      fontWeight: 600,
+      flexShrink: 0,
+      whiteSpace: "nowrap",
+      width: "100%",
+      boxSizing: "border-box"
     };
 
     return (
-      <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.5rem", backgroundColor: "var(--surface-0)", display: "grid", gap: "0.35rem" }}>
+      <div
+        style={{
+          border: "1px solid var(--panel-border)",
+          borderRadius: "0.35rem",
+          padding: "0.5rem",
+          backgroundColor: "var(--surface-0)",
+          display: "grid",
+          gap: "0.35rem",
+          minWidth: 0,
+          maxWidth: "100%",
+          boxSizing: "border-box"
+        }}
+      >
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+            gridTemplateColumns: `minmax(${HP_PANEL_PRIMARY_COLUMN_MIN_WIDTH}, 1fr) minmax(${HP_PANEL_TEMP_HP_COLUMN_MIN_WIDTH}, 1fr) minmax(${HP_PANEL_SIDE_COLUMN_MIN_WIDTH}, 1fr)`,
             gridTemplateRows: "auto auto",
             gap: "0.35rem",
             alignItems: "stretch"
@@ -929,50 +1130,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           <label
             style={{
               ...labelStyle,
-              gridColumn: 3,
-              gridRow: 1,
-              padding: "0.28rem 0.35rem",
-              border: "1px solid var(--panel-border)",
-              borderRadius: "0.3rem",
-              backgroundColor: "var(--surface-1)"
-            }}
-          >
-            <span
-              tabIndex={0}
-              onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "surges")}
-              onMouseLeave={glossaryTooltipUi.leaveHover}
-              onFocus={(event) => glossaryTooltipUi.startHover(event, "surges")}
-              onBlur={glossaryTooltipUi.leaveHover}
-            >
-              Healing Surges
-            </span>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-              <input
-                type="number"
-                min={0}
-                max={derived.healingSurgesPerDay}
-                value={sheet.resources.surgesRemaining}
-                onChange={(e) =>
-                  updateSheet((prev) => ({
-                    ...prev,
-                    resources: {
-                      ...prev.resources,
-                      surgesRemaining: clamp(Number(e.target.value) || 0, 0, derived.healingSurgesPerDay)
-                    }
-                  }))
-                }
-                style={{
-                  width: numericInputWidthCh(sheet.resources.surgesRemaining, derived.healingSurgesPerDay),
-                  textAlign: "center",
-                  ...resourceStripNumberInputStyle
-                }}
-              />
-              <span style={{ fontWeight: 700, color: "var(--text-secondary)" }}>/ {derived.healingSurgesPerDay}</span>
-            </div>
-          </label>
-          <label
-            style={{
-              ...labelStyle,
               gridColumn: 1,
               gridRow: 2,
               padding: "0.28rem 0.35rem",
@@ -982,7 +1139,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               alignSelf: "stretch",
               display: "grid",
               alignContent: "start",
-              gap: "0.2rem"
+              gap: "0.2rem",
+              overflow: "visible"
             }}
           >
             <span
@@ -1007,130 +1165,145 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               }
             />
           </label>
-          <div style={{ ...restClusterStyle, gridColumn: "2 / span 2", gridRow: 2 }}>
-            <input
-              type="number"
-              min={0}
-              max={sheet.resources.surgesRemaining}
-              value={shortRestSurgeSpendDraft}
-              onChange={(e) => setShortRestSurgeSpendDraft(e.target.value)}
-              aria-label="Healing surges to spend"
-              style={{
-                width: numericInputWidthCh(
-                  Math.max(sheet.resources.surgesRemaining, Number.parseInt(shortRestSurgeSpendDraft, 10) || 0)
-                ),
-                textAlign: "center",
-                fontSize: "0.74rem",
-                padding: "0.1rem 0.18rem",
-                borderRadius: "0.2rem",
-                border: "1px solid var(--panel-border)",
-                boxSizing: "border-box",
-                flexShrink: 0
-              }}
-            />
+          <div
+            style={{
+              ...hpPanelResourceFieldBoxStyle,
+              gridColumn: "2 / span 2",
+              gridRow: 2,
+              display: "grid",
+              gap: "0.2rem",
+              alignContent: "start"
+            }}
+          >
+            <div style={{ display: "grid", gap: "0.2rem", minWidth: 0 }}>
+              <HealingSurgesFieldLabel
+                onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "surges")}
+                onMouseLeave={glossaryTooltipUi.leaveHover}
+                onFocus={(event) => glossaryTooltipUi.startHover(event, "surges")}
+                onBlur={glossaryTooltipUi.leaveHover}
+              />
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.35rem",
+                  flexWrap: "wrap",
+                  minWidth: 0
+                }}
+              >
+                <input
+                  type="number"
+                  min={0}
+                  max={derived.healingSurgesPerDay}
+                  value={sheet.resources.surgesRemaining}
+                  onChange={(e) =>
+                    updateSheet((prev) => ({
+                      ...prev,
+                      resources: {
+                        ...prev.resources,
+                        surgesRemaining: clamp(Number(e.target.value) || 0, 0, derived.healingSurgesPerDay)
+                      }
+                    }))
+                  }
+                  aria-label="Healing surges remaining"
+                  style={{
+                    width: numericInputWidthCh(sheet.resources.surgesRemaining, derived.healingSurgesPerDay),
+                    textAlign: "center",
+                    flexShrink: 0,
+                    ...resourceStripNumberInputStyle
+                  }}
+                />
+                <span style={hpPanelResourceSuffixStyle}>/ {derived.healingSurgesPerDay}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const parsed = Number.parseInt(shortRestSurgeSpendDraft.trim(), 10);
+                    const n = Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+                    spendSurgesAfterShortRest(n);
+                  }}
+                  disabled={sheet.resources.surgesRemaining === 0}
+                  style={{
+                    ...hpPanelHealButtonStyle,
+                    cursor: sheet.resources.surgesRemaining === 0 ? "not-allowed" : "pointer",
+                    opacity: sheet.resources.surgesRemaining === 0 ? 0.55 : 1
+                  }}
+                >
+                  Spend
+                </button>
+                <input
+                  type="number"
+                  min={0}
+                  max={sheet.resources.surgesRemaining}
+                  value={shortRestSurgeSpendDraft}
+                  onChange={(e) => setShortRestSurgeSpendDraft(e.target.value)}
+                  aria-label="Healing surges to spend"
+                  style={{
+                    width: numericInputWidthCh(
+                      Math.max(sheet.resources.surgesRemaining, Number.parseInt(shortRestSurgeSpendDraft, 10) || 0)
+                    ),
+                    textAlign: "center",
+                    flexShrink: 0,
+                    ...resourceStripNumberInputStyle
+                  }}
+                />
+              <span
+                style={{
+                  ...hpPanelResourceHintStyle,
+                  flexShrink: 0,
+                  display: "inline-flex",
+                  flexDirection: "column",
+                  alignItems: "center"
+                }}
+                onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "surgeValue")}
+                onMouseLeave={glossaryTooltipUi.leaveHover}
+                onFocus={(event) => glossaryTooltipUi.startHover(event, "surgeValue")}
+                onBlur={glossaryTooltipUi.leaveHover}
+                tabIndex={0}
+              >
+                <span style={{ whiteSpace: "nowrap" }}>+{derived.surgeValue} HP / </span>
+                <span style={{ whiteSpace: "nowrap" }}>surge</span>
+              </span>
+              </div>
+            </div>
+          </div>
+          <div
+            style={{
+              ...hpPanelControlBoxStyle,
+              gridColumn: 3,
+              gridRow: 1,
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              gap: "0.22rem"
+            }}
+          >
             <button
               type="button"
-              onClick={() => {
-                const parsed = Number.parseInt(shortRestSurgeSpendDraft.trim(), 10);
-                const n = Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
-                spendSurgesAfterShortRest(n);
-              }}
-              disabled={sheet.resources.surgesRemaining === 0}
-              style={{
-                fontSize: "0.72rem",
-                padding: "0.14rem 0.32rem",
-                borderRadius: "0.22rem",
-                border: "1px solid var(--panel-border)",
-                backgroundColor: "var(--surface-0)",
-                color: "var(--text-primary)",
-                cursor: sheet.resources.surgesRemaining === 0 ? "not-allowed" : "pointer",
-                fontWeight: 600,
-                opacity: sheet.resources.surgesRemaining === 0 ? 0.55 : 1,
-                flexShrink: 0,
-                whiteSpace: "nowrap"
-              }}
-            >
-              Heal
-            </button>
-            <span
-              style={{
-                fontSize: "0.65rem",
-                color: "var(--text-muted)",
-                fontVariantNumeric: "tabular-nums",
-                flexShrink: 0,
-                display: "inline-flex",
-                flexDirection: "column",
-                alignItems: "center",
-                lineHeight: 1.15,
-                textAlign: "center"
-              }}
-              onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "surgeValue")}
+              onClick={applyShortRest}
+              onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "shortRest")}
               onMouseLeave={glossaryTooltipUi.leaveHover}
-              onFocus={(event) => glossaryTooltipUi.startHover(event, "surgeValue")}
+              onFocus={(event) => glossaryTooltipUi.startHover(event, "shortRest")}
               onBlur={glossaryTooltipUi.leaveHover}
-              tabIndex={0}
+              style={restButtonStyle}
             >
-              <span style={{ whiteSpace: "nowrap" }}>+{derived.surgeValue} HP / </span>
-              <span style={{ whiteSpace: "nowrap" }}>surge</span>
-            </span>
-            <div
+              Short rest
+            </button>
+            <button
+              type="button"
+              onClick={applyLongRest}
+              onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "extendedRest")}
+              onMouseLeave={glossaryTooltipUi.leaveHover}
+              onFocus={(event) => glossaryTooltipUi.startHover(event, "extendedRest")}
+              onBlur={glossaryTooltipUi.leaveHover}
               style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.22rem",
-                flexShrink: 0,
-                alignItems: "stretch"
+                ...restButtonStyle,
+                border: "1px solid var(--panel-border-strong, var(--panel-border))",
+                backgroundColor: "var(--surface-2)",
+                fontWeight: 700
               }}
             >
-              <button
-                type="button"
-                onClick={applyShortRest}
-                onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "shortRest")}
-                onMouseLeave={glossaryTooltipUi.leaveHover}
-                onFocus={(event) => glossaryTooltipUi.startHover(event, "shortRest")}
-                onBlur={glossaryTooltipUi.leaveHover}
-                style={{
-                  fontSize: "0.72rem",
-                  padding: "0.14rem 0.32rem",
-                  borderRadius: "0.22rem",
-                  border: "1px solid var(--panel-border)",
-                  backgroundColor: "var(--surface-0)",
-                  color: "var(--text-primary)",
-                  cursor: "pointer",
-                  fontWeight: 600,
-                  flexShrink: 0,
-                  whiteSpace: "nowrap",
-                  width: "100%",
-                  boxSizing: "border-box"
-                }}
-              >
-                Short rest
-              </button>
-              <button
-                type="button"
-                onClick={applyLongRest}
-                onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "extendedRest")}
-                onMouseLeave={glossaryTooltipUi.leaveHover}
-                onFocus={(event) => glossaryTooltipUi.startHover(event, "extendedRest")}
-                onBlur={glossaryTooltipUi.leaveHover}
-                style={{
-                  fontSize: "0.72rem",
-                  padding: "0.14rem 0.32rem",
-                  borderRadius: "0.22rem",
-                  border: "1px solid var(--panel-border-strong, var(--panel-border))",
-                  backgroundColor: "var(--surface-2)",
-                  color: "var(--text-primary)",
-                  cursor: "pointer",
-                  fontWeight: 700,
-                  flexShrink: 0,
-                  whiteSpace: "nowrap",
-                  width: "100%",
-                  boxSizing: "border-box"
-                }}
-              >
-                Long rest
-              </button>
-            </div>
+              Long rest
+            </button>
           </div>
         </div>
       </div>
@@ -1393,51 +1566,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     );
   }
 
-  function renderMagicItemBonusesPanel(): JSX.Element {
-    return (
-      <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.4rem", backgroundColor: "var(--surface-1)" }}>
-        <div style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--text-secondary)", marginBottom: "0.35rem" }}>
-          ITEM ENHANCEMENT BONUSES
-        </div>
-        <p style={{ margin: "0 0 0.4rem 0", fontSize: "0.74rem", color: "var(--text-muted)", lineHeight: 1.4 }}>
-          Optional flat bonuses (e.g. magic armor, amulet, weapon). Included in defenses above and in export JSON.
-        </p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(72px, 1fr))", gap: "0.35rem" }}>
-          {(
-            [
-              ["ac", "AC"],
-              ["fortitude", "Fort"],
-              ["reflex", "Ref"],
-              ["will", "Will"],
-              ["attack", "Atk"]
-            ] as const
-          ).map(([key, short]) => (
-            <label key={key} style={{ fontSize: "0.72rem", color: "var(--text-secondary)" }}>
-              {short}
-              <input
-                type="number"
-                inputMode="numeric"
-                value={sheet.magicItemBonuses?.[key] ?? ""}
-                onChange={(e) => setSheetMagicBonusField(key, e.target.value)}
-                placeholder="0"
-                style={{
-                  display: "block",
-                  width: "100%",
-                  marginTop: "0.12rem",
-                  padding: "0.12rem 0.22rem",
-                  fontSize: "0.8rem",
-                  borderRadius: "0.22rem",
-                  border: "1px solid var(--panel-border)",
-                  boxSizing: "border-box"
-                }}
-              />
-            </label>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
   function renderAttackPreviewPanel(): JSX.Element | null {
     if (!mainWeaponSummary && !offHandWeaponSummary && !implementAttackSummary) return null;
     return (
@@ -1480,21 +1608,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             </p>
           )}
         </div>
-      </div>
-    );
-  }
-
-  function renderStatusPanel(): JSX.Element {
-    return (
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "0.45rem", alignItems: "start" }}>
-        {renderHitPointsPanel()}
-        <div style={{ display: "grid", gap: "0.45rem", alignContent: "start" }}>
-          {renderSpeedInitiativePanel()}
-          {renderDefensesPanel()}
-          {renderMagicItemBonusesPanel()}
-          {renderAttackPreviewPanel()}
-        </div>
-        {renderConditionsPanel()}
       </div>
     );
   }
@@ -1552,6 +1665,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         boxSizing: "border-box",
         background: "var(--character-sheet-background, linear-gradient(180deg, var(--surface-1) 0%, var(--surface-1) 100%))",
         minHeight: "100%",
+        minWidth: 0,
         color: "var(--character-sheet-foreground)"
       }}
     >
@@ -1584,7 +1698,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
       </div>
 
       {tab === "overview" && (
-        <div style={{ ...panelStyle, display: "grid", gap: "0.5rem", gridTemplateColumns: "repeat(12, minmax(0, 1fr))" }}>
+        <div style={{ ...panelStyle, display: "grid", gap: "0.5rem", gridTemplateColumns: "repeat(12, minmax(0, 1fr))", minWidth: 0 }}>
           <div style={{ gridColumn: "1 / -1", display: "flex", flexWrap: "wrap", gap: "0.4rem", alignItems: "center" }}>
             <select value={selectedSavedCharacterId} onChange={(e) => setSelectedSavedCharacterId(e.target.value)}>
               <option value="">Load saved Builder character...</option>
@@ -1609,8 +1723,18 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               Refresh Saved List
             </button>
           </div>
-          <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "0.5rem", alignItems: "stretch" }}>
-            <div style={{ ...sectionInsetStyle, display: "grid", gap: "0.5rem", alignContent: "start" }}>
+          <div
+            style={{
+              gridColumn: "1 / -1",
+              display: "grid",
+              gridTemplateColumns: `minmax(0, 1fr) minmax(${OVERVIEW_CENTER_COLUMN_MIN_WIDTH}, 1fr) minmax(0, 1fr)`,
+              gap: "0.5rem",
+              alignItems: "stretch",
+              minWidth: 0,
+              width: "100%"
+            }}
+          >
+            <div style={overviewSideColumnStyle}>
               <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.4rem", padding: "0.55rem", backgroundColor: "var(--surface-0)", display: "grid", gap: "0.35rem", boxShadow: "inset 0 0 0 1px var(--surface-2)" }}>
                 <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700 }}>
                   Character
@@ -1676,10 +1800,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                     <div
                       key={ab}
                       style={{
-                        display: "grid",
-                        gridTemplateColumns: "1fr auto",
-                        alignItems: "center",
-                        columnGap: "0.5rem",
+                        ...overviewStatRowStyle,
                         fontVariantNumeric: "tabular-nums"
                       }}
                     >
@@ -1719,8 +1840,13 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   ))}
                 </div>
               </div>
+              <div style={{ display: "grid", gap: "0.45rem", alignContent: "start" }}>
+                {renderSpeedInitiativePanel()}
+                {renderDefensesPanel()}
+                {renderAttackPreviewPanel()}
+              </div>
             </div>
-            <div style={{ ...sectionInsetStyle, display: "grid", gap: "0.5rem", alignContent: "start" }}>
+            <div style={overviewCenterColumnStyle}>
               <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.5rem", backgroundColor: "var(--surface-0)" }}>
                 <h3 style={sectionTitleStyle}>Feats</h3>
                 <div style={{ marginTop: "0.25rem", display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: "0.18rem" }}>
@@ -1759,9 +1885,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   )}
                 </div>
               </div>
+              {renderHitPointsPanel()}
             </div>
-            <div style={{ ...sectionInsetStyle, display: "grid", gap: "0.5rem", alignContent: "start" }}>
-              <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.5rem", backgroundColor: "var(--surface-0)" }}>
+            <div style={overviewSideColumnStyle}>
+              <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.5rem", backgroundColor: "var(--surface-0)", minWidth: 0 }}>
                 <h3
                   style={sectionTitleStyle}
                   onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "skills")}
@@ -1777,10 +1904,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                     <div
                       key={row.skillId}
                       style={{
-                        display: "grid",
-                        gridTemplateColumns: "1fr auto",
-                        columnGap: "0.5rem",
-                        alignItems: "center",
+                        ...overviewStatRowStyle,
                         fontSize: "0.8rem",
                         lineHeight: 1.2,
                         fontVariantNumeric: "tabular-nums"
@@ -1796,7 +1920,11 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                           color: "var(--text-primary)",
                           padding: "0.2rem 0.35rem",
                           borderRadius: "0.25rem",
-                          backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)"
+                          backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)",
+                          minWidth: 0,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap"
                         }}
                       >
                         {row.name}
@@ -1816,10 +1944,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   ))}
                 </div>
               </div>
+              {renderConditionsPanel()}
             </div>
-          </div>
-          <div style={{ ...sectionInsetStyle, gridColumn: "1 / -1" }}>
-            {renderStatusPanel()}
           </div>
           {(["atWill", "encounter", "daily"] as const).map((bucket) => (
             <div key={bucket} style={{ ...sectionInsetStyle, gridColumn: "1 / -1" }}>

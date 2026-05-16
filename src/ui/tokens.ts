@@ -5,6 +5,7 @@ export const NEUTRAL_PAGE_BG = "#dde0e6";
 
 export const appLoadingShell: CSSProperties = {
   minHeight: "100vh",
+  minWidth: "var(--app-min-width, 56rem)",
   boxSizing: "border-box",
   padding: "1.25rem",
   backgroundColor: NEUTRAL_PAGE_BG,

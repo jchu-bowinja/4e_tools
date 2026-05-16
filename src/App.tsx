@@ -170,7 +170,14 @@ export default function App(): JSX.Element {
   }
 
   return (
-    <div style={{ minHeight: "100vh", backgroundColor: colors.appBackground, color: colors.text }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        minWidth: "var(--app-min-width, 56rem)",
+        backgroundColor: colors.appBackground,
+        color: colors.text
+      }}
+    >
       <a href="#app-main-content" className="skip-link">
         Skip to main content
       </a>
