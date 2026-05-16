@@ -104,13 +104,16 @@ export function StatScoreTable({
     if (!root) return;
 
     const measure = () => {
-      const nodes = root.querySelectorAll<HTMLElement>(".stat-score-table__stat-label-text, .stat-score-table__stat-label");
+      // Measure label text only — the parent .stat-score-table__stat-label stretches with the
+      // 1fr grid track and would inflate --stat-label-block-width when the panel is narrow.
+      root.style.removeProperty("--stat-label-block-width");
+      const nodes = root.querySelectorAll<HTMLElement>(".stat-score-table__stat-label-text");
       if (nodes.length === 0) return;
       let max = 0;
       for (const node of nodes) {
         max = Math.max(max, measureNaturalWidth(node));
       }
-      setLabelBlockWidth((prev) => (prev !== null && Math.abs(prev - max) < 0.5 ? prev : max));
+      setLabelBlockWidth(max > 0 ? max : null);
     };
 
     measure();

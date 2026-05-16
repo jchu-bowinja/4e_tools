@@ -6,6 +6,45 @@ export interface TraitDisplayRow {
   shortDescription?: string | null;
 }
 
+const TRAIT_BODY_FALLBACK_MAX_LEN = 240;
+
+export function parseFeatureLevel(feature: ClassFeature): number | undefined {
+  const raw = feature.raw?.specific as Record<string, unknown> | undefined;
+  const level = raw?.Level;
+  if (typeof level === "number" && Number.isFinite(level)) return level;
+  if (typeof level === "string") {
+    const parsed = Number.parseInt(level.trim(), 10);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+}
+
+export function featureIsAvailableAtLevel(feature: ClassFeature, characterLevel: number): boolean {
+  const featureLevel = parseFeatureLevel(feature);
+  if (featureLevel == null) return true;
+  return featureLevel <= characterLevel;
+}
+
+/** Theme features often include level in the compendium name; paragon/epic usually do not. */
+export function traitNameForDisplay(feature: ClassFeature, includeLevel = true): string {
+  const name = feature.name.trim();
+  if (!includeLevel || /^Level\s+\d+/i.test(name)) return name;
+  const level = parseFeatureLevel(feature);
+  if (level == null) return name;
+  return `Level ${level} ${name}`;
+}
+
+/** Compendium short text, or a single-line excerpt from feature body (common on epic destinies). */
+export function traitDescriptionForDisplay(feature: ClassFeature): string | undefined {
+  const short = typeof feature.shortDescription === "string" ? feature.shortDescription.trim() : "";
+  if (short) return short;
+  const body = typeof feature.body === "string" ? feature.body.trim() : "";
+  if (!body) return undefined;
+  const oneLine = body.replace(/\s+/g, " ").trim();
+  if (oneLine.length <= TRAIT_BODY_FALLBACK_MAX_LEN) return oneLine;
+  return `${oneLine.slice(0, TRAIT_BODY_FALLBACK_MAX_LEN - 1)}…`;
+}
+
 function specOf(entity: { raw: Record<string, unknown> } | undefined): Record<string, unknown> | undefined {
   return entity?.raw?.specific as Record<string, unknown> | undefined;
 }
@@ -49,8 +88,11 @@ export function resolveTraitDisplayRows(
   ids: string[],
   names: string[],
   byId: Map<string, ClassFeature>,
-  byName: Map<string, ClassFeature>
+  byName: Map<string, ClassFeature>,
+  options?: { includeLevelInName?: boolean; maxLevel?: number }
 ): TraitDisplayRow[] {
+  const includeLevelInName = options?.includeLevelInName ?? false;
+  const maxLevel = options?.maxLevel;
   const rows: TraitDisplayRow[] = [];
   const seen = new Set<string>();
 
@@ -58,11 +100,12 @@ export function resolveTraitDisplayRows(
     if (seen.has(id)) continue;
     const feature = byId.get(id);
     if (!feature) continue;
+    if (maxLevel != null && !featureIsAvailableAtLevel(feature, maxLevel)) continue;
     seen.add(id);
     rows.push({
       id: feature.id,
-      name: feature.name,
-      shortDescription: feature.shortDescription
+      name: traitNameForDisplay(feature, includeLevelInName),
+      shortDescription: traitDescriptionForDisplay(feature)
     });
   }
 
@@ -73,8 +116,8 @@ export function resolveTraitDisplayRows(
     seen.add(id);
     rows.push({
       id,
-      name: feature?.name ?? name,
-      shortDescription: feature?.shortDescription
+      name: feature ? traitNameForDisplay(feature, includeLevelInName) : name,
+      shortDescription: feature ? traitDescriptionForDisplay(feature) : undefined
     });
   }
 
@@ -101,23 +144,43 @@ export function getHybridClassTraitRows(
   return resolveTraitDisplayRows([], names, byId, byName);
 }
 
-export function getThemeTraitRows(theme: Theme | undefined, index: RulesIndex): TraitDisplayRow[] {
+export function getThemeTraitRows(
+  theme: Theme | undefined,
+  index: RulesIndex,
+  characterLevel: number
+): TraitDisplayRow[] {
   if (!theme) return [];
   const spec = specOf(theme);
   const { byId, byName } = buildClassFeatureLookups(index);
-  return resolveTraitDisplayRows(parseTraitIdsFromField(spec, "_PARSED_SUB_FEATURES"), [], byId, byName);
+  return resolveTraitDisplayRows(parseTraitIdsFromField(spec, "_PARSED_SUB_FEATURES"), [], byId, byName, {
+    maxLevel: characterLevel
+  });
 }
 
-export function getParagonTraitRows(path: ParagonPath | undefined, index: RulesIndex): TraitDisplayRow[] {
+export function getParagonTraitRows(
+  path: ParagonPath | undefined,
+  index: RulesIndex,
+  characterLevel: number
+): TraitDisplayRow[] {
   if (!path) return [];
   const spec = specOf(path);
   const { byId, byName } = buildClassFeatureLookups(index);
-  return resolveTraitDisplayRows(parseTraitIdsFromField(spec, "Class Features"), [], byId, byName);
+  return resolveTraitDisplayRows(parseTraitIdsFromField(spec, "Class Features"), [], byId, byName, {
+    includeLevelInName: true,
+    maxLevel: characterLevel
+  });
 }
 
-export function getEpicDestinyTraitRows(destiny: EpicDestiny | undefined, index: RulesIndex): TraitDisplayRow[] {
+export function getEpicDestinyTraitRows(
+  destiny: EpicDestiny | undefined,
+  index: RulesIndex,
+  characterLevel: number
+): TraitDisplayRow[] {
   if (!destiny) return [];
   const spec = specOf(destiny);
   const { byId, byName } = buildClassFeatureLookups(index);
-  return resolveTraitDisplayRows(parseTraitIdsFromField(spec, "Class Features"), [], byId, byName);
+  return resolveTraitDisplayRows(parseTraitIdsFromField(spec, "Class Features"), [], byId, byName, {
+    includeLevelInName: true,
+    maxLevel: characterLevel
+  });
 }

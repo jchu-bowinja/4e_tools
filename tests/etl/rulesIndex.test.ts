@@ -14,6 +14,7 @@ describe.skipIf(!existsSync(rulesIndexPath))("generated rules index", () => {
       skills: unknown[];
       languages: unknown[];
       racialTraits: unknown[];
+      classFeatures?: unknown[];
       armors: unknown[];
       weapons?: unknown[];
       implements?: unknown[];
@@ -29,6 +30,7 @@ describe.skipIf(!existsSync(rulesIndexPath))("generated rules index", () => {
     expect(data.races.length).toBeGreaterThan(0);
     expect(data.languages.length).toBeGreaterThan(0);
     expect(data.racialTraits.length).toBeGreaterThan(0);
+    expect((data.classFeatures ?? []).length).toBeGreaterThan(100);
     expect(data.classes.length).toBeGreaterThan(0);
     expect(data.feats.length).toBeGreaterThan(100);
     expect(data.powers.length).toBeGreaterThan(100);

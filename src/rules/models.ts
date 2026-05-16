@@ -169,6 +169,13 @@ export interface RacialTrait extends RulesEntity {
   raw: Record<string, unknown>;
 }
 
+/** Class feature (class / theme / paragon / epic destiny traits on the character sheet). */
+export interface ClassFeature extends RulesEntity {
+  shortDescription?: string | null;
+  body?: string | null;
+  raw: Record<string, unknown>;
+}
+
 /** Character theme (optional background package with prerequisites). */
 export interface Theme extends RulesEntity {
   prereqsRaw?: string | null;
@@ -214,6 +221,8 @@ export interface RulesIndex {
   implements?: Implement[];
   abilityScores: AbilityScoreLore[];
   racialTraits: RacialTrait[];
+  /** Populated by ETL; `loadRules` defaults to []. */
+  classFeatures?: ClassFeature[];
   themes: Theme[];
   paragonPaths: ParagonPath[];
   epicDestinies: EpicDestiny[];

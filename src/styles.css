@@ -1710,9 +1710,9 @@ button.encounter-roster-stat-cards-expand-btn[aria-pressed="true"] .template-jso
 .stat-score-table--prioritize-stat .stat-score-table__stat-label-text {
   display: inline-block;
   box-sizing: border-box;
-  width: var(--stat-label-block-width, max-content);
+  width: max-content;
   min-width: var(--stat-label-block-width, max-content);
-  max-width: none;
+  max-width: max-content;
   overflow: visible;
   text-overflow: clip;
   white-space: nowrap;

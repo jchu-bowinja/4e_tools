@@ -19,6 +19,7 @@ export function validateRulesIndexShape(data: RulesIndex): RulesIndex {
     armors: ensureArray(data.armors, "armors"),
     abilityScores: ensureArray(data.abilityScores, "abilityScores"),
     racialTraits: ensureArray(data.racialTraits, "racialTraits"),
+    classFeatures: data.classFeatures ?? [],
     themes: data.themes ?? [],
     paragonPaths: data.paragonPaths ?? [],
     epicDestinies: data.epicDestinies ?? [],

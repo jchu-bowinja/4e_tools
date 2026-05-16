@@ -1099,6 +1099,21 @@ def build_index(input_path: Path, output_dir: Path) -> None:
             }
         )
 
+    class_features: List[Dict[str, Any]] = []
+    for row in class_features_raw:
+        spec = row.get("specific") or {}
+        class_features.append(
+            {
+                "id": row.get("internal_id"),
+                "name": row.get("name"),
+                "slug": normalize_name(row.get("name", "")),
+                "source": row.get("source"),
+                "shortDescription": spec.get("Short Description"),
+                "body": row.get("body"),
+                "raw": row,
+            }
+        )
+
     classes: List[Dict[str, Any]] = []
     for cls in classes_raw:
         spec = cls.get("specific") or {}
@@ -1375,6 +1390,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
                 "skills": len(skills),
                 "languages": len(languages),
                 "racialTraits": len(racial_traits),
+                "classFeatures": len(class_features),
                 "armors": len(armors),
                 "weapons": len(weapons),
                 "implements": len(implements),
@@ -1392,6 +1408,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
         "skills": skills,
         "languages": languages,
         "racialTraits": racial_traits,
+        "classFeatures": class_features,
         "armors": armors,
         "weapons": weapons,
         "implements": implements,

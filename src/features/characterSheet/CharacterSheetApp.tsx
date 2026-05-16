@@ -127,6 +127,16 @@ type OverviewCollapsibleSectionProps = {
   children: ReactNode;
 };
 
+function traitsSectionTitle(selectionName: string | undefined, fallback: string): string {
+  const name = selectionName?.trim();
+  return name ? `${name} traits` : fallback;
+}
+
+function traitsEmptyMessage(selectionName: string | undefined, fallback: string): string {
+  const name = selectionName?.trim();
+  return name ? `No ${name} traits listed.` : fallback;
+}
+
 function TraitRowsList({ rows, emptyMessage }: { rows: TraitDisplayRow[]; emptyMessage: string }): JSX.Element {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: "0.18rem" }}>
@@ -851,16 +861,44 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     }
     return getClassTraitRows(derived.cls, index);
   }, [sheet.characterStyle, sheet.hybridClassIdA, sheet.hybridClassIdB, hybridClassA, hybridClassB, derived.cls, index]);
-  const themeTraitRows = useMemo(() => getThemeTraitRows(selectedTheme, index), [selectedTheme, index]);
-  const paragonTraitRows = useMemo(() => getParagonTraitRows(selectedParagonPath, index), [selectedParagonPath, index]);
+  const themeTraitRows = useMemo(
+    () => getThemeTraitRows(selectedTheme, index, sheet.level),
+    [selectedTheme, index, sheet.level]
+  );
+  const paragonTraitRows = useMemo(
+    () => getParagonTraitRows(selectedParagonPath, index, sheet.level),
+    [selectedParagonPath, index, sheet.level]
+  );
   const epicDestinyTraitRows = useMemo(
-    () => getEpicDestinyTraitRows(selectedEpicDestiny, index),
-    [selectedEpicDestiny, index]
+    () => getEpicDestinyTraitRows(selectedEpicDestiny, index, sheet.level),
+    [selectedEpicDestiny, index, sheet.level]
   );
   const showClassTraits = sheet.characterStyle === "hybrid" ? Boolean(sheet.hybridClassIdA && sheet.hybridClassIdB) : Boolean(sheet.classId);
   const showThemeTraits = Boolean(sheet.themeId);
   const showParagonTraits = Boolean(sheet.paragonPathId && sheet.level >= 11);
   const showEpicDestinyTraits = Boolean(sheet.epicDestinyId && sheet.level >= 21);
+  const racialTraitsSectionTitle = useMemo(
+    () => traitsSectionTitle(derived.race?.name, "Racial traits"),
+    [derived.race?.name]
+  );
+  const classTraitsSectionTitle = useMemo(() => {
+    if (sheet.characterStyle === "hybrid" && hybridClassA && hybridClassB) {
+      return traitsSectionTitle(`${hybridClassA.name} / ${hybridClassB.name}`, "Class traits");
+    }
+    return traitsSectionTitle(derived.cls?.name, "Class traits");
+  }, [sheet.characterStyle, hybridClassA, hybridClassB, derived.cls?.name]);
+  const themeTraitsSectionTitle = useMemo(
+    () => traitsSectionTitle(selectedTheme?.name, "Theme traits"),
+    [selectedTheme?.name]
+  );
+  const paragonTraitsSectionTitle = useMemo(
+    () => traitsSectionTitle(selectedParagonPath?.name, "Paragon traits"),
+    [selectedParagonPath?.name]
+  );
+  const epicDestinyTraitsSectionTitle = useMemo(
+    () => traitsSectionTitle(selectedEpicDestiny?.name, "Epic destiny traits"),
+    [selectedEpicDestiny?.name]
+  );
 
   useEffect(() => {
     const build = loadBuild();
@@ -1600,9 +1638,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           color: "var(--text-primary)",
           padding: "0.12rem 0.2rem",
           ...(stripe !== "transparent" ? { backgroundColor: stripe, borderRadius: "0.2rem" } : {}),
-          minWidth: 0,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
           whiteSpace: "nowrap"
         }}
       >
@@ -1648,6 +1683,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           columns={MOTION_SCORE_COLUMNS}
           bonusHeader={null}
           statHeader={null}
+          prioritizeStatLabel
           rows={[
             {
               rowKey: "speed",
@@ -2138,12 +2174,14 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               </div>
             </div>
             <div style={overviewCenterColumnStyle}>
-              <OverviewCollapsibleSection title="Racial traits">
+              <OverviewCollapsibleSection title={racialTraitsSectionTitle}>
                 <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: "0.18rem" }}>
                   {!derived.race ? (
                     <div style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>No race selected.</div>
                   ) : racialTraitRows.length === 0 ? (
-                    <div style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>No racial traits listed.</div>
+                    <div style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
+                      {traitsEmptyMessage(derived.race?.name, "No racial traits listed.")}
+                    </div>
                   ) : (
                     racialTraitRows.map(({ trait }, idx) => (
                       <div
@@ -2178,23 +2216,40 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 </div>
               </OverviewCollapsibleSection>
               {showClassTraits && (
-                <OverviewCollapsibleSection title="Class traits">
-                  <TraitRowsList rows={classTraitRows} emptyMessage="No class traits listed." />
+                <OverviewCollapsibleSection title={classTraitsSectionTitle}>
+                  <TraitRowsList
+                    rows={classTraitRows}
+                    emptyMessage={traitsEmptyMessage(
+                      sheet.characterStyle === "hybrid" && hybridClassA && hybridClassB
+                        ? `${hybridClassA.name} / ${hybridClassB.name}`
+                        : derived.cls?.name,
+                      "No class traits listed."
+                    )}
+                  />
                 </OverviewCollapsibleSection>
               )}
               {showThemeTraits && (
-                <OverviewCollapsibleSection title="Theme traits">
-                  <TraitRowsList rows={themeTraitRows} emptyMessage="No theme traits listed." />
+                <OverviewCollapsibleSection title={themeTraitsSectionTitle}>
+                  <TraitRowsList
+                    rows={themeTraitRows}
+                    emptyMessage={traitsEmptyMessage(selectedTheme?.name, "No theme traits listed.")}
+                  />
                 </OverviewCollapsibleSection>
               )}
               {showParagonTraits && (
-                <OverviewCollapsibleSection title="Paragon traits">
-                  <TraitRowsList rows={paragonTraitRows} emptyMessage="No paragon traits listed." />
+                <OverviewCollapsibleSection title={paragonTraitsSectionTitle}>
+                  <TraitRowsList
+                    rows={paragonTraitRows}
+                    emptyMessage={traitsEmptyMessage(selectedParagonPath?.name, "No paragon traits listed.")}
+                  />
                 </OverviewCollapsibleSection>
               )}
               {showEpicDestinyTraits && (
-                <OverviewCollapsibleSection title="Epic destiny traits">
-                  <TraitRowsList rows={epicDestinyTraitRows} emptyMessage="No epic destiny traits listed." />
+                <OverviewCollapsibleSection title={epicDestinyTraitsSectionTitle}>
+                  <TraitRowsList
+                    rows={epicDestinyTraitRows}
+                    emptyMessage={traitsEmptyMessage(selectedEpicDestiny?.name, "No epic destiny traits listed.")}
+                  />
                 </OverviewCollapsibleSection>
               )}
               <OverviewCollapsibleSection title="Feats">
