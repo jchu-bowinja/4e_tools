@@ -21,7 +21,7 @@ import {
   motionRowValues
 } from "../../rules/statScoreBreakdown";
 import { CollapsibleDisclosure } from "../../ui/CollapsibleDisclosure";
-import { SkillModifierTable } from "../../ui/SkillModifierTable";
+import { SkillModifierNameContent, SkillModifierTable } from "../../ui/SkillModifierTable";
 import { StatScoreTable, type StatScoreRowDef } from "../../ui/StatScoreTable";
 import { loadBuild, loadSavedCharacters, type SavedCharacterEntry } from "../builder/storage";
 import { GlossaryTooltipRichText, RulesRichText } from "../builder/RulesRichText";
@@ -2161,8 +2161,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   rows={skillRows}
                   fontSize="0.76rem"
                   renderSkillName={(row, stripe) => (
-                    <span
-                      className="skill-modifier-table__name-text"
+                    <SkillModifierNameContent
+                      row={row}
                       onMouseEnter={(event) => glossaryTooltipUi.startHover(event, `skill:${row.skillId}`)}
                       onMouseLeave={glossaryTooltipUi.leaveHover}
                       onFocus={(event) => glossaryTooltipUi.startHover(event, `skill:${row.skillId}`)}
@@ -2175,13 +2175,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                         borderRadius: "0.2rem",
                         backgroundColor: stripe
                       }}
-                    >
-                      {row.name}
-                      {row.abilityCode ? (
-                        <span style={{ marginLeft: "0.35rem", fontWeight: 700, fontSize: "0.68rem", color: "var(--text-secondary)" }}>{row.abilityCode}</span>
-                      ) : null}
-                      {row.trained ? <strong style={{ color: "var(--status-success)", fontWeight: 700 }}> (T)</strong> : null}
-                    </span>
+                    />
                   )}
                 />
               </OverviewCollapsibleSection>
