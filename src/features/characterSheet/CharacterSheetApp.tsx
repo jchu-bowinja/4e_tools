@@ -397,24 +397,24 @@ const CONDITION_COLORS: Record<string, { background: string; text: string }> = {
 };
 
 const CONDITION_EMOJIS: Record<string, string> = {
-  bloodied: "🩸",
-  dying: "⚠️",
-  dead: "☠️",
-  blinded: "🙈",
-  dazed: "💫",
-  deafened: "🔕",
-  dominated: "🧠",
-  helpless: "🫳",
-  immobilized: "🧱",
-  marked: "🎯",
-  petrified: "🪨",
-  prone: "⬇️",
-  restrained: "⛓️",
-  slowed: "🐢",
-  stunned: "😵",
-  surprised: "❗",
-  unconscious: "💤",
-  weakened: "🪫"
+  bloodied: "\u{1FA78}",
+  dying: "\u26A0\uFE0F",
+  dead: "\u2620\uFE0F",
+  blinded: "\u{1F648}",
+  dazed: "\u{1F4AB}",
+  deafened: "\u{1F515}",
+  dominated: "\u{1F9E0}",
+  helpless: "\u{1FAF3}",
+  immobilized: "\u{1F9F1}",
+  marked: "\u{1F3AF}",
+  petrified: "\u{1FAA8}",
+  prone: "\u2B07\uFE0F",
+  restrained: "\u26D3\uFE0F",
+  slowed: "\u{1F422}",
+  stunned: "\u{1F635}",
+  surprised: "\u2757",
+  unconscious: "\u{1F4A4}",
+  weakened: "\u{1FAAB}"
 };
 
 function conditionBadgeStyle(name: string): CSSProperties {
@@ -434,7 +434,7 @@ function conditionBadgeStyle(name: string): CSSProperties {
 
 function conditionDisplayLabel(name: string): string {
   const normalized = name.trim().toLowerCase();
-  const emoji = CONDITION_EMOJIS[normalized] ?? "🏷️";
+  const emoji = CONDITION_EMOJIS[normalized] ?? "\u{1F3F7}\uFE0F";
   return `${emoji} ${name}`;
 }
 
