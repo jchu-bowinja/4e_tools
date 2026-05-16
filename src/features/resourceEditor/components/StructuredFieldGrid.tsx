@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { AdjustableNumberInput } from "../../../ui/AdjustableNumberInput";
 
 export type FieldType = "text" | "number";
 export interface FieldOption {
@@ -45,12 +46,21 @@ export function StructuredFieldGrid({ fields, draft, onFieldChange }: Props): JS
                   </option>
                 ))}
               </select>
+            ) : field.type === "number" ? (
+              <AdjustableNumberInput
+                optional
+                fill
+                value={typeof value === "number" ? value : undefined}
+                onChange={(next) => onFieldChange(field, next === undefined ? "" : String(next))}
+                ariaLabel={field.label}
+                style={{ width: "100%" }}
+              />
             ) : (
               <input
                 value={normalizedValue}
                 onChange={(event) => onFieldChange(field, event.target.value)}
                 placeholder={field.key}
-                type={field.type === "number" ? "number" : "text"}
+                type="text"
               />
             )}
           </label>

@@ -64,6 +64,7 @@ import { NEUTRAL_PAGE_BG } from "../../ui/tokens";
 import { STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE } from "../../ui/glossaryTooltip";
 import { useGlossaryTooltip } from "../../ui/useGlossaryTooltip";
 import { SupportPassiveMotionBreakdown } from "../shared/SupportPassiveMotionBreakdown";
+import { AdjustableNumberInput } from "../../ui/AdjustableNumberInput";
 import { findCaseInsensitiveMatches, scrollTextareaToMatch } from "../../ui/jsonSearch";
 import { resolveUiGlossaryHoverPlainText, termHasPowerKeywordTooltipBody } from "../../data/glossaryHoverResolve";
 import {
@@ -1716,13 +1717,11 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
           </label>
           <label style={{ display: "block", marginTop: "0.65rem", fontSize: "0.9rem", color: "var(--text-secondary)" }}>
             Level (1–30)
-            <input
-              type="number"
+            <AdjustableNumberInput
               min={1}
               max={30}
               value={build.level}
-              onChange={(e) => {
-                const lv = Math.max(1, Math.min(30, Number(e.target.value) || 1));
+              onChange={(lv) => {
                 const milestoneKeys = new Set(requiredAsiMilestonesUpTo(lv).map(String));
                 const asiNext: AsiChoices = { ...(build.asiChoices || {}) };
                 for (const k of Object.keys(asiNext)) {
@@ -1740,16 +1739,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 const { classPowerSlots, powerIds } = reconcilePowerSlotsForBuild(nextBase, lv);
                 updateBuild({ ...nextBase, classPowerSlots, powerIds });
               }}
-              style={{
-                width: "4.75rem",
-                marginTop: "0.25rem",
-                padding: "0.4rem 0.5rem",
-                border: "1px solid var(--panel-border)",
-                borderRadius: "6px",
-                backgroundColor: "var(--surface-0)",
-                boxSizing: "border-box",
-                fontVariantNumeric: "tabular-nums"
-              }}
+              ariaLabel="Character level"
+              style={{ marginTop: "0.25rem" }}
             />
           </label>
         </div>
@@ -2784,23 +2775,12 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               <div style={{ display: "flex", flexWrap: "wrap", alignItems: "stretch", gap: "0.75rem 1rem" }}>
                 <label style={{ display: "flex", flexDirection: "column", gap: "0.3rem", width: "fit-content" }}>
                   <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.03em" }}>Budget</span>
-                  <input
-                    type="number"
+                  <AdjustableNumberInput
                     min={0}
                     max={60}
                     value={build.pointBuyBudget ?? DEFAULT_POINT_BUY_BUDGET}
-                    onChange={(e) => updateBuild({ ...build, pointBuyBudget: Number(e.target.value) })}
-                    style={{
-                      width: "4.4rem",
-                      boxSizing: "border-box",
-                      padding: "0.35rem 0.45rem",
-                      textAlign: "center",
-                      fontVariantNumeric: "tabular-nums",
-                      borderRadius: "6px",
-                      border: "1px solid var(--panel-border-strong)",
-                      backgroundColor: "var(--surface-0)",
-                      fontWeight: 600
-                    }}
+                    onChange={(next) => updateBuild({ ...build, pointBuyBudget: next })}
+                    ariaLabel="Point-buy budget"
                   />
                 </label>
                 <div style={{ flex: "1 1 14rem", display: "grid", gap: "0.35rem" }}>
@@ -2891,30 +2871,19 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                               </span>
                             </td>
                             <td style={{ padding: "0.35rem 0.25rem", verticalAlign: "middle", textAlign: "center", width: "3.75rem" }}>
-                              <input
-                                type="number"
+                              <AdjustableNumberInput
+                                compact
                                 min={8}
                                 max={18}
                                 value={base}
-                                onChange={(e) =>
+                                onChange={(next) =>
                                   updateBuild({
                                     ...build,
-                                    abilityScores: { ...build.abilityScores, [ability]: Number(e.target.value) }
+                                    abilityScores: { ...build.abilityScores, [ability]: next }
                                   })
                                 }
-                                style={{
-                                  width: "3.25rem",
-                                  maxWidth: "100%",
-                                  boxSizing: "border-box",
-                                  padding: "0.3rem 0.42rem",
-                                  textAlign: "center",
-                                  fontVariantNumeric: "tabular-nums",
-                                  border: "1px solid var(--panel-border)",
-                                  borderRadius: "6px",
-                                  backgroundColor: "var(--surface-0)",
-                                  fontWeight: 600
-                                }}
-                                aria-label={`${getAbilityLabel(ability)} base score`}
+                                ariaLabel={`${getAbilityLabel(ability)} base score`}
+                                style={{ maxWidth: "100%" }}
                               />
                             </td>
                             <td style={{ padding: "0.35rem 0", verticalAlign: "middle", fontSize: "0.82rem", textAlign: "right" }}>
@@ -4122,97 +4091,67 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "0.45rem" }}>
                   <label style={{ fontSize: "0.82rem" }}>
                     AC
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      value={build.magicItemBonuses?.ac ?? ""}
-                      onChange={(e) => setMagicItemBonusField("ac", e.target.value)}
-                      placeholder="0"
-                      style={{
-                        display: "block",
-                        width: "100%",
-                        marginTop: "0.2rem",
-                        padding: "0.28rem 0.35rem",
-                        borderRadius: "6px",
-                        border: "1px solid var(--panel-border)",
-                        boxSizing: "border-box"
-                      }}
+                    <AdjustableNumberInput
+                      optional
+                      min={-99}
+                      max={99}
+                      value={build.magicItemBonuses?.ac}
+                      onChange={(next) => setMagicItemBonusField("ac", next === undefined ? "" : String(next))}
+                      ariaLabel="Magic item AC bonus"
+                      fill
+                      style={{ display: "block", width: "100%", marginTop: "0.2rem", boxSizing: "border-box" }}
                     />
                   </label>
                   <label style={{ fontSize: "0.82rem" }}>
                     Fortitude
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      value={build.magicItemBonuses?.fortitude ?? ""}
-                      onChange={(e) => setMagicItemBonusField("fortitude", e.target.value)}
-                      placeholder="0"
-                      style={{
-                        display: "block",
-                        width: "100%",
-                        marginTop: "0.2rem",
-                        padding: "0.28rem 0.35rem",
-                        borderRadius: "6px",
-                        border: "1px solid var(--panel-border)",
-                        boxSizing: "border-box"
-                      }}
+                    <AdjustableNumberInput
+                      optional
+                      min={-99}
+                      max={99}
+                      value={build.magicItemBonuses?.fortitude}
+                      onChange={(next) => setMagicItemBonusField("fortitude", next === undefined ? "" : String(next))}
+                      ariaLabel="Magic item Fortitude bonus"
+                      fill
+                      style={{ display: "block", width: "100%", marginTop: "0.2rem", boxSizing: "border-box" }}
                     />
                   </label>
                   <label style={{ fontSize: "0.82rem" }}>
                     Reflex
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      value={build.magicItemBonuses?.reflex ?? ""}
-                      onChange={(e) => setMagicItemBonusField("reflex", e.target.value)}
-                      placeholder="0"
-                      style={{
-                        display: "block",
-                        width: "100%",
-                        marginTop: "0.2rem",
-                        padding: "0.28rem 0.35rem",
-                        borderRadius: "6px",
-                        border: "1px solid var(--panel-border)",
-                        boxSizing: "border-box"
-                      }}
+                    <AdjustableNumberInput
+                      optional
+                      min={-99}
+                      max={99}
+                      value={build.magicItemBonuses?.reflex}
+                      onChange={(next) => setMagicItemBonusField("reflex", next === undefined ? "" : String(next))}
+                      ariaLabel="Magic item Reflex bonus"
+                      fill
+                      style={{ display: "block", width: "100%", marginTop: "0.2rem", boxSizing: "border-box" }}
                     />
                   </label>
                   <label style={{ fontSize: "0.82rem" }}>
                     Will
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      value={build.magicItemBonuses?.will ?? ""}
-                      onChange={(e) => setMagicItemBonusField("will", e.target.value)}
-                      placeholder="0"
-                      style={{
-                        display: "block",
-                        width: "100%",
-                        marginTop: "0.2rem",
-                        padding: "0.28rem 0.35rem",
-                        borderRadius: "6px",
-                        border: "1px solid var(--panel-border)",
-                        boxSizing: "border-box"
-                      }}
+                    <AdjustableNumberInput
+                      optional
+                      min={-99}
+                      max={99}
+                      value={build.magicItemBonuses?.will}
+                      onChange={(next) => setMagicItemBonusField("will", next === undefined ? "" : String(next))}
+                      ariaLabel="Magic item Will bonus"
+                      fill
+                      style={{ display: "block", width: "100%", marginTop: "0.2rem", boxSizing: "border-box" }}
                     />
                   </label>
                   <label style={{ fontSize: "0.82rem" }}>
                     Attack rolls
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      value={build.magicItemBonuses?.attack ?? ""}
-                      onChange={(e) => setMagicItemBonusField("attack", e.target.value)}
-                      placeholder="0"
-                      style={{
-                        display: "block",
-                        width: "100%",
-                        marginTop: "0.2rem",
-                        padding: "0.28rem 0.35rem",
-                        borderRadius: "6px",
-                        border: "1px solid var(--panel-border)",
-                        boxSizing: "border-box"
-                      }}
+                    <AdjustableNumberInput
+                      optional
+                      min={-99}
+                      max={99}
+                      value={build.magicItemBonuses?.attack}
+                      onChange={(next) => setMagicItemBonusField("attack", next === undefined ? "" : String(next))}
+                      ariaLabel="Magic item attack bonus"
+                      fill
+                      style={{ display: "block", width: "100%", marginTop: "0.2rem", boxSizing: "border-box" }}
                     />
                   </label>
                 </div>

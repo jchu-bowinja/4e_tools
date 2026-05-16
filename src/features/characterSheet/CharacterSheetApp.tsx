@@ -20,6 +20,7 @@ import { resolveUiGlossaryHoverPlainText, termHasPowerKeywordTooltipBody } from 
 import { positionFixedTooltip } from "../../ui/glossaryTooltipPosition";
 import { GLOSSARY_TOOLTIP_OPEN_DELAY_MS, STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE } from "../../ui/glossaryTooltip";
 import { useGlossaryTooltip } from "../../ui/useGlossaryTooltip";
+import { AdjustableNumberInput } from "../../ui/AdjustableNumberInput";
 import { findCaseInsensitiveMatches, scrollTextareaToMatch } from "../../ui/jsonSearch";
 import { summarizeImplementAttack, summarizeMainWeaponAttack } from "../../rules/weaponAttack";
 import { SupportPassiveMotionBreakdown } from "../shared/SupportPassiveMotionBreakdown";
@@ -102,15 +103,6 @@ const labelStyle: CSSProperties = {
   fontWeight: 600,
   textTransform: "uppercase",
   letterSpacing: "0.04em"
-};
-
-/** Hit Points / Temp HP / Surges value fields: reduced vertical padding and type size. */
-const resourceStripNumberInputStyle: CSSProperties = {
-  fontSize: "0.74rem",
-  lineHeight: 1.05,
-  padding: "0.04rem 0.2rem",
-  boxSizing: "border-box",
-  borderRadius: "0.18rem"
 };
 
 /** HP panel resource labels (Hit Points, Temp HP, Healing Surges, etc.). */
@@ -311,49 +303,6 @@ function createInventoryId(): string {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
-}
-
-function numericInputWidthCh(...values: number[]): string {
-  const longest = values.reduce((max, value) => {
-    const digits = String(Math.max(0, Math.trunc(value))).length;
-    return Math.max(max, digits);
-  }, 1);
-  return `calc(${Math.max(4, longest + 1)}ch + 4px)`;
-}
-
-function NumberStepButtons(props: {
-  value: number;
-  onChange: (next: number) => void;
-  min?: number;
-  max?: number;
-  ariaLabel: string;
-}): JSX.Element {
-  const min = props.min ?? 0;
-  const max = props.max ?? Number.MAX_SAFE_INTEGER;
-  const value = clamp(props.value, min, max);
-
-  return (
-    <div className="adjustable-number-stepper" role="group" aria-label={`${props.ariaLabel} adjustment`}>
-      <button
-        type="button"
-        className="adjustable-number-step-btn"
-        disabled={value >= max}
-        onClick={() => props.onChange(clamp(value + 1, min, max))}
-        aria-label={`Increase ${props.ariaLabel}`}
-      >
-        +
-      </button>
-      <button
-        type="button"
-        className="adjustable-number-step-btn"
-        disabled={value <= min}
-        onClick={() => props.onChange(clamp(value - 1, min, max))}
-        aria-label={`Decrease ${props.ariaLabel}`}
-      >
-        −
-      </button>
-    </div>
-  );
 }
 
 const GLOSSARY_CONDITION_OPTIONS = [
@@ -1081,28 +1030,22 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             >
               Hit Points
             </span>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexWrap: "wrap" }}>
-              <input
-                type="number"
-                max={derived.maxHp}
-                value={sheet.resources.currentHp}
-                onChange={(e) =>
-                  updateSheet((prev) => ({
-                    ...prev,
-                    resources: {
-                      ...prev.resources,
-                      currentHp: Math.min(Number(e.target.value) || 0, derived.maxHp)
-                    }
-                  }))
-                }
-                style={{
-                  width: numericInputWidthCh(sheet.resources.currentHp, derived.maxHp),
-                  textAlign: "center",
-                  ...resourceStripNumberInputStyle
-                }}
-              />
-              <span style={{ fontWeight: 700, color: "var(--text-secondary)" }}>/ {derived.maxHp}</span>
-            </div>
+            <AdjustableNumberInput
+              compact
+              max={derived.maxHp}
+              companionMax={derived.maxHp}
+              value={sheet.resources.currentHp}
+              onChange={(next) =>
+                updateSheet((prev) => ({
+                  ...prev,
+                  resources: {
+                    ...prev.resources,
+                    currentHp: Math.min(next, derived.maxHp)
+                  }
+                }))
+              }
+              ariaLabel="Current hit points"
+            />
           </label>
           <label
             style={{
@@ -1123,24 +1066,20 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             >
               Temp HP
             </span>
-            <input
-              type="number"
+            <AdjustableNumberInput
+              compact
               min={0}
               value={sheet.resources.tempHp}
-              onChange={(e) =>
+              onChange={(next) =>
                 updateSheet((prev) => ({
                   ...prev,
                   resources: {
                     ...prev.resources,
-                    tempHp: Math.max(0, Number(e.target.value) || 0)
+                    tempHp: Math.max(0, next)
                   }
                 }))
               }
-              style={{
-                width: numericInputWidthCh(sheet.resources.tempHp),
-                textAlign: "center",
-                ...resourceStripNumberInputStyle
-              }}
+              ariaLabel="Temporary hit points"
             />
           </label>
           <label
@@ -1162,26 +1101,21 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             >
               Action Pts
             </span>
-            <input
-              type="number"
+            <AdjustableNumberInput
+              compact
               min={0}
               max={9}
               value={sheet.resources.actionPoints}
-              onChange={(e) =>
+              onChange={(next) =>
                 updateSheet((prev) => ({
                   ...prev,
                   resources: {
                     ...prev.resources,
-                    actionPoints: clamp(Number(e.target.value) || 0, 0, 9)
+                    actionPoints: clamp(next, 0, 9)
                   }
                 }))
               }
-              aria-label="Action points"
-              style={{
-                width: numericInputWidthCh(sheet.resources.actionPoints, 9),
-                textAlign: "center",
-                ...resourceStripNumberInputStyle
-              }}
+              ariaLabel="Action points"
             />
           </label>
           <div
@@ -1295,29 +1229,24 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   minWidth: 0
                 }}
               >
-                <input
-                  type="number"
+                <AdjustableNumberInput
+                  compact
                   min={0}
                   max={derived.healingSurgesPerDay}
+                  companionMax={derived.healingSurgesPerDay}
                   value={sheet.resources.surgesRemaining}
-                  onChange={(e) =>
+                  onChange={(next) =>
                     updateSheet((prev) => ({
                       ...prev,
                       resources: {
                         ...prev.resources,
-                        surgesRemaining: clamp(Number(e.target.value) || 0, 0, derived.healingSurgesPerDay)
+                        surgesRemaining: clamp(next, 0, derived.healingSurgesPerDay)
                       }
                     }))
                   }
-                  aria-label="Healing surges remaining"
-                  style={{
-                    width: numericInputWidthCh(sheet.resources.surgesRemaining, derived.healingSurgesPerDay),
-                    textAlign: "center",
-                    flexShrink: 0,
-                    ...resourceStripNumberInputStyle
-                  }}
+                  ariaLabel="Healing surges remaining"
+                  style={{ flexShrink: 0 }}
                 />
-                <span style={hpPanelResourceSuffixStyle}>/ {derived.healingSurgesPerDay}</span>
                 <button
                   type="button"
                   onClick={() => {
@@ -1334,21 +1263,14 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 >
                   Spend
                 </button>
-                <input
-                  type="number"
+                <AdjustableNumberInput
+                  compact
                   min={0}
                   max={sheet.resources.surgesRemaining}
-                  value={shortRestSurgeSpendDraft}
-                  onChange={(e) => setShortRestSurgeSpendDraft(e.target.value)}
-                  aria-label="Healing surges to spend"
-                  style={{
-                    width: numericInputWidthCh(
-                      Math.max(sheet.resources.surgesRemaining, Number.parseInt(shortRestSurgeSpendDraft, 10) || 0)
-                    ),
-                    textAlign: "center",
-                    flexShrink: 0,
-                    ...resourceStripNumberInputStyle
-                  }}
+                  value={Number.parseInt(shortRestSurgeSpendDraft, 10) || 0}
+                  onChange={(next) => setShortRestSurgeSpendDraft(String(next))}
+                  ariaLabel="Healing surges to spend"
+                  style={{ flexShrink: 0 }}
                 />
               <span
                 style={{

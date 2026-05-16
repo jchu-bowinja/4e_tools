@@ -1,4 +1,5 @@
 import { useCallback, useId, useState } from "react";
+import { AdjustableNumberInput } from "../../ui/AdjustableNumberInput";
 import type { MonsterEntryFile, MonsterIndexEntry } from "../monsterEditor/storage";
 import { loadMonsterEntry } from "../monsterEditor/storage";
 import { readCustomMonsterEntries } from "../monsterEditor/monsterLocalStorage";
@@ -142,38 +143,24 @@ export function EncounterGeneratorPanel({
       >
         <label style={{ display: "flex", flexDirection: "column", gap: "0.12rem", fontSize: "0.72rem" }}>
           <span style={{ color: "var(--text-secondary)" }}>Party level</span>
-          <input
-            type="number"
+          <AdjustableNumberInput
+            compact
             min={1}
             max={30}
             value={partyLevel}
-            onChange={(e) => setPartyLevel(Number.parseInt(e.target.value, 10) || 1)}
-            style={{
-              fontSize: "0.8rem",
-              padding: "0.25rem 0.35rem",
-              borderRadius: "0.25rem",
-              border: "1px solid var(--panel-border)",
-              backgroundColor: "var(--surface-0)",
-              color: "var(--text-primary)"
-            }}
+            onChange={setPartyLevel}
+            ariaLabel="Party level"
           />
         </label>
         <label style={{ display: "flex", flexDirection: "column", gap: "0.12rem", fontSize: "0.72rem" }}>
           <span style={{ color: "var(--text-secondary)" }}>Party size</span>
-          <input
-            type="number"
+          <AdjustableNumberInput
+            compact
             min={1}
             max={12}
             value={pcCount}
-            onChange={(e) => setPcCount(Number.parseInt(e.target.value, 10) || 1)}
-            style={{
-              fontSize: "0.8rem",
-              padding: "0.25rem 0.35rem",
-              borderRadius: "0.25rem",
-              border: "1px solid var(--panel-border)",
-              backgroundColor: "var(--surface-0)",
-              color: "var(--text-primary)"
-            }}
+            onChange={setPcCount}
+            ariaLabel="Party size"
           />
         </label>
         <label style={{ display: "flex", flexDirection: "column", gap: "0.12rem", fontSize: "0.72rem" }}>

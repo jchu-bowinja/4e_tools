@@ -199,6 +199,153 @@ textarea:hover {
   border-color: var(--panel-border-strong);
 }
 
+/* Adjustable number: value + always-visible step buttons in one control */
+.adjustable-number {
+  display: inline-flex;
+  align-items: stretch;
+  max-width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--control-radius);
+  background-color: var(--surface-0);
+  overflow: hidden;
+  vertical-align: middle;
+}
+
+.adjustable-number__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  min-height: unset;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  background: transparent;
+  box-shadow: none;
+}
+
+.adjustable-number__input:hover,
+.adjustable-number__input:focus {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.adjustable-number__input::-webkit-outer-spin-button,
+.adjustable-number__input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.adjustable-number__input {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.adjustable-number__stepper {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  border-left: 1px solid var(--panel-border);
+}
+
+.adjustable-number__step-btn {
+  flex: 1 1 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  margin: 0;
+  padding: 0 0.12rem;
+  border: none;
+  border-radius: 0;
+  background: var(--surface-1);
+  color: var(--text-primary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.adjustable-number__step-btn + .adjustable-number__step-btn {
+  border-top: 1px solid var(--panel-border);
+}
+
+.adjustable-number__step-btn:hover:not(:disabled) {
+  background: var(--control-hover-bg);
+}
+
+.adjustable-number__step-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.adjustable-number--compact .adjustable-number__input {
+  font-size: 0.74rem;
+  line-height: 1.05;
+  padding: 0.04rem 0.2rem;
+}
+
+.adjustable-number--compact .adjustable-number__step-btn {
+  font-size: 0.68rem;
+  min-width: 1.2rem;
+}
+
+.adjustable-number--fill {
+  width: 100%;
+}
+
+.adjustable-number--fill .adjustable-number__input {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 2.5ch;
+}
+
+.adjustable-number--with-companion-max {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.adjustable-number__value-pane {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.adjustable-number--with-companion-max .adjustable-number__value-pane {
+  justify-content: center;
+  padding-inline: 0.2rem;
+  box-sizing: border-box;
+}
+
+.adjustable-number--with-companion-max .adjustable-number__input {
+  flex: 0 0 auto;
+  text-align: center;
+  padding-inline: 0.08rem;
+}
+
+.adjustable-number__fraction-sep,
+.adjustable-number__companion-max {
+  flex: 0 0 auto;
+  font-weight: 700;
+  color: var(--text-secondary);
+  line-height: 1;
+}
+
+.adjustable-number__fraction-sep {
+  padding: 0 0.1rem;
+}
+
+.adjustable-number__companion-max {
+  padding-inline: 0;
+}
+
+.adjustable-number--with-companion-max .adjustable-number__stepper {
+  flex: 0 0 auto;
+}
+
 :root[data-theme="dark"] body {
   --app-background: #16120e;
   --app-foreground: #efe3cc;
