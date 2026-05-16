@@ -1157,11 +1157,11 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
       ...hpPanelHealButtonStyle,
       padding: "0.14rem 0.32rem",
       borderRadius: "0.22rem",
-      border: "1px solid var(--panel-border)",
-      backgroundColor: "var(--surface-0)",
+      border: "1px solid var(--panel-border-strong, var(--panel-border))",
+      backgroundColor: "var(--surface-2)",
       color: "var(--text-primary)",
       cursor: "pointer",
-      fontWeight: 600,
+      fontWeight: 700,
       flexShrink: 0,
       whiteSpace: "nowrap",
       width: "100%",
@@ -1317,12 +1317,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               onMouseLeave={glossaryTooltipUi.leaveHover}
               onFocus={(event) => glossaryTooltipUi.startHover(event, "extendedRest")}
               onBlur={glossaryTooltipUi.leaveHover}
-              style={{
-                ...restButtonStyle,
-                border: "1px solid var(--panel-border-strong, var(--panel-border))",
-                backgroundColor: "var(--surface-2)",
-                fontWeight: 700
-              }}
+              style={restButtonStyle}
             >
               Long rest
             </button>
@@ -1431,14 +1426,14 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                     type="button"
                     onClick={() => spendHealingSurge()}
                     disabled={sheet.resources.surgesRemaining === 0}
-                    aria-label="Spend healing surge"
+                    aria-label="Spend Surge"
                     style={{
                       ...hpPanelHealButtonStyle,
                       cursor: sheet.resources.surgesRemaining === 0 ? "not-allowed" : "pointer",
                       opacity: sheet.resources.surgesRemaining === 0 ? 0.55 : 1
                     }}
                   >
-                    Spend
+                    Spend Surge
                   </button>
                   <button
                     type="button"

@@ -19,29 +19,28 @@ export type FixedTooltipPosition = {
 };
 
 /**
- * Chooses `top` / `left` for a `position: fixed` tooltip so it stays in the window.
- * If there is not enough room below the trigger, places it above when that fits; otherwise clamps.
+ * Chooses `top` / `left` for a `position: fixed` tooltip beside the trigger.
+ * Picks the side (above or below) with more viewport space and always leaves a gap
+ * so the panel does not cover the trigger; the panel's own `maxHeight` handles overflow.
  */
 export function positionFixedTooltip(triggerRect: DOMRectReadOnly, layout: FixedTooltipLayout): FixedTooltipPosition {
   const w = window.innerWidth;
   const h = window.innerHeight;
-  const { panelWidth, maxHeightVh } = layout;
-  const panelMaxHeightPx = h * (maxHeightVh / 100);
+  const { panelWidth } = layout;
   const safeMaxLeft = Math.max(VIEWPORT_MARGIN, w - panelWidth - VIEWPORT_MARGIN);
   const left = Math.max(VIEWPORT_MARGIN, Math.min(triggerRect.left, safeMaxLeft));
 
   const minTop = VIEWPORT_MARGIN;
-  const maxTop = Math.max(minTop, h - VIEWPORT_MARGIN - panelMaxHeightPx);
+  const maxBottom = h - VIEWPORT_MARGIN;
 
   const belowTop = triggerRect.bottom + GAP;
-  if (belowTop <= maxTop) {
+  const spaceBelow = maxBottom - belowTop;
+  const aboveAnchorTop = triggerRect.top - GAP;
+  const spaceAbove = aboveAnchorTop - minTop;
+
+  if (spaceBelow >= spaceAbove) {
     return { top: belowTop, left };
   }
 
-  const canFitAboveAtMaxHeight = triggerRect.top - GAP - panelMaxHeightPx >= minTop;
-  if (canFitAboveAtMaxHeight) {
-    return { top: triggerRect.top - GAP, left, transform: "translateY(-100%)" };
-  }
-
-  return { top: Math.max(minTop, Math.min(belowTop, maxTop)), left };
+  return { top: aboveAnchorTop, left, transform: "translateY(-100%)" };
 }
