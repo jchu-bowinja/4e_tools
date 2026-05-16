@@ -1914,7 +1914,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           </p>
           {mainWeaponSummary && mainHandWeapon && (
             <p style={{ margin: "0.15rem 0" }}>
-              <strong>Weapon (main):</strong> {mainHandWeapon.name} ? attack{" "}
+              <strong>Weapon (main):</strong> {mainHandWeapon.name} — attack{" "}
               {mainWeaponSummary.attackBonus >= 0 ? "+" : ""}
               {mainWeaponSummary.attackBonus} vs AC ({mainWeaponSummary.abilityCode}); damage {mainWeaponSummary.damageNotation}
               {!mainWeaponSummary.proficient && (
@@ -1924,7 +1924,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           )}
           {offHandWeaponSummary && offHandWeapon && (
             <p style={{ margin: "0.15rem 0" }}>
-              <strong>Weapon (off):</strong> {offHandWeapon.name} ? attack{" "}
+              <strong>Weapon (off):</strong> {offHandWeapon.name} — attack{" "}
               {offHandWeaponSummary.attackBonus >= 0 ? "+" : ""}
               {offHandWeaponSummary.attackBonus} vs AC ({offHandWeaponSummary.abilityCode}); damage {offHandWeaponSummary.damageNotation}
               {!offHandWeaponSummary.proficient && (
@@ -1934,7 +1934,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           )}
           {implementAttackSummary && equippedImplement && (
             <p style={{ margin: "0.15rem 0" }}>
-              <strong>Implement:</strong> {equippedImplement.name} ? attack{" "}
+              <strong>Implement:</strong> {equippedImplement.name} — attack{" "}
               {implementAttackSummary.attackBonus >= 0 ? "+" : ""}
               {implementAttackSummary.attackBonus} vs AC (best key ability)
               {!implementAttackSummary.proficient && (
@@ -2396,7 +2396,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem" }}>
                           <strong style={{ textDecoration: expended ? "line-through" : "none" }}>{power.name}</strong>
                           <span style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>
-                            Lv {power.level ?? 0} ? {power.usage || "-"}
+                            Lv {power.level ?? 0} — {power.usage || "-"}
                           </span>
                         </div>
                         {expended ? (
