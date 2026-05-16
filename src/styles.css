@@ -1670,8 +1670,7 @@ button.encounter-roster-stat-cards-expand-btn[aria-pressed="true"] .template-jso
   padding-bottom: 0.07rem;
 }
 
-.stat-score-table--compact .stat-score-table__stat-label-text,
-.stat-score-table--compact .stat-score-table__stat > span {
+.stat-score-table--compact .stat-score-table__stat > span:not(.stat-score-table__stat-label) {
   padding: 0.1rem 0.18rem !important;
 }
 
@@ -1684,15 +1683,57 @@ button.encounter-roster-stat-cards-expand-btn[aria-pressed="true"] .template-jso
 
 /* Defenses, speed, initiative: anchor total + label; clip component columns on the right. */
 .stat-score-table--prioritize-stat {
-  --stat-label-col: minmax(var(--stat-label-block-width, max-content), 1fr);
+  /* Label track min = longest label in this table; may grow with content but not shrink per row. */
+  --stat-label-col: minmax(var(--stat-label-min-width, max-content), max-content);
+  display: grid;
+  grid-template-columns: var(--stat-bonus-col) var(--stat-label-col) minmax(0, 1fr);
+  grid-auto-rows: min-content;
+  column-gap: var(--skill-col-gap);
+  align-items: start;
   container-type: inline-size;
   container-name: stat-score-table;
   overflow: hidden;
 }
 
+.stat-score-table--prioritize-stat .stat-score-table__breakdown,
+.stat-score-table--prioritize-stat .stat-score-table__breakdown-hdr {
+  display: grid;
+  grid-template-columns: var(--stat-score-comp-cols);
+  justify-content: end;
+  justify-self: stretch;
+  min-width: 0;
+  column-gap: var(--skill-col-gap);
+}
+
+.stat-score-table--prioritize-stat.stat-score-table--no-components {
+  grid-template-columns: var(--stat-bonus-col) var(--stat-label-col);
+}
+
 .stat-score-table--prioritize-stat .stat-score-table__header,
 .stat-score-table--prioritize-stat .stat-score-table__row {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+  align-items: center;
   overflow: hidden;
+}
+
+@supports not (grid-template-columns: subgrid) {
+  .stat-score-table--prioritize-stat .stat-score-table__header,
+  .stat-score-table--prioritize-stat .stat-score-table__row {
+    grid-template-columns: var(--stat-bonus-col) var(--stat-label-col) minmax(0, 1fr);
+  }
+
+  .stat-score-table--prioritize-stat.stat-score-table--no-components .stat-score-table__header,
+  .stat-score-table--prioritize-stat.stat-score-table--no-components .stat-score-table__row {
+    grid-template-columns: var(--stat-bonus-col) var(--stat-label-col);
+  }
+}
+
+.stat-score-table--prioritize-stat .stat-score-table__bonus,
+.stat-score-table--prioritize-stat .stat-score-table__stat,
+.stat-score-table--prioritize-stat .stat-score-table__comp {
+  align-self: center;
 }
 
 .stat-score-table--prioritize-stat .stat-score-table__bonus {
@@ -1707,27 +1748,94 @@ button.encounter-roster-stat-cards-expand-btn[aria-pressed="true"] .template-jso
   overflow: visible;
 }
 
+.stat-score-table--prioritize-stat .stat-score-table__stat-label {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.stat-score-table--prioritize-stat .stat-score-table__stat {
+  min-width: 0;
+}
+
 .stat-score-table--prioritize-stat .stat-score-table__stat-label-text {
-  display: inline-block;
+  display: block;
   box-sizing: border-box;
-  width: max-content;
-  min-width: var(--stat-label-block-width, max-content);
-  max-width: max-content;
+  width: 100%;
+  min-width: var(--stat-label-min-width, max-content);
+  max-width: 100%;
+  line-height: 1.15;
+  vertical-align: middle;
   overflow: visible;
   text-overflow: clip;
   white-space: nowrap;
   background-color: var(--stat-row-bg, var(--surface-0));
-  padding-right: 0.3rem;
+  padding: 0.1rem 0.28rem 0.1rem 0.18rem;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
 
+/* Defenses: pill-width label stripe; column gap shows before Base + ½ Lvl (not full-cell fill). */
+.stat-score-table--prioritize-stat:not(.stat-score-table--compact) .stat-score-table__stat-label {
+  width: max-content;
+  max-width: 100%;
+}
+
+.stat-score-table--prioritize-stat:not(.stat-score-table--compact) .stat-score-table__stat-label-text {
+  width: max-content;
+  min-width: var(--stat-label-min-width, max-content);
+}
+
+/* Keep the label header cell in the grid when empty (speed/initiative) so columns line up. */
+.stat-score-table--prioritize-stat .stat-score-table__stat-hdr:empty {
+  visibility: hidden;
+}
+
 .stat-score-table--prioritize-stat .stat-score-table__stat-hdr {
-  display: inline-block;
+  display: block;
   box-sizing: border-box;
-  min-width: var(--stat-label-block-width, auto);
+  width: max-content;
+  min-width: var(--stat-label-min-width, max-content);
+  max-width: 100%;
+  line-height: 1.15;
   background-color: var(--surface-0);
-  padding-right: 0.3rem;
+  padding: 0.1rem 0.28rem 0.1rem 0.18rem;
+}
+
+/* Speed + initiative: label column grows until the Race column; component cols stay aligned. */
+.stat-score-table--compact.stat-score-table--prioritize-stat {
+  --stat-label-col: minmax(var(--stat-label-min-width, max-content), 1fr);
+  grid-template-columns: var(--stat-bonus-col) var(--stat-label-col) var(--stat-score-comp-cols);
+}
+
+.stat-score-table--compact.stat-score-table--prioritize-stat .stat-score-table__breakdown,
+.stat-score-table--compact.stat-score-table--prioritize-stat .stat-score-table__breakdown-hdr {
+  display: contents;
+}
+
+@supports not (grid-template-columns: subgrid) {
+  .stat-score-table--compact.stat-score-table--prioritize-stat .stat-score-table__header,
+  .stat-score-table--compact.stat-score-table--prioritize-stat .stat-score-table__row {
+    grid-template-columns: var(--stat-bonus-col) var(--stat-label-col) var(--stat-score-comp-cols);
+  }
+}
+
+.stat-score-table--compact.stat-score-table--prioritize-stat .stat-score-table__stat-hdr {
+  width: 100%;
+}
+
+/* Motion (speed + initiative): match defenses row density; fill label column to Race. */
+.stat-score-table--compact.stat-score-table--prioritize-stat .stat-score-table__stat-label {
+  width: 100%;
+}
+
+.stat-score-table--compact.stat-score-table--prioritize-stat .stat-score-table__stat-label-text,
+.stat-score-table--compact.stat-score-table--prioritize-stat .stat-score-table__stat-hdr {
+  padding: 0.07rem 0.22rem 0.07rem 0.15rem;
+}
+
+.stat-score-table--compact.stat-score-table--prioritize-stat .stat-score-table__stat-label-text {
+  width: 100%;
 }
 
 .stat-score-table--prioritize-stat .stat-score-table__comp {

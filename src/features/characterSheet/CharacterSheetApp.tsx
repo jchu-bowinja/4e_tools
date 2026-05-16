@@ -1636,8 +1636,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         style={{
           fontWeight: 600,
           color: "var(--text-primary)",
-          padding: "0.12rem 0.2rem",
-          ...(stripe !== "transparent" ? { backgroundColor: stripe, borderRadius: "0.2rem" } : {}),
           whiteSpace: "nowrap"
         }}
       >

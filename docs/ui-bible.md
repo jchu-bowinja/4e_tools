@@ -112,9 +112,11 @@ Use the shared **`CollapsibleDisclosure`** and **`CollapsibleDisclosureArrow`** 
 Character-sheet style breakdown tables show a **total** in the leading column, a **row label** (skill name, defense name, etc.), then **component columns** for the math.
 
 - **Prioritize the total and the row label.** Those two columns are the anchors users scan first. They must stay readable when the panel is narrow or when many component columns are present.
+- **Align breakdown columns on the longest label.** Every row in a table must share the **same** label-column track, with a **minimum** width equal to the longest row label (and the stat-column header when shown, e.g. `DEFENSE`). Short labels such as `AC` or `Speed` must not use a narrower track than `Fortitude` or `Initiative`; otherwise component values appear jagged row to row when the panel is narrow or resized. Do not give each row its own `max-content` or `1fr` label track.
 - **Narrow panels:** clip or hide content on the **right** (component columns), not by overlapping labels onto the math. Do not add a horizontal scrollbar on the whole table.
-- **Skills** (`SkillModifierTable`): bonus and skill name stay in the left columns; the name column is at least as wide as the longest skill name in the list; modifier columns fall off the right edge when space is tight.
-- **Defenses, speed, initiative** (`StatScoreTable` with `prioritizeStatLabel` where needed): green total and row label stay visible; measured label width prevents crushing the name; component columns clip on the right.
+- **Skills** (`SkillModifierTable`): bonus and skill name stay in the left columns; `--skill-name-block-width` is the max measured name width; modifier columns share one grid and fall off the right edge when space is tight.
+- **Defenses** (`StatScoreTable` with `prioritizeStatLabel`): green total and row label stay visible; `--stat-label-min-width` is the measured longest label in that table; the label track is `minmax(that minimum, max-content)`; component columns live in a flexible third track and **right-align** as a group when the panel is wide; component columns clip on the right when narrow.
+- **Speed + initiative** (`stat-score-table--compact` + `prioritizeStatLabel`): same label minimum and shared `subgrid` alignment; the label track is `minmax(that minimum, 1fr)` so the Speed/Initiative column **fills** the space up to the Race column (no empty gap); component columns clip on the right when narrow.
 - **Component columns** are secondary; do not sacrifice total or label legibility to keep every header on one line.
 - Reuse `StatScoreTable` / `SkillModifierTable` and shared score cell styling (`scoreTableCells`) rather than one-off breakdown layouts.
 

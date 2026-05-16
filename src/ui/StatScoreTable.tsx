@@ -61,6 +61,27 @@ function measureNaturalWidth(el: HTMLElement): number {
   return width;
 }
 
+/** Synchronous fallback so every row shares one label min-width before DOM measure runs. */
+function estimateLabelMinWidth(rows: StatScoreRowDef[], statHeader: string | null, fontSize: string): number {
+  const labels = rows.map((row) => row.label);
+  if (statHeader) labels.push(statHeader);
+  if (labels.length === 0) return 0;
+  if (typeof document === "undefined") {
+    const longest = labels.reduce((max, label) => Math.max(max, label.length), 0);
+    return longest * 7.5 + 20;
+  }
+  const probe = document.createElement("span");
+  probe.style.cssText = `position:absolute;visibility:hidden;white-space:nowrap;font-weight:600;font-size:${fontSize};padding:0.12rem 0.3rem 0.12rem 0.2rem;`;
+  document.body.appendChild(probe);
+  let max = 0;
+  for (const label of labels) {
+    probe.textContent = label;
+    max = Math.max(max, probe.getBoundingClientRect().width);
+  }
+  document.body.removeChild(probe);
+  return max;
+}
+
 export type StatScoreTableProps = {
   columns: StatScoreColumnDef[];
   rows: StatScoreRowDef[];
@@ -94,9 +115,15 @@ export function StatScoreTable({
   className
 }: StatScoreTableProps) {
   const tableRef = useRef<HTMLDivElement>(null);
-  const [labelBlockWidth, setLabelBlockWidth] = useState<number | null>(null);
+  const estimatedLabelMinWidth = prioritizeStatLabel ? estimateLabelMinWidth(rows, statHeader, fontSize) : 0;
+  const [labelMinWidth, setLabelMinWidth] = useState<number | null>(() =>
+    prioritizeStatLabel && estimatedLabelMinWidth > 0 ? estimatedLabelMinWidth : null
+  );
 
   const compCols = columns.map((col) => col.width ?? defaultStatColumnWidth(col.header)).join(" ");
+  const fillLabelColumn =
+    prioritizeStatLabel &&
+    (className?.split(/\s+/).some((token) => token === "stat-score-table--compact") ?? false);
 
   useLayoutEffect(() => {
     if (!prioritizeStatLabel) return;
@@ -105,22 +132,20 @@ export function StatScoreTable({
 
     const measure = () => {
       // Measure label text only — the parent .stat-score-table__stat-label stretches with the
-      // 1fr grid track and would inflate --stat-label-block-width when the panel is narrow.
-      root.style.removeProperty("--stat-label-block-width");
-      const nodes = root.querySelectorAll<HTMLElement>(".stat-score-table__stat-label-text");
-      if (nodes.length === 0) return;
-      let max = 0;
+      root.style.removeProperty("--stat-label-min-width");
+      const nodes = root.querySelectorAll<HTMLElement>(".stat-score-table__stat-label-text, .stat-score-table__stat-hdr");
+      let max = estimatedLabelMinWidth;
       for (const node of nodes) {
         max = Math.max(max, measureNaturalWidth(node));
       }
-      setLabelBlockWidth(max > 0 ? max : null);
+      setLabelMinWidth(max > 0 ? max : null);
     };
 
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(root);
     return () => observer.disconnect();
-  }, [rows, fontSize, renderLabel, prioritizeStatLabel]);
+  }, [rows, fontSize, renderLabel, prioritizeStatLabel, statHeader, estimatedLabelMinWidth]);
 
   const tableStyle: CSSProperties = {
     fontSize,
@@ -128,8 +153,8 @@ export function StatScoreTable({
     minWidth: 0,
     width: "100%",
     ["--stat-score-comp-cols" as string]: compCols,
-    ...(prioritizeStatLabel && labelBlockWidth != null && labelBlockWidth > 0
-      ? { ["--stat-label-block-width" as string]: `${labelBlockWidth}px` }
+    ...(prioritizeStatLabel && labelMinWidth != null && labelMinWidth > 0
+      ? { ["--stat-label-min-width" as string]: `${labelMinWidth}px` }
       : {})
   };
 
@@ -163,8 +188,11 @@ export function StatScoreTable({
         ) : null}
       </div>
       {rows.map((row, idx) => {
-        const stripe =
-          rowStripe && idx % 2 === 0 ? "var(--table-stripe-even)" : rowStripe ? "var(--table-stripe-odd)" : "transparent";
+        const stripe = !rowStripe
+          ? "transparent"
+          : idx % 2 === 0
+            ? "var(--table-stripe-even)"
+            : "var(--table-stripe-odd)";
         const totalText = formatScoreTotalDisplay(row.total, row.signedTotal ?? false);
         const labelInner = renderLabel ? (
           renderLabel(row, stripe)
@@ -177,8 +205,10 @@ export function StatScoreTable({
           </span>
         );
         const labelNode = prioritizeStatLabel ? (
-          <span className="stat-score-table__stat-label" style={{ minWidth: 0, ...labelRowBgStyle(stripe) }}>
-            <span className="stat-score-table__stat-label-text">{labelInner}</span>
+          <span className="stat-score-table__stat-label" style={{ minWidth: 0 }}>
+            <span className="stat-score-table__stat-label-text" style={labelRowBgStyle(stripe)}>
+              {labelInner}
+            </span>
           </span>
         ) : (
           <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", ...stripeStyle(stripe) }}>
@@ -191,7 +221,14 @@ export function StatScoreTable({
             <span className="stat-score-table__bonus" style={stripeStyle(stripe)}>
               <ScoreModCell value={totalText} emphasize />
             </span>
-            <span className="stat-score-table__stat" style={{ minWidth: 0, paddingLeft: "0.1rem", ...labelRowBgStyle(stripe) }}>
+            <span
+              className="stat-score-table__stat"
+              style={{
+                minWidth: 0,
+                paddingLeft: "0.1rem",
+                ...(prioritizeStatLabel ? (fillLabelColumn ? stripeStyle(stripe) : {}) : labelRowBgStyle(stripe))
+              }}
+            >
               {labelNode}
             </span>
             {showComponents ? (
