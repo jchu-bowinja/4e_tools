@@ -18,6 +18,7 @@ export interface InventoryItem {
 export interface CharacterSheetResources {
   currentHp: number;
   tempHp: number;
+  actionPoints: number;
   surgesRemaining: number;
   deathSaves: number;
   conditions: string[];

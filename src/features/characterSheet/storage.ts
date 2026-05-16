@@ -50,6 +50,7 @@ function normalizeState(input: unknown): CharacterSheetState {
     resources: {
       currentHp: clampInt(v.resources?.currentHp, Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, fallback.resources.currentHp),
       tempHp: clampInt(v.resources?.tempHp, 0, 999, fallback.resources.tempHp),
+      actionPoints: clampInt(v.resources?.actionPoints, 0, 9, fallback.resources.actionPoints),
       surgesRemaining: clampInt(v.resources?.surgesRemaining, 0, 99, fallback.resources.surgesRemaining),
       deathSaves: clampInt(v.resources?.deathSaves, 0, 3, fallback.resources.deathSaves),
       conditions: Array.isArray(v.resources?.conditions)

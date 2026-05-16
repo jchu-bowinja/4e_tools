@@ -108,6 +108,7 @@ const state: CharacterSheetState = {
   resources: {
     currentHp: 10,
     tempHp: 0,
+    actionPoints: 0,
     surgesRemaining: 5,
     deathSaves: 0,
     conditions: []
@@ -218,6 +219,7 @@ describe("computeSheetDerivedData", () => {
       resources: {
         currentHp: 1,
         tempHp: 0,
+        actionPoints: 0,
         surgesRemaining: 1,
         deathSaves: 0,
         conditions: []

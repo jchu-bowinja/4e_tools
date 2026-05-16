@@ -28,6 +28,7 @@ export const SHEET_CORE_UI_TERMS: Record<
   | "level"
   | "hp"
   | "tempHp"
+  | "actionPoints"
   | "surges"
   | "surgeValue"
   | "bloodied"
@@ -50,6 +51,7 @@ export const SHEET_CORE_UI_TERMS: Record<
   level: ["Level"],
   hp: ["Hit Points", "HP"],
   tempHp: ["Temporary Hit Points", "Temp HP"],
+  actionPoints: ["Action Point", "Action Points"],
   surges: ["Healing Surges", "Healing Surge"],
   surgeValue: ["Surge Value", "Healing Surge Value"],
   bloodied: ["Bloodied"],

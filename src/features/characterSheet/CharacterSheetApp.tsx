@@ -1,4 +1,4 @@
-import {
+﻿import {
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -41,13 +41,6 @@ const panelStyle: CSSProperties = {
 
 /** Overview column 2 (feats + HP); wide enough for the rest strip without its own scrollbar. */
 const OVERVIEW_CENTER_COLUMN_MIN_WIDTH = "26rem";
-/** HP panel col 1 (hit points, death saves). */
-const HP_PANEL_PRIMARY_COLUMN_MIN_WIDTH = "7.5rem";
-/** HP panel col 2 (temp HP). */
-const HP_PANEL_TEMP_HP_COLUMN_MIN_WIDTH = "7.5rem";
-/** HP panel col 3 (rest); wider for stacked rest buttons. */
-const HP_PANEL_SIDE_COLUMN_MIN_WIDTH = "8rem";
-
 const overviewSideColumnStyle: CSSProperties = {
   display: "grid",
   gap: "0.5rem",
@@ -129,6 +122,14 @@ const hpPanelResourceFieldBoxStyle: CSSProperties = {
   borderRadius: "0.3rem",
   backgroundColor: "var(--surface-1)",
   minWidth: 0
+};
+
+/** Lets grid columns shrink below min-content width (Temp HP, Action Pts, Death Saves, Healing Surges). */
+const hpPanelShrinkableBoxStyle: CSSProperties = {
+  minWidth: 0,
+  maxWidth: "100%",
+  width: "100%",
+  boxSizing: "border-box"
 };
 
 const hpPanelResourceSuffixStyle: CSSProperties = {
@@ -317,8 +318,42 @@ function numericInputWidthCh(...values: number[]): string {
     const digits = String(Math.max(0, Math.trunc(value))).length;
     return Math.max(max, digits);
   }, 1);
-  // Number inputs include spinner controls, so reserve extra width for arrows.
-  return `calc(${Math.max(6, longest + 3)}ch + 4px)`;
+  return `calc(${Math.max(4, longest + 1)}ch + 4px)`;
+}
+
+function NumberStepButtons(props: {
+  value: number;
+  onChange: (next: number) => void;
+  min?: number;
+  max?: number;
+  ariaLabel: string;
+}): JSX.Element {
+  const min = props.min ?? 0;
+  const max = props.max ?? Number.MAX_SAFE_INTEGER;
+  const value = clamp(props.value, min, max);
+
+  return (
+    <div className="adjustable-number-stepper" role="group" aria-label={`${props.ariaLabel} adjustment`}>
+      <button
+        type="button"
+        className="adjustable-number-step-btn"
+        disabled={value >= max}
+        onClick={() => props.onChange(clamp(value + 1, min, max))}
+        aria-label={`Increase ${props.ariaLabel}`}
+      >
+        +
+      </button>
+      <button
+        type="button"
+        className="adjustable-number-step-btn"
+        disabled={value <= min}
+        onClick={() => props.onChange(clamp(value - 1, min, max))}
+        aria-label={`Decrease ${props.ariaLabel}`}
+      >
+        −
+      </button>
+    </div>
+  );
 }
 
 const GLOSSARY_CONDITION_OPTIONS = [
@@ -493,7 +528,8 @@ function DeathSaveCheckboxes(props: { value: number; onChange: (next: number) =>
         gap: "0.35rem",
         rowGap: "0.25rem",
         alignItems: "center",
-        marginTop: "0.1rem"
+        marginTop: "0.1rem",
+        minWidth: 0
       }}
     >
       {[0, 1, 2].map((idx) => (
@@ -505,7 +541,8 @@ function DeathSaveCheckboxes(props: { value: number; onChange: (next: number) =>
             gap: "0.2rem",
             fontSize: "0.78rem",
             color: "var(--text-secondary)",
-            flexShrink: 0
+            flexShrink: 1,
+            minWidth: 0
           }}
         >
           <input
@@ -528,6 +565,7 @@ type GlossaryKey =
   | "level"
   | "hp"
   | "tempHp"
+  | "actionPoints"
   | "surges"
   | "surgeValue"
   | "bloodied"
@@ -891,6 +929,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         ...prev.resources,
         currentHp: derived.maxHp,
         tempHp: 0,
+        actionPoints: 1,
         surgesRemaining: derived.healingSurgesPerDay,
         deathSaves: 0
       },
@@ -1009,33 +1048,21 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     };
 
     return (
-      <div
-        style={{
-          border: "1px solid var(--panel-border)",
-          borderRadius: "0.35rem",
-          padding: "0.5rem",
-          backgroundColor: "var(--surface-0)",
-          display: "grid",
-          gap: "0.35rem",
-          minWidth: 0,
-          maxWidth: "100%",
-          boxSizing: "border-box"
-        }}
-      >
+      <>
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: `minmax(${HP_PANEL_PRIMARY_COLUMN_MIN_WIDTH}, 1fr) minmax(${HP_PANEL_TEMP_HP_COLUMN_MIN_WIDTH}, 1fr) minmax(${HP_PANEL_SIDE_COLUMN_MIN_WIDTH}, 1fr)`,
-            gridTemplateRows: "auto auto",
+            gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
             gap: "0.35rem",
-            alignItems: "stretch"
+            alignItems: "stretch",
+            minWidth: 0,
+            maxWidth: "100%",
+            boxSizing: "border-box"
           }}
         >
           <label
             style={{
               ...labelStyle,
-              gridColumn: 1,
-              gridRow: 1,
               padding: "0.28rem 0.35rem",
               border: "1px solid var(--panel-border)",
               borderRadius: "0.3rem",
@@ -1080,8 +1107,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           <label
             style={{
               ...labelStyle,
-              gridColumn: 2,
-              gridRow: 1,
+              ...hpPanelShrinkableBoxStyle,
               padding: "0.28rem 0.35rem",
               border: "1px solid var(--panel-border)",
               borderRadius: "0.3rem",
@@ -1120,8 +1146,98 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           <label
             style={{
               ...labelStyle,
-              gridColumn: 1,
-              gridRow: 2,
+              ...hpPanelShrinkableBoxStyle,
+              padding: "0.28rem 0.35rem",
+              border: "1px solid var(--panel-border)",
+              borderRadius: "0.3rem",
+              backgroundColor: "var(--surface-0)"
+            }}
+          >
+            <span
+              tabIndex={0}
+              onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "actionPoints")}
+              onMouseLeave={glossaryTooltipUi.leaveHover}
+              onFocus={(event) => glossaryTooltipUi.startHover(event, "actionPoints")}
+              onBlur={glossaryTooltipUi.leaveHover}
+            >
+              Action Pts
+            </span>
+            <input
+              type="number"
+              min={0}
+              max={9}
+              value={sheet.resources.actionPoints}
+              onChange={(e) =>
+                updateSheet((prev) => ({
+                  ...prev,
+                  resources: {
+                    ...prev.resources,
+                    actionPoints: clamp(Number(e.target.value) || 0, 0, 9)
+                  }
+                }))
+              }
+              aria-label="Action points"
+              style={{
+                width: numericInputWidthCh(sheet.resources.actionPoints, 9),
+                textAlign: "center",
+                ...resourceStripNumberInputStyle
+              }}
+            />
+          </label>
+          <div
+            style={{
+              ...hpPanelControlBoxStyle,
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              gap: "0.22rem"
+            }}
+          >
+            <button
+              type="button"
+              onClick={applyShortRest}
+              onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "shortRest")}
+              onMouseLeave={glossaryTooltipUi.leaveHover}
+              onFocus={(event) => glossaryTooltipUi.startHover(event, "shortRest")}
+              onBlur={glossaryTooltipUi.leaveHover}
+              style={restButtonStyle}
+            >
+              Short rest
+            </button>
+            <button
+              type="button"
+              onClick={applyLongRest}
+              onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "extendedRest")}
+              onMouseLeave={glossaryTooltipUi.leaveHover}
+              onFocus={(event) => glossaryTooltipUi.startHover(event, "extendedRest")}
+              onBlur={glossaryTooltipUi.leaveHover}
+              style={{
+                ...restButtonStyle,
+                border: "1px solid var(--panel-border-strong, var(--panel-border))",
+                backgroundColor: "var(--surface-2)",
+                fontWeight: 700
+              }}
+            >
+              Long rest
+            </button>
+          </div>
+        </div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1fr) minmax(0, 2fr)",
+            gap: "0.35rem",
+            alignItems: "stretch",
+            marginTop: "0.35rem",
+            minWidth: 0,
+            maxWidth: "100%",
+            boxSizing: "border-box"
+          }}
+        >
+          <label
+            style={{
+              ...labelStyle,
+              ...hpPanelShrinkableBoxStyle,
               padding: "0.28rem 0.35rem",
               border: "1px solid var(--panel-border)",
               borderRadius: "0.3rem",
@@ -1129,8 +1245,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               alignSelf: "stretch",
               display: "grid",
               alignContent: "start",
-              gap: "0.2rem",
-              overflow: "visible"
+              gap: "0.2rem"
             }}
           >
             <span
@@ -1158,8 +1273,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           <div
             style={{
               ...hpPanelResourceFieldBoxStyle,
-              gridColumn: "2 / span 2",
-              gridRow: 2,
+              ...hpPanelShrinkableBoxStyle,
               display: "grid",
               gap: "0.2rem",
               alignContent: "start"
@@ -1256,47 +1370,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               </div>
             </div>
           </div>
-          <div
-            style={{
-              ...hpPanelControlBoxStyle,
-              gridColumn: 3,
-              gridRow: 1,
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "center",
-              gap: "0.22rem"
-            }}
-          >
-            <button
-              type="button"
-              onClick={applyShortRest}
-              onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "shortRest")}
-              onMouseLeave={glossaryTooltipUi.leaveHover}
-              onFocus={(event) => glossaryTooltipUi.startHover(event, "shortRest")}
-              onBlur={glossaryTooltipUi.leaveHover}
-              style={restButtonStyle}
-            >
-              Short rest
-            </button>
-            <button
-              type="button"
-              onClick={applyLongRest}
-              onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "extendedRest")}
-              onMouseLeave={glossaryTooltipUi.leaveHover}
-              onFocus={(event) => glossaryTooltipUi.startHover(event, "extendedRest")}
-              onBlur={glossaryTooltipUi.leaveHover}
-              style={{
-                ...restButtonStyle,
-                border: "1px solid var(--panel-border-strong, var(--panel-border))",
-                backgroundColor: "var(--surface-2)",
-                fontWeight: 700
-              }}
-            >
-              Long rest
-            </button>
-          </div>
         </div>
-      </div>
+      </>
     );
   }
 

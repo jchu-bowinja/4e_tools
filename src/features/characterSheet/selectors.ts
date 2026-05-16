@@ -256,6 +256,7 @@ export function sheetStateFromBuild(build: CharacterBuild, index: RulesIndex): C
     resources: {
       currentHp: 1,
       tempHp: 0,
+      actionPoints: 0,
       surgesRemaining: 1,
       deathSaves: 0,
       conditions: []
@@ -353,6 +354,7 @@ export function sheetStateFromBuild(build: CharacterBuild, index: RulesIndex): C
     resources: {
       currentHp: derived.maxHp,
       tempHp: 0,
+      actionPoints: 0,
       surgesRemaining: derived.healingSurgesPerDay,
       deathSaves: 0,
       conditions: []

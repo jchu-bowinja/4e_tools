@@ -17,6 +17,7 @@ export function createDefaultCharacterSheetState(): CharacterSheetState {
     resources: {
       currentHp: 1,
       tempHp: 0,
+      actionPoints: 0,
       surgesRemaining: 1,
       deathSaves: 0,
       conditions: []
