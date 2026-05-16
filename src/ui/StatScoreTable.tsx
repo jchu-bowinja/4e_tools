@@ -68,13 +68,15 @@ export type StatScoreTableProps = {
   fontSize?: string;
   /** Default "Bonus"; pass `null` to hide the bonus column header. */
   bonusHeader?: string | null;
-  /** Default "Stat". */
-  statHeader?: string;
+  /** Default "Stat"; pass `null` to hide the stat column header. */
+  statHeader?: string | null;
   /**
    * Keep the total score and row label readable when component columns crowd the layout
    * (same principle as the skills modifier table).
    */
   prioritizeStatLabel?: boolean;
+  /** When false, only total and row label are shown (no component columns). */
+  showComponents?: boolean;
   renderLabel?: (row: StatScoreRowDef, stripe: string) => ReactNode;
 };
 
@@ -86,15 +88,13 @@ export function StatScoreTable({
   bonusHeader = "Bonus",
   statHeader = "Stat",
   prioritizeStatLabel = false,
+  showComponents = true,
   renderLabel
 }: StatScoreTableProps) {
   const tableRef = useRef<HTMLDivElement>(null);
   const [labelBlockWidth, setLabelBlockWidth] = useState<number | null>(null);
 
   const compCols = columns.map((col) => col.width ?? defaultStatColumnWidth(col.header)).join(" ");
-  const gridColumns = prioritizeStatLabel
-    ? undefined
-    : `minmax(2.35rem, max-content) minmax(0, 1fr) ${compCols}`;
 
   useLayoutEffect(() => {
     if (!prioritizeStatLabel) return;
@@ -122,27 +122,19 @@ export function StatScoreTable({
     fontVariantNumeric: "tabular-nums",
     minWidth: 0,
     width: "100%",
-    ...(prioritizeStatLabel
-      ? ({
-          ["--stat-score-comp-cols" as string]: compCols,
-          ...(labelBlockWidth != null && labelBlockWidth > 0
-            ? { ["--stat-label-block-width" as string]: `${labelBlockWidth}px` }
-            : {})
-        } as CSSProperties)
+    ["--stat-score-comp-cols" as string]: compCols,
+    ...(prioritizeStatLabel && labelBlockWidth != null && labelBlockWidth > 0
+      ? { ["--stat-label-block-width" as string]: `${labelBlockWidth}px` }
       : {})
   };
-
-  const rowGridStyle: CSSProperties | undefined = gridColumns
-    ? { display: "grid", gridTemplateColumns: gridColumns, columnGap: "var(--skill-col-gap, 0.2rem)", alignItems: "center" }
-    : undefined;
 
   return (
     <div
       ref={tableRef}
-      className={`stat-score-table${prioritizeStatLabel ? " stat-score-table--prioritize-stat" : ""}`}
+      className={`stat-score-table${prioritizeStatLabel ? " stat-score-table--prioritize-stat" : ""}${showComponents ? "" : " stat-score-table--no-components"}`}
       style={tableStyle}
     >
-      <div className="stat-score-table__header" style={{ ...rowGridStyle, marginBottom: "0.08rem" }}>
+      <div className="stat-score-table__header">
         <span
           className="stat-score-table__bonus-hdr stat-score-table__hdr"
           style={{ paddingRight: "var(--skill-bonus-name-gap, 0.4rem)" }}
@@ -150,16 +142,20 @@ export function StatScoreTable({
         >
           {bonusHeader !== null ? <HeaderStack lines={[bonusHeader]} /> : null}
         </span>
-        <span className="stat-score-table__stat-hdr stat-score-table__hdr">{statHeader}</span>
-        <div className="stat-score-table__breakdown-hdr">
-          {columns.map((col) => (
-            <HeaderStack
-              key={col.key}
-              className="stat-score-table__hdr"
-              lines={Array.isArray(col.header) ? col.header : [col.header]}
-            />
-          ))}
-        </div>
+        <span className="stat-score-table__stat-hdr stat-score-table__hdr" aria-hidden={statHeader === null}>
+          {statHeader !== null ? statHeader : null}
+        </span>
+        {showComponents ? (
+          <div className="stat-score-table__breakdown-hdr">
+            {columns.map((col) => (
+              <HeaderStack
+                key={col.key}
+                className="stat-score-table__hdr"
+                lines={Array.isArray(col.header) ? col.header : [col.header]}
+              />
+            ))}
+          </div>
+        ) : null}
       </div>
       {rows.map((row, idx) => {
         const stripe =
@@ -186,20 +182,22 @@ export function StatScoreTable({
         );
 
         return (
-          <div key={row.rowKey} className="stat-score-table__row" style={{ ...rowGridStyle, marginTop: idx > 0 ? "0.04rem" : 0 }}>
+          <div key={row.rowKey} className="stat-score-table__row">
             <span className="stat-score-table__bonus" style={stripeStyle(stripe)}>
               <ScoreModCell value={totalText} emphasize />
             </span>
             <span className="stat-score-table__stat" style={{ minWidth: 0, paddingLeft: "0.1rem", ...labelRowBgStyle(stripe) }}>
               {labelNode}
             </span>
-            <div className="stat-score-table__breakdown">
-              {columns.map((col) => (
-                <span key={col.key} className="stat-score-table__comp" style={stripeStyle(stripe)}>
-                  <ScoreModCell value={formatScoreComponentDisplay(row.values[col.key])} />
-                </span>
-              ))}
-            </div>
+            {showComponents ? (
+              <div className="stat-score-table__breakdown">
+                {columns.map((col) => (
+                  <span key={col.key} className="stat-score-table__comp" style={stripeStyle(stripe)}>
+                    <ScoreModCell value={formatScoreComponentDisplay(row.values[col.key])} />
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
         );
       })}

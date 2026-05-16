@@ -56,15 +56,8 @@ import { parseRacialTraitIdsFromRace, resolveRacialTraitsForRace } from "../../r
 import { getClassBuildOptions } from "../../rules/classBuildOptions";
 import { autoGrantedTrainedSkillIds } from "../../rules/grantedSkillsQuery";
 import { computeSkillSheetRows } from "../../rules/skillCalculator";
-import {
-  buildAcScoreComponents,
-  DEFENSE_SCORE_COLUMNS,
-  defenseRowValues,
-  MOTION_INITIATIVE_COLUMNS,
-  MOTION_SPEED_COLUMNS,
-  motionRowValues
-} from "../../rules/statScoreBreakdown";
-import { SkillModifierTable } from "../../ui/SkillModifierTable";
+import { DEFENSE_SCORE_COLUMNS, MOTION_INITIATIVE_COLUMNS } from "../../rules/statScoreBreakdown";
+import { SkillModifierNameContent, SkillModifierTable } from "../../ui/SkillModifierTable";
 import { StatScoreTable } from "../../ui/StatScoreTable";
 import { multiclassFeatIds } from "../../rules/multiclassDetection";
 import { pruneStalePowerSelections } from "../../rules/powerSelections";
@@ -2961,9 +2954,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     <label
                       className="skill-modifier-table__name-label"
                       style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.35rem",
                         cursor: canInteract ? "pointer" : "default",
                         fontWeight: trainable || checked ? 600 : 400,
                         padding: "0.12rem 0.2rem",
@@ -2985,22 +2975,20 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                           updateBuild({ ...build, trainedSkillIds: next });
                         }}
                       />
-                      <span
-                        className="skill-modifier-table__name-text"
+                      <SkillModifierNameContent
+                        row={row}
                         {...glossaryTooltipUi.hoverA11y(`skill:${skill.id}`)}
-                        style={{ minWidth: 0 }}
-                      >
-                        {row.name}
-                        {row.abilityCode ? (
-                          <span style={{ marginLeft: "0.35rem", fontWeight: 700, fontSize: "0.68rem", color: "var(--text-secondary)" }}>{row.abilityCode}</span>
-                        ) : null}
-                        {autoGranted ? (
-                          <span style={{ marginLeft: "0.35rem", fontSize: "0.72rem", color: "var(--status-success)", fontWeight: 600 }}>auto</span>
-                        ) : null}
-                        {!trainable && selectedClass ? (
-                          <span style={{ marginLeft: "0.35rem", fontSize: "0.72rem", color: "var(--text-muted)" }}>off-list</span>
-                        ) : null}
-                      </span>
+                        trailing={
+                          <>
+                            {autoGranted ? (
+                              <span style={{ marginLeft: "0.35rem", fontSize: "0.72rem", color: "var(--status-success)", fontWeight: 600 }}>auto</span>
+                            ) : null}
+                            {!trainable && selectedClass ? (
+                              <span style={{ marginLeft: "0.35rem", fontSize: "0.72rem", color: "var(--text-muted)" }}>off-list</span>
+                            ) : null}
+                          </>
+                        }
+                      />
                     </label>
                   );
                 }}
@@ -4436,34 +4424,31 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             <p style={{ margin: "0 0 0.4rem 0", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--text-secondary)", textTransform: "uppercase" }}>
               Combat Stats
             </p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "0.5rem 0.75rem", alignItems: "start" }}>
-              <div style={{ display: "grid", gap: "0.35rem", minWidth: 0 }}>
+            <div style={{ display: "grid", gap: "0.35rem", minWidth: 0 }}>
                 <p style={{ margin: 0, fontSize: "0.88rem" }}>
                   <strong {...glossaryTooltipUi.hoverA11y("hp")}>HP:</strong> {derived.maxHp}
                 </p>
-                <StatScoreTable
-                  fontSize="0.82rem"
-                  columns={MOTION_SPEED_COLUMNS}
-                  rowStripe={false}
-                  rows={[
-                    {
-                      rowKey: "speed",
-                      label: "Speed",
-                      glossaryKey: "speed",
-                      total: derived.speed,
-                      values: motionRowValues(derived.speedBreakdown.components, MOTION_SPEED_COLUMNS.map((c) => c.key))
-                    }
-                  ]}
-                  renderLabel={(row) => (
-                    <strong {...glossaryTooltipUi.hoverA11y(row.glossaryKey ?? row.rowKey)} style={{ fontSize: "0.82rem" }}>
-                      {row.label}
-                    </strong>
-                  )}
-                />
+                <p style={{ margin: 0, fontSize: "0.88rem" }}>
+                  <strong {...glossaryTooltipUi.hoverA11y("surges")}>Healing Surges:</strong> {derived.healingSurgesPerDay}
+                </p>
+                <p style={{ margin: 0, fontSize: "0.88rem" }}>
+                  <strong {...glossaryTooltipUi.hoverA11y("surgeValue")}>Surge Value:</strong> {derived.surgeValue}
+                </p>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+                  gap: "0.35rem 0.75rem",
+                  alignItems: "start"
+                }}
+              >
                 <StatScoreTable
                   fontSize="0.82rem"
                   columns={MOTION_INITIATIVE_COLUMNS}
-                  rowStripe={false}
+                  bonusHeader={null}
+                  statHeader={null}
+                  prioritizeStatLabel
+                  showComponents={false}
                   rows={[
                     {
                       rowKey: "initiative",
@@ -4471,7 +4456,14 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                       glossaryKey: "initiative",
                       total: derived.initiative,
                       signedTotal: true,
-                      values: motionRowValues(derived.initiativeBreakdown.components, MOTION_INITIATIVE_COLUMNS.map((c) => c.key))
+                      values: {}
+                    },
+                    {
+                      rowKey: "speed",
+                      label: "Speed",
+                      glossaryKey: "speed",
+                      total: derived.speed,
+                      values: {}
                     }
                   ]}
                   renderLabel={(row) => (
@@ -4480,60 +4472,49 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     </strong>
                   )}
                 />
-                <p style={{ margin: 0, fontSize: "0.88rem" }}>
-                  <strong {...glossaryTooltipUi.hoverA11y("surges")}>Healing Surges:</strong> {derived.healingSurgesPerDay}
-                </p>
-                <p style={{ margin: 0, fontSize: "0.88rem" }}>
-                  <strong {...glossaryTooltipUi.hoverA11y("surgeValue")}>Surge Value:</strong> {derived.surgeValue}
-                </p>
-              </div>
-              <div style={{ minWidth: 0 }}>
                 <StatScoreTable
                   fontSize="0.82rem"
                   columns={DEFENSE_SCORE_COLUMNS}
                   bonusHeader={null}
-                  statHeader="DEFENSE"
+                  statHeader={null}
                   prioritizeStatLabel
+                  showComponents={false}
                   rows={[
-                    {
-                      rowKey: "ac",
-                      label: "AC",
-                      glossaryKey: "ac",
-                      total: derived.defenses.ac,
-                      values: defenseRowValues(
-                        buildAcScoreComponents(derived.acBreakdown, {
-                          magicItemBonus: derived.defenses.ac - derived.acBreakdown.total
-                        })
-                      )
-                    },
-                    {
-                      rowKey: "fortitude",
-                      label: "Fortitude",
-                      glossaryKey: "fortitude",
-                      total: derived.defenses.fortitude,
-                      values: defenseRowValues(derived.fortitudeBreakdown.components)
-                    },
-                    {
-                      rowKey: "reflex",
-                      label: "Reflex",
-                      glossaryKey: "reflex",
-                      total: derived.defenses.reflex,
-                      values: defenseRowValues(derived.reflexBreakdown.components)
-                    },
-                    {
-                      rowKey: "will",
-                      label: "Will",
-                      glossaryKey: "will",
-                      total: derived.defenses.will,
-                      values: defenseRowValues(derived.willBreakdown.components)
-                    }
-                  ]}
-                  renderLabel={(row) => (
-                    <strong {...glossaryTooltipUi.hoverA11y(row.glossaryKey ?? row.rowKey)} style={{ fontSize: "0.82rem" }}>
-                      {row.label}
-                    </strong>
-                  )}
-                />
+                      {
+                        rowKey: "ac",
+                        label: "AC",
+                        glossaryKey: "ac",
+                        total: derived.defenses.ac,
+                        values: {}
+                      },
+                      {
+                        rowKey: "fortitude",
+                        label: "Fortitude",
+                        glossaryKey: "fortitude",
+                        total: derived.defenses.fortitude,
+                        values: {}
+                      },
+                      {
+                        rowKey: "reflex",
+                        label: "Reflex",
+                        glossaryKey: "reflex",
+                        total: derived.defenses.reflex,
+                        values: {}
+                      },
+                      {
+                        rowKey: "will",
+                        label: "Will",
+                        glossaryKey: "will",
+                        total: derived.defenses.will,
+                        values: {}
+                      }
+                    ]}
+                    renderLabel={(row) => (
+                      <strong {...glossaryTooltipUi.hoverA11y(row.glossaryKey ?? row.rowKey)} style={{ fontSize: "0.82rem" }}>
+                        {row.label}
+                      </strong>
+                    )}
+                  />
               </div>
             </div>
             <SupportPassiveMotionBreakdown o={derived.supportPassiveOther} summaryStyle={detailsSummaryStyle} />
@@ -4627,8 +4608,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               rows={skillSheetRows}
               fontSize="0.75rem"
               renderSkillName={(row, stripe) => (
-                <span
-                  className="skill-modifier-table__name-text"
+                <SkillModifierNameContent
+                  row={row}
                   {...glossaryTooltipUi.hoverA11y(`skill:${row.skillId}`)}
                   style={{
                     color: "var(--text-secondary)",
@@ -4637,13 +4618,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     backgroundColor: stripe,
                     fontWeight: 600
                   }}
-                >
-                  {row.name}
-                  {row.abilityCode ? (
-                    <span style={{ marginLeft: "0.35rem", fontWeight: 700, fontSize: "0.68rem" }}>{row.abilityCode}</span>
-                  ) : null}
-                  {row.trained ? " (T)" : ""}
-                </span>
+                />
               )}
             />
           </div>

@@ -112,9 +112,10 @@ Use the shared **`CollapsibleDisclosure`** and **`CollapsibleDisclosureArrow`** 
 Character-sheet style breakdown tables show a **total** in the leading column, a **row label** (skill name, defense name, etc.), then **component columns** for the math.
 
 - **Prioritize the total and the row label.** Those two columns are the anchors users scan first. They must stay readable when the panel is narrow or when many component columns are present.
-- **Skills** (`SkillModifierTable`): measure the widest skill name and use an opaque label stripe that can overlap component columns on narrow panels (container query), instead of clipping the name or adding a horizontal scrollbar to the whole table.
-- **Defenses** (`StatScoreTable` with `prioritizeStatLabel`): apply the same principle—green total stays visible, defense names (AC, Fortitude, Reflex, Will) use a measured minimum width and the same opaque overlap treatment so names are not truncated to “Forti” / “Refle”.
-- **Component columns** are secondary: they may sit under the label stripe when space is tight; do not sacrifice total or label legibility to keep every header on one line.
+- **Narrow panels:** clip or hide content on the **right** (component columns), not by overlapping labels onto the math. Do not add a horizontal scrollbar on the whole table.
+- **Skills** (`SkillModifierTable`): bonus and skill name stay in the left columns; the name column is at least as wide as the longest skill name in the list; modifier columns fall off the right edge when space is tight.
+- **Defenses, speed, initiative** (`StatScoreTable` with `prioritizeStatLabel` where needed): green total and row label stay visible; measured label width prevents crushing the name; component columns clip on the right.
+- **Component columns** are secondary; do not sacrifice total or label legibility to keep every header on one line.
 - Reuse `StatScoreTable` / `SkillModifierTable` and shared score cell styling (`scoreTableCells`) rather than one-off breakdown layouts.
 
 ### Overlays (Tooltips, Popovers, Modals)

@@ -3,6 +3,7 @@ import {
   buildInitiativeBreakdown,
   buildNadBreakdown,
   buildSpeedBreakdown,
+  defenseRowValues,
   formatAcScoreBreakdown,
   formatStatScoreBreakdown
 } from "../../src/rules/statScoreBreakdown";
@@ -12,6 +13,18 @@ describe("statScoreBreakdown", () => {
   it("formats speed and initiative components", () => {
     expect(formatStatScoreBreakdown(buildSpeedBreakdown(6, 2, 1))).toBe("+6 race · -2 armor · +1 other");
     expect(formatStatScoreBreakdown(buildInitiativeBreakdown(2, 3, 1))).toBe("+2 ½ lvl · +3 DEX · +1 other");
+  });
+
+  it("combines base and half-level for defense table row values", () => {
+    const fort = buildNadBreakdown({
+      halfLevel: 11,
+      abilityMod: 3,
+      abilityLabel: "STR/CON",
+      classBonus: 2,
+      supportBonus: 0,
+      magicItemBonus: 0
+    });
+    expect(defenseRowValues(fort.components).baseHalfLevel).toBe(21);
   });
 
   it("formats NAD breakdown with hidden zero class and magic", () => {

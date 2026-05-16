@@ -71,7 +71,10 @@ function normalizeState(input: unknown): CharacterSheetState {
     featIds: Array.isArray(v.featIds) ? v.featIds.filter((id): id is string => typeof id === "string") : [],
     trainedSkillIds: Array.isArray(v.trainedSkillIds) ? v.trainedSkillIds.filter((id): id is string => typeof id === "string") : [],
     level: clampInt(v.level, 1, 30, fallback.level),
-    magicItemBonuses: normalizeMagicItemBonuses(v.magicItemBonuses)
+    magicItemBonuses: normalizeMagicItemBonuses(v.magicItemBonuses),
+    themeId: typeof v.themeId === "string" && v.themeId.trim() ? v.themeId : undefined,
+    paragonPathId: typeof v.paragonPathId === "string" && v.paragonPathId.trim() ? v.paragonPathId : undefined,
+    epicDestinyId: typeof v.epicDestinyId === "string" && v.epicDestinyId.trim() ? v.epicDestinyId : undefined
   };
   return next;
 }

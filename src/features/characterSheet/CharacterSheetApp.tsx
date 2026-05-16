@@ -23,7 +23,7 @@ import {
 import { CollapsibleDisclosure } from "../../ui/CollapsibleDisclosure";
 import { SkillModifierTable } from "../../ui/SkillModifierTable";
 import { StatScoreTable, type StatScoreRowDef } from "../../ui/StatScoreTable";
-import { loadSavedCharacters, type SavedCharacterEntry } from "../builder/storage";
+import { loadBuild, loadSavedCharacters, type SavedCharacterEntry } from "../builder/storage";
 import { GlossaryTooltipRichText, RulesRichText } from "../builder/RulesRichText";
 import { createDefaultCharacterSheetState } from "./defaultState";
 import type { CharacterSheetState, EquipmentSlot, InventoryItem } from "./model";
@@ -181,6 +181,14 @@ const labelStyle: CSSProperties = {
   fontWeight: 600,
   textTransform: "uppercase",
   letterSpacing: "0.04em"
+};
+
+const characterOverviewFieldValueStyle: CSSProperties = {
+  border: "1px solid var(--panel-border)",
+  backgroundColor: "var(--surface-0)",
+  borderRadius: "0.32rem",
+  padding: "0.24rem 0.45rem",
+  lineHeight: 1.2
 };
 
 /** HP panel resource labels (Hit Points, Temp HP, Healing Surges, etc.). */
@@ -771,6 +779,41 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     () => (sheet.featIds ?? []).map((featId) => featsById.get(featId)).filter((feat): feat is NonNullable<typeof feat> => Boolean(feat)),
     [sheet.featIds, featsById]
   );
+  const selectedTheme = useMemo(
+    () => (sheet.themeId ? index.themes.find((t) => t.id === sheet.themeId) : undefined),
+    [index.themes, sheet.themeId]
+  );
+  const selectedParagonPath = useMemo(
+    () => (sheet.paragonPathId ? index.paragonPaths.find((p) => p.id === sheet.paragonPathId) : undefined),
+    [index.paragonPaths, sheet.paragonPathId]
+  );
+  const selectedEpicDestiny = useMemo(
+    () => (sheet.epicDestinyId ? index.epicDestinies.find((d) => d.id === sheet.epicDestinyId) : undefined),
+    [index.epicDestinies, sheet.epicDestinyId]
+  );
+
+  useEffect(() => {
+    const build = loadBuild();
+    if (!build) return;
+    setSheet((prev) => {
+      if (
+        prev.themeId === build.themeId &&
+        prev.paragonPathId === build.paragonPathId &&
+        prev.epicDestinyId === build.epicDestinyId &&
+        prev.level === build.level
+      ) {
+        return prev;
+      }
+      return {
+        ...prev,
+        level: build.level,
+        themeId: build.themeId,
+        paragonPathId: build.paragonPathId,
+        epicDestinyId: build.epicDestinyId
+      };
+    });
+  }, []);
+
   const skillRows = useMemo(
     () =>
       computeSkillSheetRows(
@@ -1948,6 +1991,30 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                       {sheet.level}
                     </div>
                   </div>
+                  {sheet.themeId && (
+                    <div style={{ ...labelStyle, gridColumn: "span 12", gap: "0.12rem" }}>
+                      Theme
+                      <div style={{ ...characterOverviewFieldValueStyle, fontWeight: 600, color: "var(--text-primary)" }}>
+                        {selectedTheme?.name ?? sheet.themeId}
+                      </div>
+                    </div>
+                  )}
+                  {sheet.paragonPathId && (
+                    <div style={{ ...labelStyle, gridColumn: "span 12", gap: "0.12rem" }}>
+                      Paragon path
+                      <div style={{ ...characterOverviewFieldValueStyle, fontWeight: 600, color: "var(--text-primary)" }}>
+                        {selectedParagonPath?.name ?? sheet.paragonPathId}
+                      </div>
+                    </div>
+                  )}
+                  {sheet.epicDestinyId && (
+                    <div style={{ ...labelStyle, gridColumn: "span 12", gap: "0.12rem" }}>
+                      Epic destiny
+                      <div style={{ ...characterOverviewFieldValueStyle, fontWeight: 600, color: "var(--text-primary)" }}>
+                        {selectedEpicDestiny?.name ?? sheet.epicDestinyId}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               <OverviewCollapsibleSection

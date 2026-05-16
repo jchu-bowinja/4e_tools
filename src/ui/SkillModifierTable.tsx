@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ComponentPropsWithoutRef, type CSSProperties, type ReactNode } from "react";
 import type { SkillSheetRow } from "../rules/skillCalculator";
 import {
   formatSkillArmorCell,
@@ -6,12 +6,11 @@ import {
   formatSkillMiscCell,
   formatSkillTotalCell
 } from "../rules/skillCalculator";
+import { ScoreModCell } from "./scoreTableCells";
 
 /** Wide-layout grid template (exported for tests or layout tooling). */
 export const SKILL_MODIFIER_TABLE_COLUMNS =
-  "minmax(2.35rem, max-content) minmax(0, 1fr) 1.85rem 1.85rem 2.15rem 3.15rem 1.95rem";
-
-import { ScoreModCell } from "./scoreTableCells";
+  "minmax(2.35rem, max-content) minmax(var(--skill-name-block-width, max-content), 1fr) 1.85rem 1.85rem 2.15rem 3.15rem 1.95rem";
 
 function HeaderStack({ lines }: { lines: string[] }) {
   return (
@@ -27,14 +26,28 @@ function stripeStyle(stripe: string): CSSProperties {
   return stripe === "transparent" ? {} : { backgroundColor: stripe, borderRadius: "0.2rem" };
 }
 
-/** Opaque row background for skill name overlap (extends with overflowing text). */
-function nameRowBgStyle(stripe: string): CSSProperties {
-  const bg = stripe === "transparent" ? "var(--surface-0)" : stripe;
-  return {
-    backgroundColor: bg,
-    ["--skill-row-bg" as string]: bg,
-    borderRadius: "0.2rem"
-  };
+export type SkillModifierNameContentProps = {
+  row: SkillSheetRow;
+  /** Extra badges after name / (T), still left of the ability code (e.g. auto, off-list). */
+  trailing?: ReactNode;
+} & Omit<ComponentPropsWithoutRef<"span">, "children">;
+
+/** Skill name, then (T), with ability code right-aligned in the name column. */
+export function SkillModifierNameContent({ row, trailing, className, style, ...rest }: SkillModifierNameContentProps) {
+  return (
+    <span
+      className={className ? `${className} skill-modifier-table__name-text` : "skill-modifier-table__name-text"}
+      style={style}
+      {...rest}
+    >
+      <span className="skill-modifier-table__name-leading">
+        <span className="skill-modifier-table__name-title">{row.name}</span>
+        {row.trained ? <strong className="skill-modifier-table__name-trained"> (T)</strong> : null}
+        {trailing}
+      </span>
+      {row.abilityCode ? <span className="skill-modifier-table__name-abil">{row.abilityCode}</span> : null}
+    </span>
+  );
 }
 
 export type SkillModifierTableProps = {
@@ -88,18 +101,12 @@ export function SkillModifierTable({ rows, rowStripe = true, fontSize = "0.78rem
 
   return (
     <div ref={tableRef} className="skill-modifier-table" style={tableStyle}>
-      <div className="skill-modifier-table__header">
-        <span className="skill-modifier-table__bonus-hdr skill-modifier-table__hdr">
-          <HeaderStack lines={["Bonus"]} />
-        </span>
-        <span className="skill-modifier-table__name-hdr skill-modifier-table__hdr">Skill</span>
-        <div className="skill-modifier-table__breakdown-hdr">
-          <HeaderStack lines={["Abil"]} />
-          <HeaderStack lines={["½", "Lvl"]} />
-          <HeaderStack lines={["Trnd", "(+5)"]} />
-          <HeaderStack lines={["Armor", "Penalty"]} />
-          <HeaderStack lines={["Misc"]} />
-        </div>
+      <div className="skill-modifier-table__comp-header">
+        <HeaderStack lines={["Abil"]} />
+        <HeaderStack lines={["½", "Lvl"]} />
+        <HeaderStack lines={["Trnd", "(+5)"]} />
+        <HeaderStack lines={["Armor", "Penalty"]} />
+        <HeaderStack lines={["Misc"]} />
       </div>
       {rows.map((row, idx) => {
         const stripe =
@@ -126,21 +133,14 @@ export function SkillModifierTableRow({ row, stripe = "transparent", renderSkill
   const nameNode = renderSkillName ? (
     renderSkillName(row, stripe)
   ) : (
-    <span
-      className="skill-modifier-table__name-text"
+    <SkillModifierNameContent
+      row={row}
       style={{
         fontWeight: 600,
         color: "var(--text-primary)",
-        padding: "0.12rem 0.2rem",
-        ...nameRowBgStyle(stripe)
+        padding: "0.12rem 0.2rem"
       }}
-    >
-      {row.name}
-      {row.abilityCode ? (
-        <span style={{ marginLeft: "0.35rem", fontWeight: 700, fontSize: "0.68rem", color: "var(--text-secondary)" }}>{row.abilityCode}</span>
-      ) : null}
-      {row.trained ? <strong style={{ color: "var(--status-success)", fontWeight: 700 }}> (T)</strong> : null}
-    </span>
+    />
   );
 
   return (
@@ -148,7 +148,7 @@ export function SkillModifierTableRow({ row, stripe = "transparent", renderSkill
       <span className="skill-modifier-table__bonus" style={stripeBg}>
         <ScoreModCell value={formatSkillTotalCell(row.modifier)} emphasize />
       </span>
-      <span className="skill-modifier-table__name" style={{ minWidth: 0, ...nameRowBgStyle(stripe) }}>
+      <span className="skill-modifier-table__name" style={{ minWidth: 0, ...stripeBg }}>
         {nameNode}
       </span>
       <div className="skill-modifier-table__breakdown">

@@ -16,14 +16,39 @@ export const MOTION_SPEED_COLUMNS: StatScoreColumnDef[] = [
 ];
 
 export const MOTION_INITIATIVE_COLUMNS: StatScoreColumnDef[] = [
-  { key: "halfLevel", header: ["½", "Lvl"] },
+  { key: "halfLevel", header: "½ Lvl" },
   { key: "dex", header: "DEX" },
   { key: "other", header: "Other" }
 ];
 
+/** Single motion table: speed uses race/armor/other; initiative uses ½ lvl/DEX/other. */
+export const MOTION_SCORE_COLUMNS: StatScoreColumnDef[] = [
+  { key: "race", header: "Race" },
+  { key: "armor", header: "Armor" },
+  { key: "halfLevel", header: "½ Lvl" },
+  { key: "dex", header: "DEX" },
+  { key: "other", header: "Other" }
+];
+
+export function motionUnifiedRowValues(
+  components: ScoreComponent[],
+  kind: "speed" | "initiative"
+): Record<string, number | null> {
+  const keys = kind === "speed" ? ["race", "armor", "other"] : ["halfLevel", "dex", "other"];
+  const partial = motionRowValues(components, keys);
+  const out: Record<string, number | null> = {
+    race: null,
+    armor: null,
+    halfLevel: null,
+    dex: null,
+    other: null
+  };
+  for (const key of keys) out[key] = partial[key];
+  return out;
+}
+
 export const DEFENSE_SCORE_COLUMNS: StatScoreColumnDef[] = [
-  { key: "base", header: "Base" },
-  { key: "halfLevel", header: ["½", "Lvl"] },
+  { key: "baseHalfLevel", header: ["Base +", "½ Lvl"], width: "2.75rem" },
   { key: "ability", header: "Abil" },
   { key: "armor", header: "Armor" },
   { key: "shield", header: "Shield" },
@@ -60,8 +85,16 @@ export function motionRowValues(components: ScoreComponent[], columnKeys: string
 }
 
 export function defenseRowValues(components: ScoreComponent[], secondWindBonus = 0): Record<string, number | null> {
-  const keys = DEFENSE_SCORE_COLUMNS.map((c) => c.key);
-  const values = rowValuesFromComponents(components, keys);
+  const byKey = new Map(components.map((c) => [c.key, c.value]));
+  const base = byKey.get("base") ?? 10;
+  const halfLevel = byKey.get("halfLevel") ?? 0;
+  const values: Record<string, number | null> = {
+    baseHalfLevel: base + halfLevel
+  };
+  for (const { key } of DEFENSE_SCORE_COLUMNS) {
+    if (key === "baseHalfLevel") continue;
+    values[key] = byKey.has(key) ? byKey.get(key)! : null;
+  }
   if (secondWindBonus > 0) values.secondWind = secondWindBonus;
   return finalizeScoreRowValues(values);
 }
