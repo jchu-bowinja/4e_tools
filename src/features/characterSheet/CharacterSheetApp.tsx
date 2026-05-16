@@ -39,14 +39,6 @@ const panelStyle: CSSProperties = {
   boxShadow: "var(--ui-panel-shadow, 0 1px 2px rgba(40, 30, 10, 0.08))"
 };
 
-const sectionInsetStyle: CSSProperties = {
-  backgroundColor: "var(--inset-section-bg, var(--surface-3))",
-  border: "1px solid var(--inset-section-border, var(--panel-border))",
-  borderRadius: "var(--ui-section-radius, 0.45rem)",
-  padding: "0.45rem",
-  boxShadow: "inset 0 1px 0 var(--inset-section-highlight, rgba(255, 255, 255, 0.12))"
-};
-
 /** Overview column 2 (feats + HP); wide enough for the rest strip without its own scrollbar. */
 const OVERVIEW_CENTER_COLUMN_MIN_WIDTH = "26rem";
 /** HP panel col 1 (hit points, death saves). */
@@ -57,7 +49,6 @@ const HP_PANEL_TEMP_HP_COLUMN_MIN_WIDTH = "7.5rem";
 const HP_PANEL_SIDE_COLUMN_MIN_WIDTH = "8rem";
 
 const overviewSideColumnStyle: CSSProperties = {
-  ...sectionInsetStyle,
   display: "grid",
   gap: "0.5rem",
   alignContent: "start",
@@ -67,7 +58,6 @@ const overviewSideColumnStyle: CSSProperties = {
 };
 
 const overviewCenterColumnStyle: CSSProperties = {
-  ...sectionInsetStyle,
   display: "grid",
   gap: "0.5rem",
   alignContent: "start",
@@ -1948,8 +1938,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             </div>
           </div>
           {(["atWill", "encounter", "daily"] as const).map((bucket) => (
-            <div key={bucket} style={{ ...sectionInsetStyle, gridColumn: "1 / -1" }}>
-              <div style={panelStyle}>
+            <div key={bucket} style={{ ...panelStyle, gridColumn: "1 / -1" }}>
                 <div
                   onMouseEnter={(event) => glossaryTooltipUi.startHover(event, `powerUsage:${bucket}`)}
                   onMouseLeave={glossaryTooltipUi.leaveHover}
@@ -2164,7 +2153,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   </div>
                 );
                 })()}
-              </div>
             </div>
           ))}
           {showRaceHoverInfo && derived.race && raceHoverPanelPos && (
