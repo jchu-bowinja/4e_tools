@@ -127,6 +127,7 @@ const overviewCollapsibleBodyStyle: CSSProperties = {
 
 type OverviewCollapsibleSectionProps = {
   title: string;
+  defaultOpen?: boolean;
   shellStyle?: CSSProperties;
   titleTabIndex?: number;
   onTitleMouseEnter?: (event: ReactMouseEvent<HTMLElement>) => void;
@@ -188,6 +189,7 @@ function TraitRowsList({ rows, emptyMessage }: { rows: TraitDisplayRow[]; emptyM
 
 function OverviewCollapsibleSection({
   title,
+  defaultOpen = true,
   shellStyle,
   titleTabIndex,
   onTitleMouseEnter,
@@ -199,7 +201,7 @@ function OverviewCollapsibleSection({
   return (
     <CollapsibleDisclosure
       className="template-json-collapsible character-sheet-overview-collapsible"
-      open
+      open={defaultOpen}
       style={{ ...overviewCollapsiblePanelStyle, ...shellStyle }}
       summaryStyle={overviewCollapsibleSummaryStyle}
       bodyStyle={overviewCollapsibleBodyStyle}
@@ -1916,7 +1918,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   function renderAttackPreviewPanel(): JSX.Element | null {
     if (!mainWeaponSummary && !offHandWeaponSummary && !implementAttackSummary) return null;
     return (
-      <OverviewCollapsibleSection title="Basic Attacks">
+      <OverviewCollapsibleSection title="Basic Attacks" defaultOpen={false}>
         <div style={{ fontSize: "0.82rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
           <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.74rem", color: "var(--text-muted)" }}>
             Half-level + ability + proficiency (or nonproficient -2). Equip weapons in Main / Off hand and an implement in the implement slot.
@@ -2165,6 +2167,29 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   renderLabel={renderAbilityScoreLabel}
                 />
               </OverviewCollapsibleSection>
+              <OverviewCollapsibleSection title="Skills">
+                <SkillModifierTable
+                  rows={skillRows}
+                  fontSize="0.76rem"
+                  renderSkillName={(row, stripe) => (
+                    <SkillModifierNameContent
+                      row={row}
+                      onMouseEnter={(event) => glossaryTooltipUi.startHover(event, `skill:${row.skillId}`)}
+                      onMouseLeave={glossaryTooltipUi.leaveHover}
+                      onFocus={(event) => glossaryTooltipUi.startHover(event, `skill:${row.skillId}`)}
+                      onBlur={glossaryTooltipUi.leaveHover}
+                      tabIndex={0}
+                      style={{
+                        fontWeight: 600,
+                        color: "var(--text-primary)",
+                        padding: "0.12rem 0.2rem",
+                        borderRadius: "0.2rem",
+                        backgroundColor: stripe
+                      }}
+                    />
+                  )}
+                />
+              </OverviewCollapsibleSection>
             </div>
             <div style={overviewCenterColumnStyle}>
               <OverviewCollapsibleSection title={racialTraitsSectionTitle}>
@@ -2229,6 +2254,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   />
                 </OverviewCollapsibleSection>
               )}
+            </div>
+            <div style={overviewSideColumnStyle}>
               {showParagonTraits && (
                 <OverviewCollapsibleSection title={paragonTraitsSectionTitle}>
                   <TraitRowsList
@@ -2281,31 +2308,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                     ))
                   )}
                 </div>
-              </OverviewCollapsibleSection>
-            </div>
-            <div style={overviewSideColumnStyle}>
-              <OverviewCollapsibleSection title="Skills">
-                <SkillModifierTable
-                  rows={skillRows}
-                  fontSize="0.76rem"
-                  renderSkillName={(row, stripe) => (
-                    <SkillModifierNameContent
-                      row={row}
-                      onMouseEnter={(event) => glossaryTooltipUi.startHover(event, `skill:${row.skillId}`)}
-                      onMouseLeave={glossaryTooltipUi.leaveHover}
-                      onFocus={(event) => glossaryTooltipUi.startHover(event, `skill:${row.skillId}`)}
-                      onBlur={glossaryTooltipUi.leaveHover}
-                      tabIndex={0}
-                      style={{
-                        fontWeight: 600,
-                        color: "var(--text-primary)",
-                        padding: "0.12rem 0.2rem",
-                        borderRadius: "0.2rem",
-                        backgroundColor: stripe
-                      }}
-                    />
-                  )}
-                />
               </OverviewCollapsibleSection>
             </div>
             </div>
