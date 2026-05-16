@@ -8,7 +8,8 @@
   type FocusEvent as ReactFocusEvent,
   type MouseEvent as ReactMouseEvent
 } from "react";
-import type { Armor, Implement, RulesIndex, Weapon } from "../../rules/models";
+import type { Armor, Implement, RacialTrait, RulesIndex, Weapon } from "../../rules/models";
+import { resolveRacialTraitsForRace } from "../../rules/racialTraits";
 import { computeSkillSheetRows } from "../../rules/skillCalculator";
 import { loadSavedCharacters, type SavedCharacterEntry } from "../builder/storage";
 import { GlossaryTooltipRichText, RulesRichText } from "../builder/RulesRichText";
@@ -40,7 +41,7 @@ const panelStyle: CSSProperties = {
   boxShadow: "var(--ui-panel-shadow, 0 1px 2px rgba(40, 30, 10, 0.08))"
 };
 
-/** Overview column 2 (feats + HP); wide enough for the rest strip without its own scrollbar. */
+/** Overview column 2 (racial traits + feats + HP); wide enough for the rest strip without its own scrollbar. */
 const OVERVIEW_CENTER_COLUMN_MIN_WIDTH = "26rem";
 const overviewSideColumnStyle: CSSProperties = {
   display: "grid",
@@ -587,6 +588,14 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   );
   const skillById = useMemo(() => new Map(index.skills.map((skill) => [skill.id, skill])), [index.skills]);
   const featsById = useMemo(() => new Map(index.feats.map((feat) => [feat.id, feat])), [index.feats]);
+  const racialTraitsById = useMemo(
+    () => new Map<string, RacialTrait>((index.racialTraits ?? []).map((trait) => [trait.id, trait])),
+    [index.racialTraits]
+  );
+  const racialTraitRows = useMemo(
+    () => resolveRacialTraitsForRace(derived.race, racialTraitsById).filter((row): row is { id: string; trait: RacialTrait } => Boolean(row.trait)),
+    [derived.race, racialTraitsById]
+  );
   const selectedFeatRows = useMemo(
     () => (sheet.featIds ?? []).map((featId) => featsById.get(featId)).filter((feat): feat is NonNullable<typeof feat> => Boolean(feat)),
     [sheet.featIds, featsById]
@@ -1834,6 +1843,46 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               </div>
             </div>
             <div style={overviewCenterColumnStyle}>
+              <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.5rem", backgroundColor: "var(--surface-0)" }}>
+                <h3 style={sectionTitleStyle}>Racial traits</h3>
+                <div style={{ marginTop: "0.25rem", display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: "0.18rem" }}>
+                  {!derived.race ? (
+                    <div style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>No race selected.</div>
+                  ) : racialTraitRows.length === 0 ? (
+                    <div style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>No racial traits listed.</div>
+                  ) : (
+                    racialTraitRows.map(({ trait }, idx) => (
+                      <div
+                        key={trait.id}
+                        style={{
+                          fontSize: "0.8rem",
+                          lineHeight: 1.2,
+                          padding: "0.24rem 0.35rem",
+                          borderRadius: "0.25rem",
+                          backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)",
+                          color: "var(--text-primary)"
+                        }}
+                      >
+                        <div style={{ fontWeight: 700 }}>{trait.name}</div>
+                        {typeof trait.shortDescription === "string" && trait.shortDescription.trim() && (
+                          <div
+                            style={{
+                              marginTop: "0.14rem",
+                              color: "var(--text-secondary)",
+                              fontSize: "0.76rem",
+                              textTransform: "none",
+                              letterSpacing: "normal",
+                              fontWeight: 500
+                            }}
+                          >
+                            {trait.shortDescription}
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
               <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.5rem", backgroundColor: "var(--surface-0)" }}>
                 <h3 style={sectionTitleStyle}>Feats</h3>
                 <div style={{ marginTop: "0.25rem", display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: "0.18rem" }}>
