@@ -68,7 +68,7 @@ const panelStyle: CSSProperties = {
   boxShadow: "var(--ui-panel-shadow, 0 1px 2px rgba(40, 30, 10, 0.08))"
 };
 
-/** Overview column 2 (racial traits + feats + HP); wide enough for the rest strip without its own scrollbar. */
+/** Overview center column (traits + feats; row 2: HP/resources); wide enough for the rest strip without its own scrollbar. */
 const OVERVIEW_CENTER_COLUMN_MIN_WIDTH = "26rem";
 const overviewSideColumnStyle: CSSProperties = {
   display: "grid",
@@ -88,6 +88,15 @@ const overviewCenterColumnStyle: CSSProperties = {
   maxWidth: "100%",
   boxSizing: "border-box",
   overflow: "hidden"
+};
+
+const overviewThreeColumnGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: `minmax(0, 1fr) minmax(${OVERVIEW_CENTER_COLUMN_MIN_WIDTH}, 1fr) minmax(0, 1fr)`,
+  gap: "0.5rem",
+  alignItems: "stretch",
+  minWidth: 0,
+  width: "100%"
 };
 
 const sectionTitleStyle: CSSProperties = {
@@ -1914,7 +1923,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           </p>
           {mainWeaponSummary && mainHandWeapon && (
             <p style={{ margin: "0.15rem 0" }}>
-              <strong>Weapon (main):</strong> {mainHandWeapon.name} — attack{" "}
+              <strong>Weapon (main):</strong> {mainHandWeapon.name} ? attack{" "}
               {mainWeaponSummary.attackBonus >= 0 ? "+" : ""}
               {mainWeaponSummary.attackBonus} vs AC ({mainWeaponSummary.abilityCode}); damage {mainWeaponSummary.damageNotation}
               {!mainWeaponSummary.proficient && (
@@ -1924,7 +1933,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           )}
           {offHandWeaponSummary && offHandWeapon && (
             <p style={{ margin: "0.15rem 0" }}>
-              <strong>Weapon (off):</strong> {offHandWeapon.name} — attack{" "}
+              <strong>Weapon (off):</strong> {offHandWeapon.name} ? attack{" "}
               {offHandWeaponSummary.attackBonus >= 0 ? "+" : ""}
               {offHandWeaponSummary.attackBonus} vs AC ({offHandWeaponSummary.abilityCode}); damage {offHandWeaponSummary.damageNotation}
               {!offHandWeaponSummary.proficient && (
@@ -1934,7 +1943,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           )}
           {implementAttackSummary && equippedImplement && (
             <p style={{ margin: "0.15rem 0" }}>
-              <strong>Implement:</strong> {equippedImplement.name} — attack{" "}
+              <strong>Implement:</strong> {equippedImplement.name} ? attack{" "}
               {implementAttackSummary.attackBonus >= 0 ? "+" : ""}
               {implementAttackSummary.attackBonus} vs AC (best key ability)
               {!implementAttackSummary.proficient && (
@@ -2058,17 +2067,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               Refresh Saved List
             </button>
           </div>
-          <div
-            style={{
-              gridColumn: "1 / -1",
-              display: "grid",
-              gridTemplateColumns: `minmax(0, 1fr) minmax(${OVERVIEW_CENTER_COLUMN_MIN_WIDTH}, 1fr) minmax(0, 1fr)`,
-              gap: "0.5rem",
-              alignItems: "stretch",
-              minWidth: 0,
-              width: "100%"
-            }}
-          >
+          <div className="character-sheet-overview-rows" style={{ gridColumn: "1 / -1", minWidth: 0, width: "100%" }}>
+            <div className="character-sheet-overview-row" style={overviewThreeColumnGridStyle}>
             <div style={overviewSideColumnStyle}>
               <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.4rem", padding: "0.55rem", backgroundColor: "var(--surface-0)", display: "grid", gap: "0.35rem", boxShadow: "inset 0 0 0 1px var(--surface-2)" }}>
                 <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700 }}>
@@ -2165,11 +2165,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   renderLabel={renderAbilityScoreLabel}
                 />
               </OverviewCollapsibleSection>
-              <div style={{ display: "grid", gap: "0.45rem", alignContent: "start" }}>
-                {renderSpeedInitiativePanel()}
-                {renderDefensesPanel()}
-                {renderAttackPreviewPanel()}
-              </div>
             </div>
             <div style={overviewCenterColumnStyle}>
               <OverviewCollapsibleSection title={racialTraitsSectionTitle}>
@@ -2287,7 +2282,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   )}
                 </div>
               </OverviewCollapsibleSection>
-              {renderHitPointsPanel()}
             </div>
             <div style={overviewSideColumnStyle}>
               <OverviewCollapsibleSection title="Skills">
@@ -2313,7 +2307,22 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   )}
                 />
               </OverviewCollapsibleSection>
+            </div>
+            </div>
+            <div className="character-sheet-overview-row character-sheet-overview-row--page-break" style={overviewThreeColumnGridStyle}>
+            <div style={overviewSideColumnStyle}>
+              <div style={{ display: "grid", gap: "0.45rem", alignContent: "start" }}>
+                {renderSpeedInitiativePanel()}
+                {renderDefensesPanel()}
+                {renderAttackPreviewPanel()}
+              </div>
+            </div>
+            <div style={overviewCenterColumnStyle}>
+              {renderHitPointsPanel()}
+            </div>
+            <div style={overviewSideColumnStyle}>
               {renderConditionsPanel()}
+            </div>
             </div>
           </div>
           {(["atWill", "encounter", "daily"] as const).map((bucket) => (
@@ -2396,7 +2405,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem" }}>
                           <strong style={{ textDecoration: expended ? "line-through" : "none" }}>{power.name}</strong>
                           <span style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>
-                            Lv {power.level ?? 0} — {power.usage || "-"}
+                            Lv {power.level ?? 0} ? {power.usage || "-"}
                           </span>
                         </div>
                         {expended ? (

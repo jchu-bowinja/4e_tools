@@ -473,6 +473,23 @@ textarea:hover {
   transform: rotate(90deg);
 }
 
+/* Character sheet overview: two 3-column rows; row 2 starts a new page when printing */
+.character-sheet-overview-rows {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+  width: 100%;
+}
+
+.character-sheet-overview-row {
+  min-width: 0;
+}
+
+.character-sheet-overview-row--page-break {
+  break-before: page;
+  page-break-before: always;
+}
+
 /* Encounter roster: expand/collapse all — ▶ rotated to point left when collapsed, down when expanded */
 button.encounter-roster-stat-cards-expand-btn {
   display: inline-flex;
