@@ -20,6 +20,8 @@ export interface CharacterSheetResources {
   tempHp: number;
   actionPoints: number;
   surgesRemaining: number;
+  /** True after Second Wind is used; resets on short or long rest. */
+  secondWindUsed?: boolean;
   deathSaves: number;
   conditions: string[];
 }

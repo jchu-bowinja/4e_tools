@@ -356,6 +356,7 @@ export function sheetStateFromBuild(build: CharacterBuild, index: RulesIndex): C
       tempHp: 0,
       actionPoints: 0,
       surgesRemaining: derived.healingSurgesPerDay,
+      secondWindUsed: false,
       deathSaves: 0,
       conditions: []
     }

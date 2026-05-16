@@ -31,6 +31,7 @@ export const SHEET_CORE_UI_TERMS: Record<
   | "actionPoints"
   | "surges"
   | "surgeValue"
+  | "secondWind"
   | "bloodied"
   | "dying"
   | "dead"
@@ -54,6 +55,7 @@ export const SHEET_CORE_UI_TERMS: Record<
   actionPoints: ["Action Point", "Action Points"],
   surges: ["Healing Surges", "Healing Surge"],
   surgeValue: ["Surge Value", "Healing Surge Value"],
+  secondWind: ["Second wind", "Second Wind"],
   bloodied: ["Bloodied"],
   dying: ["Dying"],
   dead: ["Dead"],

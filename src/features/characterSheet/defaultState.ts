@@ -19,6 +19,7 @@ export function createDefaultCharacterSheetState(): CharacterSheetState {
       tempHp: 0,
       actionPoints: 0,
       surgesRemaining: 1,
+      secondWindUsed: false,
       deathSaves: 0,
       conditions: []
     },

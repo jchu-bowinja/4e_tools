@@ -6,7 +6,8 @@
   useState,
   type CSSProperties,
   type FocusEvent as ReactFocusEvent,
-  type MouseEvent as ReactMouseEvent
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode
 } from "react";
 import type { Armor, Implement, RacialTrait, RulesIndex, Weapon } from "../../rules/models";
 import { resolveRacialTraitsForRace } from "../../rules/racialTraits";
@@ -15,6 +16,14 @@ import { loadSavedCharacters, type SavedCharacterEntry } from "../builder/storag
 import { GlossaryTooltipRichText, RulesRichText } from "../builder/RulesRichText";
 import { createDefaultCharacterSheetState } from "./defaultState";
 import type { CharacterSheetState, EquipmentSlot, InventoryItem } from "./model";
+import {
+  canUseSecondWind,
+  hasSecondWindDefenseBonus,
+  refreshSecondWindOnRest,
+  SECOND_WIND_DEFENSE_BONUS,
+  spendHealingSurgeResources,
+  useSecondWindResources
+} from "./healingSurgeActions";
 import { canEquipItem, computeSheetDerivedData, findImplementEquippedFromSheet, findWeaponEquippedInSlot, groupCombatPowers, sheetClassForImplementAttack, sheetImplementProficiencyText, sheetStateFromBuild, sheetWeaponProficiencyText } from "./selectors";
 import { loadCharacterSheetState, saveCharacterSheetState } from "./storage";
 import { resolveUiGlossaryHoverPlainText, termHasPowerKeywordTooltipBody } from "../../data/glossaryHoverResolve";
@@ -78,6 +87,66 @@ const sectionTitleStyle: CSSProperties = {
   textTransform: "uppercase",
   color: "var(--text-primary)"
 };
+
+const overviewCollapsiblePanelStyle: CSSProperties = {
+  border: "1px solid var(--panel-border)",
+  borderRadius: "0.35rem",
+  padding: "0.5rem",
+  backgroundColor: "var(--surface-0)",
+  minWidth: 0
+};
+
+const overviewCollapsibleSummaryStyle: CSSProperties = {
+  ...sectionTitleStyle,
+  cursor: "pointer",
+  color: "var(--text-primary)"
+};
+
+const overviewCollapsibleBodyStyle: CSSProperties = {
+  marginTop: "0.25rem"
+};
+
+type OverviewCollapsibleSectionProps = {
+  title: string;
+  shellStyle?: CSSProperties;
+  titleTabIndex?: number;
+  onTitleMouseEnter?: (event: ReactMouseEvent<HTMLElement>) => void;
+  onTitleMouseLeave?: () => void;
+  onTitleFocus?: (event: ReactFocusEvent<HTMLElement>) => void;
+  onTitleBlur?: () => void;
+  children: ReactNode;
+};
+
+function OverviewCollapsibleSection({
+  title,
+  shellStyle,
+  titleTabIndex,
+  onTitleMouseEnter,
+  onTitleMouseLeave,
+  onTitleFocus,
+  onTitleBlur,
+  children
+}: OverviewCollapsibleSectionProps): JSX.Element {
+  return (
+    <details className="template-json-collapsible character-sheet-overview-collapsible" open style={{ ...overviewCollapsiblePanelStyle, ...shellStyle }}>
+      <summary
+        className="template-json-collapsible-summary"
+        style={overviewCollapsibleSummaryStyle}
+        onMouseEnter={onTitleMouseEnter}
+        onMouseLeave={onTitleMouseLeave}
+        onFocus={onTitleFocus}
+        onBlur={onTitleBlur}
+        tabIndex={titleTabIndex}
+      >
+        <span className="template-json-collapsible-arrow" aria-hidden>
+          ▶
+        </span>
+        {title}
+      </summary>
+      <div style={overviewCollapsibleBodyStyle}>{children}</div>
+    </details>
+  );
+}
 
 const jsonSummaryStyle: CSSProperties = {
   cursor: "pointer",
@@ -193,6 +262,98 @@ const healingSurgesLabelProbeStyle: CSSProperties = {
   letterSpacing: labelStyle.letterSpacing,
   textTransform: labelStyle.textTransform
 };
+
+const healingSurgeValueHintProbeStyle: CSSProperties = {
+  ...healingSurgesLabelProbeStyle,
+  fontWeight: 600,
+  textTransform: "none",
+  letterSpacing: "normal",
+  fontVariantNumeric: "tabular-nums"
+};
+
+function HealingSurgeValueHint({
+  surgeValue,
+  onMouseEnter,
+  onMouseLeave,
+  onFocus,
+  onBlur
+}: {
+  surgeValue: number;
+  onMouseEnter: (event: ReactMouseEvent<HTMLSpanElement>) => void;
+  onMouseLeave: () => void;
+  onFocus: (event: ReactFocusEvent<HTMLSpanElement>) => void;
+  onBlur: () => void;
+}): JSX.Element {
+  const stackRef = useRef<HTMLSpanElement>(null);
+  const probeRef = useRef<HTMLSpanElement>(null);
+  const [useStacked, setUseStacked] = useState(false);
+
+  useLayoutEffect(() => {
+    const stack = stackRef.current;
+    const probe = probeRef.current;
+    if (!stack || !probe) return;
+
+    const measure = (): void => {
+      const availableWidth = stack.getBoundingClientRect().width;
+      if (availableWidth <= 0) return;
+      const textWidth = probe.getBoundingClientRect().width;
+      setUseStacked(textWidth >= availableWidth - 0.5);
+    };
+
+    measure();
+    const rafId = requestAnimationFrame(measure);
+    const observer = new ResizeObserver(measure);
+    observer.observe(stack);
+    const flexRow = stack.parentElement;
+    if (flexRow) observer.observe(flexRow);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      observer.disconnect();
+    };
+  }, [surgeValue]);
+
+  return (
+    <span
+      ref={stackRef}
+      style={{
+        ...hpPanelResourceHintStyle,
+        ...healingSurgesLabelStackStyle,
+        flex: "1 1 auto",
+        minWidth: 0
+      }}
+    >
+      <span ref={probeRef} aria-hidden style={healingSurgeValueHintProbeStyle}>
+        +{surgeValue} HP / surge
+      </span>
+      <span
+        tabIndex={0}
+        style={{
+          display: useStacked ? "inline-flex" : "inline",
+          flexDirection: useStacked ? "column" : undefined,
+          alignItems: useStacked ? "center" : undefined,
+          width: "100%",
+          minWidth: 0,
+          lineHeight: 1.15,
+          whiteSpace: "nowrap"
+        }}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+        onFocus={onFocus}
+        onBlur={onBlur}
+      >
+        {useStacked ? (
+          <>
+            <span>+{surgeValue} HP /</span>
+            <span>surge</span>
+          </>
+        ) : (
+          <>+{surgeValue} HP / surge</>
+        )}
+      </span>
+    </span>
+  );
+}
 
 function HealingSurgesFieldLabel({
   onMouseEnter,
@@ -539,7 +700,8 @@ type GlossaryKey =
   | `ability:${AbilityCode}`
   | `skill:${string}`
   | "shortRest"
-  | "extendedRest";
+  | "extendedRest"
+  | "secondWind";
 const CHARACTER_SHEET_GLOSSARY_TOOLTIP_ID = "character-sheet-glossary-tooltip";
 
 export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesIndex; tooltipGlossary: Record<string, string> }): JSX.Element {
@@ -570,7 +732,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   const [jsonSearchQuery, setJsonSearchQuery] = useState("");
   const [jsonSearchResultIdx, setJsonSearchResultIdx] = useState(0);
   const [jsonSearchJumpTick, setJsonSearchJumpTick] = useState(0);
-  const [shortRestSurgeSpendDraft, setShortRestSurgeSpendDraft] = useState("1");
   const glossaryTooltipUi = useGlossaryTooltip({ tooltipId: CHARACTER_SHEET_GLOSSARY_TOOLTIP_ID });
   const raceHoverTimerRef = useRef<number | null>(null);
   const classHoverTimerRef = useRef<number | null>(null);
@@ -852,6 +1013,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     const encounterIds = new Set(groupedPowers.encounter.map((power) => power.id));
     updateSheet((prev) => ({
       ...prev,
+      resources: refreshSecondWindOnRest(prev.resources),
       powers: {
         ...prev.powers,
         expendedPowerIds: prev.powers.expendedPowerIds.filter((id) => !encounterIds.has(id))
@@ -859,38 +1021,37 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     }));
   }
 
-  function spendSurgesAfterShortRest(desiredSpend: number): void {
-    const want = Math.max(0, Math.floor(desiredSpend));
-    if (want === 0) return;
-    const perSurge = Math.max(0, derived.surgeValue);
-    const capHp = derived.maxHp;
-    const capSurges = derived.healingSurgesPerDay;
-    updateSheet((prev) => {
-      const spend = Math.min(want, prev.resources.surgesRemaining);
-      if (spend === 0) return prev;
-      const gained = spend * perSurge;
-      return {
-        ...prev,
-        resources: {
-          ...prev.resources,
-          currentHp: Math.min(prev.resources.currentHp + gained, capHp),
-          surgesRemaining: clamp(prev.resources.surgesRemaining - spend, 0, capSurges)
-        }
-      };
-    });
+  const surgeSpendParams = {
+    perSurge: Math.max(0, derived.surgeValue),
+    capHp: derived.maxHp,
+    capSurges: derived.healingSurgesPerDay
+  };
+
+  function spendHealingSurge(): void {
+    updateSheet((prev) => ({
+      ...prev,
+      resources: spendHealingSurgeResources(prev.resources, surgeSpendParams)
+    }));
+  }
+
+  function useSecondWind(): void {
+    updateSheet((prev) => ({
+      ...prev,
+      resources: useSecondWindResources(prev.resources, surgeSpendParams)
+    }));
   }
 
   function applyLongRest(): void {
     updateSheet((prev) => ({
       ...prev,
-      resources: {
+      resources: refreshSecondWindOnRest({
         ...prev.resources,
         currentHp: derived.maxHp,
         tempHp: 0,
         actionPoints: 1,
         surgesRemaining: derived.healingSurgesPerDay,
         deathSaves: 0
-      },
+      }),
       powers: {
         ...prev.powers,
         expendedPowerIds: []
@@ -1256,48 +1417,52 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   ariaLabel="Healing surges remaining"
                   style={{ flexShrink: 0 }}
                 />
-                <button
-                  type="button"
-                  onClick={() => {
-                    const parsed = Number.parseInt(shortRestSurgeSpendDraft.trim(), 10);
-                    const n = Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
-                    spendSurgesAfterShortRest(n);
-                  }}
-                  disabled={sheet.resources.surgesRemaining === 0}
+                <div
                   style={{
-                    ...hpPanelHealButtonStyle,
-                    cursor: sheet.resources.surgesRemaining === 0 ? "not-allowed" : "pointer",
-                    opacity: sheet.resources.surgesRemaining === 0 ? 0.55 : 1
+                    display: "grid",
+                    gap: "0.2rem",
+                    flexShrink: 0,
+                    alignContent: "start"
                   }}
                 >
-                  Spend
-                </button>
-                <AdjustableNumberInput
-                  compact
-                  min={0}
-                  max={sheet.resources.surgesRemaining}
-                  value={Number.parseInt(shortRestSurgeSpendDraft, 10) || 0}
-                  onChange={(next) => setShortRestSurgeSpendDraft(String(next))}
-                  ariaLabel="Healing surges to spend"
-                  style={{ flexShrink: 0 }}
+                  <button
+                    type="button"
+                    onClick={() => spendHealingSurge()}
+                    disabled={sheet.resources.surgesRemaining === 0}
+                    aria-label="Spend healing surge"
+                    style={{
+                      ...hpPanelHealButtonStyle,
+                      cursor: sheet.resources.surgesRemaining === 0 ? "not-allowed" : "pointer",
+                      opacity: sheet.resources.surgesRemaining === 0 ? 0.55 : 1
+                    }}
+                  >
+                    Spend
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => useSecondWind()}
+                    disabled={!canUseSecondWind(sheet.resources)}
+                    aria-label="Use second wind"
+                    onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "secondWind")}
+                    onMouseLeave={glossaryTooltipUi.leaveHover}
+                    onFocus={(event) => glossaryTooltipUi.startHover(event, "secondWind")}
+                    onBlur={glossaryTooltipUi.leaveHover}
+                    style={{
+                      ...hpPanelHealButtonStyle,
+                      cursor: canUseSecondWind(sheet.resources) ? "pointer" : "not-allowed",
+                      opacity: canUseSecondWind(sheet.resources) ? 1 : 0.55
+                    }}
+                  >
+                    Second Wind
+                  </button>
+                </div>
+                <HealingSurgeValueHint
+                  surgeValue={derived.surgeValue}
+                  onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "surgeValue")}
+                  onMouseLeave={glossaryTooltipUi.leaveHover}
+                  onFocus={(event) => glossaryTooltipUi.startHover(event, "surgeValue")}
+                  onBlur={glossaryTooltipUi.leaveHover}
                 />
-              <span
-                style={{
-                  ...hpPanelResourceHintStyle,
-                  flexShrink: 0,
-                  display: "inline-flex",
-                  flexDirection: "column",
-                  alignItems: "center"
-                }}
-                onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "surgeValue")}
-                onMouseLeave={glossaryTooltipUi.leaveHover}
-                onFocus={(event) => glossaryTooltipUi.startHover(event, "surgeValue")}
-                onBlur={glossaryTooltipUi.leaveHover}
-                tabIndex={0}
-              >
-                <span style={{ whiteSpace: "nowrap" }}>+{derived.surgeValue} HP / </span>
-                <span style={{ whiteSpace: "nowrap" }}>surge</span>
-              </span>
               </div>
             </div>
           </div>
@@ -1498,14 +1663,15 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
 
   function renderDefensesPanel(): JSX.Element {
     const bd = derived.acBreakdown;
+    const secondWindBonus = hasSecondWindDefenseBonus(sheet.resources.conditions) ? SECOND_WIND_DEFENSE_BONUS : 0;
     return (
       <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.4rem", backgroundColor: "var(--surface-0)" }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr auto", rowGap: "0.2rem", columnGap: "0.5rem", fontVariantNumeric: "tabular-nums" }}>
           {[
-            { key: "ac" as const, label: "AC", value: derived.defenses.ac },
-            { key: "fortitude" as const, label: "Fortitude", value: derived.defenses.fortitude },
-            { key: "reflex" as const, label: "Reflex", value: derived.defenses.reflex },
-            { key: "will" as const, label: "Will", value: derived.defenses.will }
+            { key: "ac" as const, label: "AC", value: derived.defenses.ac + secondWindBonus },
+            { key: "fortitude" as const, label: "Fortitude", value: derived.defenses.fortitude + secondWindBonus },
+            { key: "reflex" as const, label: "Reflex", value: derived.defenses.reflex + secondWindBonus },
+            { key: "will" as const, label: "Will", value: derived.defenses.will + secondWindBonus }
           ].map((item, idx) => (
             <div key={item.key} style={{ display: "contents" }}>
               <span
@@ -1565,10 +1731,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   function renderAttackPreviewPanel(): JSX.Element | null {
     if (!mainWeaponSummary && !offHandWeaponSummary && !implementAttackSummary) return null;
     return (
-      <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.4rem", backgroundColor: "var(--surface-0)" }}>
-        <div style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--text-secondary)", marginBottom: "0.35rem" }}>
-          ATTACK PREVIEW
-        </div>
+      <OverviewCollapsibleSection title="Basic Attacks">
         <div style={{ fontSize: "0.82rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
           <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.74rem", color: "var(--text-muted)" }}>
             Half-level + ability + proficiency (or nonproficient −2). Equip weapons in Main / Off hand and an implement in the implement slot.
@@ -1604,7 +1767,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             </p>
           )}
         </div>
-      </div>
+      </OverviewCollapsibleSection>
     );
   }
 
@@ -1780,18 +1943,15 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   </div>
                 </div>
               </div>
-              <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.5rem", backgroundColor: "var(--surface-0)" }}>
-                <h3
-                  style={sectionTitleStyle}
-                  onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "abilityScores")}
-                  onMouseLeave={glossaryTooltipUi.leaveHover}
-                  onFocus={(event) => glossaryTooltipUi.startHover(event, "abilityScores")}
-                  onBlur={glossaryTooltipUi.leaveHover}
-                  tabIndex={0}
-                >
-                  Ability Scores
-                </h3>
-                <div style={{ marginTop: "0.25rem", display: "grid", gap: "0.2rem", gridTemplateColumns: "minmax(0, 1fr)" }}>
+              <OverviewCollapsibleSection
+                title="Ability Scores"
+                titleTabIndex={0}
+                onTitleMouseEnter={(event) => glossaryTooltipUi.startHover(event, "abilityScores")}
+                onTitleMouseLeave={glossaryTooltipUi.leaveHover}
+                onTitleFocus={(event) => glossaryTooltipUi.startHover(event, "abilityScores")}
+                onTitleBlur={glossaryTooltipUi.leaveHover}
+              >
+                <div style={{ display: "grid", gap: "0.2rem", gridTemplateColumns: "minmax(0, 1fr)" }}>
                   {(["STR", "CON", "DEX", "INT", "WIS", "CHA"] as const).map((ab, idx) => (
                     <div
                       key={ab}
@@ -1835,7 +1995,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                     </div>
                   ))}
                 </div>
-              </div>
+              </OverviewCollapsibleSection>
               <div style={{ display: "grid", gap: "0.45rem", alignContent: "start" }}>
                 {renderSpeedInitiativePanel()}
                 {renderDefensesPanel()}
@@ -1843,9 +2003,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               </div>
             </div>
             <div style={overviewCenterColumnStyle}>
-              <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.5rem", backgroundColor: "var(--surface-0)" }}>
-                <h3 style={sectionTitleStyle}>Racial traits</h3>
-                <div style={{ marginTop: "0.25rem", display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: "0.18rem" }}>
+              <OverviewCollapsibleSection title="Racial traits">
+                <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: "0.18rem" }}>
                   {!derived.race ? (
                     <div style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>No race selected.</div>
                   ) : racialTraitRows.length === 0 ? (
@@ -1882,10 +2041,9 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                     ))
                   )}
                 </div>
-              </div>
-              <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.5rem", backgroundColor: "var(--surface-0)" }}>
-                <h3 style={sectionTitleStyle}>Feats</h3>
-                <div style={{ marginTop: "0.25rem", display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: "0.18rem" }}>
+              </OverviewCollapsibleSection>
+              <OverviewCollapsibleSection title="Feats">
+                <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: "0.18rem" }}>
                   {selectedFeatRows.length === 0 ? (
                     <div style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>No feats selected.</div>
                   ) : (
@@ -1920,22 +2078,19 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                     ))
                   )}
                 </div>
-              </div>
+              </OverviewCollapsibleSection>
               {renderHitPointsPanel()}
             </div>
             <div style={overviewSideColumnStyle}>
-              <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.5rem", backgroundColor: "var(--surface-0)", minWidth: 0 }}>
-                <h3
-                  style={sectionTitleStyle}
-                  onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "skills")}
-                  onMouseLeave={glossaryTooltipUi.leaveHover}
-                  onFocus={(event) => glossaryTooltipUi.startHover(event, "skills")}
-                  onBlur={glossaryTooltipUi.leaveHover}
-                  tabIndex={0}
-                >
-                  Skills
-                </h3>
-                <div style={{ marginTop: "0.25rem", display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: "0.18rem" }}>
+              <OverviewCollapsibleSection
+                title="Skills"
+                titleTabIndex={0}
+                onTitleMouseEnter={(event) => glossaryTooltipUi.startHover(event, "skills")}
+                onTitleMouseLeave={glossaryTooltipUi.leaveHover}
+                onTitleFocus={(event) => glossaryTooltipUi.startHover(event, "skills")}
+                onTitleBlur={glossaryTooltipUi.leaveHover}
+              >
+                <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: "0.18rem" }}>
                   {skillRows.map((row, idx) => (
                     <div
                       key={row.skillId}
@@ -1979,7 +2134,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                     </div>
                   ))}
                 </div>
-              </div>
+              </OverviewCollapsibleSection>
               {renderConditionsPanel()}
             </div>
           </div>
