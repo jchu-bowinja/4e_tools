@@ -4580,7 +4580,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
           <div style={{ borderTop: "1px solid var(--panel-border)", paddingTop: "0.65rem" }}>
             <p
               style={{ margin: "0 0 0.4rem 0", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--text-secondary)", textTransform: "uppercase" }}
-              {...glossaryTooltipUi.hoverA11y("skills")}
             >
               Skills
             </p>

@@ -2082,14 +2082,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               {renderHitPointsPanel()}
             </div>
             <div style={overviewSideColumnStyle}>
-              <OverviewCollapsibleSection
-                title="Skills"
-                titleTabIndex={0}
-                onTitleMouseEnter={(event) => glossaryTooltipUi.startHover(event, "skills")}
-                onTitleMouseLeave={glossaryTooltipUi.leaveHover}
-                onTitleFocus={(event) => glossaryTooltipUi.startHover(event, "skills")}
-                onTitleBlur={glossaryTooltipUi.leaveHover}
-              >
+              <OverviewCollapsibleSection title="Skills">
                 <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: "0.18rem" }}>
                   {skillRows.map((row, idx) => (
                     <div
