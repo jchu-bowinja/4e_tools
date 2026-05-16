@@ -56,6 +56,16 @@ import { parseRacialTraitIdsFromRace, resolveRacialTraitsForRace } from "../../r
 import { getClassBuildOptions } from "../../rules/classBuildOptions";
 import { autoGrantedTrainedSkillIds } from "../../rules/grantedSkillsQuery";
 import { computeSkillSheetRows } from "../../rules/skillCalculator";
+import {
+  buildAcScoreComponents,
+  DEFENSE_SCORE_COLUMNS,
+  defenseRowValues,
+  MOTION_INITIATIVE_COLUMNS,
+  MOTION_SPEED_COLUMNS,
+  motionRowValues
+} from "../../rules/statScoreBreakdown";
+import { SkillModifierTable } from "../../ui/SkillModifierTable";
+import { StatScoreTable } from "../../ui/StatScoreTable";
 import { multiclassFeatIds } from "../../rules/multiclassDetection";
 import { pruneStalePowerSelections } from "../../rules/powerSelections";
 import { summarizeImplementAttack, summarizeMainWeaponAttack } from "../../rules/weaponAttack";
@@ -642,32 +652,6 @@ function formatAbilityMod(mod: number): string {
   return mod >= 0 ? `+${mod}` : `${mod}`;
 }
 
-function resolveSkillAbilityCode(keyAbility: string | null | undefined): keyof CharacterBuild["abilityScores"] | null {
-  const raw = String(keyAbility || "").trim().toUpperCase();
-  if (!raw) return null;
-  if (raw.startsWith("STR") || raw.includes("STRENGTH")) return "STR";
-  if (raw.startsWith("CON") || raw.includes("CONSTITUTION")) return "CON";
-  if (raw.startsWith("DEX") || raw.includes("DEXTERITY")) return "DEX";
-  if (raw.startsWith("INT") || raw.includes("INTELLIGENCE")) return "INT";
-  if (raw.startsWith("WIS") || raw.includes("WISDOM")) return "WIS";
-  if (raw.startsWith("CHA") || raw.includes("CHARISMA")) return "CHA";
-  return null;
-}
-
-function calculateSkillScore(
-  build: CharacterBuild,
-  effectiveScores: CharacterBuild["abilityScores"],
-  keyAbility: string | null | undefined,
-  trained: boolean
-): number | null {
-  const ability = resolveSkillAbilityCode(keyAbility);
-  if (!ability) return null;
-  const abilityMod = Math.floor((effectiveScores[ability] - 10) / 2);
-  const halfLevel = Math.floor(build.level / 2);
-  const trainingBonus = trained ? 5 : 0;
-  return abilityMod + halfLevel + trainingBonus;
-}
-
 const POINT_BUY_RELATIVE_TO_10: Record<number, number> = {
   8: -2, 9: -1, 10: 0, 11: 1, 12: 2, 13: 3, 14: 5, 15: 7, 16: 9, 17: 12, 18: 16
 };
@@ -1061,7 +1045,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       derived.supportPassiveOther.skillFlatBySkillId
     );
   }, [index, build.level, effectiveAbilityScores, autoGrantedSkillIds, build.trainedSkillIds, derived.armorCheckPenalty, derived.supportPassiveOther]);
-
   function powerKeywordTooltip(keyword: string): string | null {
     return resolveUiGlossaryHoverPlainText(
       `powerKeyword:${keyword}`,
@@ -2961,70 +2944,77 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               </p>
             )}
             <div style={{ ...ui.blockInset, backgroundColor: "var(--surface-1)" }}>
-              {skillsSortedAll.map((skill) => {
-                const checked = build.trainedSkillIds.includes(skill.id);
-                const trainable = !!(selectedClass && selectedClassSkillNamesLower.has(skill.name.toLowerCase()));
-                const autoGranted = autoGrantedSkillIdSet.has(skill.id);
-                const requiredSkill = requiredClassSkillNamesLower.has(skill.name.toLowerCase());
-                const disableBecauseMaxed = trainedSkillSelectionMaxed && !checked && trainable && !requiredSkill;
-                const canInteract = (trainable || checked) && !autoGranted && !disableBecauseMaxed;
-                const skillBody = typeof skill.raw?.body === "string" ? skill.raw.body : "";
-                const skillScore = calculateSkillScore(build, effectiveAbilityScores, skill.keyAbility, checked);
-                return (
-                  <div
-                    key={skill.id}
-                    style={{
-                      marginBottom: "0.35rem",
-                      opacity: trainable || checked ? (disableBecauseMaxed ? 0.58 : 1) : 0.72
-                    }}
-                  >
-                    <label style={{ display: "block", cursor: canInteract ? "pointer" : "default" }}>
+              <SkillModifierTable
+                rows={skillSheetRows}
+                rowStripe={false}
+                fontSize="0.76rem"
+                renderSkillName={(row, stripe) => {
+                  const skill = skillsSortedAll.find((s) => s.id === row.skillId);
+                  if (!skill) return row.name;
+                  const checked = build.trainedSkillIds.includes(skill.id);
+                  const trainable = !!(selectedClass && selectedClassSkillNamesLower.has(skill.name.toLowerCase()));
+                  const autoGranted = autoGrantedSkillIdSet.has(skill.id);
+                  const requiredSkill = requiredClassSkillNamesLower.has(skill.name.toLowerCase());
+                  const disableBecauseMaxed = trainedSkillSelectionMaxed && !checked && trainable && !requiredSkill;
+                  const canInteract = (trainable || checked) && !autoGranted && !disableBecauseMaxed;
+                  return (
+                    <label
+                      className="skill-modifier-table__name-label"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.35rem",
+                        cursor: canInteract ? "pointer" : "default",
+                        fontWeight: trainable || checked ? 600 : 400,
+                        padding: "0.12rem 0.2rem",
+                        borderRadius: "0.2rem",
+                        backgroundColor: stripe,
+                        minWidth: 0,
+                        opacity: trainable || checked ? (disableBecauseMaxed ? 0.58 : 1) : 0.72
+                      }}
+                    >
                       <input
                         type="checkbox"
                         checked={checked}
                         disabled={!canInteract}
                         onChange={(e) => {
                           if (e.target.checked && !trainable) return;
-                          const next = e.target.checked ? [...build.trainedSkillIds, skill.id] : build.trainedSkillIds.filter((id) => id !== skill.id);
+                          const next = e.target.checked
+                            ? [...build.trainedSkillIds, skill.id]
+                            : build.trainedSkillIds.filter((id) => id !== skill.id);
                           updateBuild({ ...build, trainedSkillIds: next });
                         }}
-                      />{" "}
-                      <span style={{ fontWeight: trainable || checked ? 600 : 400 }}>
-                        <span {...glossaryTooltipUi.hoverA11y(`skill:${skill.id}`)}>{skill.name}</span> ({skill.keyAbility || "N/A"})
+                      />
+                      <span
+                        className="skill-modifier-table__name-text"
+                        {...glossaryTooltipUi.hoverA11y(`skill:${skill.id}`)}
+                        style={{ minWidth: 0 }}
+                      >
+                        {row.name}
+                        {row.abilityCode ? (
+                          <span style={{ marginLeft: "0.35rem", fontWeight: 700, fontSize: "0.68rem", color: "var(--text-secondary)" }}>{row.abilityCode}</span>
+                        ) : null}
+                        {autoGranted ? (
+                          <span style={{ marginLeft: "0.35rem", fontSize: "0.72rem", color: "var(--status-success)", fontWeight: 600 }}>auto</span>
+                        ) : null}
+                        {!trainable && selectedClass ? (
+                          <span style={{ marginLeft: "0.35rem", fontSize: "0.72rem", color: "var(--text-muted)" }}>off-list</span>
+                        ) : null}
                       </span>
-                      <span style={{ marginLeft: "0.4rem", fontSize: "0.84rem", color: "var(--text-primary)", fontWeight: 600 }}>
-                        {skillScore === null ? "Score —" : `Score ${formatAbilityMod(skillScore)}`}
-                      </span>
-                      {autoGranted && (
-                        <span style={{ marginLeft: "0.35rem", fontSize: "0.78rem", color: "var(--status-success)", fontWeight: 600 }}>
-                          — auto trained
-                        </span>
-                      )}
-                      {!trainable && (
-                        <span style={{ marginLeft: "0.35rem", fontSize: "0.78rem", color: "var(--text-muted)", fontWeight: 400 }}>
-                          {selectedClass ? "— not on class list" : ""}
-                        </span>
-                      )}
-                      {disableBecauseMaxed && (
-                        <span style={{ marginLeft: "0.35rem", fontSize: "0.78rem", color: "var(--text-secondary)", fontWeight: 500 }}>
-                          — max trained selected
-                        </span>
-                      )}
-                      {checked && !trainable && selectedClass && (
-                        <span style={{ marginLeft: "0.35rem", fontSize: "0.78rem", color: "var(--status-danger)", fontWeight: 600 }}>
-                          (clear — not a class skill)
-                        </span>
-                      )}
                     </label>
-                    {skillBody && (
-                      <details open style={{ marginLeft: "1.25rem", marginTop: "0.15rem" }}>
-                        <summary style={detailsSummaryStyle}>Description</summary>
-                        <div style={{ fontSize: "0.8rem", margin: "0.25rem 0 0 0", color: "var(--text-secondary)" }}>
-                          <RulesRichText text={skillBody} paragraphStyle={{ fontSize: "0.8rem", color: "var(--text-secondary)" }} listItemStyle={{ fontSize: "0.8rem", color: "var(--text-secondary)" }} />
-                        </div>
-                      </details>
-                    )}
-                  </div>
+                  );
+                }}
+              />
+              {skillsSortedAll.map((skill) => {
+                const skillBody = typeof skill.raw?.body === "string" ? skill.raw.body : "";
+                if (!skillBody) return null;
+                return (
+                  <details key={`${skill.id}-desc`} open style={{ margin: "0.25rem 0 0.35rem 1.25rem" }}>
+                    <summary style={detailsSummaryStyle}>{skill.name} — description</summary>
+                    <div style={{ fontSize: "0.8rem", margin: "0.25rem 0 0 0", color: "var(--text-secondary)" }}>
+                      <RulesRichText text={skillBody} paragraphStyle={{ fontSize: "0.8rem", color: "var(--text-secondary)" }} listItemStyle={{ fontSize: "0.8rem", color: "var(--text-secondary)" }} />
+                    </div>
+                  </details>
                 );
               })}
             </div>
@@ -4446,18 +4436,50 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             <p style={{ margin: "0 0 0.4rem 0", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--text-secondary)", textTransform: "uppercase" }}>
               Combat Stats
             </p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "0.3rem 0.75rem" }}>
-              <div style={{ display: "grid", gap: "0.3rem" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "0.5rem 0.75rem", alignItems: "start" }}>
+              <div style={{ display: "grid", gap: "0.35rem", minWidth: 0 }}>
                 <p style={{ margin: 0, fontSize: "0.88rem" }}>
                   <strong {...glossaryTooltipUi.hoverA11y("hp")}>HP:</strong> {derived.maxHp}
                 </p>
-                <p style={{ margin: 0, fontSize: "0.88rem" }}>
-                  <strong {...glossaryTooltipUi.hoverA11y("speed")}>Speed:</strong> {derived.speed}
-                </p>
-                <p style={{ margin: 0, fontSize: "0.88rem" }}>
-                  <strong {...glossaryTooltipUi.hoverA11y("initiative")}>Initiative:</strong>{" "}
-                  {derived.initiative >= 0 ? `+${derived.initiative}` : derived.initiative}
-                </p>
+                <StatScoreTable
+                  fontSize="0.82rem"
+                  columns={MOTION_SPEED_COLUMNS}
+                  rowStripe={false}
+                  rows={[
+                    {
+                      rowKey: "speed",
+                      label: "Speed",
+                      glossaryKey: "speed",
+                      total: derived.speed,
+                      values: motionRowValues(derived.speedBreakdown.components, MOTION_SPEED_COLUMNS.map((c) => c.key))
+                    }
+                  ]}
+                  renderLabel={(row) => (
+                    <strong {...glossaryTooltipUi.hoverA11y(row.glossaryKey ?? row.rowKey)} style={{ fontSize: "0.82rem" }}>
+                      {row.label}
+                    </strong>
+                  )}
+                />
+                <StatScoreTable
+                  fontSize="0.82rem"
+                  columns={MOTION_INITIATIVE_COLUMNS}
+                  rowStripe={false}
+                  rows={[
+                    {
+                      rowKey: "initiative",
+                      label: "Initiative",
+                      glossaryKey: "initiative",
+                      total: derived.initiative,
+                      signedTotal: true,
+                      values: motionRowValues(derived.initiativeBreakdown.components, MOTION_INITIATIVE_COLUMNS.map((c) => c.key))
+                    }
+                  ]}
+                  renderLabel={(row) => (
+                    <strong {...glossaryTooltipUi.hoverA11y(row.glossaryKey ?? row.rowKey)} style={{ fontSize: "0.82rem" }}>
+                      {row.label}
+                    </strong>
+                  )}
+                />
                 <p style={{ margin: 0, fontSize: "0.88rem" }}>
                   <strong {...glossaryTooltipUi.hoverA11y("surges")}>Healing Surges:</strong> {derived.healingSurgesPerDay}
                 </p>
@@ -4465,41 +4487,56 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   <strong {...glossaryTooltipUi.hoverA11y("surgeValue")}>Surge Value:</strong> {derived.surgeValue}
                 </p>
               </div>
-              <div style={{ display: "grid", gap: "0.3rem" }}>
-                <p style={{ margin: 0, fontSize: "0.88rem" }}>
-                  <strong {...glossaryTooltipUi.hoverA11y("ac")}>AC:</strong> {derived.defenses.ac}
-                </p>
-                <p style={{ margin: 0, fontSize: "0.88rem" }}>
-                  <strong {...glossaryTooltipUi.hoverA11y("fortitude")}>Fortitude:</strong> {derived.defenses.fortitude}
-                </p>
-                <p style={{ margin: 0, fontSize: "0.88rem" }}>
-                  <strong {...glossaryTooltipUi.hoverA11y("reflex")}>Reflex:</strong> {derived.defenses.reflex}
-                </p>
-                <p style={{ margin: 0, fontSize: "0.88rem" }}>
-                  <strong {...glossaryTooltipUi.hoverA11y("will")}>Will:</strong> {derived.defenses.will}
-                </p>
+              <div style={{ minWidth: 0 }}>
+                <StatScoreTable
+                  fontSize="0.82rem"
+                  columns={DEFENSE_SCORE_COLUMNS}
+                  bonusHeader={null}
+                  statHeader="DEFENSE"
+                  prioritizeStatLabel
+                  rows={[
+                    {
+                      rowKey: "ac",
+                      label: "AC",
+                      glossaryKey: "ac",
+                      total: derived.defenses.ac,
+                      values: defenseRowValues(
+                        buildAcScoreComponents(derived.acBreakdown, {
+                          magicItemBonus: derived.defenses.ac - derived.acBreakdown.total
+                        })
+                      )
+                    },
+                    {
+                      rowKey: "fortitude",
+                      label: "Fortitude",
+                      glossaryKey: "fortitude",
+                      total: derived.defenses.fortitude,
+                      values: defenseRowValues(derived.fortitudeBreakdown.components)
+                    },
+                    {
+                      rowKey: "reflex",
+                      label: "Reflex",
+                      glossaryKey: "reflex",
+                      total: derived.defenses.reflex,
+                      values: defenseRowValues(derived.reflexBreakdown.components)
+                    },
+                    {
+                      rowKey: "will",
+                      label: "Will",
+                      glossaryKey: "will",
+                      total: derived.defenses.will,
+                      values: defenseRowValues(derived.willBreakdown.components)
+                    }
+                  ]}
+                  renderLabel={(row) => (
+                    <strong {...glossaryTooltipUi.hoverA11y(row.glossaryKey ?? row.rowKey)} style={{ fontSize: "0.82rem" }}>
+                      {row.label}
+                    </strong>
+                  )}
+                />
               </div>
             </div>
             <SupportPassiveMotionBreakdown o={derived.supportPassiveOther} summaryStyle={detailsSummaryStyle} />
-            <details style={{ marginTop: "0.45rem", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
-              <summary style={detailsSummaryStyle}>AC breakdown</summary>
-              <p style={{ margin: "0.25rem 0 0 0", color: "var(--text-muted)" }}>
-                AC = 10 + one-half level + armor + shield + ability when allowed by armor.
-              </p>
-              <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.15rem", fontVariantNumeric: "tabular-nums" }}>
-                <span>Base {derived.acBreakdown.base}</span>
-                <span>Half level +{derived.acBreakdown.halfLevel}</span>
-                <span>Armor +{derived.acBreakdown.armorBonus}</span>
-                <span>Shield +{derived.acBreakdown.shieldBonus}</span>
-                <span>
-                  Ability ({derived.acBreakdown.abilityLabel}){" "}
-                  {derived.acBreakdown.abilityLabel === "—" ? "—" : `${derived.acBreakdown.abilityBonus >= 0 ? "+" : ""}${derived.acBreakdown.abilityBonus}`}
-                </span>
-                {derived.acBreakdown.supportAcBonus > 0 && (
-                  <span>Feats / theme / path / destiny +{derived.acBreakdown.supportAcBonus}</span>
-                )}
-              </div>
-            </details>
             {derived.armorCheckPenalty > 0 && (
               <p style={{ margin: "0.45rem 0 0 0", fontSize: "0.82rem", color: "var(--status-warning)" }}>
                 Armor check penalty −{derived.armorCheckPenalty} on untrained Strength / Dexterity skills (see Skills).
@@ -4586,28 +4623,29 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.76rem", color: "var(--text-muted)" }}>
               Includes untrained skills; trained rows add +5 and ignore armor check penalty.
             </p>
-            <div style={{ display: "grid", gap: "0.2rem", fontSize: "0.82rem" }}>
-              {skillSheetRows.map((row) => (
-                <div
-                  key={row.skillId}
+            <SkillModifierTable
+              rows={skillSheetRows}
+              fontSize="0.75rem"
+              renderSkillName={(row, stripe) => (
+                <span
+                  className="skill-modifier-table__name-text"
+                  {...glossaryTooltipUi.hoverA11y(`skill:${row.skillId}`)}
                   style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: "0.5rem",
-                    fontVariantNumeric: "tabular-nums"
+                    color: "var(--text-secondary)",
+                    padding: "0.12rem 0.2rem",
+                    borderRadius: "0.2rem",
+                    backgroundColor: stripe,
+                    fontWeight: 600
                   }}
                 >
-                  <span style={{ color: "var(--text-secondary)" }} {...glossaryTooltipUi.hoverA11y(`skill:${row.skillId}`)}>
-                    {row.name}
-                    {row.trained ? " (T)" : ""}
-                  </span>
-                  <span style={{ fontWeight: 600 }}>
-                    {row.modifier >= 0 ? "+" : ""}
-                    {row.modifier}
-                  </span>
-                </div>
-              ))}
-            </div>
+                  {row.name}
+                  {row.abilityCode ? (
+                    <span style={{ marginLeft: "0.35rem", fontWeight: 700, fontSize: "0.68rem" }}>{row.abilityCode}</span>
+                  ) : null}
+                  {row.trained ? " (T)" : ""}
+                </span>
+              )}
+            />
           </div>
 
           {glossaryTooltipUi.showPanel && glossaryTooltipUi.hoverKey && glossaryTooltipUi.panelPos && (

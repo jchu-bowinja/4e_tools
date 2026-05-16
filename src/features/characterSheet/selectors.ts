@@ -4,6 +4,7 @@ import { autoGrantedClassPowers, collectPowerIdsFromRacialTrait } from "../../ru
 import { parseRacialTraitIdsFromRace } from "../../rules/racialTraits";
 import { computeBuilderLikeDerivedStats } from "../../rules/derivedStatsFromBuild";
 import type { AcBreakdown } from "../../rules/defenseCalculator";
+import type { StatScoreBreakdown } from "../../rules/statScoreBreakdown";
 import { mergeHybridProficiencyLines } from "../../rules/hybridDerivedStats";
 import type { PassiveOtherBonuses } from "../../rules/supportStatAdds";
 import type { Armor, CharacterBuild, ClassDef, Implement, Power, Race, RacialTrait, RulesIndex, Weapon } from "../../rules/models";
@@ -31,6 +32,11 @@ export interface SheetDerivedData {
   /** Initiative / speed / surge / skill flat bonuses from feat, theme, path, destiny statAdds. */
   supportPassiveOther: PassiveOtherBonuses;
   acBreakdown: AcBreakdown;
+  speedBreakdown: StatScoreBreakdown;
+  initiativeBreakdown: StatScoreBreakdown;
+  fortitudeBreakdown: StatScoreBreakdown;
+  reflexBreakdown: StatScoreBreakdown;
+  willBreakdown: StatScoreBreakdown;
 }
 
 export interface GroupedPowerCards {
@@ -122,7 +128,12 @@ export function computeSheetDerivedData(state: CharacterSheetState, index: Rules
       CHA: abilityMod(state.abilityScores.CHA)
     },
     supportPassiveOther: derived.supportPassiveOther,
-    acBreakdown: derived.acBreakdown
+    acBreakdown: derived.acBreakdown,
+    speedBreakdown: derived.speedBreakdown,
+    initiativeBreakdown: derived.initiativeBreakdown,
+    fortitudeBreakdown: derived.fortitudeBreakdown,
+    reflexBreakdown: derived.reflexBreakdown,
+    willBreakdown: derived.willBreakdown
   };
 }
 

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { computeSkillSheetRows } from "../../src/rules/skillCalculator";
+import {
+  computeSkillSheetRows,
+  formatSkillArmorCell,
+  formatSkillComponentCell,
+  formatSkillMiscCell,
+  formatSkillTotalCell
+} from "../../src/rules/skillCalculator";
 
 describe("skillCalculator", () => {
   it("computes trained and untrained skill modifiers", () => {
@@ -54,5 +60,28 @@ describe("skillCalculator", () => {
     expect(rows.find((r) => r.skillId === "s_ath")?.modifier).toBe(1 + 1 - 2);
     expect(rows.find((r) => r.skillId === "s_ste")?.modifier).toBe(1 + 1 + 5);
     expect(rows.find((r) => r.skillId === "s_arc")?.modifier).toBe(1 + 2);
+  });
+
+  it("exposes modifier breakdown components", () => {
+    const index = {
+      skills: [{ id: "s_ath", name: "Athletics", keyAbility: "Strength", slug: "athletics", raw: {} }]
+    } as never;
+    const row = computeSkillSheetRows(
+      index,
+      4,
+      { STR: 18, CON: 10, DEX: 10, INT: 10, WIS: 10, CHA: 10 },
+      new Set<string>(),
+      2
+    )[0];
+    expect(row.halfLevel).toBe(2);
+    expect(row.abilityMod).toBe(4);
+    expect(row.abilityCode).toBe("STR");
+    expect(row.trainedBonus).toBe(0);
+    expect(row.armorCheckDelta).toBe(-2);
+    expect(row.flatBonus).toBe(0);
+    expect(formatSkillTotalCell(row.modifier)).toBe("+4");
+    expect(formatSkillComponentCell(row.halfLevel)).toBe("2");
+    expect(formatSkillArmorCell(row)).toBe("-2");
+    expect(formatSkillMiscCell(row.flatBonus)).toBe("—");
   });
 });

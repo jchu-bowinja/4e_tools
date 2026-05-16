@@ -32,6 +32,35 @@ export interface SkillSheetRow {
   name: string;
   modifier: number;
   trained: boolean;
+  abilityCode?: Ability;
+  halfLevel: number;
+  abilityMod: number;
+  trainedBonus: number;
+  armorCheckDelta: number;
+  flatBonus: number;
+}
+
+export function formatSkillTotalCell(n: number): string {
+  return n >= 0 ? `+${n}` : String(n);
+}
+
+/** Component column: plain integer (0, 5, -2). */
+export function formatSkillComponentCell(n: number): string {
+  return String(n);
+}
+
+export function skillArmorPenaltyApplies(row: Pick<SkillSheetRow, "abilityCode" | "trained">): boolean {
+  if (row.trained) return false;
+  return row.abilityCode === "STR" || row.abilityCode === "DEX";
+}
+
+export function formatSkillArmorCell(row: Pick<SkillSheetRow, "armorCheckDelta" | "abilityCode" | "trained">): string {
+  if (!skillArmorPenaltyApplies(row)) return "—";
+  return formatSkillComponentCell(row.armorCheckDelta);
+}
+
+export function formatSkillMiscCell(flatBonus: number): string {
+  return flatBonus === 0 ? "—" : formatSkillComponentCell(flatBonus);
 }
 
 /** Half-level + ability + trained (+5). Trained characters ignore armor check penalty on skills. */
@@ -49,16 +78,22 @@ export function computeSkillSheetRows(
     const trained = trainedSkillIdSet.has(skill.id);
     const code = skillAbilityCode(skill);
     const score = code ? effectiveAbilityScores[code] ?? 10 : 10;
-    const base = halfLevel + abilityMod(score);
+    const abil = abilityMod(score);
+    const trainedBonus = trained ? 5 : 0;
+    const armorCheckDelta = armorCheckSkillDelta(skill, armorCheckPenalty, trained);
+    const flatBonus = skillFlatBonuses?.[skill.id] ?? 0;
+    const base = halfLevel + abil;
     rows.push({
       skillId: skill.id,
       name: skill.name,
-      modifier:
-        base +
-        (trained ? 5 : 0) +
-        armorCheckSkillDelta(skill, armorCheckPenalty, trained) +
-        (skillFlatBonuses?.[skill.id] ?? 0),
-      trained
+      modifier: base + trainedBonus + armorCheckDelta + flatBonus,
+      trained,
+      abilityCode: code,
+      halfLevel,
+      abilityMod: abil,
+      trainedBonus,
+      armorCheckDelta,
+      flatBonus
     });
   }
 

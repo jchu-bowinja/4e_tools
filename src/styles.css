@@ -1556,6 +1556,271 @@ button.encounter-roster-stat-cards-expand-btn[aria-pressed="true"] .template-jso
   }
 }
 
+/* Stat score tables (speed, initiative, defenses) share spacing tokens with skills. */
+.stat-score-table {
+  --skill-bonus-name-gap: 0.4rem;
+  --skill-col-gap: 0.2rem;
+  min-width: 0;
+  width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-score-table__hdr {
+  font-size: 0.58rem;
+  font-weight: 700;
+  line-height: 1.1;
+  text-align: center;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding: 0.12rem 0.1rem;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.stat-score-table__hdr--stack span {
+  display: block;
+}
+
+.stat-score-table__hdr--stack span + span {
+  margin-top: 0.04rem;
+}
+
+.stat-score-table__stat-hdr {
+  text-align: left;
+  padding-left: 0.1rem;
+}
+
+/* Defenses and other wide breakdown tables: anchor total + label like the skills table. */
+.stat-score-table--prioritize-stat {
+  --stat-bonus-col: minmax(2.35rem, max-content);
+  --stat-label-col: minmax(var(--stat-label-block-width, max-content), 1fr);
+  container-type: inline-size;
+  container-name: stat-score-table;
+  overflow: visible;
+}
+
+.stat-score-table--prioritize-stat .stat-score-table__header,
+.stat-score-table--prioritize-stat .stat-score-table__row {
+  display: grid;
+  grid-template-columns: var(--stat-bonus-col) var(--stat-label-col) var(--stat-score-comp-cols);
+  column-gap: var(--skill-col-gap);
+  align-items: center;
+  overflow: visible;
+}
+
+.stat-score-table--prioritize-stat .stat-score-table__header {
+  margin-bottom: 0.08rem;
+}
+
+.stat-score-table--prioritize-stat .stat-score-table__row + .stat-score-table__row {
+  margin-top: 0.04rem;
+}
+
+.stat-score-table--prioritize-stat .stat-score-table__bonus {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0.1rem var(--skill-bonus-name-gap) 0.1rem 0.05rem;
+  overflow: visible;
+  min-width: 0;
+}
+
+.stat-score-table--prioritize-stat .stat-score-table__bonus-hdr {
+  padding-right: var(--skill-bonus-name-gap);
+}
+
+.stat-score-table--prioritize-stat .stat-score-table__stat {
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+  padding-left: 0.1rem;
+  overflow: visible;
+}
+
+.stat-score-table--prioritize-stat .stat-score-table__stat-label-text {
+  display: inline-block;
+  box-sizing: border-box;
+  width: var(--stat-label-block-width, max-content);
+  min-width: var(--stat-label-block-width, max-content);
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
+  background-color: var(--stat-row-bg, var(--surface-0));
+  padding-right: 0.3rem;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.stat-score-table--prioritize-stat .stat-score-table__stat-hdr {
+  display: inline-block;
+  box-sizing: border-box;
+  min-width: var(--stat-label-block-width, auto);
+  background-color: var(--surface-0);
+  padding-right: 0.3rem;
+}
+
+.stat-score-table--prioritize-stat .stat-score-table__breakdown,
+.stat-score-table--prioritize-stat .stat-score-table__breakdown-hdr {
+  display: contents;
+}
+
+.stat-score-table--prioritize-stat .stat-score-table__comp {
+  position: relative;
+  z-index: 0;
+  display: flex;
+  justify-content: center;
+  padding: 0.1rem 0;
+}
+
+/* Skill modifier table: skill name overlaps component columns when the panel is narrow. */
+.skill-modifier-table {
+  --skill-bonus-col: minmax(2.35rem, max-content);
+  --skill-name-col: minmax(0, 1fr);
+  --skill-comp-col: 1.85rem;
+  --skill-comp-col-trained: 2.15rem;
+  --skill-comp-col-armor: 3.15rem;
+  --skill-comp-col-misc: 1.95rem;
+  --skill-bonus-name-gap: 0.4rem;
+  --skill-col-gap: 0.2rem;
+  container-type: inline-size;
+  container-name: skill-modifier-table;
+  min-width: 0;
+  width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+
+.skill-modifier-table__header,
+.skill-modifier-table__row {
+  display: grid;
+  grid-template-columns:
+    var(--skill-bonus-col)
+    var(--skill-name-col)
+    var(--skill-comp-col)
+    var(--skill-comp-col)
+    var(--skill-comp-col-trained)
+    var(--skill-comp-col-armor)
+    var(--skill-comp-col-misc);
+  column-gap: var(--skill-col-gap);
+  align-items: center;
+  overflow: visible;
+}
+
+.skill-modifier-table__header {
+  margin-bottom: 0.08rem;
+}
+
+.skill-modifier-table__row + .skill-modifier-table__row {
+  margin-top: 0.04rem;
+}
+
+.skill-modifier-table__bonus {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0.1rem var(--skill-bonus-name-gap) 0.1rem 0.05rem;
+  overflow: visible;
+  min-width: 0;
+}
+
+.skill-modifier-table__bonus-hdr {
+  padding-right: var(--skill-bonus-name-gap);
+}
+
+.skill-modifier-table__name {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  padding-left: 0.1rem;
+  overflow: hidden;
+}
+
+.skill-modifier-table__name-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skill-modifier-table__name-label {
+  overflow: hidden;
+  min-width: 0;
+}
+
+.skill-modifier-table__name-hdr {
+  text-align: left;
+  padding-left: 0.1rem;
+}
+
+.skill-modifier-table__breakdown,
+.skill-modifier-table__breakdown-hdr {
+  display: contents;
+}
+
+.skill-modifier-table__comp {
+  position: relative;
+  z-index: 0;
+  display: flex;
+  justify-content: center;
+  padding: 0.1rem 0;
+}
+
+.skill-modifier-table__hdr {
+  font-size: 0.58rem;
+  font-weight: 700;
+  line-height: 1.1;
+  text-align: center;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding: 0.12rem 0.1rem;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.skill-modifier-table__hdr--stack span {
+  display: block;
+}
+
+.skill-modifier-table__hdr--stack span + span {
+  margin-top: 0.04rem;
+}
+
+@container skill-modifier-table (max-width: 17.75rem) {
+  .skill-modifier-table__name,
+  .skill-modifier-table__name-hdr {
+    overflow: visible;
+    z-index: 2;
+  }
+
+  .skill-modifier-table__name-text,
+  .skill-modifier-table__name-label {
+    display: inline-block;
+    box-sizing: border-box;
+    width: var(--skill-name-block-width, max-content);
+    min-width: var(--skill-name-block-width, max-content);
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: nowrap;
+    background-color: var(--skill-row-bg, var(--surface-0));
+    padding-right: 0.3rem;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+
+  .skill-modifier-table__name-hdr {
+    display: inline-block;
+    box-sizing: border-box;
+    min-width: var(--skill-name-block-width, auto);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

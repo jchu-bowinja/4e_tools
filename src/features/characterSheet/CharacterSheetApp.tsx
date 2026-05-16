@@ -1,4 +1,4 @@
-﻿import {
+import {
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -12,6 +12,17 @@
 import type { Armor, Implement, RacialTrait, RulesIndex, Weapon } from "../../rules/models";
 import { resolveRacialTraitsForRace } from "../../rules/racialTraits";
 import { computeSkillSheetRows } from "../../rules/skillCalculator";
+import {
+  buildAcScoreComponents,
+  DEFENSE_SCORE_COLUMNS,
+  defenseRowValues,
+  MOTION_INITIATIVE_COLUMNS,
+  MOTION_SPEED_COLUMNS,
+  motionRowValues
+} from "../../rules/statScoreBreakdown";
+import { CollapsibleDisclosure } from "../../ui/CollapsibleDisclosure";
+import { SkillModifierTable } from "../../ui/SkillModifierTable";
+import { StatScoreTable, type StatScoreRowDef } from "../../ui/StatScoreTable";
 import { loadSavedCharacters, type SavedCharacterEntry } from "../builder/storage";
 import { GlossaryTooltipRichText, RulesRichText } from "../builder/RulesRichText";
 import { createDefaultCharacterSheetState } from "./defaultState";
@@ -33,7 +44,6 @@ import { useGlossaryTooltip } from "../../ui/useGlossaryTooltip";
 import { AdjustableNumberInput } from "../../ui/AdjustableNumberInput";
 import { findCaseInsensitiveMatches, scrollTextareaToMatch } from "../../ui/jsonSearch";
 import { summarizeImplementAttack, summarizeMainWeaponAttack } from "../../rules/weaponAttack";
-import { SupportPassiveMotionBreakdown } from "../shared/SupportPassiveMotionBreakdown";
 
 type SheetTab = "overview" | "inventory";
 
@@ -128,23 +138,21 @@ function OverviewCollapsibleSection({
   children
 }: OverviewCollapsibleSectionProps): JSX.Element {
   return (
-    <details className="template-json-collapsible character-sheet-overview-collapsible" open style={{ ...overviewCollapsiblePanelStyle, ...shellStyle }}>
-      <summary
-        className="template-json-collapsible-summary"
-        style={overviewCollapsibleSummaryStyle}
-        onMouseEnter={onTitleMouseEnter}
-        onMouseLeave={onTitleMouseLeave}
-        onFocus={onTitleFocus}
-        onBlur={onTitleBlur}
-        tabIndex={titleTabIndex}
-      >
-        <span className="template-json-collapsible-arrow" aria-hidden>
-          ▶
-        </span>
-        {title}
-      </summary>
-      <div style={overviewCollapsibleBodyStyle}>{children}</div>
-    </details>
+    <CollapsibleDisclosure
+      className="template-json-collapsible character-sheet-overview-collapsible"
+      open
+      style={{ ...overviewCollapsiblePanelStyle, ...shellStyle }}
+      summaryStyle={overviewCollapsibleSummaryStyle}
+      bodyStyle={overviewCollapsibleBodyStyle}
+      summary={title}
+      summaryTabIndex={titleTabIndex}
+      onSummaryMouseEnter={onTitleMouseEnter}
+      onSummaryMouseLeave={onTitleMouseLeave}
+      onSummaryFocus={onTitleFocus}
+      onSummaryBlur={onTitleBlur}
+    >
+      {children}
+    </CollapsibleDisclosure>
   );
 }
 
@@ -1468,46 +1476,62 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     );
   }
 
+  function renderGlossaryStatLabel(row: StatScoreRowDef, stripe: string): ReactNode {
+    const glossaryKey = row.glossaryKey ?? row.rowKey;
+    return (
+      <span
+        onMouseEnter={(event) => glossaryTooltipUi.startHover(event, glossaryKey)}
+        onMouseLeave={glossaryTooltipUi.leaveHover}
+        style={{
+          fontWeight: 600,
+          color: "var(--text-primary)",
+          padding: "0.12rem 0.2rem",
+          ...(stripe !== "transparent" ? { backgroundColor: stripe, borderRadius: "0.2rem" } : {}),
+          minWidth: 0,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap"
+        }}
+      >
+        {row.label}
+      </span>
+    );
+  }
+
   function renderSpeedInitiativePanel(): JSX.Element {
     return (
       <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.4rem", backgroundColor: "var(--surface-0)" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr auto", rowGap: "0.2rem", columnGap: "0.5rem", fontVariantNumeric: "tabular-nums" }}>
-          {[
-            { key: "speed" as const, label: "Speed", value: derived.speed },
-            {
-              key: "initiative" as const,
-              label: "Initiative",
-              value: derived.initiative >= 0 ? `+${derived.initiative}` : String(derived.initiative)
-            }
-          ].map((item, idx) => (
-            <div key={item.key} style={{ display: "contents" }}>
-              <span
-                onMouseEnter={(event) => glossaryTooltipUi.startHover(event, item.key)}
-                onMouseLeave={glossaryTooltipUi.leaveHover}
-                style={{
-                  padding: "0.16rem 0.35rem",
-                  borderRadius: "0.25rem",
-                  backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)",
-                  color: "var(--text-primary)"
-                }}
-              >
-                {item.label}
-              </span>
-              <strong
-                style={{
-                  padding: "0.16rem 0.35rem",
-                  borderRadius: "0.25rem",
-                  textAlign: "right",
-                  backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)",
-                  color: "var(--text-primary)"
-                }}
-              >
-                {item.value}
-              </strong>
-            </div>
-          ))}
+        <div style={{ display: "grid", gap: "0.35rem" }}>
+          <StatScoreTable
+            columns={MOTION_SPEED_COLUMNS}
+            rows={[
+              {
+                rowKey: "speed",
+                label: "Speed",
+                glossaryKey: "speed",
+                total: derived.speed,
+                values: motionRowValues(derived.speedBreakdown.components, MOTION_SPEED_COLUMNS.map((c) => c.key))
+              }
+            ]}
+            rowStripe={false}
+            renderLabel={renderGlossaryStatLabel}
+          />
+          <StatScoreTable
+            columns={MOTION_INITIATIVE_COLUMNS}
+            rows={[
+              {
+                rowKey: "initiative",
+                label: "Initiative",
+                glossaryKey: "initiative",
+                total: derived.initiative,
+                signedTotal: true,
+                values: motionRowValues(derived.initiativeBreakdown.components, MOTION_INITIATIVE_COLUMNS.map((c) => c.key))
+              }
+            ]}
+            rowStripe={false}
+            renderLabel={renderGlossaryStatLabel}
+          />
         </div>
-        <SupportPassiveMotionBreakdown o={derived.supportPassiveOther} summaryStyle={detailsSummaryStyle} />
       </div>
     );
   }
@@ -1661,64 +1685,50 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   function renderDefensesPanel(): JSX.Element {
     const bd = derived.acBreakdown;
     const secondWindBonus = hasSecondWindDefenseBonus(sheet.resources.conditions) ? SECOND_WIND_DEFENSE_BONUS : 0;
+    const magicAcBonus = derived.defenses.ac - bd.total;
+    const acComponents = buildAcScoreComponents(bd, { magicItemBonus: magicAcBonus, secondWindBonus });
     return (
       <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.4rem", backgroundColor: "var(--surface-0)" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr auto", rowGap: "0.2rem", columnGap: "0.5rem", fontVariantNumeric: "tabular-nums" }}>
-          {[
-            { key: "ac" as const, label: "AC", value: derived.defenses.ac + secondWindBonus },
-            { key: "fortitude" as const, label: "Fortitude", value: derived.defenses.fortitude + secondWindBonus },
-            { key: "reflex" as const, label: "Reflex", value: derived.defenses.reflex + secondWindBonus },
-            { key: "will" as const, label: "Will", value: derived.defenses.will + secondWindBonus }
-          ].map((item, idx) => (
-            <div key={item.key} style={{ display: "contents" }}>
-              <span
-                onMouseEnter={(event) => glossaryTooltipUi.startHover(event, item.key)}
-                onMouseLeave={glossaryTooltipUi.leaveHover}
-                style={{
-                  padding: "0.16rem 0.35rem",
-                  borderRadius: "0.25rem",
-                  backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)",
-                  color: "var(--text-primary)"
-                }}
-              >
-                {item.label}
-              </span>
-              <strong
-                style={{
-                  padding: "0.16rem 0.35rem",
-                  borderRadius: "0.25rem",
-                  textAlign: "right",
-                  backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)",
-                  color: "var(--text-primary)"
-                }}
-              >
-                {item.value}
-              </strong>
-            </div>
-          ))}
-        </div>
-        <details style={{ marginTop: "0.45rem", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
-          <summary style={detailsSummaryStyle}>AC breakdown</summary>
-          <p style={{ margin: "0.25rem 0 0 0", color: "var(--text-muted)" }}>
-            AC = 10 + one-half level + armor + shield + ability when allowed by armor.
-          </p>
-          <div style={{ marginTop: "0.35rem", display: "grid", gap: "0.15rem", fontVariantNumeric: "tabular-nums" }}>
-            <span>Base {bd.base}</span>
-            <span>Half level +{bd.halfLevel}</span>
-            <span>Armor +{bd.armorBonus}</span>
-            <span>Shield +{bd.shieldBonus}</span>
-            <span>
-              Ability ({bd.abilityLabel}){" "}
-              {bd.abilityLabel === "—" ? "—" : `${bd.abilityBonus >= 0 ? "+" : ""}${bd.abilityBonus}`}
-            </span>
-            {bd.supportAcBonus > 0 && (
-              <span>Feats / theme / path / destiny +{bd.supportAcBonus}</span>
-            )}
-          </div>
-        </details>
+        <StatScoreTable
+          columns={DEFENSE_SCORE_COLUMNS}
+          bonusHeader={null}
+          statHeader="DEFENSE"
+          prioritizeStatLabel
+          rows={[
+            {
+              rowKey: "ac",
+              label: "AC",
+              glossaryKey: "ac",
+              total: derived.defenses.ac + secondWindBonus,
+              values: defenseRowValues(acComponents)
+            },
+            {
+              rowKey: "fortitude",
+              label: "Fortitude",
+              glossaryKey: "fortitude",
+              total: derived.defenses.fortitude + secondWindBonus,
+              values: defenseRowValues(derived.fortitudeBreakdown.components, secondWindBonus)
+            },
+            {
+              rowKey: "reflex",
+              label: "Reflex",
+              glossaryKey: "reflex",
+              total: derived.defenses.reflex + secondWindBonus,
+              values: defenseRowValues(derived.reflexBreakdown.components, secondWindBonus)
+            },
+            {
+              rowKey: "will",
+              label: "Will",
+              glossaryKey: "will",
+              total: derived.defenses.will + secondWindBonus,
+              values: defenseRowValues(derived.willBreakdown.components, secondWindBonus)
+            }
+          ]}
+          renderLabel={renderGlossaryStatLabel}
+        />
         {derived.armorCheckPenalty > 0 && (
           <p style={{ margin: "0.45rem 0 0 0", fontSize: "0.82rem", color: "var(--status-warning)" }}>
-            Armor check penalty −{derived.armorCheckPenalty} on untrained Strength / Dexterity skills (see Skills).
+            Armor check penalty -{derived.armorCheckPenalty} on untrained Strength / Dexterity skills (see Skills).
           </p>
         )}
       </div>
@@ -1731,35 +1741,35 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
       <OverviewCollapsibleSection title="Basic Attacks">
         <div style={{ fontSize: "0.82rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
           <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.74rem", color: "var(--text-muted)" }}>
-            Half-level + ability + proficiency (or nonproficient −2). Equip weapons in Main / Off hand and an implement in the implement slot.
+            Half-level + ability + proficiency (or nonproficient -2). Equip weapons in Main / Off hand and an implement in the implement slot.
           </p>
           {mainWeaponSummary && mainHandWeapon && (
             <p style={{ margin: "0.15rem 0" }}>
-              <strong>Weapon (main):</strong> {mainHandWeapon.name} — attack{" "}
+              <strong>Weapon (main):</strong> {mainHandWeapon.name} ? attack{" "}
               {mainWeaponSummary.attackBonus >= 0 ? "+" : ""}
               {mainWeaponSummary.attackBonus} vs AC ({mainWeaponSummary.abilityCode}); damage {mainWeaponSummary.damageNotation}
               {!mainWeaponSummary.proficient && (
-                <span style={{ color: "var(--status-warning)", marginLeft: "0.25rem" }}>(nonproficient −2 applied in bonus)</span>
+                <span style={{ color: "var(--status-warning)", marginLeft: "0.25rem" }}>(nonproficient -2 applied in bonus)</span>
               )}
             </p>
           )}
           {offHandWeaponSummary && offHandWeapon && (
             <p style={{ margin: "0.15rem 0" }}>
-              <strong>Weapon (off):</strong> {offHandWeapon.name} — attack{" "}
+              <strong>Weapon (off):</strong> {offHandWeapon.name} ? attack{" "}
               {offHandWeaponSummary.attackBonus >= 0 ? "+" : ""}
               {offHandWeaponSummary.attackBonus} vs AC ({offHandWeaponSummary.abilityCode}); damage {offHandWeaponSummary.damageNotation}
               {!offHandWeaponSummary.proficient && (
-                <span style={{ color: "var(--status-warning)", marginLeft: "0.25rem" }}>(nonproficient −2 applied in bonus)</span>
+                <span style={{ color: "var(--status-warning)", marginLeft: "0.25rem" }}>(nonproficient -2 applied in bonus)</span>
               )}
             </p>
           )}
           {implementAttackSummary && equippedImplement && (
             <p style={{ margin: "0.15rem 0" }}>
-              <strong>Implement:</strong> {equippedImplement.name} — attack{" "}
+              <strong>Implement:</strong> {equippedImplement.name} ? attack{" "}
               {implementAttackSummary.attackBonus >= 0 ? "+" : ""}
               {implementAttackSummary.attackBonus} vs AC (best key ability)
               {!implementAttackSummary.proficient && (
-                <span style={{ color: "var(--status-warning)", marginLeft: "0.25rem" }}>(nonproficient −2 applied in bonus)</span>
+                <span style={{ color: "var(--status-warning)", marginLeft: "0.25rem" }}>(nonproficient -2 applied in bonus)</span>
               )}
             </p>
           )}
@@ -2080,50 +2090,33 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             </div>
             <div style={overviewSideColumnStyle}>
               <OverviewCollapsibleSection title="Skills">
-                <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: "0.18rem" }}>
-                  {skillRows.map((row, idx) => (
-                    <div
-                      key={row.skillId}
+                <SkillModifierTable
+                  rows={skillRows}
+                  fontSize="0.76rem"
+                  renderSkillName={(row, stripe) => (
+                    <span
+                      className="skill-modifier-table__name-text"
+                      onMouseEnter={(event) => glossaryTooltipUi.startHover(event, `skill:${row.skillId}`)}
+                      onMouseLeave={glossaryTooltipUi.leaveHover}
+                      onFocus={(event) => glossaryTooltipUi.startHover(event, `skill:${row.skillId}`)}
+                      onBlur={glossaryTooltipUi.leaveHover}
+                      tabIndex={0}
                       style={{
-                        ...overviewStatRowStyle,
-                        fontSize: "0.8rem",
-                        lineHeight: 1.2,
-                        fontVariantNumeric: "tabular-nums"
+                        fontWeight: 600,
+                        color: "var(--text-primary)",
+                        padding: "0.12rem 0.2rem",
+                        borderRadius: "0.2rem",
+                        backgroundColor: stripe
                       }}
                     >
-                      <span
-                        onMouseEnter={(event) => glossaryTooltipUi.startHover(event, `skill:${row.skillId}`)}
-                        onMouseLeave={glossaryTooltipUi.leaveHover}
-                        onFocus={(event) => glossaryTooltipUi.startHover(event, `skill:${row.skillId}`)}
-                        onBlur={glossaryTooltipUi.leaveHover}
-                        tabIndex={0}
-                        style={{
-                          color: "var(--text-primary)",
-                          padding: "0.2rem 0.35rem",
-                          borderRadius: "0.25rem",
-                          backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)",
-                          minWidth: 0,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap"
-                        }}
-                      >
-                        {row.name}
-                        {row.trained ? <strong style={{ color: "var(--status-success)" }}> (T)</strong> : null}
-                      </span>
-                      <strong
-                        style={{
-                          textAlign: "right",
-                          padding: "0.2rem 0.35rem",
-                          borderRadius: "0.25rem",
-                          backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)"
-                        }}
-                      >
-                        {row.modifier >= 0 ? `+${row.modifier}` : row.modifier}
-                      </strong>
-                    </div>
-                  ))}
-                </div>
+                      {row.name}
+                      {row.abilityCode ? (
+                        <span style={{ marginLeft: "0.35rem", fontWeight: 700, fontSize: "0.68rem", color: "var(--text-secondary)" }}>{row.abilityCode}</span>
+                      ) : null}
+                      {row.trained ? <strong style={{ color: "var(--status-success)", fontWeight: 700 }}> (T)</strong> : null}
+                    </span>
+                  )}
+                />
               </OverviewCollapsibleSection>
               {renderConditionsPanel()}
             </div>
@@ -2208,7 +2201,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem" }}>
                           <strong style={{ textDecoration: expended ? "line-through" : "none" }}>{power.name}</strong>
                           <span style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>
-                            Lv {power.level ?? 0} • {power.usage || "-"}
+                            Lv {power.level ?? 0} ? {power.usage || "-"}
                           </span>
                         </div>
                         {expended ? (

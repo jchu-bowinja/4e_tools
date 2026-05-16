@@ -16,6 +16,7 @@ import { STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE } from "../../ui/glossaryTooltip"
 import { useGlossaryTooltip } from "../../ui/useGlossaryTooltip";
 import { resolveMonsterGlossaryHoverSections, resolveMonsterStyleTooltip } from "./monsterTooltipResolve";
 import { GlossaryTooltipRichText } from "../builder/RulesRichText";
+import { CollapsibleDisclosure, CollapsibleDisclosureArrow } from "../../ui/CollapsibleDisclosure";
 import { findCaseInsensitiveMatches, scrollTextareaToMatch } from "../../ui/jsonSearch";
 import {
   loadMonsterEntry,
@@ -298,17 +299,15 @@ function TemplateJsonCollapsible({
   preExtraStyle?: CSSProperties;
 }): JSX.Element {
   return (
-    <details className="template-json-collapsible" style={templateJsonCollapsibleDetailsStyle}>
-      <summary className="template-json-collapsible-summary" style={templateJsonCollapsibleSummaryStyle}>
-        <span className="template-json-collapsible-arrow" aria-hidden>
-          ▶
-        </span>
-        {summaryLabel}
-      </summary>
+    <CollapsibleDisclosure
+      style={templateJsonCollapsibleDetailsStyle}
+      summaryStyle={templateJsonCollapsibleSummaryStyle}
+      summary={summaryLabel}
+    >
       <pre style={{ ...templateAbilityJsonPreStyle, marginTop: "0.35rem", ...preExtraStyle }}>
         {JSON.stringify(value, null, 2)}
       </pre>
-    </details>
+    </CollapsibleDisclosure>
   );
 }
 
@@ -389,13 +388,11 @@ function TemplateJsonSnippetEditor({
   );
 
   return (
-    <details className="template-json-collapsible" style={templateJsonCollapsibleDetailsStyle}>
-      <summary className="template-json-collapsible-summary" style={templateJsonCollapsibleSummaryStyle}>
-        <span className="template-json-collapsible-arrow" aria-hidden>
-          ▶
-        </span>
-        {summaryLabel}
-      </summary>
+    <CollapsibleDisclosure
+      style={templateJsonCollapsibleDetailsStyle}
+      summaryStyle={templateJsonCollapsibleSummaryStyle}
+      summary={summaryLabel}
+    >
       <textarea
         ref={taRef}
         spellCheck={false}
@@ -423,7 +420,7 @@ function TemplateJsonSnippetEditor({
       {parseError ? (
         <div style={{ marginTop: "0.25rem", fontSize: "0.72rem", color: "var(--status-danger)" }}>{parseError}</div>
       ) : null}
-    </details>
+    </CollapsibleDisclosure>
   );
 }
 
@@ -6073,9 +6070,7 @@ export function MonsterEditorApp({
                                   : "Open every creature stat block on this roster"
                               }
                             >
-                              <span className="template-json-collapsible-arrow" aria-hidden>
-                                ▶
-                              </span>
+                              <CollapsibleDisclosureArrow />
                             </button>
                           ) : null}
                         </div>

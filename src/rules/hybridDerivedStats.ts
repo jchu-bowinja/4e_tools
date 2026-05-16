@@ -1,10 +1,14 @@
 import type { CharacterBuild, HybridClassDef, Race } from "./models";
 import type { DerivedStats } from "./statCalculator";
 import type { Armor } from "./models";
-import { applyMagicItemDefenseBonuses } from "./statCalculator";
 import { computeAcBreakdown, bodyArmorSpeedPenalty, totalArmorCheckPenalty } from "./defenseCalculator";
 import type { PassiveDefenseBonuses, PassiveOtherBonuses } from "./supportStatAdds";
 import { emptyPassiveOther } from "./supportStatAdds";
+import { buildInitiativeBreakdown, buildNadBreakdown, buildSpeedBreakdown } from "./statScoreBreakdown";
+
+function finiteBonus(n: unknown): number {
+  return typeof n === "number" && Number.isFinite(n) ? n : 0;
+}
 
 const emptySupportDefense: PassiveDefenseBonuses = { ac: 0, fortitude: 0, reflex: 0, will: 0 };
 
@@ -83,7 +87,8 @@ export function computeHybridDerivedStats(
   const intMod = abilityMod(int);
   const raceSpeed = race?.speed ?? 6;
   const spdPen = bodyArmorSpeedPenalty(armor);
-  const speed = Math.max(0, raceSpeed - spdPen + o.speed);
+  const speedBreakdown = buildSpeedBreakdown(raceSpeed, spdPen, o.speed);
+  const speed = speedBreakdown.total;
 
   const baseFort = 10;
   const baseRef = 10;
@@ -94,30 +99,48 @@ export function computeHybridDerivedStats(
   const sp = supportPassiveDefense ?? emptySupportDefense;
   const acBreakdown = computeAcBreakdown(dexMod, intMod, armor, shield, build.level, sp.ac);
   const armorCheckPenalty = totalArmorCheckPenalty(armor, shield);
-  const initiative = halfLevel + dexMod + o.initiative;
+  const initiativeBreakdown = buildInitiativeBreakdown(halfLevel, dexMod, o.initiative);
+  const initiative = initiativeBreakdown.total;
 
-  const defensesBase = {
-    ac: acBreakdown.total,
-    fortitude:
-      baseFort +
-      halfLevel +
-      Math.max(abilityMod(str), abilityMod(con)) +
-      (mergeDef.Fortitude || 0) +
-      sp.fortitude,
-    reflex:
-      baseRef +
-      halfLevel +
-      Math.max(dexMod, intMod) +
-      (mergeDef.Reflex || 0) +
-      sp.reflex,
-    will:
-      baseWill +
-      halfLevel +
-      Math.max(abilityMod(wis), abilityMod(cha)) +
-      (mergeDef.Will || 0) +
-      sp.will
+  const fortAbility = Math.max(abilityMod(str), abilityMod(con));
+  const refAbility = Math.max(dexMod, intMod);
+  const willAbility = Math.max(abilityMod(wis), abilityMod(cha));
+  const magicFort = finiteBonus(build.magicItemBonuses?.fortitude);
+  const magicRef = finiteBonus(build.magicItemBonuses?.reflex);
+  const magicWill = finiteBonus(build.magicItemBonuses?.will);
+  const magicAc = finiteBonus(build.magicItemBonuses?.ac);
+
+  const fortitudeBreakdown = buildNadBreakdown({
+    halfLevel,
+    abilityMod: fortAbility,
+    abilityLabel: "STR/CON",
+    classBonus: mergeDef.Fortitude || 0,
+    supportBonus: sp.fortitude,
+    magicItemBonus: magicFort
+  });
+  const reflexBreakdown = buildNadBreakdown({
+    halfLevel,
+    abilityMod: refAbility,
+    abilityLabel: "DEX/INT",
+    classBonus: mergeDef.Reflex || 0,
+    supportBonus: sp.reflex,
+    magicItemBonus: magicRef
+  });
+  const willBreakdown = buildNadBreakdown({
+    halfLevel,
+    abilityMod: willAbility,
+    abilityLabel: "WIS/CHA",
+    classBonus: mergeDef.Will || 0,
+    supportBonus: sp.will,
+    magicItemBonus: magicWill
+  });
+
+  const defenses = {
+    ac: acBreakdown.total + magicAc,
+    fortitude: fortitudeBreakdown.total,
+    reflex: reflexBreakdown.total,
+    will: willBreakdown.total
   };
-  const defenses = applyMagicItemDefenseBonuses(defensesBase, build.magicItemBonuses);
 
   return {
     maxHp,
@@ -128,6 +151,11 @@ export function computeHybridDerivedStats(
     armorCheckPenalty,
     defenses,
     acBreakdown,
+    speedBreakdown,
+    initiativeBreakdown,
+    fortitudeBreakdown,
+    reflexBreakdown,
+    willBreakdown,
     supportPassiveOther: o
   };
 }

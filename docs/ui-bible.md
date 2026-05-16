@@ -92,11 +92,30 @@ State visuals should be consistent across buttons, fields, toggles, and list row
 - Keep heading structure and internal spacing predictable.
 - Avoid creating feature-specific panel variants unless the data shape truly demands it.
 
+#### Collapsible disclosure (expand / collapse)
+
+Use the shared **`CollapsibleDisclosure`** and **`CollapsibleDisclosureArrow`** components from `src/ui/CollapsibleDisclosure.tsx` whenever a section expands or collapses with a leading indicator (JSON snippets, character-sheet overview blocks such as ability scores and skills, template preview panels, roster expand-all controls).
+
+- **Do not** hand-roll `<details>` / `<summary>` markup with a one-off arrow character or placeholder (`?`, `+`, native markers). Reuse the component so the indicator and rotation stay consistent.
+- Styling lives in `src/styles.css` under `.template-json-collapsible` and `.template-json-collapsible-arrow`: collapsed shows **▶**; open rotates the arrow 90° (points down). Summary rows hide the browser default disclosure marker.
+- Pass section-specific layout via `style`, `summaryStyle`, and optional `bodyStyle` props; add a feature class on `className` only when local overrides are required (for example `character-sheet-overview-collapsible`).
+- For toggle buttons that are not `<details>` (for example expand-all on an encounter roster), render **`CollapsibleDisclosureArrow`** inside the button and reuse the same CSS hooks documented in `styles.css`.
+
 ### Lists, Tables, and Data Rows
 
 - Use consistent row density and alignment rules.
 - Keep sorting/filtering interaction patterns uniform when used.
 - Empty, loading, and error states should use shared phrasing and layout conventions.
+
+#### Score breakdown tables (skills, defenses, speed, initiative)
+
+Character-sheet style breakdown tables show a **total** in the leading column, a **row label** (skill name, defense name, etc.), then **component columns** for the math.
+
+- **Prioritize the total and the row label.** Those two columns are the anchors users scan first. They must stay readable when the panel is narrow or when many component columns are present.
+- **Skills** (`SkillModifierTable`): measure the widest skill name and use an opaque label stripe that can overlap component columns on narrow panels (container query), instead of clipping the name or adding a horizontal scrollbar to the whole table.
+- **Defenses** (`StatScoreTable` with `prioritizeStatLabel`): apply the same principle—green total stays visible, defense names (AC, Fortitude, Reflex, Will) use a measured minimum width and the same opaque overlap treatment so names are not truncated to “Forti” / “Refle”.
+- **Component columns** are secondary: they may sit under the label stripe when space is tight; do not sacrifice total or label legibility to keep every header on one line.
+- Reuse `StatScoreTable` / `SkillModifierTable` and shared score cell styling (`scoreTableCells`) rather than one-off breakdown layouts.
 
 ### Overlays (Tooltips, Popovers, Modals)
 
@@ -180,6 +199,7 @@ Use this checklist before merging UI/style/look-and-feel work:
 - [ ] Any local subapplication variation is documented and intentionally scoped.
 - [ ] Obvious one-off styles were avoided or justified with a clear reason.
 - [ ] Glossary or rules hover tooltips are not attached to raw value inputs; they use labels or explicit help text instead.
+- [ ] Expand/collapse sections use `CollapsibleDisclosure` (or `CollapsibleDisclosureArrow` for non-details toggles), not ad-hoc arrows or placeholders.
 
 ## Update Process
 

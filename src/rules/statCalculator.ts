@@ -3,6 +3,12 @@ import type { AcBreakdown } from "./defenseCalculator";
 import { bodyArmorSpeedPenalty, computeAcBreakdown, totalArmorCheckPenalty } from "./defenseCalculator";
 import type { PassiveDefenseBonuses, PassiveOtherBonuses } from "./supportStatAdds";
 import { emptyPassiveOther } from "./supportStatAdds";
+import {
+  buildInitiativeBreakdown,
+  buildNadBreakdown,
+  buildSpeedBreakdown,
+  type StatScoreBreakdown
+} from "./statScoreBreakdown";
 
 function finiteBonus(n: unknown): number {
   return typeof n === "number" && Number.isFinite(n) ? n : 0;
@@ -37,6 +43,11 @@ export interface DerivedStats {
     will: number;
   };
   acBreakdown: AcBreakdown;
+  speedBreakdown: StatScoreBreakdown;
+  initiativeBreakdown: StatScoreBreakdown;
+  fortitudeBreakdown: StatScoreBreakdown;
+  reflexBreakdown: StatScoreBreakdown;
+  willBreakdown: StatScoreBreakdown;
   /** Flat bonuses from support entities' statAdds (initiative, speed, healing surges, skills). */
   supportPassiveOther: PassiveOtherBonuses;
 }
@@ -74,10 +85,12 @@ export function computeDerivedStats(
   const intMod = abilityMod(int);
   const halfLevel = Math.floor(build.level / 2);
   const o = supportPassiveOther ?? emptyPassiveOther();
-  const initiative = halfLevel + dexMod + o.initiative;
   const raceSpeed = race?.speed ?? 6;
   const spdPen = bodyArmorSpeedPenalty(armor);
-  const speed = Math.max(0, raceSpeed - spdPen + o.speed);
+  const speedBreakdown = buildSpeedBreakdown(raceSpeed, spdPen, o.speed);
+  const speed = speedBreakdown.total;
+  const initiativeBreakdown = buildInitiativeBreakdown(halfLevel, dexMod, o.initiative);
+  const initiative = initiativeBreakdown.total;
 
   const baseFort = 10;
   const baseRef = 10;
@@ -89,28 +102,48 @@ export function computeDerivedStats(
 
   const healingSurgesPerDayAdjusted = Math.max(0, healingSurgesPerDay + o.healingSurgesPerDay);
 
-  const defensesBase = {
-    ac: acBreakdown.total,
-    fortitude:
-      baseFort +
-      halfLevel +
-      Math.max(abilityMod(str), abilityMod(con)) +
-      (classDefenseBonuses?.Fortitude || 0) +
-      sp.fortitude,
-    reflex:
-      baseRef +
-      halfLevel +
-      Math.max(dexMod, intMod) +
-      (classDefenseBonuses?.Reflex || 0) +
-      sp.reflex,
-    will:
-      baseWill +
-      halfLevel +
-      Math.max(abilityMod(wis), abilityMod(cha)) +
-      (classDefenseBonuses?.Will || 0) +
-      sp.will
+  const fortAbility = Math.max(abilityMod(str), abilityMod(con));
+  const refAbility = Math.max(dexMod, intMod);
+  const willAbility = Math.max(abilityMod(wis), abilityMod(cha));
+  const classFort = classDefenseBonuses?.Fortitude || 0;
+  const classRef = classDefenseBonuses?.Reflex || 0;
+  const classWill = classDefenseBonuses?.Will || 0;
+  const magicFort = finiteBonus(build.magicItemBonuses?.fortitude);
+  const magicRef = finiteBonus(build.magicItemBonuses?.reflex);
+  const magicWill = finiteBonus(build.magicItemBonuses?.will);
+  const magicAc = finiteBonus(build.magicItemBonuses?.ac);
+
+  const fortitudeBreakdown = buildNadBreakdown({
+    halfLevel,
+    abilityMod: fortAbility,
+    abilityLabel: "STR/CON",
+    classBonus: classFort,
+    supportBonus: sp.fortitude,
+    magicItemBonus: magicFort
+  });
+  const reflexBreakdown = buildNadBreakdown({
+    halfLevel,
+    abilityMod: refAbility,
+    abilityLabel: "DEX/INT",
+    classBonus: classRef,
+    supportBonus: sp.reflex,
+    magicItemBonus: magicRef
+  });
+  const willBreakdown = buildNadBreakdown({
+    halfLevel,
+    abilityMod: willAbility,
+    abilityLabel: "WIS/CHA",
+    classBonus: classWill,
+    supportBonus: sp.will,
+    magicItemBonus: magicWill
+  });
+
+  const defenses = {
+    ac: acBreakdown.total + magicAc,
+    fortitude: fortitudeBreakdown.total,
+    reflex: reflexBreakdown.total,
+    will: willBreakdown.total
   };
-  const defenses = applyMagicItemDefenseBonuses(defensesBase, build.magicItemBonuses);
 
   return {
     maxHp,
@@ -121,6 +154,11 @@ export function computeDerivedStats(
     armorCheckPenalty,
     defenses,
     acBreakdown,
+    speedBreakdown,
+    initiativeBreakdown,
+    fortitudeBreakdown,
+    reflexBreakdown,
+    willBreakdown,
     supportPassiveOther: o
   };
 }
