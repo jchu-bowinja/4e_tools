@@ -306,6 +306,8 @@ function HealingSurgeValueHint({
     observer.observe(stack);
     const flexRow = stack.parentElement;
     if (flexRow) observer.observe(flexRow);
+    const surgesBox = flexRow?.parentElement?.parentElement;
+    if (surgesBox) observer.observe(surgesBox);
 
     return () => {
       cancelAnimationFrame(rafId);
@@ -319,7 +321,7 @@ function HealingSurgeValueHint({
       style={{
         ...hpPanelResourceHintStyle,
         ...healingSurgesLabelStackStyle,
-        flex: "1 1 auto",
+        flex: "1 1 0",
         minWidth: 0
       }}
     >
