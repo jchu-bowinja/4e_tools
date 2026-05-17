@@ -15,6 +15,33 @@ export interface InventoryItem {
   notes?: string;
 }
 
+export type ConditionDurationKind =
+  | "none"
+  | "save_ends"
+  | "save_ends_both"
+  | "save_ends_all"
+  | "end_encounter"
+  | "end_turn"
+  | "start_turn"
+  | "rounds";
+
+export type ConditionDurationSubject = "self" | "target" | "source";
+
+export interface ConditionDuration {
+  kind: ConditionDurationKind;
+  phrase: string;
+  rounds?: number;
+  subject?: ConditionDurationSubject;
+}
+
+export interface ActiveCondition {
+  id: string;
+  name: string;
+  duration: ConditionDuration;
+  /** Reserved for turn tracker: encounter round or turn index when added */
+  appliedAt?: { round?: number; turnId?: string };
+}
+
 export interface CharacterSheetResources {
   currentHp: number;
   tempHp: number;
@@ -23,7 +50,7 @@ export interface CharacterSheetResources {
   /** True after Second Wind is used; resets on short or long rest. */
   secondWindUsed?: boolean;
   deathSaves: number;
-  conditions: string[];
+  conditions: ActiveCondition[];
 }
 
 export interface CharacterSheetPowerSelection {

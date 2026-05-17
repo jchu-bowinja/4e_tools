@@ -1,3 +1,4 @@
+import { normalizeActiveConditions } from "./activeConditions";
 import { createDefaultCharacterSheetState } from "./defaultState";
 import type { CharacterSheetState } from "./model";
 
@@ -30,7 +31,7 @@ function normalizeMagicItemBonuses(raw: unknown): CharacterSheetState["magicItem
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
-function normalizeState(input: unknown): CharacterSheetState {
+export function normalizeState(input: unknown): CharacterSheetState {
   const fallback = createDefaultCharacterSheetState();
   if (!input || typeof input !== "object") {
     return fallback;
@@ -57,9 +58,7 @@ function normalizeState(input: unknown): CharacterSheetState {
           ? v.resources.secondWindUsed
           : fallback.resources.secondWindUsed ?? false,
       deathSaves: clampInt(v.resources?.deathSaves, 0, 3, fallback.resources.deathSaves),
-      conditions: Array.isArray(v.resources?.conditions)
-        ? v.resources.conditions.filter((name): name is string => typeof name === "string" && name.trim().length > 0).map((name) => name.trim())
-        : fallback.resources.conditions
+      conditions: normalizeActiveConditions(v.resources?.conditions ?? fallback.resources.conditions)
     },
     inventory: Array.isArray(v.inventory) ? v.inventory : [],
     equipment: typeof v.equipment === "object" && v.equipment ? v.equipment : {},

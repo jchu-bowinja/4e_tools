@@ -1,12 +1,16 @@
-import type { CharacterSheetResources } from "./model";
+import { buildDurationFromPreset } from "./conditionDurationPresets";
+import { createActiveCondition } from "./activeConditions";
+import type { ActiveCondition, CharacterSheetResources } from "./model";
 
 /** Condition label applied when Second Wind is used (+2 to all defenses until start of next turn). */
 export const SECOND_WIND_CONDITION = "Second Wind (+2 defenses)";
 
 export const SECOND_WIND_DEFENSE_BONUS = 2;
 
-export function hasSecondWindDefenseBonus(conditions: string[]): boolean {
-  return conditions.some((c) => c === SECOND_WIND_CONDITION);
+const SECOND_WIND_DURATION = buildDurationFromPreset("start_your_next");
+
+export function hasSecondWindDefenseBonus(conditions: ActiveCondition[]): boolean {
+  return conditions.some((c) => c.name === SECOND_WIND_CONDITION);
 }
 
 export function canUseSecondWind(resources: CharacterSheetResources): boolean {
@@ -33,7 +37,7 @@ export function useSecondWindResources(
   const afterSurge = spendHealingSurgeResources(resources, params);
   const conditions = hasSecondWindDefenseBonus(afterSurge.conditions)
     ? afterSurge.conditions
-    : [...afterSurge.conditions, SECOND_WIND_CONDITION];
+    : [...afterSurge.conditions, createActiveCondition(SECOND_WIND_CONDITION, SECOND_WIND_DURATION)];
   return {
     ...afterSurge,
     secondWindUsed: true,
@@ -46,6 +50,6 @@ export function refreshSecondWindOnRest(resources: CharacterSheetResources): Cha
   return {
     ...resources,
     secondWindUsed: false,
-    conditions: resources.conditions.filter((c) => c !== SECOND_WIND_CONDITION)
+    conditions: resources.conditions.filter((c) => c.name !== SECOND_WIND_CONDITION)
   };
 }

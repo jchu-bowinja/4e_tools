@@ -39,7 +39,8 @@ describe("useSecondWindResources", () => {
     expect(next.surgesRemaining).toBe(1);
     expect(next.currentHp).toBe(12);
     expect(next.secondWindUsed).toBe(true);
-    expect(next.conditions).toContain(SECOND_WIND_CONDITION);
+    expect(next.conditions.some((c) => c.name === SECOND_WIND_CONDITION)).toBe(true);
+    expect(next.conditions.find((c) => c.name === SECOND_WIND_CONDITION)?.duration.kind).toBe("start_turn");
   });
 
   it("is blocked after second wind was used", () => {
@@ -66,7 +67,7 @@ describe("refreshSecondWindOnRest", () => {
     const used = useSecondWindResources(baseResources, params);
     const refreshed = refreshSecondWindOnRest(used);
     expect(refreshed.secondWindUsed).toBe(false);
-    expect(refreshed.conditions).not.toContain(SECOND_WIND_CONDITION);
+    expect(refreshed.conditions.some((c) => c.name === SECOND_WIND_CONDITION)).toBe(false);
     expect(refreshed.surgesRemaining).toBe(used.surgesRemaining);
   });
 });

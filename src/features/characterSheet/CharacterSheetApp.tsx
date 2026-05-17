@@ -33,6 +33,13 @@ import { SkillModifierNameContent, SkillModifierTable } from "../../ui/SkillModi
 import { StatScoreTable, type StatScoreRowDef } from "../../ui/StatScoreTable";
 import { loadBuild, loadSavedCharacters, type SavedCharacterEntry } from "../builder/storage";
 import { GlossaryTooltipRichText, RulesRichText } from "../builder/RulesRichText";
+import { areActiveConditionsDuplicate, createActiveCondition } from "./activeConditions";
+import {
+  buildDurationFromPreset,
+  conditionDurationDisplayPhrase,
+  CONDITION_DURATION_PRESET_OPTIONS,
+  type ConditionDurationPresetKey
+} from "./conditionDurationPresets";
 import { createDefaultCharacterSheetState } from "./defaultState";
 import type { CharacterSheetState, EquipmentSlot, InventoryItem } from "./model";
 import {
@@ -795,6 +802,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   const [selectedSavedCharacterId, setSelectedSavedCharacterId] = useState("");
   const [selectedConditionOption, setSelectedConditionOption] = useState("");
   const [customConditionText, setCustomConditionText] = useState("");
+  const [selectedDurationPreset, setSelectedDurationPreset] = useState<ConditionDurationPresetKey>("");
+  const [conditionDurationRounds, setConditionDurationRounds] = useState(1);
   const [showRaceHoverInfo, setShowRaceHoverInfo] = useState(false);
   const [raceHoverPanelPos, setRaceHoverPanelPos] = useState<{
     top: number;
@@ -1286,31 +1295,81 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     setSavedCharacters(loadSavedCharacters());
   }
 
+  function buildSelectedConditionDuration() {
+    return buildDurationFromPreset(selectedDurationPreset, conditionDurationRounds);
+  }
+
   function addCondition(name: string): void {
     const normalized = name.trim();
     if (!normalized) return;
+    const duration = buildSelectedConditionDuration();
+    const candidate = createActiveCondition(normalized, duration);
     updateSheet((prev) => {
-      if (prev.resources.conditions.some((existing) => existing.toLowerCase() === normalized.toLowerCase())) {
+      if (prev.resources.conditions.some((existing) => areActiveConditionsDuplicate(existing, candidate))) {
         return prev;
       }
       return {
         ...prev,
         resources: {
           ...prev.resources,
-          conditions: [...prev.resources.conditions, normalized]
+          conditions: [...prev.resources.conditions, candidate]
         }
       };
     });
   }
 
-  function removeCondition(name: string): void {
+  function removeCondition(id: string): void {
     updateSheet((prev) => ({
       ...prev,
       resources: {
         ...prev.resources,
-        conditions: prev.resources.conditions.filter((existing) => existing !== name)
+        conditions: prev.resources.conditions.filter((existing) => existing.id !== id)
       }
     }));
+  }
+
+  function renderConditionDurationSelect(style?: CSSProperties): JSX.Element {
+    return (
+      <select
+        value={selectedDurationPreset}
+        onChange={(e) => setSelectedDurationPreset(e.target.value as ConditionDurationPresetKey)}
+        aria-label="Condition duration"
+        style={{
+          fontSize: "0.78rem",
+          borderRadius: "0.25rem",
+          border: "1px solid var(--panel-border)",
+          padding: "0.15rem 0.2rem",
+          ...style
+        }}
+      >
+        {CONDITION_DURATION_PRESET_OPTIONS.map((opt) => (
+          <option key={opt.key || "none"} value={opt.key}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  function renderConditionDurationRoundsInput(): JSX.Element | null {
+    if (selectedDurationPreset !== "rounds") return null;
+    return (
+      <input
+        type="number"
+        min={1}
+        max={99}
+        value={conditionDurationRounds}
+        onChange={(e) => setConditionDurationRounds(Math.max(1, Math.min(99, Number(e.target.value) || 1)))}
+        aria-label="Number of rounds"
+        style={{
+          fontSize: "0.78rem",
+          borderRadius: "0.25rem",
+          border: "1px solid var(--panel-border)",
+          padding: "0.15rem 0.25rem",
+          width: "3.2rem"
+        }}
+      />
+    );
   }
 
   function renderHitPointsPanel(): JSX.Element {
@@ -1727,21 +1786,58 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           Conditions
         </div>
         <div style={{ display: "grid", gap: "0.25rem" }}>
-          <select
-            value={selectedConditionOption}
-            onChange={(e) => setSelectedConditionOption(e.target.value)}
-            style={{ fontSize: "0.78rem", borderRadius: "0.25rem", border: "1px solid var(--panel-border)", padding: "0.15rem 0.2rem" }}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                selectedConditionOption && selectedConditionOption !== "__custom__"
+                  ? selectedDurationPreset === "rounds"
+                    ? "1fr auto 3.2rem auto"
+                    : "1fr auto auto"
+                  : "1fr",
+              gap: "0.2rem",
+              alignItems: "center"
+            }}
           >
-            <option value="">Add condition...</option>
-            {GLOSSARY_CONDITION_OPTIONS.map((condition) => (
-              <option key={condition} value={condition}>
-                {condition}
-              </option>
-            ))}
-            <option value="__custom__">Custom condition...</option>
-          </select>
+            <select
+              value={selectedConditionOption}
+              onChange={(e) => setSelectedConditionOption(e.target.value)}
+              style={{ fontSize: "0.78rem", borderRadius: "0.25rem", border: "1px solid var(--panel-border)", padding: "0.15rem 0.2rem" }}
+            >
+              <option value="">Add condition...</option>
+              {GLOSSARY_CONDITION_OPTIONS.map((condition) => (
+                <option key={condition} value={condition}>
+                  {condition}
+                </option>
+              ))}
+              <option value="__custom__">Custom condition...</option>
+            </select>
+            {selectedConditionOption && selectedConditionOption !== "__custom__" && (
+              <>
+                {renderConditionDurationSelect()}
+                {renderConditionDurationRoundsInput()}
+                <button
+                  type="button"
+                  onClick={() => {
+                    addCondition(selectedConditionOption);
+                    setSelectedConditionOption("");
+                  }}
+                  style={{ fontSize: "0.75rem", padding: "0.15rem 0.35rem", whiteSpace: "nowrap" }}
+                >
+                  Add
+                </button>
+              </>
+            )}
+          </div>
           {selectedConditionOption === "__custom__" && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "0.2rem" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: selectedDurationPreset === "rounds" ? "1fr auto 3.2rem auto" : "1fr auto auto",
+                gap: "0.2rem",
+                alignItems: "center"
+              }}
+            >
               <input
                 type="text"
                 value={customConditionText}
@@ -1749,29 +1845,19 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 placeholder="Enter custom condition"
                 style={{ fontSize: "0.78rem", borderRadius: "0.25rem", border: "1px solid var(--panel-border)", padding: "0.15rem 0.25rem" }}
               />
+              {renderConditionDurationSelect()}
+              {renderConditionDurationRoundsInput()}
               <button
                 type="button"
                 onClick={() => {
                   addCondition(customConditionText);
                   setCustomConditionText("");
                 }}
-                style={{ fontSize: "0.75rem", padding: "0.15rem 0.35rem" }}
+                style={{ fontSize: "0.75rem", padding: "0.15rem 0.35rem", whiteSpace: "nowrap" }}
               >
                 Add
               </button>
             </div>
-          )}
-          {selectedConditionOption && selectedConditionOption !== "__custom__" && (
-            <button
-              type="button"
-              onClick={() => {
-                addCondition(selectedConditionOption);
-                setSelectedConditionOption("");
-              }}
-              style={{ fontSize: "0.75rem", padding: "0.15rem 0.35rem", justifySelf: "start" }}
-            >
-              Add Selected
-            </button>
           )}
         </div>
         {(isBloodied || isDying || isDead) && (
@@ -1810,52 +1896,66 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         )}
         {sheet.resources.conditions.length > 0 && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "0.25rem" }}>
-            {sheet.resources.conditions.map((condition) => (
-              <div
-                key={condition}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr auto",
-                  gap: "0.25rem",
-                  alignItems: "center",
-                  padding: "0.14rem 0.35rem",
-                  borderRadius: "0.25rem",
-                  backgroundColor: conditionBadgeStyle(condition).backgroundColor,
-                  color: conditionBadgeStyle(condition).color,
-                  fontSize: "0.74rem",
-                  fontWeight: 700,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.04em"
-                }}
-              >
-                <span
-                  onMouseEnter={(event) => glossaryTooltipUi.startHover(event, `condition:${condition}`)}
-                  onFocus={(event) => glossaryTooltipUi.startHover(event, `condition:${condition}`)}
-                  onMouseLeave={glossaryTooltipUi.leaveHover}
-                  onBlur={glossaryTooltipUi.leaveHover}
-                  tabIndex={0}
-                >
-                  {conditionDisplayLabel(condition)}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => removeCondition(condition)}
+            {sheet.resources.conditions.map((condition) => {
+              const durationPhrase = conditionDurationDisplayPhrase(condition.duration);
+              return (
+                <div
+                  key={condition.id}
                   style={{
-                    border: "1px solid var(--panel-border-strong)",
-                    borderRadius: "0.2rem",
-                    backgroundColor: "var(--surface-0)",
-                    color: "var(--text-secondary)",
-                    fontSize: "0.7rem",
-                    lineHeight: 1,
-                    padding: "0.05rem 0.2rem",
-                    cursor: "pointer"
+                    display: "grid",
+                    gridTemplateColumns: "1fr auto",
+                    gap: "0.25rem",
+                    alignItems: "center",
+                    width: "auto",
+                    ...conditionBadgeStyle(condition.name)
                   }}
-                  aria-label={`Remove ${condition}`}
                 >
-                  x
-                </button>
-              </div>
-            ))}
+                  <span
+                    onMouseEnter={(event) => glossaryTooltipUi.startHover(event, `condition:${condition.name}`)}
+                    onFocus={(event) => glossaryTooltipUi.startHover(event, `condition:${condition.name}`)}
+                    onMouseLeave={glossaryTooltipUi.leaveHover}
+                    onBlur={glossaryTooltipUi.leaveHover}
+                    tabIndex={0}
+                    style={{ display: "grid", gap: "0.05rem", minWidth: 0 }}
+                  >
+                    <span>{conditionDisplayLabel(condition.name)}</span>
+                    {durationPhrase ? (
+                      <span
+                        style={{
+                          fontSize: "0.62rem",
+                          fontWeight: 600,
+                          textTransform: "none",
+                          letterSpacing: "0.02em",
+                          opacity: 0.9,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap"
+                        }}
+                      >
+                        {durationPhrase}
+                      </span>
+                    ) : null}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeCondition(condition.id)}
+                    style={{
+                      border: "1px solid var(--panel-border-strong)",
+                      borderRadius: "0.2rem",
+                      backgroundColor: "var(--surface-0)",
+                      color: "var(--text-secondary)",
+                      fontSize: "0.7rem",
+                      lineHeight: 1,
+                      padding: "0.05rem 0.2rem",
+                      cursor: "pointer"
+                    }}
+                    aria-label={`Remove ${condition.name}`}
+                  >
+                    x
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
