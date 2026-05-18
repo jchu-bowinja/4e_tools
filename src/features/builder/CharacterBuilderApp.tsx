@@ -813,6 +813,7 @@ function importBuildFromFile(file: File, onLoaded: (build: CharacterBuild) => vo
 
 export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Element {
   const [build, setBuild] = useState<CharacterBuild>(() => loadBuild() || defaultBuild);
+  const [nameDraft, setNameDraft] = useState(build.name);
   const [savedCharacters, setSavedCharacters] = useState(() => loadSavedCharacters());
   const [selectedSavedCharacterId, setSelectedSavedCharacterId] = useState("");
   const prevAutoGrantedSkillIdsRef = useRef<Set<string>>(new Set());
@@ -1619,6 +1620,17 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     saveBuild(pruned);
   }
 
+  useEffect(() => {
+    setNameDraft(build.name);
+  }, [build.name]);
+
+  function commitNameDraft(): CharacterBuild {
+    if (nameDraft === build.name) return build;
+    const next = { ...build, name: nameDraft };
+    updateBuild(next);
+    return next;
+  }
+
   function parseOptionalBonus(raw: string): number | undefined {
     const t = raw.trim();
     if (t === "") return undefined;
@@ -1772,8 +1784,12 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
           <label style={{ display: "block", fontSize: "0.9rem", color: "var(--text-secondary)" }}>
             Character Name
             <input
-              value={build.name}
-              onChange={(e) => updateBuild({ ...build, name: e.target.value })}
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              onBlur={commitNameDraft}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+              }}
               style={{
                 width: "100%",
                 marginTop: "0.25rem",
@@ -4392,10 +4408,11 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
 
         {activeTab === "summary" && (
           <div style={{ marginTop: "1rem", display: "flex", gap: "0.5rem" }}>
-            <button onClick={() => exportBuild(build)}>Export Character JSON</button>
+            <button onClick={() => exportBuild(commitNameDraft())}>Export Character JSON</button>
             <button
               onClick={() => {
-                const requestedName = (build.name || "Unnamed Character").trim() || "Unnamed Character";
+                const buildToSave = commitNameDraft();
+                const requestedName = (buildToSave.name || "Unnamed Character").trim() || "Unnamed Character";
                 const existing = loadSavedCharacters().find(
                   (entry) => entry.name.trim().toLowerCase() === requestedName.toLowerCase()
                 );
@@ -4405,7 +4422,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 if (existing && !shouldOverwrite) {
                   return;
                 }
-                const result = saveBuildToSavedCharacters(build, { overwriteExistingByName: shouldOverwrite });
+                const result = saveBuildToSavedCharacters(buildToSave, { overwriteExistingByName: shouldOverwrite });
                 refreshSavedCharacters();
                 const actionLabel = result.overwritten ? "Overwrote" : "Saved";
                 alert(`${actionLabel} "${result.entry.name}" for Character Sheet.`);
