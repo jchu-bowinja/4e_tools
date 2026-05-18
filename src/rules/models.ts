@@ -2,9 +2,33 @@ export type Tier = "HEROIC" | "PARAGON" | "EPIC";
 export type Ability = "STR" | "CON" | "DEX" | "INT" | "WIS" | "CHA";
 
 export interface PrereqToken {
-  kind: "levelAtLeast" | "tier" | "abilityAtLeast" | "trainedSkill" | "race" | "class" | "tag";
+  kind:
+    | "levelAtLeast"
+    | "tier"
+    | "abilityAtLeast"
+    | "trainedSkill"
+    | "race"
+    | "class"
+    | "tag"
+    | "powerSourceAny"
+    | "classFeature"
+    | "power"
+    | "racialPower"
+    | "feat"
+    | "racialTrait"
+    | "heritage"
+    | "deity"
+    | "negatedTag"
+    | "negatedClass"
+    | "proficiency"
+    | "implement"
+    | "size"
+    | "anyOf"
+    | "allOf";
   value?: string | number;
   ability?: Ability;
+  options?: PrereqToken[];
+  requirements?: PrereqToken[];
 }
 
 export interface RulesEntity {
@@ -90,6 +114,13 @@ export interface StatAddEntry {
 /** Parsed `specific['Bonus to Defense']` sums (ETL uses lowercase keys). */
 export type NadBonusesFromSpecific = Partial<Record<"fortitude" | "reflex" | "will", number>>;
 
+/** Structured proficiency from feat `rules.grant` type Proficiency (ETL). */
+export interface ProficiencyGrant {
+  kind: "weaponCategory" | "weaponGroup" | "weaponName" | "armor" | "shield" | "implement";
+  value: string;
+  label?: string | null;
+}
+
 export interface Feat extends RulesEntity {
   tier?: string | null;
   category?: string | null;
@@ -102,6 +133,14 @@ export interface Feat extends RulesEntity {
   statAdds?: StatAddEntry[];
   /** ETL: parsed `Bonus to Defense` in specific, when present. */
   nadBonusesFromSpecific?: NadBonusesFromSpecific;
+  /** ETL: `rules.grant` entries with type Power. */
+  grantedPowerIds?: string[];
+  /** ETL: `rules.grant` entries with type Class Feature. */
+  grantedClassFeatureIds?: string[];
+  /** ETL: `rules.grant` entries with type Racial Trait. */
+  grantedRacialTraitIds?: string[];
+  /** ETL: `rules.grant` entries with type Proficiency (armor, shield, weapon, implement). */
+  proficiencyGrants?: ProficiencyGrant[];
   raw: Record<string, unknown>;
 }
 
@@ -235,6 +274,8 @@ export interface RulesIndex {
   autoGrantedPowerIdsByClassId?: Record<string, string[]>;
   /** Auto-trained skill names granted by selected race/class/theme/path/destiny supports. */
   autoGrantedSkillTrainingNamesBySupportId?: Record<string, string[]>;
+  /** Class feature names granted via Grants rows, keyed by supported entity id. */
+  grantedClassFeatureNamesBySupportId?: Record<string, string[]>;
   /** Class build options (choice features) with description/rules/powers, keyed by class id. */
   classBuildOptionsByClassId?: Record<
     string,

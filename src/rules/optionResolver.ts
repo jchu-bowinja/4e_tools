@@ -15,7 +15,8 @@ export function resolveFeatOptions(index: RulesIndex, build: CharacterBuild): Re
   const hybridNames = hybridBaseClassNames(index, build);
   return index.feats.map((feat) => {
     const result = evaluatePrereqs(feat.prereqTokens, build, raceNames, classNames, skillNames, {
-      additionalClassNamesForMatch: hybridNames.length ? hybridNames : undefined
+      additionalClassNamesForMatch: hybridNames.length ? hybridNames : undefined,
+      index
     });
     return {
       item: feat,

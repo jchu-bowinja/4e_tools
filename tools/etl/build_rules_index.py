@@ -3,9 +3,12 @@ import re
 import sys
 import xml.etree.ElementTree as ET
 from collections import defaultdict
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
+
+_ETL_DIR = Path(__file__).resolve().parent
+if str(_ETL_DIR) not in sys.path:
+    sys.path.insert(0, str(_ETL_DIR))
 
 
 ABILITY_NAME_TO_CODE = {
@@ -33,10 +36,7 @@ ABILITY_MAP = {
 }
 
 
-@dataclass
-class ParseResult:
-    tokens: List[Dict[str, Any]]
-    anomalies: List[Dict[str, Any]]
+from prereq_parser import ParseResult, parse_prereqs  # noqa: E402
 
 
 def normalize_name(name: str) -> str:
@@ -324,117 +324,6 @@ def parse_int_from_text(text: Any) -> Optional[int]:
     return int(match.group(1)) if match else None
 
 
-def _parse_one_prereq_clause(
-    part: str,
-    tokens: List[Dict[str, Any]],
-    anomalies: List[Dict[str, Any]],
-    race_by_lower: Dict[str, str],
-    known_classes: set[str],
-    _depth: int = 0,
-) -> None:
-    """Parse a single comma/semicolon clause; may recurse on remainder after a level prefix."""
-    if _depth > 6:
-        anomalies.append({"kind": "unparsedPrereqClause", "value": part})
-        return
-
-    part = part.strip().strip(",").strip()
-    if not part:
-        return
-
-    # Ordinal level: "21st-level wizard", "21st level", "21st level, fighter"
-    m = re.match(r"^(\d+)(?:st|nd|rd|th)\s*-\s*level\s*(.*)$", part, re.I)
-    if not m:
-        m = re.match(r"^(\d+)(?:st|nd|rd|th)\s+level\s*(.*)$", part, re.I)
-    if m:
-        tokens.append({"kind": "levelAtLeast", "value": int(m.group(1))})
-        rest = (m.group(2) or "").strip().strip(",").strip()
-        if rest:
-            _parse_one_prereq_clause(rest, tokens, anomalies, race_by_lower, known_classes, _depth + 1)
-        return
-
-    # "10 th level" (digit, space, literal th)
-    m_gap_th = re.match(r"^(\d+)\s+th\s+level\s*(.*)$", part, re.I)
-    if m_gap_th:
-        tokens.append({"kind": "levelAtLeast", "value": int(m_gap_th.group(1))})
-        rest = (m_gap_th.group(2) or "").strip().strip(",").strip()
-        if rest:
-            _parse_one_prereq_clause(rest, tokens, anomalies, race_by_lower, known_classes, _depth + 1)
-        return
-
-    # "11th level" spelled with literal "th" after the digit (no st/nd/rd)
-    m_th_level = re.match(r"^(\d+)\s*th\s+level\s*(.*)$", part, re.I)
-    if m_th_level:
-        tokens.append({"kind": "levelAtLeast", "value": int(m_th_level.group(1))})
-        rest = (m_th_level.group(2) or "").strip().strip(",").strip()
-        if rest:
-            _parse_one_prereq_clause(rest, tokens, anomalies, race_by_lower, known_classes, _depth + 1)
-        return
-
-    tier = re.search(r"(Heroic|Paragon|Epic)\s+Tier", part, re.I)
-    if tier:
-        tokens.append({"kind": "tier", "value": tier.group(1).upper()})
-        return
-
-    ability = re.search(
-        r"(Str|Con|Dex|Int|Wis|Cha|Strength|Constitution|Dexterity|Intelligence|Wisdom|Charisma)\s*(\d+)",
-        part,
-        re.I,
-    )
-    if ability:
-        tokens.append(
-            {
-                "kind": "abilityAtLeast",
-                "ability": ABILITY_MAP[ability.group(1).lower()],
-                "value": int(ability.group(2)),
-            }
-        )
-        return
-
-    trained = re.search(r"trained in\s+([a-zA-Z ]+)", part, re.I)
-    if trained:
-        tokens.append({"kind": "trainedSkill", "value": trained.group(1).strip()})
-        return
-
-    lowered = part.lower()
-    if lowered in race_by_lower:
-        tokens.append({"kind": "race", "value": race_by_lower[lowered]})
-        return
-
-    if lowered in known_classes:
-        tokens.append({"kind": "class", "value": part.strip()})
-        return
-
-    class_suffix = re.match(r"^(.+?)\s+class\s*$", part, re.I)
-    if class_suffix:
-        inner = class_suffix.group(1).strip()
-        if inner.lower() in known_classes:
-            tokens.append({"kind": "class", "value": inner})
-            return
-
-    if part.startswith("~"):
-        tokens.append({"kind": "tag", "value": part[1:]})
-        return
-
-    anomalies.append({"kind": "unparsedPrereqClause", "value": part})
-
-
-def parse_prereqs(prereqs: Optional[str], known_races: set[str], known_classes: set[str]) -> ParseResult:
-    if not prereqs:
-        return ParseResult(tokens=[], anomalies=[])
-
-    tokens: List[Dict[str, Any]] = []
-    anomalies: List[Dict[str, Any]] = []
-    race_by_lower = {str(r).lower(): str(r) for r in known_races if r}
-
-    text = prereqs.strip()
-    parts = [p.strip() for p in re.split(r"[;,]", text) if p.strip()]
-
-    for part in parts:
-        _parse_one_prereq_clause(part, tokens, anomalies, race_by_lower, known_classes)
-
-    return ParseResult(tokens=tokens, anomalies=anomalies)
-
-
 def _power_selectable_ids_from_class_feature(cf: Dict[str, Any]) -> Set[str]:
     """Power internal_ids the player picks from lists on this class feature (if any)."""
     out: Set[str] = set()
@@ -506,6 +395,34 @@ def build_auto_granted_power_ids_by_class(
                 continue
             bucket |= _granted_power_ids_from_class_feature(cf, class_id)
     return {cid: sorted(ids) for cid, ids in by_class.items() if ids}
+
+
+def build_granted_class_feature_names_by_support(
+    grants_raw: List[Dict[str, Any]], features_by_id: Dict[str, Dict[str, Any]]
+) -> Dict[str, List[str]]:
+    """Map supported entity id -> class feature names granted via Grants rows (direct grants only)."""
+    out: Dict[str, Set[str]] = {}
+    for g in grants_raw:
+        sp = g.get("specific") or {}
+        support_id = sp.get("_SupportsID")
+        if not isinstance(support_id, str) or not support_id:
+            continue
+        rules = g.get("rules") or {}
+        bucket = out.setdefault(support_id, set())
+        for gr in rules.get("grant") or []:
+            attrs = gr.get("attrs") or {}
+            if attrs.get("type") != "Class Feature":
+                continue
+            cf_id = attrs.get("name")
+            if not isinstance(cf_id, str):
+                continue
+            row = features_by_id.get(cf_id)
+            if not row:
+                continue
+            nm = str(row.get("name") or "").strip()
+            if nm:
+                bucket.add(nm)
+    return {sid: sorted(names) for sid, names in out.items() if names}
 
 
 def build_auto_granted_skill_training_names_by_support(
@@ -824,6 +741,96 @@ def _normalize_statadd_entry_attrs(attrs: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+def _parse_proficiency_grant_internal_id(internal_id: str) -> Optional[Dict[str, str]]:
+    """Parse ID_INTERNAL_PROFICIENCY_* grant targets into structured proficiency grants."""
+    if not internal_id.startswith("ID_INTERNAL_PROFICIENCY_"):
+        return None
+    rest = internal_id[len("ID_INTERNAL_PROFICIENCY_") :]
+    patterns = [
+        (r"^WEAPON_GROUP_\(([^)]+)\)$", "weaponGroup"),
+        (r"^ARMOR_PROFICIENCY_\(([^)]+)\)$", "armor"),
+        (r"^SHIELD_PROFICIENCY_\(([^)]+)\)$", "shield"),
+        (r"^IMPLEMENT_PROFICIENCY_\(([^)]+)\)$", "implement"),
+        (r"^WEAPON_PROFICIENCY_\(([^)]+)\)$", "weaponName"),
+    ]
+    for pat, kind in patterns:
+        m = re.match(pat, rest)
+        if m:
+            raw = m.group(1).replace("_", " ").strip()
+            return {
+                "kind": kind,
+                "value": raw.lower(),
+                "label": raw.title(),
+            }
+    val = rest.replace("_", " ").strip()
+    if not val:
+        return None
+    return {
+        "kind": "weaponCategory",
+        "value": val.lower(),
+        "label": val.title(),
+    }
+
+
+def extract_grants_from_rules(rules: Any) -> Dict[str, Any]:
+    """Flatten `rules.grant` into compendium internal_ids and proficiency grants."""
+    empty: Dict[str, Any] = {
+        "grantedPowerIds": [],
+        "grantedClassFeatureIds": [],
+        "grantedRacialTraitIds": [],
+        "proficiencyGrants": [],
+    }
+    if not isinstance(rules, dict):
+        return empty
+
+    power_ids: List[str] = []
+    feature_ids: List[str] = []
+    trait_ids: List[str] = []
+    proficiency_grants: List[Dict[str, str]] = []
+    seen_p: Set[str] = set()
+    seen_f: Set[str] = set()
+    seen_t: Set[str] = set()
+    seen_prof: Set[str] = set()
+
+    for gr in rules.get("grant") or []:
+        if not isinstance(gr, dict):
+            continue
+        attrs = gr.get("attrs") or {}
+        name = attrs.get("name")
+        if not isinstance(name, str):
+            continue
+        gtype = str(attrs.get("type") or "").strip().lower()
+        if gtype == "proficiency" and name.startswith("ID_INTERNAL_PROFICIENCY_"):
+            parsed = _parse_proficiency_grant_internal_id(name)
+            if parsed:
+                key = f"{parsed['kind']}:{parsed['value']}"
+                if key not in seen_prof:
+                    seen_prof.add(key)
+                    proficiency_grants.append(parsed)
+            continue
+        if not name.startswith("ID_"):
+            continue
+        if gtype == "power" and "_POWER_" in name:
+            if name not in seen_p:
+                seen_p.add(name)
+                power_ids.append(name)
+        elif gtype == "class feature":
+            if name not in seen_f:
+                seen_f.add(name)
+                feature_ids.append(name)
+        elif gtype == "racial trait":
+            if name not in seen_t:
+                seen_t.add(name)
+                trait_ids.append(name)
+
+    return {
+        "grantedPowerIds": power_ids,
+        "grantedClassFeatureIds": feature_ids,
+        "grantedRacialTraitIds": trait_ids,
+        "proficiencyGrants": proficiency_grants,
+    }
+
+
 def extract_stat_adds_from_rules(rules: Any) -> List[Dict[str, Any]]:
     """rules.statadd from a compendium row (feat, theme, paragon path, epic destiny, etc.)."""
     if not isinstance(rules, dict):
@@ -1043,6 +1050,9 @@ def build_index(input_path: Path, output_dir: Path) -> None:
     auto_granted_skill_training_names_by_support = build_auto_granted_skill_training_names_by_support(
         grants_raw, skill_training_by_id
     )
+    granted_class_feature_names_by_support_id = build_granted_class_feature_names_by_support(
+        grants_raw, features_by_id
+    )
     class_build_options_by_class = build_class_build_options_by_class(grants_raw, features_by_id)
 
     known_races = {r.get("name", "") for r in races_raw}
@@ -1149,6 +1159,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
                         "detail": a,
                     }
                 )
+        feat_grants = extract_grants_from_rules(feat.get("rules"))
         feats.append(
             {
                 "id": feat.get("internal_id"),
@@ -1164,6 +1175,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
                 "prereqSummary": feat_meta["prereqSummary"],
                 "raw": feat,
                 **support_entity_stat_bonuses(feat),
+                **feat_grants,
             }
         )
 
@@ -1419,6 +1431,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
         "hybridClasses": hybrid_classes,
         "autoGrantedPowerIdsByClassId": auto_granted_power_ids_by_class,
         "autoGrantedSkillTrainingNamesBySupportId": auto_granted_skill_training_names_by_support,
+        "grantedClassFeatureNamesBySupportId": granted_class_feature_names_by_support_id,
         "classBuildOptionsByClassId": class_build_options_by_class,
     }
 

@@ -272,6 +272,41 @@ export function racePowerGroupsForRace(
   return out;
 }
 
+/** ETL `grantedPowerIds`, or empty when only Associated Powers text exists. */
+export function featGrantedPowerIdsFromEtl(feat: Feat): string[] {
+  return feat.grantedPowerIds?.length ? [...feat.grantedPowerIds] : [];
+}
+
+/** Powers granted by a feat: prefer ETL ids, else Associated Powers name resolution. */
+export function resolveFeatGrantedPowers(index: RulesIndex, feat: Feat): Power[] {
+  const etlIds = featGrantedPowerIdsFromEtl(feat);
+  if (etlIds.length > 0) {
+    const byId = new Map(index.powers.map((p) => [p.id, p]));
+    return etlIds.map((id) => byId.get(id)).filter((p): p is Power => !!p);
+  }
+  return resolvePowersByLooseNames(index, parseFeatAssociatedPowerNames(feat));
+}
+
+/** All powers granted by selected feats (deduped, stable order). */
+export function collectFeatGrantedPowersForBuild(
+  index: RulesIndex,
+  build: Pick<CharacterBuild, "featIds">
+): Array<{ feat: Feat; powers: Power[] }> {
+  const rows: Array<{ feat: Feat; powers: Power[] }> = [];
+  const seenPowerIds = new Set<string>();
+  for (const fid of build.featIds) {
+    const feat = index.feats.find((f) => f.id === fid);
+    if (!feat) continue;
+    const powers = resolveFeatGrantedPowers(index, feat).filter((p) => {
+      if (seenPowerIds.has(p.id)) return false;
+      seenPowerIds.add(p.id);
+      return true;
+    });
+    if (powers.length > 0) rows.push({ feat, powers });
+  }
+  return rows;
+}
+
 /** Parse feat `Associated Powers` (comma-separated display names). */
 export function parseFeatAssociatedPowerNames(feat: Feat): string[] {
   const spec = feat.raw?.specific as Record<string, unknown> | undefined;

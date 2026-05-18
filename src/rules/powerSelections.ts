@@ -1,10 +1,9 @@
 import { getPowersForOwnerId } from "./classPowersQuery";
 import {
   autoGrantedClassPowers,
-  parseFeatAssociatedPowerNames,
   racePowerGroupsForRace,
   racePowerSelectSelectionKey,
-  resolvePowersByLooseNames
+  resolveFeatGrantedPowers
 } from "./grantedPowersQuery";
 import type { CharacterBuild, RulesIndex } from "./models";
 import { getChildTraitIdsForSubrace, getRaceSubraceData } from "./raceSubraces";
@@ -65,8 +64,7 @@ export function collectCharacterPowerIdsForSelections(index: RulesIndex, build: 
   for (const fid of build.featIds) {
     const feat = index.feats.find((f) => f.id === fid);
     if (!feat) continue;
-    const names = parseFeatAssociatedPowerNames(feat);
-    for (const p of resolvePowersByLooseNames(index, names)) ids.add(p.id);
+    for (const p of resolveFeatGrantedPowers(index, feat)) ids.add(p.id);
   }
 
   return ids;

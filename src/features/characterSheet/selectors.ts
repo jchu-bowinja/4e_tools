@@ -1,6 +1,10 @@
 import { attackPowerBucketFromUsage } from "../../rules/classPowerSlots";
 import { getPowersForOwnerId } from "../../rules/classPowersQuery";
-import { autoGrantedClassPowers, collectPowerIdsFromRacialTrait } from "../../rules/grantedPowersQuery";
+import {
+  autoGrantedClassPowers,
+  collectFeatGrantedPowersForBuild,
+  collectPowerIdsFromRacialTrait
+} from "../../rules/grantedPowersQuery";
 import { parseRacialTraitIdsFromRace } from "../../rules/racialTraits";
 import { computeBuilderLikeDerivedStats } from "../../rules/derivedStatsFromBuild";
 import type { AcBreakdown } from "../../rules/defenseCalculator";
@@ -231,7 +235,18 @@ export function groupCombatPowers(state: CharacterSheetState, index: RulesIndex)
     ...getPowersForOwnerId(index, state.epicDestinyId, state.level, "attack"),
     ...getPowersForOwnerId(index, state.epicDestinyId, state.level, "utility")
   ];
-  const allPowers = [...selected, ...autoClass, ...raceGranted, ...themeGranted, ...paragonGranted, ...epicGranted];
+  const featGranted = collectFeatGrantedPowersForBuild(index, {
+    featIds: state.featIds ?? []
+  }).flatMap((row) => row.powers);
+  const allPowers = [
+    ...selected,
+    ...autoClass,
+    ...raceGranted,
+    ...themeGranted,
+    ...paragonGranted,
+    ...epicGranted,
+    ...featGranted
+  ];
   const deduped = allPowers.filter((power, indexPos) => allPowers.findIndex((entry) => entry.id === power.id) === indexPos);
 
   const grouped: GroupedPowerCards = { atWill: [], encounter: [], daily: [] };
@@ -277,7 +292,8 @@ export function sheetStateFromBuild(build: CharacterBuild, index: RulesIndex): C
     powers: {
       selectedPowerIds: [...build.powerIds],
       expendedPowerIds: [],
-      manualOrderIds: []
+      manualOrderIds: [],
+      groupBy: "usage"
     }
   };
 

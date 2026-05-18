@@ -1,4 +1,15 @@
 import { CharacterBuild, PrereqToken, RulesIndex, Tier, ValidationResult } from "./models";
+import {
+  characterClassFeatureNames,
+  characterFeatNames,
+  characterHasClassFeature,
+  characterHeritageLabels,
+  characterNegatedClassIds,
+  characterPowerNames,
+  characterPowerSourceLabels,
+  characterRacialTraitNames,
+  characterSupportIds
+} from "./prereqContext";
 
 function tierFromLevel(level: number): Tier {
   if (level >= 21) {
@@ -13,6 +24,8 @@ function tierFromLevel(level: number): Tier {
 export type PrereqEvaluateOptions = {
   /** When set (e.g. hybrid), class prereqs match if the token equals any of these names or the primary class. */
   additionalClassNamesForMatch?: string[];
+  /** Rules index for class features, power sources, feats, etc. */
+  index?: RulesIndex;
 };
 
 /** Resolve PHB base class names for hybrid builds (for feat/theme prereqs). */
@@ -27,6 +40,206 @@ export function hybridBaseClassNames(index: RulesIndex, build: CharacterBuild): 
     if (n) out.push(n);
   }
   return out;
+}
+
+function norm(s: string): string {
+  return s.trim().toLowerCase();
+}
+
+function nameInSet(want: string, names: Set<string>): boolean {
+  const w = norm(want);
+  for (const n of names) {
+    const h = norm(n);
+    if (h === w || h.includes(w) || w.includes(h)) return true;
+  }
+  return false;
+}
+
+function evaluateOneToken(
+  token: PrereqToken,
+  build: CharacterBuild,
+  raceNameById: Map<string, string>,
+  classNameById: Map<string, string>,
+  skillNameById: Map<string, string>,
+  options: PrereqEvaluateOptions | undefined,
+  tier: Tier,
+  raceName: string | undefined,
+  className: string | undefined,
+  extraClasses: string[],
+  trainedSkillNames: Set<string>,
+  index: RulesIndex | undefined
+): string[] {
+  const reasons: string[] = [];
+
+  if (token.kind === "anyOf" && Array.isArray(token.options)) {
+    const childReasons = token.options.map((opt) =>
+      evaluateOneToken(
+        opt,
+        build,
+        raceNameById,
+        classNameById,
+        skillNameById,
+        options,
+        tier,
+        raceName,
+        className,
+        extraClasses,
+        trainedSkillNames,
+        index
+      )
+    );
+    if (!childReasons.some((r) => r.length === 0)) {
+      reasons.push("Requires one of: " + childReasons.map((r) => r.join(", ")).filter(Boolean).join(" OR "));
+    }
+    return reasons;
+  }
+
+  if (token.kind === "allOf" && Array.isArray(token.requirements)) {
+    for (const req of token.requirements) {
+      reasons.push(
+        ...evaluateOneToken(
+          req,
+          build,
+          raceNameById,
+          classNameById,
+          skillNameById,
+          options,
+          tier,
+          raceName,
+          className,
+          extraClasses,
+          trainedSkillNames,
+          index
+        )
+      );
+    }
+    return reasons;
+  }
+
+  if (token.kind === "levelAtLeast" && typeof token.value === "number") {
+    if (build.level < token.value) {
+      reasons.push(`Requires level ${token.value}+`);
+    }
+    return reasons;
+  }
+
+  if (token.kind === "tier" && typeof token.value === "string") {
+    if (tier !== token.value) {
+      reasons.push(`Requires ${token.value} tier`);
+    }
+    return reasons;
+  }
+
+  if (token.kind === "abilityAtLeast" && token.ability && typeof token.value === "number") {
+    if ((build.abilityScores[token.ability] || 0) < token.value) {
+      reasons.push(`Requires ${token.ability} ${token.value}+`);
+    }
+    return reasons;
+  }
+
+  if (token.kind === "race" && typeof token.value === "string") {
+    if (!raceName || raceName.toLowerCase() !== token.value.toLowerCase()) {
+      reasons.push(`Requires race: ${token.value}`);
+    }
+    return reasons;
+  }
+
+  if (token.kind === "class" && typeof token.value === "string") {
+    const want = token.value.toLowerCase();
+    const primaryOk = className && className.toLowerCase() === want;
+    const hybridOk = extraClasses.some((n) => n.toLowerCase() === want);
+    if (!primaryOk && !hybridOk) {
+      reasons.push(`Requires class: ${token.value}`);
+    }
+    return reasons;
+  }
+
+  if (token.kind === "trainedSkill" && typeof token.value === "string") {
+    if (!trainedSkillNames.has(token.value.toLowerCase())) {
+      reasons.push(`Requires trained in ${token.value}`);
+    }
+    return reasons;
+  }
+
+  if (token.kind === "powerSourceAny" && typeof token.value === "string" && index) {
+    const want = norm(token.value);
+    const sources = characterPowerSourceLabels(index, build);
+    const ok = [...sources].some((s) => s.includes(want) || want.includes(s));
+    if (!ok) {
+      reasons.push(`Requires any ${token.value} class`);
+    }
+    return reasons;
+  }
+
+  if (token.kind === "classFeature" && typeof token.value === "string" && index) {
+    if (!characterHasClassFeature(index, build, token.value)) {
+      reasons.push(`Requires ${token.value} class feature`);
+    }
+    return reasons;
+  }
+
+  if (
+    (token.kind === "power" || token.kind === "racialPower") &&
+    typeof token.value === "string" &&
+    index
+  ) {
+    if (!nameInSet(token.value, characterPowerNames(index, build))) {
+      reasons.push(`Requires ${token.value} power`);
+    }
+    return reasons;
+  }
+
+  if (token.kind === "feat" && typeof token.value === "string" && index) {
+    if (!nameInSet(token.value, characterFeatNames(index, build))) {
+      reasons.push(`Requires ${token.value} feat`);
+    }
+    return reasons;
+  }
+
+  if (token.kind === "racialTrait" && typeof token.value === "string" && index) {
+    if (!nameInSet(token.value, characterRacialTraitNames(index, build))) {
+      reasons.push(`Requires ${token.value} racial trait`);
+    }
+    return reasons;
+  }
+
+  if (token.kind === "heritage" && typeof token.value === "string" && index) {
+    if (!nameInSet(token.value, characterHeritageLabels(index, build))) {
+      reasons.push(`Requires ${token.value} heritage`);
+    }
+    return reasons;
+  }
+
+  if (token.kind === "negatedClass" && typeof token.value === "string") {
+    if (characterNegatedClassIds(build).has(token.value)) {
+      reasons.push(`Not available for this class`);
+    }
+    return reasons;
+  }
+
+  if (token.kind === "size" && typeof token.value === "string") {
+    const race = index?.races.find((r) => r.id === build.raceId);
+    const size = race?.size ?? "";
+    if (size && size.toLowerCase() !== token.value.toLowerCase()) {
+      reasons.push(`Requires ${token.value} size`);
+    }
+    return reasons;
+  }
+
+  if (
+    token.kind === "tag" ||
+    token.kind === "negatedTag" ||
+    token.kind === "deity" ||
+    token.kind === "implement"
+  ) {
+    return reasons;
+  }
+
+  if (token.kind === "proficiency") {
+    return reasons;
+  }
+
+  return reasons;
 }
 
 export function evaluatePrereqs(
@@ -45,62 +258,26 @@ export function evaluatePrereqs(
   const trainedSkillNames = new Set(
     build.trainedSkillIds.map((id) => (skillNameById.get(id) || "").toLowerCase())
   );
+  const index = options?.index;
 
   for (const token of prereqTokens) {
-    if (token.kind === "levelAtLeast" && typeof token.value === "number") {
-      if (build.level < token.value) {
-        reasons.push(`Requires level ${token.value}+`);
-      }
-      continue;
-    }
-
-    if (token.kind === "tier" && typeof token.value === "string") {
-      if (tier !== token.value) {
-        reasons.push(`Requires ${token.value} tier`);
-      }
-      continue;
-    }
-
-    if (
-      token.kind === "abilityAtLeast" &&
-      token.ability &&
-      typeof token.value === "number"
-    ) {
-      if ((build.abilityScores[token.ability] || 0) < token.value) {
-        reasons.push(`Requires ${token.ability} ${token.value}+`);
-      }
-      continue;
-    }
-
-    if (token.kind === "race" && typeof token.value === "string") {
-      if (!raceName || raceName.toLowerCase() !== token.value.toLowerCase()) {
-        reasons.push(`Requires race: ${token.value}`);
-      }
-      continue;
-    }
-
-    if (token.kind === "class" && typeof token.value === "string") {
-      const want = token.value.toLowerCase();
-      const primaryOk = className && className.toLowerCase() === want;
-      const hybridOk = extraClasses.some((n) => n.toLowerCase() === want);
-      if (!primaryOk && !hybridOk) {
-        reasons.push(`Requires class: ${token.value}`);
-      }
-      continue;
-    }
-
-    if (token.kind === "trainedSkill" && typeof token.value === "string") {
-      if (!trainedSkillNames.has(token.value.toLowerCase())) {
-        reasons.push(`Requires trained in ${token.value}`);
-      }
-      continue;
-    }
-
-    if (token.kind === "tag") {
-      continue;
-    }
+    reasons.push(
+      ...evaluateOneToken(
+        token,
+        build,
+        raceNameById,
+        classNameById,
+        skillNameById,
+        options,
+        tier,
+        raceName,
+        className,
+        extraClasses,
+        trainedSkillNames,
+        index
+      )
+    );
   }
 
   return { ok: reasons.length === 0, reasons };
 }
-

@@ -1,6 +1,7 @@
 import { normalizeActiveConditions } from "./activeConditions";
 import { createDefaultCharacterSheetState } from "./defaultState";
 import type { CharacterSheetState } from "./model";
+import { normalizePowerGroupBy } from "./powerDisplay";
 
 const CHARACTER_SHEET_STORAGE_KEY = "dnd4e_character_sheet_v1";
 
@@ -65,7 +66,8 @@ export function normalizeState(input: unknown): CharacterSheetState {
     powers: {
       selectedPowerIds: Array.isArray(v.powers?.selectedPowerIds) ? v.powers.selectedPowerIds : [],
       expendedPowerIds: Array.isArray(v.powers?.expendedPowerIds) ? v.powers.expendedPowerIds : [],
-      manualOrderIds: Array.isArray(v.powers?.manualOrderIds) ? v.powers.manualOrderIds : []
+      manualOrderIds: Array.isArray(v.powers?.manualOrderIds) ? v.powers.manualOrderIds : [],
+      groupBy: normalizePowerGroupBy(v.powers?.groupBy ?? fallback.powers.groupBy)
     },
     featIds: Array.isArray(v.featIds) ? v.featIds.filter((id): id is string => typeof id === "string") : [],
     trainedSkillIds: Array.isArray(v.trainedSkillIds) ? v.trainedSkillIds.filter((id): id is string => typeof id === "string") : [],

@@ -53,10 +53,14 @@ export interface CharacterSheetResources {
   conditions: ActiveCondition[];
 }
 
+export type PowerSheetGroupBy = "usage" | "actionType";
+
 export interface CharacterSheetPowerSelection {
   selectedPowerIds: string[];
   expendedPowerIds: string[];
   manualOrderIds: string[];
+  /** How combat powers are grouped on the overview sheet. */
+  groupBy?: PowerSheetGroupBy;
 }
 
 export interface CharacterSheetState {

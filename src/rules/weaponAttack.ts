@@ -1,4 +1,8 @@
-import type { Ability, ClassDef, Implement, Weapon } from "./models";
+import type { Ability, ClassDef, Implement, ProficiencyGrant, Weapon } from "./models";
+import {
+  isProficientWithImplementIncludingFeats,
+  isProficientWithWeaponIncludingFeats
+} from "./featProficiencies";
 
 function abilityMod(score: number): number {
   return Math.floor((score - 10) / 2);
@@ -17,11 +21,12 @@ export function parseProficiencyPhrases(text: string | null | undefined): string
 }
 
 /** Weapon category from compendium (e.g. "Simple Melee") vs class line ("simple melee"). */
-export function isProficientWithWeapon(weapon: Weapon, classWeaponProficienciesText: string | null | undefined): boolean {
-  const phrases = parseProficiencyPhrases(classWeaponProficienciesText);
-  const cat = String(weapon.weaponCategory || "").trim().toLowerCase();
-  if (!cat || phrases.length === 0) return false;
-  return phrases.some((p) => cat === p || cat.startsWith(`${p} `) || cat.includes(p));
+export function isProficientWithWeapon(
+  weapon: Weapon,
+  classWeaponProficienciesText: string | null | undefined,
+  featProficiencyGrants: ProficiencyGrant[] = []
+): boolean {
+  return isProficientWithWeaponIncludingFeats(weapon, classWeaponProficienciesText, featProficiencyGrants);
 }
 
 export function weaponAttackAbility(weapon: Weapon): "STR" | "DEX" {
@@ -61,12 +66,10 @@ export function maxKeyAbilityModifier(cls: ClassDef | undefined, scores: Record<
 
 export function isProficientWithImplement(
   implement: Implement,
-  classImplementText: string | null | undefined
+  classImplementText: string | null | undefined,
+  featProficiencyGrants: ProficiencyGrant[] = []
 ): boolean {
-  const phrases = parseProficiencyPhrases(classImplementText);
-  const g = String(implement.implementGroup || "").trim().toLowerCase();
-  if (!g || phrases.length === 0) return false;
-  return phrases.some((p) => g === p || g.includes(p) || p.includes(g));
+  return isProficientWithImplementIncludingFeats(implement, classImplementText, featProficiencyGrants);
 }
 
 const IMPL_PROF_BONUS = 2;
@@ -83,11 +86,12 @@ export function summarizeMainWeaponAttack(
   scores: Record<Ability, number>,
   weapon: Weapon | undefined,
   classWeaponProficienciesText: string | null | undefined,
-  magicItemAttackBonus?: number
+  magicItemAttackBonus?: number,
+  featProficiencyGrants: ProficiencyGrant[] = []
 ): WeaponAttackSummary | null {
   if (!weapon) return null;
   const abilityCode = weaponAttackAbility(weapon);
-  const prof = isProficientWithWeapon(weapon, classWeaponProficienciesText);
+  const prof = isProficientWithWeapon(weapon, classWeaponProficienciesText, featProficiencyGrants);
   const half = Math.floor(level / 2);
   const mod = abilityMod(scores[abilityCode] ?? 10);
   const pb = weapon.proficiencyBonus ?? 0;
@@ -113,10 +117,11 @@ export function summarizeImplementAttack(
   cls: ClassDef | undefined,
   implement: Implement | undefined,
   classImplementText: string | null | undefined,
-  magicItemAttackBonus?: number
+  magicItemAttackBonus?: number,
+  featProficiencyGrants: ProficiencyGrant[] = []
 ): ImplementAttackSummary | null {
   if (!implement) return null;
-  const prof = isProficientWithImplement(implement, classImplementText);
+  const prof = isProficientWithImplement(implement, classImplementText, featProficiencyGrants);
   const half = Math.floor(level / 2);
   const mod = maxKeyAbilityModifier(cls, scores);
   const itemBonus =

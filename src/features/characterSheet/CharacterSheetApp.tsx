@@ -15,10 +15,16 @@ import {
   getClassTraitRows,
   getEpicDestinyTraitRows,
   getHybridClassTraitRows,
+  getFeatGrantedTraitRows,
   getParagonTraitRows,
   getThemeTraitRows,
   type TraitDisplayRow
 } from "../../rules/supportTraits";
+import {
+  collectFeatProficiencyDisplayRows,
+  collectFeatProficiencyGrants
+} from "../../rules/featProficiencies";
+import { collectFeatGrantedPowersForBuild } from "../../rules/grantedPowersQuery";
 import { computeSkillSheetRows } from "../../rules/skillCalculator";
 import {
   ABILITY_SCORE_COLUMNS,
@@ -41,7 +47,8 @@ import {
   type ConditionDurationPresetKey
 } from "./conditionDurationPresets";
 import { createDefaultCharacterSheetState } from "./defaultState";
-import type { CharacterSheetState, EquipmentSlot, InventoryItem } from "./model";
+import type { CharacterSheetState, EquipmentSlot, InventoryItem, PowerSheetGroupBy } from "./model";
+import { buildPowerDisplaySections, powerUsageBucket } from "./powerDisplay";
 import {
   canUseSecondWind,
   hasSecondWindDefenseBonus,
@@ -829,6 +836,11 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
 
   const derived = useMemo(() => computeSheetDerivedData(sheet, index), [sheet, index]);
   const groupedPowers = useMemo(() => groupCombatPowers(sheet, index), [sheet, index]);
+  const powerGroupBy = sheet.powers.groupBy ?? "usage";
+  const powerDisplaySections = useMemo(
+    () => buildPowerDisplaySections(groupedPowers, powerGroupBy),
+    [groupedPowers, powerGroupBy]
+  );
   const rulesById = useMemo(() => buildRulesIdLookup(index), [index]);
   const expandedSheetJson = useMemo(() => JSON.stringify(expandJsonIds(sheet, rulesById), null, 2), [sheet, rulesById]);
   const jsonSearchMatches = useMemo(
@@ -919,6 +931,22 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     () => traitsSectionTitle(selectedEpicDestiny?.name, "Epic destiny traits"),
     [selectedEpicDestiny?.name]
   );
+  const featGrantedTraitRows = useMemo(
+    () => getFeatGrantedTraitRows(index, sheet.featIds ?? []),
+    [index, sheet.featIds]
+  );
+  const featGrantedPowerRows = useMemo(
+    () => collectFeatGrantedPowersForBuild(index, { featIds: sheet.featIds ?? [] }),
+    [index, sheet.featIds]
+  );
+  const featProficiencyGrants = useMemo(
+    () => collectFeatProficiencyGrants(index, sheet.featIds ?? []),
+    [index, sheet.featIds]
+  );
+  const featProficiencyDisplayRows = useMemo(
+    () => collectFeatProficiencyDisplayRows(index, sheet.featIds ?? []),
+    [index, sheet.featIds]
+  );
 
   useEffect(() => {
     const build = loadBuild();
@@ -977,9 +1005,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         sheet.abilityScores,
         mainHandWeapon,
         sheetWeaponProfText,
-        sheet.magicItemBonuses?.attack
+        sheet.magicItemBonuses?.attack,
+        featProficiencyGrants
       ),
-    [sheet.level, sheet.abilityScores, mainHandWeapon, sheetWeaponProfText, sheet.magicItemBonuses?.attack]
+    [sheet.level, sheet.abilityScores, mainHandWeapon, sheetWeaponProfText, sheet.magicItemBonuses?.attack, featProficiencyGrants]
   );
   const offHandWeaponSummary = useMemo(
     () =>
@@ -988,9 +1017,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         sheet.abilityScores,
         offHandWeapon,
         sheetWeaponProfText,
-        sheet.magicItemBonuses?.attack
+        sheet.magicItemBonuses?.attack,
+        featProficiencyGrants
       ),
-    [sheet.level, sheet.abilityScores, offHandWeapon, sheetWeaponProfText, sheet.magicItemBonuses?.attack]
+    [sheet.level, sheet.abilityScores, offHandWeapon, sheetWeaponProfText, sheet.magicItemBonuses?.attack, featProficiencyGrants]
   );
   const implementAttackSummary = useMemo(
     () =>
@@ -1000,7 +1030,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         sheetImplementClass,
         equippedImplement,
         sheetImplementProfText,
-        sheet.magicItemBonuses?.attack
+        sheet.magicItemBonuses?.attack,
+        featProficiencyGrants
       ),
     [
       sheet.level,
@@ -1008,7 +1039,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
       sheetImplementClass,
       equippedImplement,
       sheetImplementProfText,
-      sheet.magicItemBonuses?.attack
+      sheet.magicItemBonuses?.attack,
+      featProficiencyGrants
     ]
   );
 
@@ -1240,11 +1272,18 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     }));
   }
 
-  function getOrderedBucketPowers(bucketPowers: typeof groupedPowers.atWill): typeof groupedPowers.atWill {
+  function setPowerGroupBy(next: PowerSheetGroupBy): void {
+    updateSheet((prev) => ({
+      ...prev,
+      powers: { ...prev.powers, groupBy: next }
+    }));
+  }
+
+  function getOrderedSectionPowers(sectionPowers: typeof groupedPowers.atWill): typeof groupedPowers.atWill {
     const usedSet = new Set(sheet.powers.expendedPowerIds);
     const manualIndexById = new Map(sheet.powers.manualOrderIds.map((id, idx) => [id, idx]));
-    const fallbackIndexById = new Map(bucketPowers.map((power, idx) => [power.id, idx]));
-    return [...bucketPowers].sort((a, b) => {
+    const fallbackIndexById = new Map(sectionPowers.map((power, idx) => [power.id, idx]));
+    return [...sectionPowers].sort((a, b) => {
       const aUsed = usedSet.has(a.id);
       const bUsed = usedSet.has(b.id);
       if (aUsed !== bUsed) return aUsed ? 1 : -1;
@@ -1255,9 +1294,9 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     });
   }
 
-  function reorderPowerCardsByDrag(bucketPowers: typeof groupedPowers.atWill, sourcePowerId: string, targetPowerId: string): void {
+  function reorderPowerCardsByDrag(sectionPowers: typeof groupedPowers.atWill, sourcePowerId: string, targetPowerId: string): void {
     if (sourcePowerId === targetPowerId) return;
-    const ordered = getOrderedBucketPowers(bucketPowers);
+    const ordered = getOrderedSectionPowers(sectionPowers);
     const usedSet = new Set(sheet.powers.expendedPowerIds);
     const source = ordered.find((power) => power.id === sourcePowerId);
     const target = ordered.find((power) => power.id === targetPowerId);
@@ -2409,6 +2448,46 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   )}
                 </div>
               </OverviewCollapsibleSection>
+              {featGrantedTraitRows.length > 0 && (
+                <OverviewCollapsibleSection title="Granted by feats">
+                  <TraitRowsList rows={featGrantedTraitRows} emptyMessage="No feat-granted features." />
+                </OverviewCollapsibleSection>
+              )}
+              {featGrantedPowerRows.length > 0 && (
+                <OverviewCollapsibleSection title="Feat powers">
+                  <div style={{ display: "grid", gap: "0.35rem" }}>
+                    {featGrantedPowerRows.map(({ feat, powers }) => (
+                      <div key={feat.id} style={{ fontSize: "0.8rem" }}>
+                        <div style={{ fontWeight: 700, marginBottom: "0.12rem" }}>{feat.name}</div>
+                        <ul style={{ margin: 0, paddingLeft: "1.1rem", color: "var(--text-secondary)" }}>
+                          {powers.map((p) => (
+                            <li key={p.id}>
+                              {p.name}
+                              {p.usage ? ` (${p.usage})` : ""}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </OverviewCollapsibleSection>
+              )}
+              {featProficiencyDisplayRows.length > 0 && (
+                <OverviewCollapsibleSection title="Proficiencies from feats">
+                  <ul style={{ margin: 0, paddingLeft: "1.1rem", fontSize: "0.8rem", color: "var(--text-primary)" }}>
+                    {featProficiencyDisplayRows.map((row) => (
+                      <li key={row.featId} style={{ marginBottom: "0.35rem" }}>
+                        <span style={{ fontWeight: 700 }}>{row.featName}</span>
+                        <ul style={{ margin: "0.12rem 0 0 0", paddingLeft: "1rem", color: "var(--text-secondary)" }}>
+                          {row.grants.map((g, i) => (
+                            <li key={i}>{g}</li>
+                          ))}
+                        </ul>
+                      </li>
+                    ))}
+                  </ul>
+                </OverviewCollapsibleSection>
+              )}
             </div>
             </div>
             <div className="character-sheet-overview-row character-sheet-overview-row--page-break" style={overviewThreeColumnGridStyle}>
@@ -2427,37 +2506,86 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             </div>
             </div>
           </div>
-          {(["atWill", "encounter", "daily"] as const).map((bucket) => (
-            <div key={bucket} style={{ ...panelStyle, gridColumn: "1 / -1" }}>
-                <div
-                  onMouseEnter={(event) => glossaryTooltipUi.startHover(event, `powerUsage:${bucket}`)}
-                  onMouseLeave={glossaryTooltipUi.leaveHover}
-                  onFocus={(event) => glossaryTooltipUi.startHover(event, `powerUsage:${bucket}`)}
-                  onBlur={glossaryTooltipUi.leaveHover}
-                  tabIndex={0}
-                  style={{
-                    fontWeight: 700,
-                    marginBottom: "0.35rem",
-                    borderLeft: `5px solid ${usageAccentColor(bucket)}`,
-                    paddingLeft: "0.45rem",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                    color: "var(--text-primary)"
-                  }}
-                >
-                  {bucket === "atWill" ? "At-Will" : bucket === "encounter" ? "Encounter" : "Daily"}
-                </div>
+          <div style={{ ...panelStyle, gridColumn: "1 / -1", display: "flex", flexWrap: "wrap", gap: "0.4rem", alignItems: "center" }}>
+            <span style={{ fontSize: "0.78rem", fontWeight: 700, letterSpacing: "0.03em", textTransform: "uppercase", color: "var(--text-secondary)" }}>
+              Group powers by
+            </span>
+            {(
+              [
+                { key: "usage" as const, label: "Usage" },
+                { key: "actionType" as const, label: "Action type" }
+              ] as const
+            ).map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                disabled={powerGroupBy === key}
+                onClick={() => setPowerGroupBy(key)}
+                style={{
+                  padding: "0.3rem 0.65rem",
+                  borderRadius: "0.3rem",
+                  border: powerGroupBy === key ? "1px solid var(--surface-3)" : "1px solid var(--panel-border)",
+                  backgroundColor: powerGroupBy === key ? "var(--surface-3)" : "var(--surface-0)",
+                  color: powerGroupBy === key ? "var(--surface-0)" : "var(--text-primary)",
+                  fontWeight: 700,
+                  letterSpacing: "0.03em",
+                  textTransform: "uppercase",
+                  fontSize: "0.76rem",
+                  cursor: powerGroupBy === key ? "default" : "pointer"
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {powerDisplaySections.map((section) => (
+            <div key={section.key} style={{ ...panelStyle, gridColumn: "1 / -1" }}>
+                {section.sectionKind === "usage" && section.usageBucket ? (
+                  <div
+                    onMouseEnter={(event) => glossaryTooltipUi.startHover(event, `powerUsage:${section.usageBucket}`)}
+                    onMouseLeave={glossaryTooltipUi.leaveHover}
+                    onFocus={(event) => glossaryTooltipUi.startHover(event, `powerUsage:${section.usageBucket}`)}
+                    onBlur={glossaryTooltipUi.leaveHover}
+                    tabIndex={0}
+                    style={{
+                      fontWeight: 700,
+                      marginBottom: "0.35rem",
+                      borderLeft: `5px solid ${usageAccentColor(section.usageBucket)}`,
+                      paddingLeft: "0.45rem",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      color: "var(--text-primary)"
+                    }}
+                  >
+                    {section.title}
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      marginBottom: "0.35rem",
+                      borderLeft: "5px solid var(--panel-border)",
+                      paddingLeft: "0.45rem",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      color: "var(--text-primary)"
+                    }}
+                  >
+                    {section.title}
+                  </div>
+                )}
                 {(() => {
-                  const orderedBucketPowers = getOrderedBucketPowers(groupedPowers[bucket]);
+                  const orderedSectionPowers = getOrderedSectionPowers(section.powers);
                   const usedSet = new Set(sheet.powers.expendedPowerIds);
-                  return orderedBucketPowers.length === 0 ? (
+                  return orderedSectionPowers.length === 0 ? (
                   <div style={{ color: "var(--text-muted)" }}>No cards selected.</div>
                 ) : (
                   <div style={{ display: "grid", gap: "0.4rem", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", alignItems: "stretch" }}>
-                    {orderedBucketPowers.map((power) => {
-                    const accent = usageAccentCardStyle(bucket);
+                    {orderedSectionPowers.map((power) => {
+                    const usageBucket = powerUsageBucket(power);
+                    const accent = usageAccentCardStyle(usageBucket);
                     const expended = usedSet.has(power.id);
-                    const canExpend = bucket === "encounter" || bucket === "daily";
+                    const canExpend = usageBucket === "encounter" || usageBucket === "daily";
                     const raw = (power.raw || {}) as Record<string, unknown>;
                     const specific = (raw.specific as Record<string, unknown> | undefined) || {};
                     const display = String(specific["Display"] || power.display || "").trim();
@@ -2483,7 +2611,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                           borderRadius: "8px",
                           padding: "0.55rem 0.65rem",
                           backgroundColor: accent.backgroundColor,
-                          boxShadow: `inset 0 0 0 1px ${usageAccentColor(bucket)}33`,
+                          boxShadow: `inset 0 0 0 1px ${usageAccentColor(usageBucket)}33`,
                           opacity: expended ? 0.58 : 1,
                           filter: expended ? "grayscale(0.55) saturate(0.65) brightness(0.88) contrast(0.82)" : "none",
                           height: "100%",
@@ -2500,7 +2628,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                         onDrop={(event) => {
                           event.preventDefault();
                           if (!draggingPowerId) return;
-                          reorderPowerCardsByDrag(groupedPowers[bucket], draggingPowerId, power.id);
+                          reorderPowerCardsByDrag(section.powers, draggingPowerId, power.id);
                           setDraggingPowerId(null);
                         }}
                       >
@@ -2642,6 +2770,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                     })}
                   </div>
                 );
+
                 })()}
             </div>
           ))}

@@ -16,6 +16,12 @@ import {
   racePowerGroupsForRace,
   racePowerSelectSelectionKey
 } from "./grantedPowersQuery";
+import {
+  collectFeatProficiencyGrants,
+  legacyFeatNamesSet,
+  validateArmorProficiencyForSelection,
+  validateShieldProficiencyForSelection
+} from "./featProficiencies";
 import { isProficientWithImplement, isProficientWithWeapon } from "./weaponAttack";
 import { mergeHybridProficiencyLines, parseHybridDefenseBonuses } from "./hybridDerivedStats";
 import { parseClassDefenseBonusesFromClassDef } from "./parseClassDefenseBonuses";
@@ -302,49 +308,15 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
 
     const selectedArmor = index.armors.find((a) => a.id === build.armorId);
     const selectedShield = index.armors.find((a) => a.id === build.shieldId);
-    const featNames = new Set(
-      build.featIds
-        .map((id) => index.feats.find((f) => f.id === id)?.name?.toLowerCase() || "")
-        .filter(Boolean)
+    const featProficiencyGrants = collectFeatProficiencyGrants(index, build.featIds);
+    const legacyFeatNames = legacyFeatNamesSet(index, build);
+
+    errors.push(
+      ...validateArmorProficiencyForSelection(selectedArmor, armorProficiencies, featProficiencyGrants, legacyFeatNames)
     );
-
-    function hasArmorProficiency(label: string): boolean {
-      const lower = label.toLowerCase();
-      if (armorProficiencies.includes(lower)) return true;
-      return featNames.has(`armor proficiency: ${label.toLowerCase()}`);
-    }
-
-    if (selectedArmor) {
-      const category = String(selectedArmor.armorCategory || "").toLowerCase();
-      if (category.includes("cloth") && !hasArmorProficiency("cloth")) {
-        errors.push("Missing Cloth armor proficiency for selected armor.");
-      }
-      if (category.includes("leather") && !hasArmorProficiency("leather")) {
-        errors.push("Missing Leather armor proficiency for selected armor.");
-      }
-      if (category.includes("hide") && !hasArmorProficiency("hide")) {
-        errors.push("Missing Hide armor proficiency for selected armor.");
-      }
-      if (category.includes("chain") && !hasArmorProficiency("chainmail")) {
-        errors.push("Missing Chainmail armor proficiency for selected armor.");
-      }
-      if (category.includes("scale") && !hasArmorProficiency("scale")) {
-        errors.push("Missing Scale armor proficiency for selected armor.");
-      }
-      if (category.includes("plate") && !hasArmorProficiency("plate")) {
-        errors.push("Missing Plate armor proficiency for selected armor.");
-      }
-    }
-
-    if (selectedShield) {
-      const shieldCat = String(selectedShield.armorCategory || "").toLowerCase();
-      if (shieldCat.includes("light") && !armorProficiencies.includes("light shields")) {
-        errors.push("Missing Light Shield proficiency for selected shield.");
-      }
-      if (shieldCat.includes("heavy") && !armorProficiencies.includes("heavy shields")) {
-        errors.push("Missing Heavy Shield proficiency for selected shield.");
-      }
-    }
+    errors.push(
+      ...validateShieldProficiencyForSelection(selectedShield, armorProficiencies, featProficiencyGrants, legacyFeatNames)
+    );
 
     const weaponsIndex = index.weapons ?? [];
     const implementsIndex = index.implements ?? [];
@@ -355,7 +327,7 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
       const mw = weaponsIndex.find((w) => w.id === build.mainWeaponId);
       if (!mw) {
         errors.push("Selected main weapon is not in the rules index.");
-      } else if (!isProficientWithWeapon(mw, weaponProfText)) {
+      } else if (!isProficientWithWeapon(mw, weaponProfText, featProficiencyGrants)) {
         warnings.push(
           `Main weapon "${mw.name}" — your class weapon proficiencies may not include this category (nonproficient weapon attacks take −2).`
         );
@@ -365,7 +337,7 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
       const ow = weaponsIndex.find((w) => w.id === build.offHandWeaponId);
       if (!ow) {
         errors.push("Selected off-hand weapon is not in the rules index.");
-      } else if (!isProficientWithWeapon(ow, weaponProfText)) {
+      } else if (!isProficientWithWeapon(ow, weaponProfText, featProficiencyGrants)) {
         warnings.push(
           `Off-hand weapon "${ow.name}" — your class weapon proficiencies may not include this category (nonproficient weapon attacks take −2).`
         );
@@ -375,7 +347,7 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
       const imp = implementsIndex.find((x) => x.id === build.implementId);
       if (!imp) {
         errors.push("Selected implement is not in the rules index.");
-      } else if (!isProficientWithImplement(imp, implementSupportText)) {
+      } else if (!isProficientWithImplement(imp, implementSupportText, featProficiencyGrants)) {
         warnings.push(
           `Implement "${imp.name}" — your class may not match this implement group (nonproficient implement attacks take −2).`
         );
@@ -556,50 +528,28 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
 
     const mergedProf = mergeHybridProficiencyLines(hybridA, hybridB);
     const armorProficienciesHy = mergedProf.armorLine.toLowerCase();
-    const featNamesHy = new Set(
-      build.featIds.map((id) => index.feats.find((f) => f.id === id)?.name?.toLowerCase() || "").filter(Boolean)
-    );
-
-    function hasArmorProficiencyHy(label: string): boolean {
-      const lower = label.toLowerCase();
-      if (armorProficienciesHy.includes(lower)) return true;
-      return featNamesHy.has(`armor proficiency: ${label.toLowerCase()}`);
-    }
+    const featProficiencyGrantsHy = collectFeatProficiencyGrants(index, build.featIds);
+    const legacyFeatNamesHy = legacyFeatNamesSet(index, build);
 
     const selectedArmorHy = index.armors.find((a) => a.id === build.armorId);
     const selectedShieldHy = index.armors.find((a) => a.id === build.shieldId);
 
-    if (selectedArmorHy) {
-      const category = String(selectedArmorHy.armorCategory || "").toLowerCase();
-      if (category.includes("cloth") && !hasArmorProficiencyHy("cloth")) {
-        errors.push("Missing Cloth armor proficiency for selected armor.");
-      }
-      if (category.includes("leather") && !hasArmorProficiencyHy("leather")) {
-        errors.push("Missing Leather armor proficiency for selected armor.");
-      }
-      if (category.includes("hide") && !hasArmorProficiencyHy("hide")) {
-        errors.push("Missing Hide armor proficiency for selected armor.");
-      }
-      if (category.includes("chain") && !hasArmorProficiencyHy("chainmail")) {
-        errors.push("Missing Chainmail armor proficiency for selected armor.");
-      }
-      if (category.includes("scale") && !hasArmorProficiencyHy("scale")) {
-        errors.push("Missing Scale armor proficiency for selected armor.");
-      }
-      if (category.includes("plate") && !hasArmorProficiencyHy("plate")) {
-        errors.push("Missing Plate armor proficiency for selected armor.");
-      }
-    }
-
-    if (selectedShieldHy) {
-      const shieldCat = String(selectedShieldHy.armorCategory || "").toLowerCase();
-      if (shieldCat.includes("light") && !armorProficienciesHy.includes("light shields")) {
-        errors.push("Missing Light Shield proficiency for selected shield.");
-      }
-      if (shieldCat.includes("heavy") && !armorProficienciesHy.includes("heavy shields")) {
-        errors.push("Missing Heavy Shield proficiency for selected shield.");
-      }
-    }
+    errors.push(
+      ...validateArmorProficiencyForSelection(
+        selectedArmorHy,
+        armorProficienciesHy,
+        featProficiencyGrantsHy,
+        legacyFeatNamesHy
+      )
+    );
+    errors.push(
+      ...validateShieldProficiencyForSelection(
+        selectedShieldHy,
+        armorProficienciesHy,
+        featProficiencyGrantsHy,
+        legacyFeatNamesHy
+      )
+    );
 
     const weaponsIndex = index.weapons ?? [];
     const implementsIndex = index.implements ?? [];
@@ -610,7 +560,7 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
       const mw = weaponsIndex.find((w) => w.id === build.mainWeaponId);
       if (!mw) {
         errors.push("Selected main weapon is not in the rules index.");
-      } else if (!isProficientWithWeapon(mw, weaponProfTextHy)) {
+      } else if (!isProficientWithWeapon(mw, weaponProfTextHy, featProficiencyGrantsHy)) {
         warnings.push(
           `Main weapon "${mw.name}" — your hybrid weapon proficiencies may not include this category (nonproficient weapon attacks take −2).`
         );
@@ -620,7 +570,7 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
       const ow = weaponsIndex.find((w) => w.id === build.offHandWeaponId);
       if (!ow) {
         errors.push("Selected off-hand weapon is not in the rules index.");
-      } else if (!isProficientWithWeapon(ow, weaponProfTextHy)) {
+      } else if (!isProficientWithWeapon(ow, weaponProfTextHy, featProficiencyGrantsHy)) {
         warnings.push(
           `Off-hand weapon "${ow.name}" — your hybrid weapon proficiencies may not include this category (nonproficient weapon attacks take −2).`
         );
@@ -630,7 +580,7 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
       const imp = implementsIndex.find((x) => x.id === build.implementId);
       if (!imp) {
         errors.push("Selected implement is not in the rules index.");
-      } else if (!isProficientWithImplement(imp, implementSupportTextHy)) {
+      } else if (!isProficientWithImplement(imp, implementSupportTextHy, featProficiencyGrantsHy)) {
         warnings.push(
           `Implement "${imp.name}" — your hybrid classes may not match this implement group (nonproficient implement attacks take −2).`
         );
@@ -716,8 +666,10 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
   const classNameById = new Map(index.classes.map((c) => [c.id, c.name]));
   const skillNameById = new Map(index.skills.map((s) => [s.id, s.name]));
   const hybridNamesForPrereq = hybridBaseClassNames(index, build);
-  const prereqClassOpts =
-    hybridNamesForPrereq.length > 0 ? { additionalClassNamesForMatch: hybridNamesForPrereq } : undefined;
+  const prereqClassOpts = {
+    index,
+    ...(hybridNamesForPrereq.length > 0 ? { additionalClassNamesForMatch: hybridNamesForPrereq } : {})
+  };
   const themes = index.themes;
   const paragonPaths = index.paragonPaths;
   const epicDestinies = index.epicDestinies;

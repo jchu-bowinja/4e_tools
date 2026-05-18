@@ -28,7 +28,8 @@ export function createDefaultCharacterSheetState(): CharacterSheetState {
     powers: {
       selectedPowerIds: [],
       expendedPowerIds: [],
-      manualOrderIds: []
+      manualOrderIds: [],
+      groupBy: "usage"
     }
   };
 }

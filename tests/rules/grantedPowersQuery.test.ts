@@ -12,6 +12,7 @@ import {
   raceGrantsBonusClassAtWillSlot,
   racePowerGroupsForRace,
   racialTraitGrantsBonusClassAtWillSlot,
+  resolveFeatGrantedPowers,
   resolvePowersByLooseNames
 } from "../../src/rules/grantedPowersQuery";
 import type { Feat, Race, RacialTrait, RulesIndex } from "../../src/rules/models";
@@ -277,6 +278,23 @@ describe("bonus class at-will from racial traits", () => {
     } as unknown as RulesIndex;
     expect(bonusClassAtWillSlotFromRaceBuild(index, { raceId: "rh", raceSelections: undefined })).toBe(true);
     expect(bonusClassAtWillSlotFromRaceBuild(index, { raceId: "rh", raceSelections: {} })).toBe(true);
+  });
+});
+
+describe("resolveFeatGrantedPowers", () => {
+  it("prefers ETL grantedPowerIds over Associated Powers names", () => {
+    const feat = {
+      id: "F1",
+      name: "Armor of Bahamut",
+      slug: "armor-of-bahamut",
+      prereqTokens: [],
+      grantedPowerIds: ["ID_FMP_POWER_2161"],
+      raw: { specific: { "Associated Powers": "Wrong Name" } }
+    } as Feat;
+    const index = {
+      powers: [{ id: "ID_FMP_POWER_2161", name: "Armor of Bahamut", slug: "aob", raw: {} }]
+    } as unknown as RulesIndex;
+    expect(resolveFeatGrantedPowers(index, feat).map((p) => p.id)).toEqual(["ID_FMP_POWER_2161"]);
   });
 });
 
