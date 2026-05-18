@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useMemo, useState, type ChangeEvent, type CSSProperties, type ReactNode } from "react";
 import type { Armor, CharacterBuild, EnhancementLevel, Implement, MagicItem, RulesIndex, Weapon } from "../../rules/models";
 import type { EquipmentCombatBonuses } from "../../rules/equipment";
 import { normalizeCharacterEquipment } from "../../rules/equipment";
@@ -19,7 +19,7 @@ import {
   magicItemFamilyDisplayName,
   type EnchantmentFamily
 } from "../../rules/enchantmentFamilies";
-import { AdjustableNumberInput } from "../../ui/AdjustableNumberInput";
+import { adjustableNumberWidthCh } from "../../ui/AdjustableNumberInput";
 import { ensureSelectedEntityInFiltered, filterRulesEntitiesByQuery } from "./featPowerFilters";
 import {
   setImplementEnchantmentFamily,
@@ -46,6 +46,24 @@ import {
 export type EquipmentEditorSlot = "armor" | "shield" | "mainHand" | "offHand" | "implement" | "neck";
 /** Sheet inventory picker: both weapon hands share one category. */
 export type EquipmentEditorSlotFilter = EquipmentEditorSlot | "weapon";
+
+export const ADD_EQUIPMENT_OPTIONS: { value: EquipmentEditorSlotFilter; label: string }[] = [
+  { value: "armor", label: "Armor" },
+  { value: "shield", label: "Shield" },
+  { value: "weapon", label: "Weapon" },
+  { value: "implement", label: "Implement" },
+  { value: "neck", label: "Neck" }
+];
+
+export const equipmentPickerSelectStyle: CSSProperties = {
+  width: "100%",
+  maxWidth: "22rem",
+  marginTop: "0.25rem",
+  padding: "0.4rem 0.5rem",
+  borderRadius: "6px",
+  border: "1px solid var(--panel-border)",
+  boxSizing: "border-box"
+};
 
 interface EquipmentTabProps {
   index: RulesIndex;
@@ -106,10 +124,19 @@ function EquipmentPickerRow(props: {
   filterPlaceholder: string;
   filterAriaLabel: string;
   children: ReactNode;
+  between?: ReactNode;
 }): JSX.Element {
   return (
-    <div style={pickerRowStyle}>
+    <div
+      style={{
+        ...pickerRowStyle,
+        gridTemplateColumns: props.between
+          ? "minmax(0, 1fr) auto minmax(6.5rem, 9.5rem)"
+          : pickerRowStyle.gridTemplateColumns
+      }}
+    >
       <div style={{ minWidth: 0 }}>{props.children}</div>
+      {props.between}
       <input
         type="search"
         value={props.filterValue}
@@ -174,39 +201,108 @@ function ensureSelectedFamilyInFiltered(
   return selected ? [selected, ...filtered] : filtered;
 }
 
+function stepEnhancementLevel(
+  current: EnhancementLevel,
+  allowed: EnhancementLevel[],
+  direction: 1 | -1
+): EnhancementLevel {
+  const sorted = [...allowed].sort((a, b) => a - b);
+  if (sorted.length === 0) {
+    return Math.max(0, Math.min(6, current + direction)) as EnhancementLevel;
+  }
+  const idx = sorted.indexOf(current);
+  const baseIdx = idx === -1 ? 0 : idx;
+  const nextIdx = baseIdx + direction;
+  if (nextIdx < 0) return sorted[0]!;
+  if (nextIdx >= sorted.length) return sorted[sorted.length - 1]!;
+  return sorted[nextIdx]!;
+}
+
+function snapEnhancementLevel(value: number, allowed: EnhancementLevel[]): EnhancementLevel {
+  const sorted = [...allowed].sort((a, b) => a - b);
+  if (sorted.length === 0) {
+    return Math.max(0, Math.min(6, Math.trunc(value))) as EnhancementLevel;
+  }
+  if (sorted.includes(value as EnhancementLevel)) return value as EnhancementLevel;
+  return sorted.reduce((best, level) =>
+    Math.abs(level - value) < Math.abs(best - value) ? level : best
+  );
+}
+
 function EnchantmentPlusInput(props: {
   title: string;
-  hasEnchantment: boolean;
   allowedEnhancements: EnhancementLevel[];
   value: number;
   onChange: (value: EnhancementLevel) => void;
 }): JSX.Element {
-  const { title, hasEnchantment, allowedEnhancements, value, onChange } = props;
-  if (hasEnchantment && allowedEnhancements.length > 0) {
-    return (
-      <select
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value) as EnhancementLevel)}
-        style={{ ...selectStyle, marginTop: "0.25rem" }}
-        aria-label={`${title} enhancement`}
-      >
-        {allowedEnhancements.map((n) => (
-          <option key={n} value={n}>
-            +{n}
-          </option>
-        ))}
-      </select>
-    );
-  }
+  const { title, allowedEnhancements, value, onChange } = props;
+  const sortedAllowed = useMemo(
+    () => [...allowedEnhancements].sort((a, b) => a - b),
+    [allowedEnhancements]
+  );
+  const min = sortedAllowed.length > 0 ? sortedAllowed[0]! : 0;
+  const max = sortedAllowed.length > 0 ? sortedAllowed[sortedAllowed.length - 1]! : 6;
+  const resolved = snapEnhancementLevel(value, sortedAllowed);
+  const ariaLabel = `${title} enhancement plus`;
+
+  const handleInputChange = (event: ChangeEvent<HTMLInputElement>): void => {
+    const raw = event.target.value;
+    if (raw === "") {
+      onChange(min);
+      return;
+    }
+    const parsed = Number(raw);
+    onChange(snapEnhancementLevel(Number.isFinite(parsed) ? parsed : min, sortedAllowed));
+  };
+
   return (
-    <AdjustableNumberInput
-      min={0}
-      max={6}
-      value={value}
-      onChange={onChange}
-      ariaLabel={`${title} enhancement`}
-      style={{ marginTop: "0.25rem" }}
-    />
+    <div
+      className="adjustable-number adjustable-number--compact"
+      style={{ marginTop: 0, flexShrink: 0 }}
+      title={sortedAllowed.length > 0 ? `Allowed: +${sortedAllowed.join(", +")}` : "+0 to +6"}
+    >
+      <span
+        aria-hidden
+        style={{
+          fontSize: "0.85rem",
+          fontWeight: 600,
+          color: "var(--text-secondary)",
+          paddingLeft: "0.1rem"
+        }}
+      >
+        +
+      </span>
+      <input
+        type="number"
+        min={min}
+        max={max}
+        value={resolved}
+        onChange={handleInputChange}
+        aria-label={ariaLabel}
+        className="adjustable-number__input"
+        style={{ width: adjustableNumberWidthCh(resolved, max) }}
+      />
+      <div className="adjustable-number__stepper" role="group" aria-label={`${ariaLabel} adjustment`}>
+        <button
+          type="button"
+          className="adjustable-number__step-btn"
+          disabled={resolved >= max}
+          onClick={() => onChange(stepEnhancementLevel(resolved, sortedAllowed, 1))}
+          aria-label={`Increase ${ariaLabel}`}
+        >
+          +
+        </button>
+        <button
+          type="button"
+          className="adjustable-number__step-btn"
+          disabled={resolved <= min}
+          onClick={() => onChange(stepEnhancementLevel(resolved, sortedAllowed, -1))}
+          aria-label={`Decrease ${ariaLabel}`}
+        >
+          −
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -312,6 +408,14 @@ function StandardSlotSection(props: StandardSlotSectionProps): JSX.Element {
           onFilterChange={onEnchantmentSearchChange}
           filterPlaceholder="Magic item name"
           filterAriaLabel="Filter enchantment"
+          between={
+            <EnchantmentPlusInput
+              title={title}
+              allowedEnhancements={selectedFamily?.allowedEnhancements ?? []}
+              value={enhancement}
+              onChange={onEnhancementChange}
+            />
+          }
         >
           <select
             value={selectedFamilyKey || ""}
@@ -326,16 +430,6 @@ function StandardSlotSection(props: StandardSlotSectionProps): JSX.Element {
             ))}
           </select>
         </EquipmentPickerRow>
-      </label>
-      <label style={{ fontSize: "0.88rem", display: "block" }}>
-        3. Plus {selectedFamily ? `(+${selectedFamily.allowedEnhancements.join(", +")})` : "(+0–+6)"}
-        <EnchantmentPlusInput
-          title={title}
-          hasEnchantment={!!selectedFamily}
-          allowedEnhancements={selectedFamily?.allowedEnhancements ?? []}
-          value={enhancement}
-          onChange={onEnhancementChange}
-        />
       </label>
       <EquipmentSelectionDetails
         baseName={baseItem?.name}
@@ -353,8 +447,14 @@ export function EquipmentTab({
   onBuildChange,
   magicCombat,
   hideTitle,
-  activeSlotOnly
+  activeSlotOnly: activeSlotOnlyProp
 }: EquipmentTabProps): JSX.Element {
+  const [pickedSlot, setPickedSlot] = useState<EquipmentEditorSlotFilter | "">("");
+  const useParentSlotPicker = hideTitle === true;
+  const activeSlotFilter: EquipmentEditorSlotFilter | undefined = useParentSlotPicker
+    ? activeSlotOnlyProp
+    : pickedSlot || undefined;
+
   const equipment = useMemo(() => normalizeCharacterEquipment(build.equipment), [build.equipment]);
   const equipmentWarnings = useMemo(() => equipmentDuplicateEnchantmentWarnings(build, index), [build, index]);
   const enchantmentEffects = useMemo(
@@ -485,18 +585,18 @@ export function EquipmentTab({
     magicCombat.implementAttack > 0;
 
   const showSlot = (slot: EquipmentEditorSlot): boolean => {
-    if (!activeSlotOnly) return true;
-    if (activeSlotOnly === "weapon") return slot === "mainHand" || slot === "offHand";
-    return activeSlotOnly === slot;
+    if (!activeSlotFilter) return false;
+    if (activeSlotFilter === "weapon") return slot === "mainHand" || slot === "offHand";
+    return activeSlotFilter === slot;
   };
-  const filteredEnchantmentEffects = activeSlotOnly
-    ? activeSlotOnly === "weapon"
+  const filteredEnchantmentEffects = activeSlotFilter
+    ? activeSlotFilter === "weapon"
       ? enchantmentEffects.filter(
           (row) =>
             row.slotLabel.toLowerCase() === "main hand" || row.slotLabel.toLowerCase() === "off hand"
         )
       : enchantmentEffects.filter(
-          (row) => row.slotLabel.toLowerCase() === slotLabelForEditor(activeSlotOnly).toLowerCase()
+          (row) => row.slotLabel.toLowerCase() === slotLabelForEditor(activeSlotFilter).toLowerCase()
         )
     : enchantmentEffects;
 
@@ -514,7 +614,25 @@ export function EquipmentTab({
         backgroundColor: "var(--surface-1)"
       }}
     >
-      {!activeSlotOnly && (
+      {!useParentSlotPicker && (
+        <label style={{ fontSize: "0.88rem", fontWeight: 600 }}>
+          Add equipment…
+          <select
+            value={pickedSlot}
+            onChange={(e) => setPickedSlot((e.target.value || "") as EquipmentEditorSlotFilter | "")}
+            style={equipmentPickerSelectStyle}
+            aria-label="Choose equipment slot to edit"
+          >
+            <option value="">Add equipment…</option>
+            {ADD_EQUIPMENT_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {!activeSlotFilter && (
         <p style={{ margin: 0, fontSize: "0.78rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
           Per slot: pick base gear, an optional magic enchantment, then plus. Enchantments group all compendium +1…+6
           variants into one entry; plus is limited to tiers that exist for that enchantment.
@@ -730,6 +848,14 @@ export function EquipmentTab({
             onFilterChange={setImplementEnchantSearch}
             filterPlaceholder="Staff, orb, holy symbol…"
             filterAriaLabel="Filter enchantment"
+            between={
+              <EnchantmentPlusInput
+                title="Implement"
+                allowedEnhancements={implementSelectedFamily?.allowedEnhancements ?? []}
+                value={equipment.implement?.enhancement ?? 0}
+                onChange={(n) => onBuildChange(setImplementEnhancement(build, index, n, magicImplementCatalog))}
+              />
+            }
           >
             <select
               value={implementFamilyKey || ""}
@@ -748,19 +874,6 @@ export function EquipmentTab({
               ))}
             </select>
           </EquipmentPickerRow>
-        </label>
-        <label style={{ fontSize: "0.88rem", display: "block" }}>
-          3. Plus{" "}
-          {implementSelectedFamily
-            ? `(+${implementSelectedFamily.allowedEnhancements.join(", +")})`
-            : "(+0–+6)"}
-          <EnchantmentPlusInput
-            title="Implement"
-            hasEnchantment={!!implementSelectedFamily}
-            allowedEnhancements={implementSelectedFamily?.allowedEnhancements ?? []}
-            value={equipment.implement?.enhancement ?? 0}
-            onChange={(n) => onBuildChange(setImplementEnhancement(build, index, n, magicImplementCatalog))}
-          />
         </label>
         <EquipmentSelectionDetails
           baseName={selectedSuperiorImplement?.name}
@@ -788,6 +901,14 @@ export function EquipmentTab({
             onFilterChange={setNeckEnchantSearch}
             filterPlaceholder="Cloak, amulet…"
             filterAriaLabel="Filter enchantment"
+            between={
+              <EnchantmentPlusInput
+                title="Neck"
+                allowedEnhancements={neckSelectedFamily?.allowedEnhancements ?? []}
+                value={equipment.neck?.enhancement ?? 0}
+                onChange={(n) => onBuildChange(setNeckEnhancement(build, index, n, magicNeckCatalog))}
+              />
+            }
           >
             <select
               value={neckFamilyKey || ""}
@@ -804,16 +925,6 @@ export function EquipmentTab({
               ))}
             </select>
           </EquipmentPickerRow>
-        </label>
-        <label style={{ fontSize: "0.88rem", display: "block" }}>
-          2. Plus {neckSelectedFamily ? `(+${neckSelectedFamily.allowedEnhancements.join(", +")})` : "(+0–+6)"}
-          <EnchantmentPlusInput
-            title="Neck"
-            hasEnchantment={!!neckSelectedFamily}
-            allowedEnhancements={neckSelectedFamily?.allowedEnhancements ?? []}
-            value={equipment.neck?.enhancement ?? 0}
-            onChange={(n) => onBuildChange(setNeckEnhancement(build, index, n, magicNeckCatalog))}
-          />
         </label>
         <EquipmentSelectionDetails
           enchantmentName={

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { sheetStateFromBuild, toBuildLikeState, computeSheetDerivedData } from "../../src/features/characterSheet/selectors";
 import {
+  characterBuildInventoryItems,
   isEquipmentDerivedInventoryItem,
   updateSheetEquipmentFromBuild
 } from "../../src/features/characterSheet/sheetEquipment";
@@ -115,6 +116,28 @@ describe("sheetStateFromBuild equipment", () => {
       index
     );
     expect(derived.defenses.fortitude).toBe(baseline.defenses.fortitude + 1);
+  });
+
+  it("characterBuildInventoryItems lists equipment with equipped slots", () => {
+    const build: CharacterBuild = {
+      name: "Hero",
+      level: 9,
+      raceId: "race_human",
+      classId: "class_fighter",
+      abilityScores: { STR: 16, CON: 14, DEX: 12, INT: 10, WIS: 10, CHA: 8 },
+      trainedSkillIds: [],
+      featIds: [],
+      powerIds: [],
+      equipment: {
+        armor: { baseId: plate.id, enchantmentId: blackIron.id, enhancement: 2 },
+        neck: { enchantmentId: cloak.id, enhancement: 1 }
+      }
+    };
+    const items = characterBuildInventoryItems(build, index);
+    expect(items).toHaveLength(2);
+    expect(items[0]?.equippedSlot).toBe("Armor");
+    expect(items[0]?.name).toContain("Plate Armor");
+    expect(items[1]?.name).toContain("Cloak");
   });
 });
 

@@ -174,6 +174,43 @@ function rowForStandardSlot(
   };
 }
 
+const EQUIPMENT_SLOT_LABELS: Record<EquipmentSlot, string> = {
+  armor: "Armor",
+  shield: "Shield",
+  mainHand: "Main hand",
+  offHand: "Off hand",
+  implement: "Implement"
+};
+
+export interface CharacterBuildItemRow {
+  id: string;
+  name: string;
+  kind: InventoryItem["kind"];
+  quantity: number;
+  equippedSlot?: string;
+  notes?: string;
+}
+
+/** Inventory rows for a builder `CharacterBuild` (equipment-derived items only). */
+export function characterBuildInventoryItems(build: CharacterBuild, index: RulesIndex): CharacterBuildItemRow[] {
+  const characterEquipment = normalizeCharacterEquipment(build.equipment);
+  const { inventory, equipment: equippedBySlot } = inventoryAndSlotsFromCharacterEquipment(characterEquipment, index);
+  const equippedSlotByItemId = new Map<string, string>();
+  for (const [slot, itemId] of Object.entries(equippedBySlot)) {
+    if (itemId) {
+      equippedSlotByItemId.set(itemId, EQUIPMENT_SLOT_LABELS[slot as EquipmentSlot]);
+    }
+  }
+  return inventory.map((item) => ({
+    id: item.id,
+    name: item.name,
+    kind: item.kind,
+    quantity: item.quantity,
+    equippedSlot: equippedSlotByItemId.get(item.id),
+    notes: item.notes
+  }));
+}
+
 export function characterEquipmentSummaryRows(
   state: CharacterSheetState,
   index: RulesIndex

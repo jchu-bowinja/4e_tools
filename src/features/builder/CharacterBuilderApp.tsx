@@ -86,7 +86,9 @@ import {
 import { normalizeCharacterBuild, resolveEffectiveEquipmentIds } from "../../rules/equipment";
 import { computeMagicItemCombatBonuses } from "../../rules/magicItemEquipment";
 import { summarizeImplementAttack, summarizeMainWeaponAttack } from "../../rules/weaponAttack";
+import { BuilderSidebarItemsPanel } from "./BuilderSidebarItemsPanel";
 import { EquipmentTab } from "./EquipmentTab";
+import { LiveSheetCollapsibleSection } from "./LiveSheetCollapsibleSection";
 import { GlossaryTooltipRichText, RulesRichText } from "./RulesRichText";
 import { NEUTRAL_PAGE_BG } from "../../ui/tokens";
 import { STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE } from "../../ui/glossaryTooltip";
@@ -4357,11 +4359,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         }}
       >
         <h3 style={{ ...sectionTitleStyle, marginBottom: "0.75rem" }}>Live Character Sheet</h3>
-        <div style={{ ...ui.blockInset, backgroundColor: "var(--surface-1)", borderColor: "var(--panel-border)", display: "grid", gap: "0.75rem" }}>
-          <div>
-            <p style={{ margin: "0 0 0.4rem 0", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--text-secondary)", textTransform: "uppercase" }}>
-              Character
-            </p>
+        <div style={{ display: "grid", gap: "0.5rem" }}>
+          <LiveSheetCollapsibleSection title="Character">
             <div style={{ display: "grid", gap: "0.25rem" }}>
               <p style={{ margin: 0, fontSize: "0.88rem" }}>
                 <strong {...glossaryTooltipUi.hoverA11y("race")}>Race:</strong> {selectedRace?.name || "None"}
@@ -4464,12 +4463,9 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 </details>
               )}
             </div>
-          </div>
+          </LiveSheetCollapsibleSection>
 
-          <div style={{ borderTop: "1px solid var(--panel-border)", paddingTop: "0.65rem" }}>
-            <p style={{ margin: "0 0 0.4rem 0", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--text-secondary)", textTransform: "uppercase" }}>
-              Combat Stats
-            </p>
+          <LiveSheetCollapsibleSection title="Combat Stats">
             <div style={{ display: "grid", gap: "0.35rem", minWidth: 0 }}>
                 <p style={{ margin: 0, fontSize: "0.88rem" }}>
                   <strong {...glossaryTooltipUi.hoverA11y("hp")}>HP:</strong> {derived.maxHp}
@@ -4606,12 +4602,9 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 )}
               </div>
             )}
-          </div>
+          </LiveSheetCollapsibleSection>
 
-          <div style={{ borderTop: "1px solid var(--panel-border)", paddingTop: "0.65rem" }}>
-            <p style={{ margin: "0 0 0.4rem 0", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--text-secondary)", textTransform: "uppercase" }}>
-              Equipment
-            </p>
+          <LiveSheetCollapsibleSection title="Equipment">
             <div style={{ display: "grid", gap: "0.25rem" }}>
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Armor:</strong> {selectedArmor?.name || "None"}</p>
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Shield:</strong> {selectedShield?.name || "None"}</p>
@@ -4619,15 +4612,12 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Off-hand:</strong> {selectedOffHandWeapon?.name || "None"}</p>
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Implement:</strong> {selectedImplement?.name || "None"}</p>
             </div>
-          </div>
+          </LiveSheetCollapsibleSection>
 
-          <div style={{ borderTop: "1px solid var(--panel-border)", paddingTop: "0.65rem" }}>
-            <p
-              style={{ margin: "0 0 0.4rem 0", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--text-secondary)", textTransform: "uppercase" }}
-              {...glossaryTooltipUi.hoverA11y("abilityScores")}
-            >
-              Ability Scores
-            </p>
+          <LiveSheetCollapsibleSection
+            title="Ability Scores"
+            summaryA11y={glossaryTooltipUi.hoverA11y("abilityScores")}
+          >
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "0.3rem 0.75rem", fontVariantNumeric: "tabular-nums" }}>
               {abilities.map((ability) => {
                 const score = effectiveAbilityScores[ability];
@@ -4639,14 +4629,9 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 );
               })}
             </div>
-          </div>
+          </LiveSheetCollapsibleSection>
 
-          <div style={{ borderTop: "1px solid var(--panel-border)", paddingTop: "0.65rem" }}>
-            <p
-              style={{ margin: "0 0 0.4rem 0", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--text-secondary)", textTransform: "uppercase" }}
-            >
-              Skills
-            </p>
+          <LiveSheetCollapsibleSection title="Skills">
             <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.76rem", color: "var(--text-muted)" }}>
               Includes untrained skills; trained rows add +5 and ignore armor check penalty.
             </p>
@@ -4667,9 +4652,12 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 />
               )}
             />
-          </div>
+          </LiveSheetCollapsibleSection>
 
-          {glossaryTooltipUi.showPanel && glossaryTooltipUi.hoverKey && glossaryTooltipUi.panelPos && (
+          <BuilderSidebarItemsPanel index={index} build={build} />
+        </div>
+
+        {glossaryTooltipUi.showPanel && glossaryTooltipUi.hoverKey && glossaryTooltipUi.panelPos && (
             <div
               id={BUILDER_GLOSSARY_TOOLTIP_ID}
               role="tooltip"
@@ -4686,7 +4674,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               {glossaryContent(glossaryTooltipUi.hoverKey as BuilderGlossaryKey)}
             </div>
           )}
-        </div>
       </div>
     </div>
   );

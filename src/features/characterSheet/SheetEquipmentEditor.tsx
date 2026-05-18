@@ -1,7 +1,12 @@
-import { useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState } from "react";
 import type { CharacterBuild, RulesIndex } from "../../rules/models";
 import type { EquipmentCombatBonuses } from "../../rules/equipment";
-import { EquipmentTab, type EquipmentEditorSlotFilter } from "../builder/EquipmentTab";
+import {
+  ADD_EQUIPMENT_OPTIONS,
+  EquipmentTab,
+  equipmentPickerSelectStyle,
+  type EquipmentEditorSlotFilter
+} from "../builder/EquipmentTab";
 import { describeArmor, describeImplement, describeMagicItem, describeWeapon } from "../../rules/equipmentDescriptions";
 import { findMagicItem } from "../../rules/magicItemEquipment";
 import { magicItemFamilyDisplayName } from "../../rules/enchantmentFamilies";
@@ -39,24 +44,6 @@ function inventoryItemDescriptions(
   }
   return {};
 }
-
-const pickerSelectStyle: CSSProperties = {
-  width: "100%",
-  maxWidth: "22rem",
-  marginTop: "0.25rem",
-  padding: "0.4rem 0.5rem",
-  borderRadius: "6px",
-  border: "1px solid var(--panel-border)",
-  boxSizing: "border-box"
-};
-
-const ADD_EQUIPMENT_OPTIONS: { value: EquipmentEditorSlotFilter; label: string }[] = [
-  { value: "armor", label: "Armor" },
-  { value: "shield", label: "Shield" },
-  { value: "weapon", label: "Weapon" },
-  { value: "implement", label: "Implement" },
-  { value: "neck", label: "Neck" }
-];
 
 const INVENTORY_SINGLE_SLOT_OPTIONS: { slot: EquipmentSlot; label: string }[] = [
   { slot: "armor", label: "Armor" },
@@ -130,7 +117,7 @@ export function SheetEquipmentEditor({
         <select
           value={activeSlot}
           onChange={(e) => setActiveSlot((e.target.value || "") as EquipmentEditorSlotFilter | "")}
-          style={pickerSelectStyle}
+          style={equipmentPickerSelectStyle}
           aria-label="Choose equipment slot to edit"
         >
           <option value="">Add equipment…</option>
@@ -183,7 +170,7 @@ export function SheetEquipmentEditor({
                   onChange={(e) =>
                     e.target.value ? onEquipInventory(slot, e.target.value) : onUnequipInventory(slot)
                   }
-                  style={{ ...pickerSelectStyle, maxWidth: "none" }}
+                  style={{ ...equipmentPickerSelectStyle, maxWidth: "none" }}
                 >
                   <option value="">Unequipped</option>
                   {sheet.inventory
@@ -222,7 +209,7 @@ export function SheetEquipmentEditor({
                     onChange={(e) =>
                       e.target.value ? onEquipInventory(slot, e.target.value) : onUnequipInventory(slot)
                     }
-                    style={{ ...pickerSelectStyle, maxWidth: "none" }}
+                    style={{ ...equipmentPickerSelectStyle, maxWidth: "none" }}
                   >
                     <option value="">Unequipped</option>
                     {inventoryItemsForWeaponHand(sheet, slot).map((item) => (
