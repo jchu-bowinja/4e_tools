@@ -47,7 +47,7 @@ import {
   type ConditionDurationPresetKey
 } from "./conditionDurationPresets";
 import { createDefaultCharacterSheetState } from "./defaultState";
-import type { CharacterSheetState, EquipmentSlot, InventoryItem, PowerSheetGroupBy } from "./model";
+import type { CharacterSheetState, EquipmentSlot, PowerSheetGroupBy } from "./model";
 import { buildPowerDisplaySections, powerUsageBucket } from "./powerDisplay";
 import {
   canUseSecondWind,
@@ -59,7 +59,6 @@ import {
 } from "./healingSurgeActions";
 import { computeMagicItemCombatBonuses } from "../../rules/magicItemEquipment";
 import {
-  canEquipItem,
   computeSheetDerivedData,
   findImplementEquippedFromSheet,
   findWeaponEquippedInSlot,
@@ -70,8 +69,13 @@ import {
   sheetWeaponProficiencyText,
   toBuildLikeState
 } from "./selectors";
-import { buildLikeStateFromSheet, updateSheetEquipmentFromBuild } from "./sheetEquipment";
-import { SheetEquipmentEditor } from "./SheetEquipmentEditor";
+import { EquipmentTab } from "../builder/EquipmentTab";
+import { CharacterInventoryList } from "./CharacterInventoryList";
+import {
+  buildLikeStateFromSheet,
+  characterSheetInventoryItems,
+  updateSheetEquipmentFromBuild
+} from "./sheetEquipment";
 import { loadCharacterSheetState, saveCharacterSheetState } from "./storage";
 import { resolveUiGlossaryHoverPlainText, termHasPowerKeywordTooltipBody } from "../../data/glossaryHoverResolve";
 import { positionFixedTooltip } from "../../ui/glossaryTooltipPosition";
@@ -81,11 +85,11 @@ import { AdjustableNumberInput } from "../../ui/AdjustableNumberInput";
 import { findCaseInsensitiveMatches, scrollTextareaToMatch } from "../../ui/jsonSearch";
 import { summarizeImplementAttack, summarizeMainWeaponAttack } from "../../rules/weaponAttack";
 
-type SheetTab = "overview" | "inventory";
+type SheetTab = "overview" | "equipment";
 
 const tabLabel: Record<SheetTab, string> = {
   overview: "Character",
-  inventory: "Inventory"
+  equipment: "Equipment"
 };
 
 const panelStyle: CSSProperties = {
@@ -1003,6 +1007,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     return computeMagicItemCombatBonuses(index, toBuildLikeState(sheet, index));
   }, [index, sheet]);
   const sheetEquipmentBuild = useMemo(() => buildLikeStateFromSheet(sheet, index), [sheet, index]);
+  const inventoryItems = useMemo(() => characterSheetInventoryItems(sheet), [sheet]);
   const mainWeaponSummary = useMemo(
     () =>
       summarizeMainWeaponAttack(
@@ -1183,28 +1188,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         inventory: prev.inventory.filter((item) => item.id !== itemId),
         equipment
       };
-    });
-  }
-
-  function setEquipped(slot: EquipmentSlot, itemId: string): void {
-    updateSheet((prev) => {
-      const item = prev.inventory.find((entry) => entry.id === itemId);
-      if (!item || !canEquipItem(item, slot)) return prev;
-      return {
-        ...prev,
-        equipment: {
-          ...prev.equipment,
-          [slot]: itemId
-        }
-      };
-    });
-  }
-
-  function unequip(slot: EquipmentSlot): void {
-    updateSheet((prev) => {
-      const next = { ...prev.equipment };
-      delete next[slot];
-      return { ...prev, equipment: next };
     });
   }
 
@@ -2877,43 +2860,21 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         </div>
       )}
 
-      {tab === "inventory" && (
+      {tab === "equipment" && (
         <div style={{ display: "grid", gap: "0.55rem" }}>
+          <EquipmentTab
+            index={index}
+            build={sheetEquipmentBuild}
+            magicCombat={magicCombat}
+            onBuildChange={(next) =>
+              updateSheet((prev) => updateSheetEquipmentFromBuild(prev, index, () => next))
+            }
+          />
           <div style={panelStyle}>
-            <div style={{ fontWeight: 700, marginBottom: "0.5rem" }}>Equipment</div>
-            <SheetEquipmentEditor
-              index={index}
-              build={sheetEquipmentBuild}
-              magicCombat={magicCombat}
-              sheet={sheet}
-              onEquipInventory={setEquipped}
-              onUnequipInventory={unequip}
-              onBuildChange={(next) =>
-                updateSheet((prev) => updateSheetEquipmentFromBuild(prev, index, () => next))
-              }
-            />
-          </div>
-
-          <div style={panelStyle}>
-            <div style={{ fontWeight: 700, marginBottom: "0.5rem" }}>Inventory</div>
-            {sheet.inventory.length === 0 ? (
-              <div style={{ color: "var(--text-muted)" }}>No items yet.</div>
-            ) : (
-              <div style={{ display: "grid", gap: "0.25rem" }}>
-                {sheet.inventory.map((item) => (
-                  <div key={item.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
-                    <div>
-                      {item.name} ({item.kind}) {item.quantity > 1 ? `x${item.quantity}` : ""}
-                    </div>
-                    <div style={{ display: "flex", gap: "0.35rem" }}>
-                      <button type="button" onClick={() => removeInventoryItem(item.id)}>
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <div style={{ fontWeight: 700, marginBottom: "0.5rem" }}>
+              {inventoryItems.length > 0 ? `Items (${inventoryItems.length})` : "Items"}
+            </div>
+            <CharacterInventoryList items={inventoryItems} onRemoveItem={removeInventoryItem} />
           </div>
         </div>
       )}

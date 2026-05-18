@@ -191,10 +191,10 @@ export interface CharacterBuildItemRow {
   notes?: string;
 }
 
-/** Inventory rows for a builder `CharacterBuild` (equipment-derived items only). */
-export function characterBuildInventoryItems(build: CharacterBuild, index: RulesIndex): CharacterBuildItemRow[] {
-  const characterEquipment = normalizeCharacterEquipment(build.equipment);
-  const { inventory, equipment: equippedBySlot } = inventoryAndSlotsFromCharacterEquipment(characterEquipment, index);
+function inventoryItemRows(
+  inventory: InventoryItem[],
+  equippedBySlot: Partial<Record<EquipmentSlot, string>>
+): CharacterBuildItemRow[] {
   const equippedSlotByItemId = new Map<string, string>();
   for (const [slot, itemId] of Object.entries(equippedBySlot)) {
     if (itemId) {
@@ -209,6 +209,18 @@ export function characterBuildInventoryItems(build: CharacterBuild, index: Rules
     equippedSlot: equippedSlotByItemId.get(item.id),
     notes: item.notes
   }));
+}
+
+/** Inventory rows for a builder `CharacterBuild` (equipment-derived items only). */
+export function characterBuildInventoryItems(build: CharacterBuild, index: RulesIndex): CharacterBuildItemRow[] {
+  const characterEquipment = normalizeCharacterEquipment(build.equipment);
+  const { inventory, equipment: equippedBySlot } = inventoryAndSlotsFromCharacterEquipment(characterEquipment, index);
+  return inventoryItemRows(inventory, equippedBySlot);
+}
+
+/** All inventory rows on a character sheet (derived equipment + manual items). */
+export function characterSheetInventoryItems(state: CharacterSheetState): CharacterBuildItemRow[] {
+  return inventoryItemRows(state.inventory, state.equipment);
 }
 
 export function characterEquipmentSummaryRows(

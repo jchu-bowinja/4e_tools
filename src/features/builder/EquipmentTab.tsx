@@ -615,22 +615,19 @@ export function EquipmentTab({
       }}
     >
       {!useParentSlotPicker && (
-        <label style={{ fontSize: "0.88rem", fontWeight: 600 }}>
-          Add equipment…
-          <select
-            value={pickedSlot}
-            onChange={(e) => setPickedSlot((e.target.value || "") as EquipmentEditorSlotFilter | "")}
-            style={equipmentPickerSelectStyle}
-            aria-label="Choose equipment slot to edit"
-          >
-            <option value="">Add equipment…</option>
-            {ADD_EQUIPMENT_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <select
+          value={pickedSlot}
+          onChange={(e) => setPickedSlot((e.target.value || "") as EquipmentEditorSlotFilter | "")}
+          style={equipmentPickerSelectStyle}
+          aria-label="Add equipment"
+        >
+          <option value="">Add equipment…</option>
+          {ADD_EQUIPMENT_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
       )}
       {!activeSlotFilter && (
         <p style={{ margin: 0, fontSize: "0.78rem", color: "var(--text-muted)", lineHeight: 1.45 }}>

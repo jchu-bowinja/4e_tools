@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import { sheetStateFromBuild, toBuildLikeState, computeSheetDerivedData } from "../../src/features/characterSheet/selectors";
 import {
   characterBuildInventoryItems,
+  characterSheetInventoryItems,
   isEquipmentDerivedInventoryItem,
   updateSheetEquipmentFromBuild
 } from "../../src/features/characterSheet/sheetEquipment";
+import type { CharacterSheetState } from "../../src/features/characterSheet/model";
 import { setStandardSlotBase } from "../../src/features/builder/equipmentBuildUpdates";
 import type { CharacterBuild, MagicItem, RulesIndex } from "../../src/rules/models";
 
@@ -138,6 +140,32 @@ describe("sheetStateFromBuild equipment", () => {
     expect(items[0]?.equippedSlot).toBe("Armor");
     expect(items[0]?.name).toContain("Plate Armor");
     expect(items[1]?.name).toContain("Cloak");
+  });
+});
+
+describe("characterSheetInventoryItems", () => {
+  it("includes manual inventory rows with equipped slot labels", () => {
+    const build: CharacterBuild = {
+      name: "Hero",
+      level: 1,
+      raceId: "race_human",
+      classId: "class_fighter",
+      abilityScores: { STR: 16, CON: 14, DEX: 12, INT: 10, WIS: 10, CHA: 8 },
+      trainedSkillIds: [],
+      featIds: [],
+      powerIds: [],
+      equipment: { armor: { baseId: plate.id, enhancement: 0 }, neck: { enhancement: 0 } }
+    };
+    const sheet: CharacterSheetState = {
+      ...sheetStateFromBuild(build, index),
+      inventory: [
+        ...sheetStateFromBuild(build, index).inventory,
+        { id: "manual-potion", name: "Potion", kind: "gear", quantity: 2, slotHints: [] }
+      ]
+    };
+    const rows = characterSheetInventoryItems(sheet);
+    expect(rows.some((r) => r.id === "manual-potion" && r.name === "Potion")).toBe(true);
+    expect(rows.find((r) => r.equippedSlot === "Armor")).toBeDefined();
   });
 });
 
