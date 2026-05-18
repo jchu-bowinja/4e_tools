@@ -175,7 +175,8 @@ export default function App(): JSX.Element {
         minHeight: "100vh",
         minWidth: "var(--app-min-width, 56rem)",
         backgroundColor: colors.appBackground,
-        color: colors.text
+        color: colors.text,
+        ["--app-header-sticky-offset" as string]: "3.25rem"
       }}
     >
       <a href="#app-main-content" className="skip-link">

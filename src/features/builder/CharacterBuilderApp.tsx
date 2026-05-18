@@ -680,18 +680,53 @@ const DEFAULT_POINT_BUY_BUDGET = 22;
 /** Neutral grey panels for visual hierarchy (builder chrome only). */
 const ui = {
   page: {
-    display: "grid" as const,
-    gridTemplateColumns: "minmax(0, 1fr) minmax(300px, 400px)",
+    display: "flex" as const,
+    flexDirection: "column" as const,
     gap: "0.65rem",
-    alignItems: "start" as const,
+    alignItems: "stretch" as const,
     padding: "clamp(0.75rem, 1.5vw, 1.25rem)",
     minHeight: "100%",
+    width: "100%",
     maxWidth: "1440px",
     margin: "0 auto",
     boxSizing: "border-box" as const,
     fontFamily: "system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
     backgroundColor: "var(--app-background, " + NEUTRAL_PAGE_BG + ")",
     color: "var(--text-primary)"
+  },
+  stickyTabBar: {
+    position: "sticky" as const,
+    top: "var(--app-header-sticky-offset, 3.25rem)",
+    zIndex: 15,
+    backgroundColor: "var(--app-background, " + NEUTRAL_PAGE_BG + ")",
+    paddingTop: "0.65rem",
+    paddingBottom: "0.65rem",
+    borderBottom: "1px solid var(--panel-border)",
+    boxShadow: "0 4px 12px color-mix(in srgb, var(--app-background, " + NEUTRAL_PAGE_BG + ") 88%, transparent)",
+    minWidth: 0,
+    maxWidth: "100%",
+    boxSizing: "border-box" as const
+  },
+  builderBody: {
+    minWidth: 0,
+    maxWidth: "100%",
+    width: "100%",
+    overflowX: "hidden" as const
+  },
+  bodyRow: {
+    display: "flex" as const,
+    gap: "0.65rem",
+    alignItems: "start" as const,
+    minWidth: 0,
+    maxWidth: "100%",
+    width: "100%"
+  },
+  chromeFields: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) auto",
+    gap: "0.75rem 1.25rem",
+    alignItems: "end",
+    marginTop: "0.55rem"
   },
   mainColumn: {
     minWidth: 0,
@@ -703,16 +738,30 @@ const ui = {
     padding: "1.25rem 1.35rem",
     boxShadow: "var(--ui-panel-shadow, 0 1px 4px rgba(15, 23, 42, 0.06))"
   },
-  sidebarColumn: {
+  sidebarStack: {
+    display: "flex" as const,
+    flexDirection: "column" as const,
+    gap: "0.65rem",
     minWidth: 0,
-    maxWidth: "420px",
+    maxWidth: "100%",
+    boxSizing: "border-box" as const
+  },
+  sidebarPanel: {
+    minWidth: 0,
+    maxWidth: "100%",
     width: "100%",
-    justifySelf: "end" as const,
-    backgroundColor: "var(--surface-2)",
+    boxSizing: "border-box" as const,
+    overflowX: "hidden" as const,
     border: "1px solid var(--panel-border)",
     borderRadius: "var(--ui-section-radius, 12px)",
     padding: "1.25rem 1.35rem",
     boxShadow: "var(--ui-panel-shadow, 0 1px 4px rgba(15, 23, 42, 0.06))"
+  },
+  validationColumn: {
+    backgroundColor: "var(--surface-1)"
+  },
+  sidebarColumn: {
+    backgroundColor: "var(--surface-2)"
   },
   blockTitle: {
     backgroundColor: "var(--surface-1)",
@@ -1580,6 +1629,13 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     expectedFeatCount
   ]);
 
+  const validationIssueCount = useMemo(() => {
+    const featIssueCount = featOptions
+      .filter((f) => !f.legal && build.featIds.includes(f.item.id))
+      .reduce((sum, f) => sum + f.reasons.length, 0);
+    return legality.warnings.length + legality.errors.length + featIssueCount;
+  }, [featOptions, build.featIds, legality.warnings, legality.errors]);
+
   function renderTabStatus(status: "complete" | "incomplete"): string {
     return status === "complete" ? "Complete" : "Incomplete";
   }
@@ -1713,23 +1769,9 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   }, [autoGrantedSkillIds.join("|"), build.trainedSkillIds.join("|")]);
 
   return (
-    <div
-      style={{
-        ...ui.page,
-        display: useSingleColumnLayout ? "grid" : "flex",
-        gridTemplateColumns: useSingleColumnLayout ? "minmax(0, 1fr)" : undefined,
-        alignItems: "start"
-      }}
-    >
-      <div
-        style={{
-          ...ui.mainColumn,
-          flex: useSingleColumnLayout ? undefined : "1 1 0",
-          width: useSingleColumnLayout ? undefined : 0
-        }}
-      >
-        <h1 style={pageTitleStyle}>D&amp;D 4e Character Builder</h1>
-        <div style={ui.blockTitle}>
+    <div style={ui.page}>
+      <h1 style={pageTitleStyle}>D&amp;D 4e Character Builder</h1>
+      <div style={ui.chromeFields}>
           <label style={{ display: "block", fontSize: "0.9rem", color: "var(--text-secondary)" }}>
             Character Name
             <input
@@ -1750,7 +1792,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               }}
             />
           </label>
-          <label style={{ display: "block", marginTop: "0.65rem", fontSize: "0.9rem", color: "var(--text-secondary)" }}>
+          <label style={{ display: "block", fontSize: "0.9rem", color: "var(--text-secondary)" }}>
             Level (1–30)
             <AdjustableNumberInput
               min={1}
@@ -1779,8 +1821,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             />
           </label>
         </div>
-        <div style={ui.blockTabs}>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.45rem" }}>
+      <div style={ui.stickyTabBar}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.45rem" }}>
             {[
               ["race", "Race"],
               ["class", "Class"],
@@ -1822,46 +1864,24 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 </div>
               </button>
             ))}
-          </div>
         </div>
-        <div style={ui.blockSheetSection}>
-          <h4 style={subsectionTitleStyle}>Validation Notes</h4>
-          {legality.warnings.length > 0 && (
-            <ul style={{ margin: "0 0 0.5rem 0", paddingLeft: "1.2rem", color: "var(--status-warning)", fontSize: "0.88rem" }}>
-              {legality.warnings.map((w) => (
-                <li key={w}>{w}</li>
-              ))}
-            </ul>
-          )}
-          <ul style={{ margin: 0, paddingLeft: "1.2rem" }}>
-            {featOptions
-              .filter((f) => !f.legal && build.featIds.includes(f.item.id))
-              .flatMap((f) => f.reasons.map((r) => `${f.item.name}: ${r}`))
-              .map((r) => (
-                <li key={r}>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab(navigateToTabForError(r))}
-                    style={{ border: "none", background: "transparent", textDecoration: "underline", cursor: "pointer", padding: 0, color: "var(--text-secondary)" }}
-                  >
-                    {r}
-                  </button>
-                </li>
-              ))}
-            {legality.errors.map((e) => (
-              <li key={e}>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab(navigateToTabForError(e))}
-                  style={{ border: "none", background: "transparent", textDecoration: "underline", cursor: "pointer", padding: 0, color: "var(--text-secondary)" }}
-                >
-                  {e}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
+      </div>
 
+      <div style={ui.builderBody}>
+        <div
+          style={{
+            ...ui.bodyRow,
+            display: useSingleColumnLayout ? "grid" : "flex",
+            gridTemplateColumns: useSingleColumnLayout ? "minmax(0, 1fr)" : undefined
+          }}
+        >
+        <div
+          style={{
+            ...ui.mainColumn,
+            flex: useSingleColumnLayout ? undefined : "1 1 0",
+            width: useSingleColumnLayout ? undefined : 0
+          }}
+        >
         <div style={ui.blockContent}>
         {activeTab === "race" && (
           <div>
@@ -4351,15 +4371,89 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
 
       <div
         style={{
-          ...ui.sidebarColumn,
-          maxWidth: useSingleColumnLayout ? "100%" : "400px",
-          width: useSingleColumnLayout ? "100%" : "400px",
-          flex: useSingleColumnLayout ? undefined : "0 0 400px",
-          justifySelf: useSingleColumnLayout ? "stretch" : "auto"
+          ...ui.sidebarStack,
+          flex: useSingleColumnLayout ? undefined : "0 1 400px",
+          maxWidth: useSingleColumnLayout ? "100%" : "min(400px, 100%)",
+          width: useSingleColumnLayout ? "100%" : "min(400px, 100%)"
         }}
       >
-        <h3 style={{ ...sectionTitleStyle, marginBottom: "0.75rem" }}>Live Character Sheet</h3>
-        <div style={{ display: "grid", gap: "0.5rem" }}>
+        <div style={{ ...ui.sidebarPanel, ...ui.validationColumn }}>
+          <LiveSheetCollapsibleSection
+            title={
+              validationIssueCount > 0
+                ? `Validation Notes (${validationIssueCount})`
+                : "Validation Notes"
+            }
+            defaultOpen={validationIssueCount > 0}
+            summaryStyle={{ textAlign: "left" }}
+            bodyStyle={{ textAlign: "left" }}
+          >
+            {validationIssueCount === 0 ? (
+              <p style={{ margin: 0, fontSize: "0.88rem", color: "var(--text-muted)", textAlign: "left" }}>No validation issues.</p>
+            ) : (
+              <>
+                {legality.warnings.length > 0 && (
+                  <ul style={{ margin: "0 0 0.5rem 0", paddingLeft: "1.2rem", color: "var(--status-warning)", fontSize: "0.88rem", textAlign: "left" }}>
+                    {legality.warnings.map((w) => (
+                      <li key={w}>{w}</li>
+                    ))}
+                  </ul>
+                )}
+                <ul style={{ margin: 0, paddingLeft: "1.2rem", textAlign: "left", overflowWrap: "anywhere" }}>
+                  {featOptions
+                    .filter((f) => !f.legal && build.featIds.includes(f.item.id))
+                    .flatMap((f) => f.reasons.map((r) => `${f.item.name}: ${r}`))
+                    .map((r) => (
+                      <li key={r}>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab(navigateToTabForError(r))}
+                          style={{
+                            border: "none",
+                            background: "transparent",
+                            textDecoration: "underline",
+                            cursor: "pointer",
+                            padding: 0,
+                            color: "var(--text-secondary)",
+                            textAlign: "left",
+                            display: "block",
+                            width: "100%"
+                          }}
+                        >
+                          {r}
+                        </button>
+                      </li>
+                    ))}
+                  {legality.errors.map((e) => (
+                    <li key={e}>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab(navigateToTabForError(e))}
+                        style={{
+                          border: "none",
+                          background: "transparent",
+                          textDecoration: "underline",
+                          cursor: "pointer",
+                          padding: 0,
+                          color: "var(--text-secondary)",
+                          textAlign: "left",
+                          display: "block",
+                          width: "100%"
+                        }}
+                      >
+                        {e}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </LiveSheetCollapsibleSection>
+        </div>
+
+        <div style={{ ...ui.sidebarPanel, ...ui.sidebarColumn }}>
+          <h3 style={{ ...sectionTitleStyle, marginBottom: "0.75rem" }}>Live Character Sheet</h3>
+          <div style={{ display: "grid", gap: "0.5rem" }}>
           <LiveSheetCollapsibleSection title="Character">
             <div style={{ display: "grid", gap: "0.25rem" }}>
               <p style={{ margin: 0, fontSize: "0.88rem" }}>
@@ -4655,9 +4749,9 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
           </LiveSheetCollapsibleSection>
 
           <BuilderSidebarItemsPanel index={index} build={build} />
-        </div>
+          </div>
 
-        {glossaryTooltipUi.showPanel && glossaryTooltipUi.hoverKey && glossaryTooltipUi.panelPos && (
+          {glossaryTooltipUi.showPanel && glossaryTooltipUi.hoverKey && glossaryTooltipUi.panelPos && (
             <div
               id={BUILDER_GLOSSARY_TOOLTIP_ID}
               role="tooltip"
@@ -4674,7 +4768,10 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               {glossaryContent(glossaryTooltipUi.hoverKey as BuilderGlossaryKey)}
             </div>
           )}
+        </div>
       </div>
+      </div>
+    </div>
     </div>
   );
 }

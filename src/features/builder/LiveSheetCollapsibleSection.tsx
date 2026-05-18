@@ -16,7 +16,11 @@ export const liveSheetSectionBodyStyle: CSSProperties = {
   border: "1px solid var(--panel-border)",
   backgroundColor: "var(--surface-1)",
   display: "grid",
-  gap: "0.35rem"
+  gap: "0.35rem",
+  minWidth: 0,
+  maxWidth: "100%",
+  boxSizing: "border-box",
+  overflowX: "hidden"
 };
 
 export interface LiveSheetCollapsibleSectionProps {
@@ -24,20 +28,24 @@ export interface LiveSheetCollapsibleSectionProps {
   children: ReactNode;
   defaultOpen?: boolean;
   summaryA11y?: Record<string, unknown>;
+  summaryStyle?: CSSProperties;
+  bodyStyle?: CSSProperties;
 }
 
 export function LiveSheetCollapsibleSection({
   title,
   children,
   defaultOpen = true,
-  summaryA11y
+  summaryA11y,
+  summaryStyle,
+  bodyStyle
 }: LiveSheetCollapsibleSectionProps): JSX.Element {
   return (
     <details open={defaultOpen}>
-      <summary style={liveSheetSummaryStyle} {...summaryA11y}>
+      <summary style={{ ...liveSheetSummaryStyle, ...summaryStyle }} {...summaryA11y}>
         {title}
       </summary>
-      <div style={liveSheetSectionBodyStyle}>{children}</div>
+      <div style={{ ...liveSheetSectionBodyStyle, ...bodyStyle }}>{children}</div>
     </details>
   );
 }
