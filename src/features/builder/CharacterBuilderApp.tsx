@@ -4730,6 +4730,49 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               >
                 <StatScoreTable
                   fontSize="0.82rem"
+                  columns={DEFENSE_SCORE_COLUMNS}
+                  bonusHeader={null}
+                  statHeader={null}
+                  prioritizeStatLabel
+                  showComponents={false}
+                  rows={[
+                    {
+                      rowKey: "ac",
+                      label: "AC",
+                      glossaryKey: "ac",
+                      total: derived.defenses.ac,
+                      values: {}
+                    },
+                    {
+                      rowKey: "fortitude",
+                      label: "Fortitude",
+                      glossaryKey: "fortitude",
+                      total: derived.defenses.fortitude,
+                      values: {}
+                    },
+                    {
+                      rowKey: "reflex",
+                      label: "Reflex",
+                      glossaryKey: "reflex",
+                      total: derived.defenses.reflex,
+                      values: {}
+                    },
+                    {
+                      rowKey: "will",
+                      label: "Will",
+                      glossaryKey: "will",
+                      total: derived.defenses.will,
+                      values: {}
+                    }
+                  ]}
+                  renderLabel={(row) => (
+                    <strong {...glossaryTooltipUi.hoverA11y(row.glossaryKey ?? row.rowKey)} style={{ fontSize: "0.82rem" }}>
+                      {row.label}
+                    </strong>
+                  )}
+                />
+                <StatScoreTable
+                  fontSize="0.82rem"
                   columns={MOTION_INITIATIVE_COLUMNS}
                   bonusHeader={null}
                   statHeader={null}
@@ -4758,49 +4801,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     </strong>
                   )}
                 />
-                <StatScoreTable
-                  fontSize="0.82rem"
-                  columns={DEFENSE_SCORE_COLUMNS}
-                  bonusHeader={null}
-                  statHeader={null}
-                  prioritizeStatLabel
-                  showComponents={false}
-                  rows={[
-                      {
-                        rowKey: "ac",
-                        label: "AC",
-                        glossaryKey: "ac",
-                        total: derived.defenses.ac,
-                        values: {}
-                      },
-                      {
-                        rowKey: "fortitude",
-                        label: "Fortitude",
-                        glossaryKey: "fortitude",
-                        total: derived.defenses.fortitude,
-                        values: {}
-                      },
-                      {
-                        rowKey: "reflex",
-                        label: "Reflex",
-                        glossaryKey: "reflex",
-                        total: derived.defenses.reflex,
-                        values: {}
-                      },
-                      {
-                        rowKey: "will",
-                        label: "Will",
-                        glossaryKey: "will",
-                        total: derived.defenses.will,
-                        values: {}
-                      }
-                    ]}
-                    renderLabel={(row) => (
-                      <strong {...glossaryTooltipUi.hoverA11y(row.glossaryKey ?? row.rowKey)} style={{ fontSize: "0.82rem" }}>
-                        {row.label}
-                      </strong>
-                    )}
-                  />
               </div>
             </div>
             <SupportPassiveMotionBreakdown o={derived.supportPassiveOther} summaryStyle={detailsSummaryStyle} />
