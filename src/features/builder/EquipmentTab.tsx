@@ -2,6 +2,7 @@ import { useMemo, useState, type CSSProperties } from "react";
 import type { Armor, CharacterBuild, EnhancementLevel, Implement, MagicItem, RulesIndex, Weapon } from "../../rules/models";
 import type { EquipmentCombatBonuses } from "../../rules/equipment";
 import { normalizeCharacterEquipment } from "../../rules/equipment";
+import { equipmentEnchantmentEffects } from "../../rules/equipmentEnchantmentEffects";
 import {
   enchantmentFamilyKeyFromId,
   equipmentDuplicateEnchantmentWarnings,
@@ -250,6 +251,10 @@ function StandardSlotSection(props: StandardSlotSectionProps): JSX.Element {
 export function EquipmentTab({ index, build, onBuildChange, magicCombat }: EquipmentTabProps): JSX.Element {
   const equipment = useMemo(() => normalizeCharacterEquipment(build.equipment), [build.equipment]);
   const equipmentWarnings = useMemo(() => equipmentDuplicateEnchantmentWarnings(build, index), [build, index]);
+  const enchantmentEffects = useMemo(
+    () => equipmentEnchantmentEffects(equipment, index),
+    [equipment, index]
+  );
 
   const armorOptions = useMemo(
     () => index.armors.filter((a) => (a.armorType || "").toLowerCase() !== "shield"),
@@ -399,6 +404,46 @@ export function EquipmentTab({ index, build, onBuildChange, magicCombat }: Equip
           {magicCombat.offHandWeaponAttack > 0 ? `; off-hand attack +${magicCombat.offHandWeaponAttack}` : ""}
           {magicCombat.implementAttack > 0 ? `; implement attack +${magicCombat.implementAttack}` : ""}
         </p>
+      )}
+      {enchantmentEffects.length > 0 && (
+        <div
+          style={{
+            display: "grid",
+            gap: "0.45rem",
+            padding: "0.5rem 0.6rem",
+            borderRadius: "6px",
+            border: "1px solid var(--panel-border)",
+            backgroundColor: "var(--surface-0)"
+          }}
+        >
+          <p style={{ margin: 0, fontSize: "0.76rem", fontWeight: 700, color: "var(--text-secondary)" }}>
+            Enchantment effects
+          </p>
+          {enchantmentEffects.map((row) => (
+            <div key={row.slotLabel} style={{ fontSize: "0.78rem", lineHeight: 1.45, color: "var(--text-primary)" }}>
+              <span style={{ fontWeight: 600 }}>{row.slotLabel}</span>
+              <span style={{ color: "var(--text-muted)" }}> — {row.name}</span>
+              {row.property && (
+                <div style={{ marginTop: "0.15rem", color: "var(--text-secondary)" }}>
+                  <span style={{ fontWeight: 600 }}>Property: </span>
+                  {row.property}
+                </div>
+              )}
+              {row.power && (
+                <div style={{ marginTop: "0.15rem", color: "var(--text-secondary)" }}>
+                  <span style={{ fontWeight: 600 }}>Power: </span>
+                  {row.power}
+                </div>
+              )}
+              {row.critical && (
+                <div style={{ marginTop: "0.15rem", color: "var(--text-secondary)" }}>
+                  <span style={{ fontWeight: 600 }}>Critical: </span>
+                  {row.critical}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "0.75rem" }}>

@@ -248,7 +248,7 @@ Per slot section:
 2. Enchantment selector — “None (mundane)”, then filtered magic items.
 3. Plus — `AdjustableNumberInput` or stepped 0–6.
 
-Show derived summary: AC breakdown, attack preview, active properties (short text from selected magic row).
+Show derived summary: active numeric bonuses, enchantment property/power/critical text (short); full AC/attack breakdown remains on the builder live sheet tab.
 
 Remove duplicate magic-only dropdown block from Equipment tab.
 
