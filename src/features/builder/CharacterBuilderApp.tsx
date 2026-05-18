@@ -6,6 +6,8 @@ import {
   Feat,
   HybridClassDef,
   Implement,
+  MagicItem,
+  MagicItemSlotIds,
   Power,
   RacialTrait,
   RulesIndex,
@@ -85,7 +87,14 @@ import {
   collectFeatProficiencyDisplayRows,
   collectFeatProficiencyGrants
 } from "../../rules/featProficiencies";
+import {
+  computeMagicItemCombatBonuses,
+  formatMagicItemOptionLabel,
+  normalizeCharacterBuild,
+  pruneMagicItemSlotIds
+} from "../../rules/magicItemEquipment";
 import { summarizeImplementAttack, summarizeMainWeaponAttack } from "../../rules/weaponAttack";
+import { magicArmorOptions, magicImplementOptions, magicNeckOptions, magicWeaponOptions } from "./magicItemOptions";
 import { GlossaryTooltipRichText, RulesRichText } from "./RulesRichText";
 import { NEUTRAL_PAGE_BG } from "../../ui/tokens";
 import { STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE } from "../../ui/glossaryTooltip";
@@ -803,7 +812,7 @@ function importBuildFromFile(file: File, onLoaded: (build: CharacterBuild) => vo
   const reader = new FileReader();
   reader.onload = () => {
     try {
-      onLoaded(JSON.parse(String(reader.result)) as CharacterBuild);
+      onLoaded(normalizeCharacterBuild(JSON.parse(String(reader.result)) as CharacterBuild));
     } catch {
       alert("Could not parse character JSON file.");
     }
@@ -812,7 +821,7 @@ function importBuildFromFile(file: File, onLoaded: (build: CharacterBuild) => vo
 }
 
 export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Element {
-  const [build, setBuild] = useState<CharacterBuild>(() => loadBuild() || defaultBuild);
+  const [build, setBuild] = useState<CharacterBuild>(() => normalizeCharacterBuild(loadBuild() || defaultBuild));
   const [nameDraft, setNameDraft] = useState(build.name);
   const [savedCharacters, setSavedCharacters] = useState(() => loadSavedCharacters());
   const [selectedSavedCharacterId, setSelectedSavedCharacterId] = useState("");
@@ -831,6 +840,11 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   const [mainWeaponSearch, setMainWeaponSearch] = useState("");
   const [offHandWeaponSearch, setOffHandWeaponSearch] = useState("");
   const [implementSearch, setImplementSearch] = useState("");
+  const [magicArmorSearch, setMagicArmorSearch] = useState("");
+  const [magicNeckSearch, setMagicNeckSearch] = useState("");
+  const [magicMainWeaponSearch, setMagicMainWeaponSearch] = useState("");
+  const [magicOffHandWeaponSearch, setMagicOffHandWeaponSearch] = useState("");
+  const [magicImplementSearch, setMagicImplementSearch] = useState("");
   const [jsonSearchInput, setJsonSearchInput] = useState("");
   const [jsonSearchQuery, setJsonSearchQuery] = useState("");
   const [jsonSearchResultIdx, setJsonSearchResultIdx] = useState(0);
@@ -1132,7 +1146,72 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       ensureSelectedEntityInFiltered(filterRulesEntitiesByQuery(implementsSorted, implementSearch), build.implementId, implementsSorted),
     [implementsSorted, implementSearch, build.implementId]
   );
-  const magicItemAttackBonus = build.magicItemBonuses?.attack;
+
+  const magicArmorCatalog = useMemo(
+    () => magicArmorOptions(index, build.level, selectedArmor),
+    [index, build.level, selectedArmor]
+  );
+  const magicNeckCatalog = useMemo(() => magicNeckOptions(index, build.level), [index, build.level]);
+  const magicMainWeaponCatalog = useMemo(
+    () => magicWeaponOptions(index, build.level, selectedMainWeapon),
+    [index, build.level, selectedMainWeapon]
+  );
+  const magicOffHandWeaponCatalog = useMemo(
+    () => magicWeaponOptions(index, build.level, selectedOffHandWeapon),
+    [index, build.level, selectedOffHandWeapon]
+  );
+  const magicImplementCatalog = useMemo(
+    () => magicImplementOptions(index, build.level),
+    [index, build.level]
+  );
+  const magicArmorOptionsFiltered = useMemo(
+    () =>
+      ensureSelectedEntityInFiltered(
+        filterRulesEntitiesByQuery(magicArmorCatalog, magicArmorSearch),
+        build.magicItemIds?.armor,
+        magicArmorCatalog
+      ),
+    [magicArmorCatalog, magicArmorSearch, build.magicItemIds?.armor]
+  );
+  const magicNeckOptionsFiltered = useMemo(
+    () =>
+      ensureSelectedEntityInFiltered(
+        filterRulesEntitiesByQuery(magicNeckCatalog, magicNeckSearch),
+        build.magicItemIds?.neck,
+        magicNeckCatalog
+      ),
+    [magicNeckCatalog, magicNeckSearch, build.magicItemIds?.neck]
+  );
+  const magicMainWeaponOptionsFiltered = useMemo(
+    () =>
+      ensureSelectedEntityInFiltered(
+        filterRulesEntitiesByQuery(magicMainWeaponCatalog, magicMainWeaponSearch),
+        build.magicItemIds?.mainWeapon,
+        magicMainWeaponCatalog
+      ),
+    [magicMainWeaponCatalog, magicMainWeaponSearch, build.magicItemIds?.mainWeapon]
+  );
+  const magicOffHandWeaponOptionsFiltered = useMemo(
+    () =>
+      ensureSelectedEntityInFiltered(
+        filterRulesEntitiesByQuery(magicOffHandWeaponCatalog, magicOffHandWeaponSearch),
+        build.magicItemIds?.offHandWeapon,
+        magicOffHandWeaponCatalog
+      ),
+    [magicOffHandWeaponCatalog, magicOffHandWeaponSearch, build.magicItemIds?.offHandWeapon]
+  );
+  const magicImplementOptionsFiltered = useMemo(
+    () =>
+      ensureSelectedEntityInFiltered(
+        filterRulesEntitiesByQuery(magicImplementCatalog, magicImplementSearch),
+        build.magicItemIds?.implement,
+        magicImplementCatalog
+      ),
+    [magicImplementCatalog, magicImplementSearch, build.magicItemIds?.implement]
+  );
+
+  const magicCombat = useMemo(() => computeMagicItemCombatBonuses(index, build), [index, build]);
+
   const mainWeaponSummary = useMemo(
     () =>
       summarizeMainWeaponAttack(
@@ -1140,10 +1219,10 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         effectiveAbilityScores,
         selectedMainWeapon,
         classWeaponProfText,
-        magicItemAttackBonus,
+        magicCombat.mainWeaponAttack,
         featProficiencyGrants
       ),
-    [build.level, effectiveAbilityScores, selectedMainWeapon, classWeaponProfText, magicItemAttackBonus, featProficiencyGrants]
+    [build.level, effectiveAbilityScores, selectedMainWeapon, classWeaponProfText, magicCombat.mainWeaponAttack, featProficiencyGrants]
   );
   const offHandWeaponSummary = useMemo(
     () =>
@@ -1152,10 +1231,10 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         effectiveAbilityScores,
         selectedOffHandWeapon,
         classWeaponProfText,
-        magicItemAttackBonus,
+        magicCombat.offHandWeaponAttack,
         featProficiencyGrants
       ),
-    [build.level, effectiveAbilityScores, selectedOffHandWeapon, classWeaponProfText, magicItemAttackBonus, featProficiencyGrants]
+    [build.level, effectiveAbilityScores, selectedOffHandWeapon, classWeaponProfText, magicCombat.offHandWeaponAttack, featProficiencyGrants]
   );
   const implementAttackSummary = useMemo(
     () =>
@@ -1165,7 +1244,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         hybridBaseClassDefA || selectedClass,
         selectedImplement,
         classImplementProfText,
-        magicItemAttackBonus,
+        magicCombat.implementAttack,
         featProficiencyGrants
       ),
     [
@@ -1175,7 +1254,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       selectedClass,
       selectedImplement,
       classImplementProfText,
-      magicItemAttackBonus,
+      magicCombat.implementAttack,
       featProficiencyGrants
     ]
   );
@@ -1616,8 +1695,14 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
 
   function updateBuild(next: CharacterBuild): void {
     const pruned = pruneStalePowerSelections(index, next);
-    setBuild(pruned);
-    saveBuild(pruned);
+    const normalized = normalizeCharacterBuild(pruned);
+    setBuild(normalized);
+    saveBuild(normalized);
+  }
+
+  function setMagicItemSlot(slot: keyof MagicItemSlotIds, id: string | undefined): void {
+    const nextIds = { ...(build.magicItemIds ?? {}), [slot]: id || undefined };
+    updateBuild({ ...build, magicItemIds: pruneMagicItemSlotIds(nextIds) });
   }
 
   useEffect(() => {
@@ -1629,28 +1714,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     const next = { ...build, name: nameDraft };
     updateBuild(next);
     return next;
-  }
-
-  function parseOptionalBonus(raw: string): number | undefined {
-    const t = raw.trim();
-    if (t === "") return undefined;
-    const n = Number.parseInt(t, 10);
-    if (!Number.isFinite(n)) return undefined;
-    return Math.max(-99, Math.min(99, n));
-  }
-
-  function setMagicItemBonusField(field: keyof NonNullable<CharacterBuild["magicItemBonuses"]>, raw: string): void {
-    const n = parseOptionalBonus(raw);
-    const cur = { ...(build.magicItemBonuses ?? {}) };
-    if (n === undefined) {
-      delete cur[field];
-    } else {
-      cur[field] = n;
-    }
-    updateBuild({
-      ...build,
-      magicItemBonuses: Object.keys(cur).length === 0 ? undefined : cur
-    });
   }
 
   function refreshSavedCharacters(): void {
@@ -4317,7 +4380,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   ))}
                 </select>
               </label>
-              <div style={{ marginTop: "0.35rem", paddingTop: "0.55rem", borderTop: "1px solid var(--panel-border)" }}>
+              <div style={{ marginTop: "0.35rem", paddingTop: "0.55rem", borderTop: "1px solid var(--panel-border)", display: "grid", gap: "0.65rem" }}>
                 <p
                   style={{
                     margin: "0 0 0.35rem 0",
@@ -4328,79 +4391,142 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     textTransform: "uppercase"
                   }}
                 >
-                  Magic item enhancement bonuses
+                  Magic items
                 </p>
                 <p style={{ margin: "0 0 0.45rem 0", fontSize: "0.78rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
-                  Optional flat bonuses from enhancements (e.g. armor, neck, weapon). Same fields sync when you use{" "}
-                  <strong>Save for Character Sheet</strong>.
+                  Bonuses come from compendium enhancement and stat adds. Lists items at or below your level; armor and
+                  weapons are filtered to your mundane picks when possible.
                 </p>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "0.45rem" }}>
-                  <label style={{ fontSize: "0.82rem" }}>
-                    AC
-                    <AdjustableNumberInput
-                      optional
-                      min={-99}
-                      max={99}
-                      value={build.magicItemBonuses?.ac}
-                      onChange={(next) => setMagicItemBonusField("ac", next === undefined ? "" : String(next))}
-                      ariaLabel="Magic item AC bonus"
-                      fill
-                      style={{ display: "block", width: "100%", marginTop: "0.2rem", boxSizing: "border-box" }}
-                    />
-                  </label>
-                  <label style={{ fontSize: "0.82rem" }}>
-                    Fortitude
-                    <AdjustableNumberInput
-                      optional
-                      min={-99}
-                      max={99}
-                      value={build.magicItemBonuses?.fortitude}
-                      onChange={(next) => setMagicItemBonusField("fortitude", next === undefined ? "" : String(next))}
-                      ariaLabel="Magic item Fortitude bonus"
-                      fill
-                      style={{ display: "block", width: "100%", marginTop: "0.2rem", boxSizing: "border-box" }}
-                    />
-                  </label>
-                  <label style={{ fontSize: "0.82rem" }}>
-                    Reflex
-                    <AdjustableNumberInput
-                      optional
-                      min={-99}
-                      max={99}
-                      value={build.magicItemBonuses?.reflex}
-                      onChange={(next) => setMagicItemBonusField("reflex", next === undefined ? "" : String(next))}
-                      ariaLabel="Magic item Reflex bonus"
-                      fill
-                      style={{ display: "block", width: "100%", marginTop: "0.2rem", boxSizing: "border-box" }}
-                    />
-                  </label>
-                  <label style={{ fontSize: "0.82rem" }}>
-                    Will
-                    <AdjustableNumberInput
-                      optional
-                      min={-99}
-                      max={99}
-                      value={build.magicItemBonuses?.will}
-                      onChange={(next) => setMagicItemBonusField("will", next === undefined ? "" : String(next))}
-                      ariaLabel="Magic item Will bonus"
-                      fill
-                      style={{ display: "block", width: "100%", marginTop: "0.2rem", boxSizing: "border-box" }}
-                    />
-                  </label>
-                  <label style={{ fontSize: "0.82rem" }}>
-                    Attack rolls
-                    <AdjustableNumberInput
-                      optional
-                      min={-99}
-                      max={99}
-                      value={build.magicItemBonuses?.attack}
-                      onChange={(next) => setMagicItemBonusField("attack", next === undefined ? "" : String(next))}
-                      ariaLabel="Magic item attack bonus"
-                      fill
-                      style={{ display: "block", width: "100%", marginTop: "0.2rem", boxSizing: "border-box" }}
-                    />
-                  </label>
-                </div>
+                {(magicCombat.defenses.ac > 0 ||
+                  magicCombat.defenses.fortitude > 0 ||
+                  magicCombat.defenses.reflex > 0 ||
+                  magicCombat.defenses.will > 0 ||
+                  magicCombat.mainWeaponAttack > 0 ||
+                  magicCombat.offHandWeaponAttack > 0 ||
+                  magicCombat.implementAttack > 0) && (
+                  <p style={{ margin: "0 0 0.45rem 0", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
+                    Active: AC +{magicCombat.defenses.ac}, Fort +{magicCombat.defenses.fortitude}, Ref +{magicCombat.defenses.reflex},
+                    Will +{magicCombat.defenses.will}
+                    {magicCombat.mainWeaponAttack > 0 ? `; main attack +${magicCombat.mainWeaponAttack}` : ""}
+                    {magicCombat.offHandWeaponAttack > 0 ? `; off-hand attack +${magicCombat.offHandWeaponAttack}` : ""}
+                    {magicCombat.implementAttack > 0 ? `; implement attack +${magicCombat.implementAttack}` : ""}
+                  </p>
+                )}
+                <label style={{ fontSize: "0.88rem" }}>
+                  Filter magic armor
+                  <input
+                    type="search"
+                    value={magicArmorSearch}
+                    onChange={(e) => setMagicArmorSearch(e.target.value)}
+                    placeholder="Name"
+                    style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem 0.45rem", borderRadius: "6px", border: "1px solid var(--panel-border)", boxSizing: "border-box" }}
+                  />
+                </label>
+                <label style={{ fontSize: "0.88rem" }}>
+                  Magic armor
+                  <select
+                    value={build.magicItemIds?.armor || ""}
+                    onChange={(e) => setMagicItemSlot("armor", e.target.value || undefined)}
+                    style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem", borderRadius: "6px", border: "1px solid var(--panel-border)", boxSizing: "border-box" }}
+                  >
+                    <option value="">None</option>
+                    {magicArmorOptionsFiltered.map((item: MagicItem) => (
+                      <option key={item.id} value={item.id}>{formatMagicItemOptionLabel(item)}</option>
+                    ))}
+                  </select>
+                </label>
+                <label style={{ fontSize: "0.88rem" }}>
+                  Filter neck items
+                  <input
+                    type="search"
+                    value={magicNeckSearch}
+                    onChange={(e) => setMagicNeckSearch(e.target.value)}
+                    placeholder="Cloak, amulet"
+                    style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem 0.45rem", borderRadius: "6px", border: "1px solid var(--panel-border)", boxSizing: "border-box" }}
+                  />
+                </label>
+                <label style={{ fontSize: "0.88rem" }}>
+                  Neck slot
+                  <select
+                    value={build.magicItemIds?.neck || ""}
+                    onChange={(e) => setMagicItemSlot("neck", e.target.value || undefined)}
+                    style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem", borderRadius: "6px", border: "1px solid var(--panel-border)", boxSizing: "border-box" }}
+                  >
+                    <option value="">None</option>
+                    {magicNeckOptionsFiltered.map((item: MagicItem) => (
+                      <option key={item.id} value={item.id}>{formatMagicItemOptionLabel(item)}</option>
+                    ))}
+                  </select>
+                </label>
+                <label style={{ fontSize: "0.88rem" }}>
+                  Filter magic main-hand weapon
+                  <input
+                    type="search"
+                    value={magicMainWeaponSearch}
+                    onChange={(e) => setMagicMainWeaponSearch(e.target.value)}
+                    placeholder="Name"
+                    style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem 0.45rem", borderRadius: "6px", border: "1px solid var(--panel-border)", boxSizing: "border-box" }}
+                  />
+                </label>
+                <label style={{ fontSize: "0.88rem" }}>
+                  Magic main-hand weapon
+                  <select
+                    value={build.magicItemIds?.mainWeapon || ""}
+                    onChange={(e) => setMagicItemSlot("mainWeapon", e.target.value || undefined)}
+                    style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem", borderRadius: "6px", border: "1px solid var(--panel-border)", boxSizing: "border-box" }}
+                  >
+                    <option value="">None</option>
+                    {magicMainWeaponOptionsFiltered.map((item: MagicItem) => (
+                      <option key={item.id} value={item.id}>{formatMagicItemOptionLabel(item)}</option>
+                    ))}
+                  </select>
+                </label>
+                <label style={{ fontSize: "0.88rem" }}>
+                  Filter magic off-hand weapon
+                  <input
+                    type="search"
+                    value={magicOffHandWeaponSearch}
+                    onChange={(e) => setMagicOffHandWeaponSearch(e.target.value)}
+                    placeholder="Name"
+                    style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem 0.45rem", borderRadius: "6px", border: "1px solid var(--panel-border)", boxSizing: "border-box" }}
+                  />
+                </label>
+                <label style={{ fontSize: "0.88rem" }}>
+                  Magic off-hand weapon
+                  <select
+                    value={build.magicItemIds?.offHandWeapon || ""}
+                    onChange={(e) => setMagicItemSlot("offHandWeapon", e.target.value || undefined)}
+                    style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem", borderRadius: "6px", border: "1px solid var(--panel-border)", boxSizing: "border-box" }}
+                  >
+                    <option value="">None</option>
+                    {magicOffHandWeaponOptionsFiltered.map((item: MagicItem) => (
+                      <option key={item.id} value={item.id}>{formatMagicItemOptionLabel(item)}</option>
+                    ))}
+                  </select>
+                </label>
+                <label style={{ fontSize: "0.88rem" }}>
+                  Filter magic implement
+                  <input
+                    type="search"
+                    value={magicImplementSearch}
+                    onChange={(e) => setMagicImplementSearch(e.target.value)}
+                    placeholder="Staff, orb, holy symbol"
+                    style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem 0.45rem", borderRadius: "6px", border: "1px solid var(--panel-border)", boxSizing: "border-box" }}
+                  />
+                </label>
+                <label style={{ fontSize: "0.88rem" }}>
+                  Magic implement
+                  <select
+                    value={build.magicItemIds?.implement || ""}
+                    onChange={(e) => setMagicItemSlot("implement", e.target.value || undefined)}
+                    style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem", borderRadius: "6px", border: "1px solid var(--panel-border)", boxSizing: "border-box" }}
+                  >
+                    <option value="">None</option>
+                    {magicImplementOptionsFiltered.map((item: MagicItem) => (
+                      <option key={item.id} value={item.id}>{formatMagicItemOptionLabel(item)}</option>
+                    ))}
+                  </select>
+                </label>
               </div>
             </div>
           </div>

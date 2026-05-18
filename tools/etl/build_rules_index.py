@@ -1057,6 +1057,160 @@ def support_entity_stat_bonuses(row: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+def _split_csv_field(text: Any) -> List[str]:
+    """Split compendium comma/semicolon lists (Associated Skills, Category ids, etc.)."""
+    if text is None:
+        return []
+    if isinstance(text, list):
+        parts: List[str] = []
+        for item in text:
+            parts.extend(_split_csv_field(item))
+        return parts
+    s = str(text).strip()
+    if not s:
+        return []
+    out: List[str] = []
+    for chunk in re.split(r"[,;]", s):
+        piece = chunk.strip()
+        if piece:
+            out.append(piece)
+    return out
+
+
+def _proficiency_index_entry(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Normalize Proficiency compendium rows (internal grant targets + weapon category tags)."""
+    iid = row.get("internal_id")
+    name = row.get("name") or ""
+    grant = _parse_proficiency_grant_internal_id(str(iid)) if isinstance(iid, str) else None
+    category_raw = row.get("category")
+    category_ids = _split_csv_field(category_raw) if category_raw else []
+    entry: Dict[str, Any] = {
+        "id": iid,
+        "name": name,
+        "slug": normalize_name(name),
+        "source": row.get("source"),
+        "categoryIds": category_ids,
+        "raw": row,
+    }
+    if grant:
+        entry["grant"] = grant
+    body = row.get("body")
+    if isinstance(body, str) and body.strip():
+        entry["body"] = body.strip()
+    return entry
+
+
+def _background_index_entry(
+    row: Dict[str, Any],
+    known_races: Set[str],
+    known_classes: Set[str],
+    anomalies: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    spec = row.get("specific") or {}
+    prereqs = row.get("prereqs")
+    parse = parse_prereqs(prereqs, known_races, known_classes)
+    if parse.anomalies:
+        for a in parse.anomalies:
+            anomalies.append(
+                {
+                    "entityType": "Background",
+                    "id": row.get("internal_id"),
+                    "name": row.get("name"),
+                    "detail": a,
+                }
+            )
+    name = row.get("name") or ""
+    return {
+        "id": row.get("internal_id"),
+        "name": name,
+        "slug": normalize_name(name),
+        "source": row.get("source"),
+        "backgroundType": spec.get("type"),
+        "shortDescription": spec.get("Short Description"),
+        "benefit": spec.get("Benefit"),
+        "commonKnowledge": spec.get("Common Knowledge"),
+        "campaign": spec.get("Campaign"),
+        "associatedSkills": _split_csv_field(spec.get("Associated Skills")),
+        "associatedLanguages": _split_csv_field(spec.get("Associated Languages")),
+        "prereqsRaw": prereqs,
+        "prereqTokens": parse.tokens,
+        "raw": row,
+    }
+
+
+def _enhancement_bonus_from_magic_item(row: Dict[str, Any]) -> Optional[int]:
+    """Item level enhancement (+1, +2, …) from rules.statadd or Enhancement specific."""
+    rules = row.get("rules") or {}
+    for item in rules.get("statadd") or []:
+        if not isinstance(item, dict):
+            continue
+        attrs = item.get("attrs") or {}
+        nm = str(attrs.get("name") or "")
+        if nm.endswith(" Enhancement Bonus"):
+            val = parse_int_from_text(attrs.get("value"))
+            if val is not None:
+                return val
+    spec = row.get("specific") or {}
+    text = spec.get("Enhancement")
+    if text:
+        val = parse_int_from_text(text)
+        if val is not None:
+            return val
+    return None
+
+
+def _magic_item_index_entry(row: Dict[str, Any]) -> Dict[str, Any]:
+    spec = row.get("specific") or {}
+    name = row.get("name") or ""
+    stat_adds = extract_stat_adds_from_rules(row.get("rules"))
+    armor_types = _split_csv_field(spec.get("Armor"))
+    weapon_types = _split_csv_field(spec.get("Weapon"))
+    entry: Dict[str, Any] = {
+        "id": row.get("internal_id"),
+        "name": name,
+        "slug": normalize_name(name),
+        "source": row.get("source"),
+        "flavor": row.get("flavor"),
+        "level": parse_int_from_text(spec.get("Level")),
+        "gold": parse_int_from_text(spec.get("Gold")),
+        "magicItemType": spec.get("Magic Item Type"),
+        "itemSlot": spec.get("Item Slot") or None,
+        "tier": spec.get("Tier") or None,
+        "rarity": spec.get("Rarity") or None,
+        "armorTypes": armor_types or None,
+        "weaponTypes": weapon_types or None,
+        "enhancement": spec.get("Enhancement"),
+        "enhancementBonus": _enhancement_bonus_from_magic_item(row),
+        "property": spec.get("Property") or None,
+        "power": spec.get("Power") or None,
+        "critical": spec.get("Critical") or None,
+        "requirement": spec.get("Requirement") or None,
+        "statAdds": stat_adds,
+        "raw": row,
+    }
+    if not entry["itemSlot"]:
+        entry.pop("itemSlot", None)
+    if not entry["tier"]:
+        entry.pop("tier", None)
+    if not entry["rarity"]:
+        entry.pop("rarity", None)
+    if not entry["armorTypes"]:
+        entry.pop("armorTypes", None)
+    if not entry["weaponTypes"]:
+        entry.pop("weaponTypes", None)
+    if not entry["property"]:
+        entry.pop("property", None)
+    if not entry["power"]:
+        entry.pop("power", None)
+    if not entry["critical"]:
+        entry.pop("critical", None)
+    if not entry["requirement"]:
+        entry.pop("requirement", None)
+    if not entry["flavor"]:
+        entry.pop("flavor", None)
+    return entry
+
+
 def _rules_element_to_row(elem: ET.Element) -> Dict[str, Any]:
     row: Dict[str, Any] = {
         "internal_id": elem.attrib.get("internal-id"),
@@ -1083,6 +1237,10 @@ def _rules_element_to_row(elem: ET.Element) -> Dict[str, Any]:
             text = _normalize_ws("".join(child.itertext()))
             if text:
                 row["flavor"] = text
+        elif tag == "Category":
+            text = _normalize_ws("".join(child.itertext()))
+            if text:
+                row["category"] = text
         elif tag == "specific":
             key = child.attrib.get("name")
             if key:
@@ -1141,6 +1299,9 @@ def load_raw_collections_from_xml(xml_path: Path) -> Dict[str, List[Dict[str, An
         "Grants",
         "Skill Training",
         "Hybrid Class",
+        "Proficiency",
+        "Background",
+        "Magic Item",
     }
     out: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     for _, elem in ET.iterparse(str(xml_path), events=("end",)):
@@ -1187,6 +1348,9 @@ def load_raw_collections(input_path: Path) -> Dict[str, List[Dict[str, Any]]]:
         "Grants": read_json("Grants.json"),
         "Skill Training": read_json("Skill Training.json"),
         "Hybrid Class": read_json("Hybrid Class.json"),
+        "Proficiency": read_json("Proficiency.json"),
+        "Background": read_json("Background.json"),
+        "Magic Item": read_json("Magic Item.json"),
     }
 
 
@@ -1212,6 +1376,9 @@ def build_index(input_path: Path, output_dir: Path) -> None:
     class_features_raw = collections["Class Feature"]
     skill_training_raw = collections["Skill Training"]
     hybrid_classes_raw = collections["Hybrid Class"]
+    proficiencies_raw = collections["Proficiency"]
+    backgrounds_raw = collections["Background"]
+    magic_items_raw = collections["Magic Item"]
     features_by_id: Dict[str, Dict[str, Any]] = {
         str(row.get("internal_id")): row for row in class_features_raw if row.get("internal_id")
     }
@@ -1581,6 +1748,18 @@ def build_index(input_path: Path, output_dir: Path) -> None:
             }
         )
 
+    proficiencies: List[Dict[str, Any]] = []
+    for row in proficiencies_raw:
+        proficiencies.append(_proficiency_index_entry(row))
+
+    backgrounds: List[Dict[str, Any]] = []
+    for row in backgrounds_raw:
+        backgrounds.append(_background_index_entry(row, known_races, known_classes, anomalies))
+
+    magic_items: List[Dict[str, Any]] = []
+    for row in magic_items_raw:
+        magic_items.append(_magic_item_index_entry(row))
+
     epic_destinies: List[Dict[str, Any]] = []
     for row in epic_raw:
         parse = parse_prereqs(row.get("prereqs"), known_races, known_classes)
@@ -1627,6 +1806,9 @@ def build_index(input_path: Path, output_dir: Path) -> None:
                 "paragonPaths": len(paragon_paths),
                 "epicDestinies": len(epic_destinies),
                 "hybridClasses": len(hybrid_classes),
+                "proficiencies": len(proficiencies),
+                "backgrounds": len(backgrounds),
+                "magicItems": len(magic_items),
             },
         },
         "races": races,
@@ -1645,6 +1827,9 @@ def build_index(input_path: Path, output_dir: Path) -> None:
         "paragonPaths": paragon_paths,
         "epicDestinies": epic_destinies,
         "hybridClasses": hybrid_classes,
+        "proficiencies": proficiencies,
+        "backgrounds": backgrounds,
+        "magicItems": magic_items,
         "autoGrantedPowerIdsByClassId": auto_granted_power_ids_by_class,
         "autoGrantedSkillTrainingNamesBySupportId": auto_granted_skill_training_names_by_support,
         "grantedClassFeatureNamesBySupportId": granted_class_feature_names_by_support_id,

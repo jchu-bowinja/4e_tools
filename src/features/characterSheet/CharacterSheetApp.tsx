@@ -57,7 +57,19 @@ import {
   spendHealingSurgeResources,
   useSecondWindResources
 } from "./healingSurgeActions";
-import { canEquipItem, computeSheetDerivedData, findImplementEquippedFromSheet, findWeaponEquippedInSlot, groupCombatPowers, sheetClassForImplementAttack, sheetImplementProficiencyText, sheetStateFromBuild, sheetWeaponProficiencyText } from "./selectors";
+import { computeMagicItemCombatBonuses } from "../../rules/magicItemEquipment";
+import {
+  canEquipItem,
+  computeSheetDerivedData,
+  findImplementEquippedFromSheet,
+  findWeaponEquippedInSlot,
+  groupCombatPowers,
+  sheetClassForImplementAttack,
+  sheetImplementProficiencyText,
+  sheetStateFromBuild,
+  sheetWeaponProficiencyText,
+  toBuildLikeState
+} from "./selectors";
 import { loadCharacterSheetState, saveCharacterSheetState } from "./storage";
 import { resolveUiGlossaryHoverPlainText, termHasPowerKeywordTooltipBody } from "../../data/glossaryHoverResolve";
 import { positionFixedTooltip } from "../../ui/glossaryTooltipPosition";
@@ -998,6 +1010,14 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     () => sheetClassForImplementAttack(index, sheet, derived.cls),
     [index, sheet, derived.cls]
   );
+  const magicCombat = useMemo(() => {
+    const buildLike = toBuildLikeState(sheet);
+    return computeMagicItemCombatBonuses(index, {
+      ...buildLike,
+      level: sheet.level,
+      abilityScores: sheet.abilityScores
+    });
+  }, [index, sheet]);
   const mainWeaponSummary = useMemo(
     () =>
       summarizeMainWeaponAttack(
@@ -1005,10 +1025,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         sheet.abilityScores,
         mainHandWeapon,
         sheetWeaponProfText,
-        sheet.magicItemBonuses?.attack,
+        magicCombat.mainWeaponAttack,
         featProficiencyGrants
       ),
-    [sheet.level, sheet.abilityScores, mainHandWeapon, sheetWeaponProfText, sheet.magicItemBonuses?.attack, featProficiencyGrants]
+    [sheet.level, sheet.abilityScores, mainHandWeapon, sheetWeaponProfText, magicCombat.mainWeaponAttack, featProficiencyGrants]
   );
   const offHandWeaponSummary = useMemo(
     () =>
@@ -1017,10 +1037,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         sheet.abilityScores,
         offHandWeapon,
         sheetWeaponProfText,
-        sheet.magicItemBonuses?.attack,
+        magicCombat.offHandWeaponAttack,
         featProficiencyGrants
       ),
-    [sheet.level, sheet.abilityScores, offHandWeapon, sheetWeaponProfText, sheet.magicItemBonuses?.attack, featProficiencyGrants]
+    [sheet.level, sheet.abilityScores, offHandWeapon, sheetWeaponProfText, magicCombat.offHandWeaponAttack, featProficiencyGrants]
   );
   const implementAttackSummary = useMemo(
     () =>
@@ -1030,7 +1050,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         sheetImplementClass,
         equippedImplement,
         sheetImplementProfText,
-        sheet.magicItemBonuses?.attack,
+        magicCombat.implementAttack,
         featProficiencyGrants
       ),
     [
@@ -1039,7 +1059,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
       sheetImplementClass,
       equippedImplement,
       sheetImplementProfText,
-      sheet.magicItemBonuses?.attack,
+      magicCombat.implementAttack,
       featProficiencyGrants
     ]
   );

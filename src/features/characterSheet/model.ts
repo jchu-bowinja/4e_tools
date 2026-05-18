@@ -1,4 +1,4 @@
-import type { Ability, CharacterStyle } from "../../rules/models";
+import type { Ability, CharacterStyle, MagicItemSlotIds } from "../../rules/models";
 
 export type AbilityScores = Record<Ability, number>;
 
@@ -75,14 +75,8 @@ export interface CharacterSheetState {
   themeId?: string;
   paragonPathId?: string;
   epicDestinyId?: string;
-  /** Same optional enhancement bonuses as `CharacterBuild.magicItemBonuses`. */
-  magicItemBonuses?: {
-    ac?: number;
-    fortitude?: number;
-    reflex?: number;
-    will?: number;
-    attack?: number;
-  };
+  /** Equipped magic items (bonuses derived from compendium data). */
+  magicItemIds?: MagicItemSlotIds;
   abilityScores: AbilityScores;
   trainedSkillIds: string[];
   featIds?: string[];

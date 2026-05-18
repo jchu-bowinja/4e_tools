@@ -259,6 +259,58 @@ export interface EpicDestiny extends RulesEntity {
   raw: Record<string, unknown>;
 }
 
+/** Compendium Proficiency row (internal grant target; weapon rows include category ids). */
+export interface ProficiencyDef extends RulesEntity {
+  grant?: ProficiencyGrant;
+  categoryIds?: string[];
+  body?: string | null;
+  raw: Record<string, unknown>;
+}
+
+/** PHB2-style character background. */
+export interface Background extends RulesEntity {
+  backgroundType?: string | null;
+  shortDescription?: string | null;
+  benefit?: string | null;
+  commonKnowledge?: string | null;
+  campaign?: string | null;
+  associatedSkills?: string[];
+  associatedLanguages?: string[];
+  prereqsRaw?: string | null;
+  prereqTokens: PrereqToken[];
+  raw: Record<string, unknown>;
+}
+
+/** Magic item from the compendium (armor, weapon, implement, wondrous, etc.). */
+/** Equipped magic item ids keyed by equipment role. */
+export interface MagicItemSlotIds {
+  armor?: string;
+  neck?: string;
+  mainWeapon?: string;
+  offHandWeapon?: string;
+  implement?: string;
+}
+
+export interface MagicItem extends RulesEntity {
+  flavor?: string | null;
+  level?: number | null;
+  gold?: number | null;
+  magicItemType?: string | null;
+  itemSlot?: string | null;
+  tier?: string | null;
+  rarity?: string | null;
+  armorTypes?: string[] | null;
+  weaponTypes?: string[] | null;
+  enhancement?: string | null;
+  enhancementBonus?: number | null;
+  property?: string | null;
+  power?: string | null;
+  critical?: string | null;
+  requirement?: string | null;
+  statAdds?: StatAddEntry[];
+  raw: Record<string, unknown>;
+}
+
 export interface RulesIndex {
   meta: {
     version: number;
@@ -284,6 +336,12 @@ export interface RulesIndex {
   epicDestinies: EpicDestiny[];
   /** PHB3 hybrid class entries; `loadRules` defaults to []. */
   hybridClasses?: HybridClassDef[];
+  /** Internal proficiency grant targets; `loadRules` defaults to []. */
+  proficiencies?: ProficiencyDef[];
+  /** Character backgrounds; `loadRules` defaults to []. */
+  backgrounds?: Background[];
+  /** Magic item catalog; `loadRules` defaults to []. */
+  magicItems?: MagicItem[];
   /**
    * Powers automatically granted by class features (from ETL / Grants + Class Feature data).
    * Omits powers that are only gained via player choice lists on the same feature.
@@ -350,6 +408,8 @@ export interface CharacterBuild {
   mainWeaponId?: string;
   offHandWeaponId?: string;
   implementId?: string;
+  /** Equipped magic items by role (bonuses derived from compendium `statAdds` / enhancement). */
+  magicItemIds?: MagicItemSlotIds;
   abilityScores: Record<Ability, number>;
   /** Point-buy / starting base only; level bumps live in `asiChoices` and automatic 11/21 bonuses. */
   asiChoices?: AsiChoices;
@@ -372,17 +432,6 @@ export interface CharacterBuild {
    * Values are power ids; `powerIds` should stay in sync (see `orderedPowerIdsFromSlots` in rules).
    */
   classPowerSlots?: Record<string, string>;
-  /**
-   * Manual enhancement bonuses from magic items (not tied to the item catalog).
-   * Defense values stack on computed AC / Fortitude / Reflex / Will; attack applies to weapon and implement previews.
-   */
-  magicItemBonuses?: {
-    ac?: number;
-    fortitude?: number;
-    reflex?: number;
-    will?: number;
-    attack?: number;
-  };
 }
 
 export interface ValidationResult {

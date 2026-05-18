@@ -69,7 +69,8 @@ export function computeHybridDerivedStats(
   shield: Armor | undefined,
   hybridDefenseBonuses?: Partial<Record<"Fortitude" | "Reflex" | "Will", number>>,
   supportPassiveDefense?: PassiveDefenseBonuses,
-  supportPassiveOther?: PassiveOtherBonuses
+  supportPassiveOther?: PassiveOtherBonuses,
+  magicItemDefense?: PassiveDefenseBonuses
 ): DerivedStats {
   const con = build.abilityScores.CON || 10;
   const dex = build.abilityScores.DEX || 10;
@@ -105,10 +106,11 @@ export function computeHybridDerivedStats(
   const fortAbility = Math.max(abilityMod(str), abilityMod(con));
   const refAbility = Math.max(dexMod, intMod);
   const willAbility = Math.max(abilityMod(wis), abilityMod(cha));
-  const magicFort = finiteBonus(build.magicItemBonuses?.fortitude);
-  const magicRef = finiteBonus(build.magicItemBonuses?.reflex);
-  const magicWill = finiteBonus(build.magicItemBonuses?.will);
-  const magicAc = finiteBonus(build.magicItemBonuses?.ac);
+  const magic = magicItemDefense ?? { ac: 0, fortitude: 0, reflex: 0, will: 0 };
+  const magicFort = magic.fortitude;
+  const magicRef = magic.reflex;
+  const magicWill = magic.will;
+  const magicAc = magic.ac;
 
   const fortitudeBreakdown = buildNadBreakdown({
     halfLevel,

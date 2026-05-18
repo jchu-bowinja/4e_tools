@@ -1,4 +1,5 @@
 import { CharacterBuild } from "../../rules/models";
+import { normalizeCharacterBuild } from "../../rules/magicItemEquipment";
 
 const STORAGE_KEY = "dnd4e_builder_character_v1";
 const SAVED_CHARACTERS_KEY = "dnd4e_saved_characters_v1";
@@ -31,7 +32,7 @@ export interface ImportSavedCharactersResult {
 }
 
 export function saveBuild(build: CharacterBuild): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(build));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizeCharacterBuild(build)));
 }
 
 export function loadBuild(): CharacterBuild | null {
@@ -40,7 +41,7 @@ export function loadBuild(): CharacterBuild | null {
     return null;
   }
   try {
-    return JSON.parse(raw) as CharacterBuild;
+    return normalizeCharacterBuild(JSON.parse(raw) as CharacterBuild);
   } catch {
     return null;
   }
@@ -96,7 +97,7 @@ export function saveBuildToSavedCharacters(
     id: overwriteExistingByName && existing ? existing.id : createId(),
     name,
     updatedAt: new Date().toISOString(),
-    build: { ...build }
+    build: normalizeCharacterBuild(build)
   };
   let overwritten = false;
   if (overwriteExistingByName && existing && existingIndex >= 0) {
@@ -168,7 +169,7 @@ export function importSavedCharacters(
       ...incoming,
       name: incoming.name.trim() || "Unnamed Character",
       updatedAt: incoming.updatedAt || new Date().toISOString(),
-      build: { ...incoming.build }
+      build: normalizeCharacterBuild(incoming.build)
     };
     nextEntries.unshift(nextEntry);
     byId.set(nextEntry.id, nextEntry);

@@ -11,7 +11,19 @@ import type { AcBreakdown } from "../../rules/defenseCalculator";
 import type { StatScoreBreakdown } from "../../rules/statScoreBreakdown";
 import { mergeHybridProficiencyLines } from "../../rules/hybridDerivedStats";
 import type { PassiveOtherBonuses } from "../../rules/supportStatAdds";
-import type { Armor, CharacterBuild, ClassDef, Implement, Power, Race, RacialTrait, RulesIndex, Weapon } from "../../rules/models";
+import { findMagicItem } from "../../rules/magicItemEquipment";
+import type {
+  Armor,
+  CharacterBuild,
+  ClassDef,
+  Implement,
+  MagicItem,
+  Power,
+  Race,
+  RacialTrait,
+  RulesIndex,
+  Weapon
+} from "../../rules/models";
 import type { CharacterSheetState, EquipmentSlot, InventoryItem } from "./model";
 
 export interface SheetDerivedData {
@@ -84,7 +96,7 @@ export function toBuildLikeState(state: CharacterSheetState): CharacterBuild {
     themeId: state.themeId,
     paragonPathId: state.paragonPathId,
     epicDestinyId: state.epicDestinyId,
-    magicItemBonuses: state.magicItemBonuses ? { ...state.magicItemBonuses } : undefined,
+    magicItemIds: state.magicItemIds ? { ...state.magicItemIds } : undefined,
     abilityScores: state.abilityScores,
     trainedSkillIds: state.trainedSkillIds,
     featIds: state.featIds ?? [],
@@ -275,7 +287,7 @@ export function sheetStateFromBuild(build: CharacterBuild, index: RulesIndex): C
     themeId: build.themeId,
     paragonPathId: build.paragonPathId,
     epicDestinyId: build.epicDestinyId,
-    magicItemBonuses: build.magicItemBonuses ? { ...build.magicItemBonuses } : undefined,
+    magicItemIds: build.magicItemIds ? { ...build.magicItemIds } : undefined,
     abilityScores: build.abilityScores,
     trainedSkillIds: [...build.trainedSkillIds],
     featIds: [...(build.featIds ?? [])],
@@ -368,6 +380,39 @@ export function sheetStateFromBuild(build: CharacterBuild, index: RulesIndex): C
         slotHints: ["implement", "mainHand", "offHand"]
       });
     }
+  }
+
+  const pushMagicInventory = (mi: MagicItem, label: string): void => {
+    inventory.push({
+      id: `eq-magic-${mi.id}`,
+      name: mi.name,
+      kind: "gear",
+      quantity: 1,
+      sourceId: mi.id,
+      slotHints: [],
+      notes: label
+    });
+  };
+  const magicSlots = build.magicItemIds;
+  if (magicSlots?.armor) {
+    const mi = findMagicItem(index, magicSlots.armor);
+    if (mi) pushMagicInventory(mi, "Magic armor");
+  }
+  if (magicSlots?.neck) {
+    const mi = findMagicItem(index, magicSlots.neck);
+    if (mi) pushMagicInventory(mi, "Neck slot");
+  }
+  if (magicSlots?.mainWeapon) {
+    const mi = findMagicItem(index, magicSlots.mainWeapon);
+    if (mi) pushMagicInventory(mi, "Magic weapon (main)");
+  }
+  if (magicSlots?.offHandWeapon) {
+    const mi = findMagicItem(index, magicSlots.offHandWeapon);
+    if (mi) pushMagicInventory(mi, "Magic weapon (off-hand)");
+  }
+  if (magicSlots?.implement) {
+    const mi = findMagicItem(index, magicSlots.implement);
+    if (mi) pushMagicInventory(mi, "Magic implement");
   }
 
   const withEquipment: CharacterSheetState = {

@@ -23,6 +23,9 @@ describe.skipIf(!existsSync(rulesIndexPath))("generated rules index", () => {
       paragonPaths: unknown[];
       epicDestinies: unknown[];
       hybridClasses?: unknown[];
+      proficiencies?: unknown[];
+      backgrounds?: unknown[];
+      magicItems?: unknown[];
       autoGrantedPowerIdsByClassId?: Record<string, string[]>;
       autoGrantedSkillTrainingNamesBySupportId?: Record<string, string[]>;
     };
@@ -43,12 +46,36 @@ describe.skipIf(!existsSync(rulesIndexPath))("generated rules index", () => {
     expect(data.paragonPaths.length).toBeGreaterThan(50);
     expect(data.epicDestinies.length).toBeGreaterThan(10);
     expect((data.hybridClasses ?? []).length).toBeGreaterThan(0);
+    expect((data.proficiencies ?? []).length).toBeGreaterThan(100);
+    expect((data.backgrounds ?? []).length).toBeGreaterThan(100);
+    expect((data.magicItems ?? []).length).toBeGreaterThan(1000);
     expect(data.autoGrantedPowerIdsByClassId?.["ID_FMP_CLASS_2"]).toContain("ID_FMP_POWER_1455");
     expect(data.autoGrantedSkillTrainingNamesBySupportId?.["ID_FMP_CLASS_9"]).toContain("Arcana");
 
     const ironWill = data.feats.find((f) => f.id === "ID_FMP_FEAT_148");
     if (ironWill && Array.isArray(ironWill.statAdds)) {
       expect(ironWill.statAdds.length).toBeGreaterThan(0);
+    }
+
+    const waterdeep = (data.backgrounds as Array<{ id?: string; associatedSkills?: string[] }>).find(
+      (b) => b.id === "ID_FMP_BACKGROUND_1"
+    );
+    if (waterdeep) {
+      expect(waterdeep.associatedSkills?.length).toBeGreaterThanOrEqual(0);
+    }
+
+    const blackIron = (data.magicItems as Array<{ id?: string; enhancementBonus?: number }>).find(
+      (m) => m.id === "ID_FMP_MAGIC_ITEM_32"
+    );
+    if (blackIron) {
+      expect(blackIron.enhancementBonus).toBe(2);
+    }
+
+    const longswordProf = (data.proficiencies as Array<{ id?: string; grant?: { kind?: string } }>).find(
+      (p) => p.id === "ID_INTERNAL_PROFICIENCY_WEAPON_PROFICIENCY_(LONGSWORD)"
+    );
+    if (longswordProf?.grant) {
+      expect(longswordProf.grant.kind).toBe("weaponName");
     }
   });
 

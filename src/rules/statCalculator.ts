@@ -14,20 +14,6 @@ function finiteBonus(n: unknown): number {
   return typeof n === "number" && Number.isFinite(n) ? n : 0;
 }
 
-/** Applies optional manual magic-item-style enhancement bonuses to computed defenses. */
-export function applyMagicItemDefenseBonuses(
-  defenses: DerivedStats["defenses"],
-  bonuses: CharacterBuild["magicItemBonuses"] | undefined
-): DerivedStats["defenses"] {
-  if (!bonuses) return defenses;
-  return {
-    ac: defenses.ac + finiteBonus(bonuses.ac),
-    fortitude: defenses.fortitude + finiteBonus(bonuses.fortitude),
-    reflex: defenses.reflex + finiteBonus(bonuses.reflex),
-    will: defenses.will + finiteBonus(bonuses.will)
-  };
-}
-
 export interface DerivedStats {
   maxHp: number;
   healingSurgesPerDay: number;
@@ -66,7 +52,8 @@ export function computeDerivedStats(
   shield: Armor | undefined,
   classDefenseBonuses?: Partial<Record<"Fortitude" | "Reflex" | "Will", number>>,
   supportPassiveDefense?: PassiveDefenseBonuses,
-  supportPassiveOther?: PassiveOtherBonuses
+  supportPassiveOther?: PassiveOtherBonuses,
+  magicItemDefense?: PassiveDefenseBonuses
 ): DerivedStats {
   const con = build.abilityScores.CON || 10;
   const dex = build.abilityScores.DEX || 10;
@@ -108,10 +95,11 @@ export function computeDerivedStats(
   const classFort = classDefenseBonuses?.Fortitude || 0;
   const classRef = classDefenseBonuses?.Reflex || 0;
   const classWill = classDefenseBonuses?.Will || 0;
-  const magicFort = finiteBonus(build.magicItemBonuses?.fortitude);
-  const magicRef = finiteBonus(build.magicItemBonuses?.reflex);
-  const magicWill = finiteBonus(build.magicItemBonuses?.will);
-  const magicAc = finiteBonus(build.magicItemBonuses?.ac);
+  const magic = magicItemDefense ?? { ac: 0, fortitude: 0, reflex: 0, will: 0 };
+  const magicFort = magic.fortitude;
+  const magicRef = magic.reflex;
+  const magicWill = magic.will;
+  const magicAc = magic.ac;
 
   const fortitudeBreakdown = buildNadBreakdown({
     halfLevel,

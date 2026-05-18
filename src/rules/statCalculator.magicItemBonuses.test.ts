@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { computeDerivedStats } from "./statCalculator";
-import type { CharacterBuild, ClassDef, Race } from "./models";
+import type { CharacterBuild, ClassDef, MagicItem, Race, RulesIndex } from "./models";
+import { computeMagicItemCombatBonuses } from "./magicItemEquipment";
 
 const race: Race = {
   id: "r1",
@@ -18,42 +19,66 @@ const cls: ClassDef = {
   raw: {}
 } as ClassDef;
 
-describe("computeDerivedStats magic item defense bonuses", () => {
-  it("adds optional enhancement bonuses to NADs and AC", () => {
+const cloak: MagicItem = {
+  id: "ID_TEST_NECK",
+  name: "Cloak of Resistance +1",
+  slug: "cloak",
+  level: 4,
+  magicItemType: "Neck Slot Item",
+  statAdds: [
+    { name: "Fortitude Defense", value: "+1" },
+    { name: "Reflex Defense", value: "+1" },
+    { name: "Will Defense", value: "+1" }
+  ],
+  raw: {}
+};
+
+const index: RulesIndex = {
+  meta: { version: 1, counts: {} },
+  races: [],
+  classes: [],
+  feats: [],
+  powers: [],
+  skills: [],
+  languages: [],
+  armors: [],
+  abilityScores: [],
+  racialTraits: [],
+  themes: [],
+  paragonPaths: [],
+  epicDestinies: [],
+  magicItems: [cloak]
+};
+
+describe("computeDerivedStats equipped magic items", () => {
+  it("adds defense bonuses from equipped magic item statAdds", () => {
     const baseBuild: CharacterBuild = {
       name: "Hero",
-      level: 1,
+      level: 4,
       abilityScores: { STR: 16, CON: 14, DEX: 12, INT: 10, WIS: 10, CHA: 8 },
       trainedSkillIds: [],
       featIds: [],
       powerIds: []
     };
-    const withItems: CharacterBuild = {
+    const withNeck: CharacterBuild = {
       ...baseBuild,
-      magicItemBonuses: { ac: 2, fortitude: 1, reflex: 0, will: 3 }
+      magicItemIds: { neck: cloak.id }
     };
+    const magicDefense = computeMagicItemCombatBonuses(index, withNeck).defenses;
     const baseline = computeDerivedStats(baseBuild, race, cls, undefined, undefined);
-    const merged = computeDerivedStats(withItems, race, cls, undefined, undefined);
-    expect(merged.defenses.ac).toBe(baseline.defenses.ac + 2);
+    const merged = computeDerivedStats(
+      withNeck,
+      race,
+      cls,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      magicDefense
+    );
     expect(merged.defenses.fortitude).toBe(baseline.defenses.fortitude + 1);
-    expect(merged.defenses.reflex).toBe(baseline.defenses.reflex);
-    expect(merged.defenses.will).toBe(baseline.defenses.will + 3);
-  });
-
-  it("ignores invalid or missing bonus fields", () => {
-    const build: CharacterBuild = {
-      name: "Hero",
-      level: 1,
-      abilityScores: { STR: 16, CON: 14, DEX: 12, INT: 10, WIS: 10, CHA: 8 },
-      trainedSkillIds: [],
-      featIds: [],
-      powerIds: [],
-      magicItemBonuses: { ac: NaN, fortitude: undefined, reflex: 1, will: Number.NaN, attack: 2 }
-    };
-    const base = computeDerivedStats({ ...build, magicItemBonuses: undefined }, race, cls, undefined, undefined);
-    const merged = computeDerivedStats(build, race, cls, undefined, undefined);
-    expect(merged.defenses.ac).toBe(base.defenses.ac);
-    expect(merged.defenses.reflex).toBe(base.defenses.reflex + 1);
-    expect(merged.defenses.will).toBe(base.defenses.will);
+    expect(merged.defenses.reflex).toBe(baseline.defenses.reflex + 1);
+    expect(merged.defenses.will).toBe(baseline.defenses.will + 1);
   });
 });

@@ -1,3 +1,4 @@
+import { normalizeMagicItemSlotIds } from "../../rules/magicItemEquipment";
 import { normalizeActiveConditions } from "./activeConditions";
 import { createDefaultCharacterSheetState } from "./defaultState";
 import type { CharacterSheetState } from "./model";
@@ -8,28 +9,6 @@ const CHARACTER_SHEET_STORAGE_KEY = "dnd4e_character_sheet_v1";
 function clampInt(value: unknown, min: number, max: number, fallback: number): number {
   const n = typeof value === "number" ? Math.trunc(value) : fallback;
   return Math.max(min, Math.min(max, Number.isNaN(n) ? fallback : n));
-}
-
-function clampBonusField(value: unknown): number | undefined {
-  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
-  return Math.max(-99, Math.min(99, Math.trunc(value)));
-}
-
-function normalizeMagicItemBonuses(raw: unknown): CharacterSheetState["magicItemBonuses"] {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
-  const o = raw as Record<string, unknown>;
-  const out: NonNullable<CharacterSheetState["magicItemBonuses"]> = {};
-  const ac = clampBonusField(o.ac);
-  const fortitude = clampBonusField(o.fortitude);
-  const reflex = clampBonusField(o.reflex);
-  const will = clampBonusField(o.will);
-  const attack = clampBonusField(o.attack);
-  if (ac !== undefined) out.ac = ac;
-  if (fortitude !== undefined) out.fortitude = fortitude;
-  if (reflex !== undefined) out.reflex = reflex;
-  if (will !== undefined) out.will = will;
-  if (attack !== undefined) out.attack = attack;
-  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 export function normalizeState(input: unknown): CharacterSheetState {
@@ -72,7 +51,7 @@ export function normalizeState(input: unknown): CharacterSheetState {
     featIds: Array.isArray(v.featIds) ? v.featIds.filter((id): id is string => typeof id === "string") : [],
     trainedSkillIds: Array.isArray(v.trainedSkillIds) ? v.trainedSkillIds.filter((id): id is string => typeof id === "string") : [],
     level: clampInt(v.level, 1, 30, fallback.level),
-    magicItemBonuses: normalizeMagicItemBonuses(v.magicItemBonuses),
+    magicItemIds: normalizeMagicItemSlotIds(v.magicItemIds),
     themeId: typeof v.themeId === "string" && v.themeId.trim() ? v.themeId : undefined,
     paragonPathId: typeof v.paragonPathId === "string" && v.paragonPathId.trim() ? v.paragonPathId : undefined,
     epicDestinyId: typeof v.epicDestinyId === "string" && v.epicDestinyId.trim() ? v.epicDestinyId : undefined
