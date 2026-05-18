@@ -7,7 +7,6 @@ import {
   HybridClassDef,
   Implement,
   Power,
-  PrereqToken,
   RacialTrait,
   RulesIndex,
   Weapon
@@ -48,7 +47,9 @@ import {
   racePowerGroupsForRace,
   racePowerSelectSelectionKey
 } from "../../rules/grantedPowersQuery";
-import { evaluatePrereqs, hybridBaseClassNames } from "../../rules/prereqEvaluator";
+import { hybridBaseClassNames } from "../../rules/prereqEvaluator";
+import { buildPrereqCharacterContext } from "../../rules/prereqContext";
+import { evaluateSupportOptionLegality } from "../../rules/supportOptionLegality";
 import { applyRacialBonuses, getAbilityLabel, parseRaceAbilityBonusInfo } from "../../rules/abilityScores";
 import { getRaceSecondarySelectSlots, selectableStartingLanguages } from "../../rules/raceRuleSelects";
 import { parseRacialTraitIdsFromRace, resolveRacialTraitsForRace } from "../../rules/racialTraits";
@@ -1350,13 +1351,15 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   }, [build.trainedSkillIds, skillNameById, selectedClassSkillNamesLower, requiredClassSkillNamesLower]);
   const maxAdditionalTrainedSkills = legality.classSkillRules?.chooseAdditionalCount ?? 0;
   const trainedSkillSelectionMaxed = trainedOptionalClassSkillCount >= maxAdditionalTrainedSkills;
-  const hybridPrereqOptions = useMemo(
-    () => ({
+  const prereqContext = useMemo(() => buildPrereqCharacterContext(index, build), [index, build]);
+  const hybridPrereqOptions = useMemo(() => {
+    const hybridNames = hybridBaseClassNames(index, build);
+    return {
       index,
-      additionalClassNamesForMatch: hybridBaseClassNames(index, build)
-    }),
-    [index, build.characterStyle, build.hybridClassIdA, build.hybridClassIdB]
-  );
+      context: prereqContext,
+      additionalClassNamesForMatch: hybridNames.length ? hybridNames : undefined
+    };
+  }, [index, build, prereqContext]);
 
   const themesSorted = useMemo(
     () => [...index.themes].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })),
@@ -1370,6 +1373,39 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     () => [...index.epicDestinies].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })),
     [index.epicDestinies]
   );
+
+  const themeLegalityById = useMemo(() => {
+    const map = new Map<string, { legal: boolean; reasons: string[] }>();
+    for (const theme of themesSorted) {
+      map.set(
+        theme.id,
+        evaluateSupportOptionLegality(theme.prereqTokens, 0, build, raceNameById, classNameById, skillNameById, hybridPrereqOptions)
+      );
+    }
+    return map;
+  }, [themesSorted, build, raceNameById, classNameById, skillNameById, hybridPrereqOptions]);
+
+  const paragonLegalityById = useMemo(() => {
+    const map = new Map<string, { legal: boolean; reasons: string[] }>();
+    for (const path of paragonPathsSorted) {
+      map.set(
+        path.id,
+        evaluateSupportOptionLegality(path.prereqTokens, 11, build, raceNameById, classNameById, skillNameById, hybridPrereqOptions)
+      );
+    }
+    return map;
+  }, [paragonPathsSorted, build, raceNameById, classNameById, skillNameById, hybridPrereqOptions]);
+
+  const epicLegalityById = useMemo(() => {
+    const map = new Map<string, { legal: boolean; reasons: string[] }>();
+    for (const destiny of epicDestiniesSorted) {
+      map.set(
+        destiny.id,
+        evaluateSupportOptionLegality(destiny.prereqTokens, 21, build, raceNameById, classNameById, skillNameById, hybridPrereqOptions)
+      );
+    }
+    return map;
+  }, [epicDestiniesSorted, build, raceNameById, classNameById, skillNameById, hybridPrereqOptions]);
 
   const filteredThemes = useMemo(
     () => ensureSelectedEntityInFiltered(filterRulesEntitiesByQuery(themesSorted, themeSearch), build.themeId, themesSorted),
@@ -1412,16 +1448,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     const budget = build.pointBuyBudget ?? DEFAULT_POINT_BUY_BUDGET;
     return { total, budget, remaining: budget - total, invalidScores };
   }, [build.abilityScores, build.pointBuyBudget]);
-
-  function evalOptionWithLevel(tokens: PrereqToken[], minLevel: number): { legal: boolean; reasons: string[] } {
-    const reasons: string[] = [];
-    if (minLevel > 0 && build.level < minLevel) {
-      reasons.push(`Requires level ${minLevel}+`);
-    }
-    const ev = evaluatePrereqs(tokens, build, raceNameById, classNameById, skillNameById, hybridPrereqOptions);
-    if (!ev.ok) reasons.push(...ev.reasons);
-    return { legal: reasons.length === 0, reasons };
-  }
 
   /** Which builder tab owns this validation message (for status dots and error buckets). */
   function resolveValidationErrorTab(message: string): BuilderTab {
@@ -3675,7 +3701,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
                     {filteredThemes.map((t) => {
                       const selected = build.themeId === t.id;
-                      const { legal, reasons } = evalOptionWithLevel(t.prereqTokens, 0);
+                      const { legal, reasons } = themeLegalityById.get(t.id) ?? { legal: false, reasons: [] };
                       return (
                         <li key={t.id} style={{ marginBottom: "0.2rem" }}>
                           <button
@@ -3791,7 +3817,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
                     {filteredParagonPaths.map((p) => {
                       const selected = build.paragonPathId === p.id;
-                      const { legal, reasons } = evalOptionWithLevel(p.prereqTokens, 11);
+                      const { legal, reasons } = paragonLegalityById.get(p.id) ?? { legal: false, reasons: [] };
                       return (
                         <li key={p.id} style={{ marginBottom: "0.2rem" }}>
                           <button
@@ -3904,7 +3930,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
                     {filteredEpicDestinies.map((d) => {
                       const selected = build.epicDestinyId === d.id;
-                      const { legal, reasons } = evalOptionWithLevel(d.prereqTokens, 21);
+                      const { legal, reasons } = epicLegalityById.get(d.id) ?? { legal: false, reasons: [] };
                       return (
                         <li key={d.id} style={{ marginBottom: "0.2rem" }}>
                           <button
