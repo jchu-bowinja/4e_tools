@@ -1,5 +1,5 @@
 import { CharacterBuild } from "../../rules/models";
-import { normalizeCharacterBuild } from "../../rules/magicItemEquipment";
+import { normalizeCharacterBuild } from "../../rules/equipment";
 
 const STORAGE_KEY = "dnd4e_builder_character_v1";
 const SAVED_CHARACTERS_KEY = "dnd4e_saved_characters_v1";

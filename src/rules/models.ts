@@ -291,6 +291,40 @@ export interface MagicItemSlotIds {
   implement?: string;
 }
 
+/** Enhancement bonus chosen for a slot (+0 = none). */
+export type EnhancementLevel = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+/** Mundane base + optional magic enchantment + enhancement plus. */
+export interface EquipmentSlotSelection {
+  /** Compendium id: Armor or Weapon. */
+  baseId?: string;
+  /** Magic Item id; omit = mundane only. */
+  enchantmentId?: string;
+  enhancement?: EnhancementLevel;
+}
+
+/** Superior implement + optional magic implement + plus. */
+export interface ImplementSlotSelection {
+  superiorImplementId?: string;
+  enchantmentId?: string;
+  enhancement?: EnhancementLevel;
+}
+
+/** Neck slot: no mundane base; always includes `enhancement` (0 when empty). */
+export interface NeckSlotSelection {
+  enchantmentId?: string;
+  enhancement: EnhancementLevel;
+}
+
+export interface CharacterEquipment {
+  armor?: EquipmentSlotSelection;
+  shield?: EquipmentSlotSelection;
+  mainHand?: EquipmentSlotSelection;
+  offHand?: EquipmentSlotSelection;
+  implement?: ImplementSlotSelection;
+  neck?: NeckSlotSelection;
+}
+
 export interface MagicItem extends RulesEntity {
   flavor?: string | null;
   level?: number | null;
@@ -403,12 +437,19 @@ export interface CharacterBuild {
   /** Paragon-tier power picks from the multiclass class when `paragonMulticlassing` is true. */
   paragonMulticlassPowers?: ParagonMulticlassPowers;
   epicDestinyId?: string;
+  /** Unified equipment per slot (base → enchantment → plus). Preferred after phase 1. */
+  equipment?: CharacterEquipment;
+  /** @deprecated Use `equipment.armor.baseId`. Kept in sync by `normalizeCharacterBuild`. */
   armorId?: string;
+  /** @deprecated Use `equipment.shield.baseId`. */
   shieldId?: string;
+  /** @deprecated Use `equipment.mainHand.baseId`. */
   mainWeaponId?: string;
+  /** @deprecated Use `equipment.offHand.baseId`. */
   offHandWeaponId?: string;
+  /** @deprecated Use `equipment.implement.superiorImplementId`. */
   implementId?: string;
-  /** Equipped magic items by role (bonuses derived from compendium `statAdds` / enhancement). */
+  /** @deprecated Use `equipment.*.enchantmentId`. */
   magicItemIds?: MagicItemSlotIds;
   abilityScores: Record<Ability, number>;
   /** Point-buy / starting base only; level bumps live in `asiChoices` and automatic 11/21 bonuses. */

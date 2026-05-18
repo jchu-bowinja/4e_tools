@@ -1,14 +1,16 @@
 import type { Armor, CharacterBuild, MagicItem, MagicItemSlotIds, RulesIndex, Weapon } from "./models";
-import { passiveDefenseBonusesFromStatAdds, type PassiveDefenseBonuses } from "./supportStatAdds";
+import { mergePassiveDefenseBonuses, type PassiveDefenseBonuses } from "./supportStatAdds";
+import {
+  computeEquipmentCombatBonuses,
+  enchantmentDefenseBonusesFromItem,
+  equipmentDefenseBonusesFromBuild,
+  stripLegacyMagicItemBonuses,
+  type EquipmentCombatBonuses
+} from "./equipment";
 
 export type { MagicItemSlotIds };
-
-export interface MagicItemCombatBonuses {
-  defenses: PassiveDefenseBonuses;
-  mainWeaponAttack: number;
-  offHandWeaponAttack: number;
-  implementAttack: number;
-}
+export type MagicItemCombatBonuses = EquipmentCombatBonuses;
+export { stripLegacyMagicItemBonuses, equipmentDefenseBonusesFromBuild };
 
 const IMPLEMENT_MAGIC_TYPES = new Set([
   "holy symbol",
@@ -20,10 +22,6 @@ const IMPLEMENT_MAGIC_TYPES = new Set([
   "totem",
   "superior implement"
 ]);
-
-function finiteBonus(n: unknown): number {
-  return typeof n === "number" && Number.isFinite(n) ? n : 0;
-}
 
 export function emptyMagicItemDefenseBonuses(): PassiveDefenseBonuses {
   return { ac: 0, fortitude: 0, reflex: 0, will: 0 };
@@ -38,13 +36,6 @@ export function normalizeMagicItemSlotIds(raw: unknown): MagicItemSlotIds | unde
     if (typeof id === "string" && id.trim()) out[key] = id.trim();
   }
   return Object.keys(out).length > 0 ? out : undefined;
-}
-
-/** @deprecated Legacy manual bonuses — stripped on import; not applied at runtime. */
-export function stripLegacyMagicItemBonuses<T extends { magicItemBonuses?: unknown }>(build: T): T {
-  if (!build.magicItemBonuses) return build;
-  const { magicItemBonuses: _removed, ...rest } = build;
-  return rest as T;
 }
 
 export function findMagicItem(index: RulesIndex, id: string | undefined): MagicItem | undefined {
@@ -127,17 +118,12 @@ export function weaponMatchesMagicItem(weapon: Weapon | undefined, item: MagicIt
 export function aggregateMagicItemDefenseBonuses(items: MagicItem[], level: number): PassiveDefenseBonuses {
   let merged: PassiveDefenseBonuses = { ac: 0, fortitude: 0, reflex: 0, will: 0 };
   for (const item of items) {
-    merged = {
-      ac: merged.ac + passiveDefenseBonusesFromStatAdds(item.statAdds, level).ac,
-      fortitude: merged.fortitude + passiveDefenseBonusesFromStatAdds(item.statAdds, level).fortitude,
-      reflex: merged.reflex + passiveDefenseBonusesFromStatAdds(item.statAdds, level).reflex,
-      will: merged.will + passiveDefenseBonusesFromStatAdds(item.statAdds, level).will
-    };
+    merged = mergePassiveDefenseBonuses(merged, enchantmentDefenseBonusesFromItem(item, level));
   }
   return merged;
 }
 
-/** Weapon/implement enhancement to attack rolls from an equipped magic item. */
+/** @deprecated Prefer slot `enhancement` from `build.equipment`; kept for tests. */
 export function magicItemAttackBonus(item: MagicItem | undefined): number {
   if (!item) return 0;
   const fromField = item.enhancementBonus;
@@ -148,24 +134,14 @@ export function magicItemAttackBonus(item: MagicItem | undefined): number {
 }
 
 export function computeMagicItemCombatBonuses(index: RulesIndex, build: CharacterBuild): MagicItemCombatBonuses {
-  const slots = build.magicItemIds;
-  const level = build.level;
-  const worn = equippedMagicItems(index, slots);
-  const defenses = aggregateMagicItemDefenseBonuses(worn, level);
-  return {
-    defenses,
-    mainWeaponAttack: magicItemAttackBonus(findMagicItem(index, slots?.mainWeapon)),
-    offHandWeaponAttack: magicItemAttackBonus(findMagicItem(index, slots?.offHandWeapon)),
-    implementAttack: magicItemAttackBonus(findMagicItem(index, slots?.implement))
-  };
+  return computeEquipmentCombatBonuses(index, build);
 }
 
 export function magicItemDefenseBonusesFromBuild(
   index: RulesIndex | undefined,
   build: CharacterBuild
 ): PassiveDefenseBonuses {
-  if (!index) return { ac: 0, fortitude: 0, reflex: 0, will: 0 };
-  return computeMagicItemCombatBonuses(index, build).defenses;
+  return equipmentDefenseBonusesFromBuild(index, build);
 }
 
 export function formatMagicItemOptionLabel(item: MagicItem): string {
@@ -184,10 +160,4 @@ export function pruneMagicItemSlotIds(ids: MagicItemSlotIds | undefined): MagicI
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
-export function normalizeCharacterBuild(build: CharacterBuild): CharacterBuild {
-  const stripped = stripLegacyMagicItemBonuses(build);
-  return {
-    ...stripped,
-    magicItemIds: pruneMagicItemSlotIds(normalizeMagicItemSlotIds(stripped.magicItemIds))
-  };
-}
+export { normalizeCharacterBuild } from "./equipment";

@@ -5,13 +5,9 @@ import {
   CharacterBuild,
   Feat,
   HybridClassDef,
-  Implement,
-  MagicItem,
-  MagicItemSlotIds,
   Power,
   RacialTrait,
-  RulesIndex,
-  Weapon
+  RulesIndex
 } from "../../rules/models";
 import { defaultBuild } from "./defaultBuild";
 import { deleteSavedCharacterById, loadBuild, loadSavedCharacters, saveBuild, saveBuildToSavedCharacters } from "./storage";
@@ -87,14 +83,10 @@ import {
   collectFeatProficiencyDisplayRows,
   collectFeatProficiencyGrants
 } from "../../rules/featProficiencies";
-import {
-  computeMagicItemCombatBonuses,
-  formatMagicItemOptionLabel,
-  normalizeCharacterBuild,
-  pruneMagicItemSlotIds
-} from "../../rules/magicItemEquipment";
+import { normalizeCharacterBuild, resolveEffectiveEquipmentIds } from "../../rules/equipment";
+import { computeMagicItemCombatBonuses } from "../../rules/magicItemEquipment";
 import { summarizeImplementAttack, summarizeMainWeaponAttack } from "../../rules/weaponAttack";
-import { magicArmorOptions, magicImplementOptions, magicNeckOptions, magicWeaponOptions } from "./magicItemOptions";
+import { EquipmentTab } from "./EquipmentTab";
 import { GlossaryTooltipRichText, RulesRichText } from "./RulesRichText";
 import { NEUTRAL_PAGE_BG } from "../../ui/tokens";
 import { STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE } from "../../ui/glossaryTooltip";
@@ -812,7 +804,7 @@ function importBuildFromFile(file: File, onLoaded: (build: CharacterBuild) => vo
   const reader = new FileReader();
   reader.onload = () => {
     try {
-      onLoaded(normalizeCharacterBuild(JSON.parse(String(reader.result)) as CharacterBuild));
+      onLoaded(normalizeCharacterBuild(JSON.parse(String(reader.result)) as CharacterBuild, index));
     } catch {
       alert("Could not parse character JSON file.");
     }
@@ -821,7 +813,10 @@ function importBuildFromFile(file: File, onLoaded: (build: CharacterBuild) => vo
 }
 
 export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Element {
-  const [build, setBuild] = useState<CharacterBuild>(() => normalizeCharacterBuild(loadBuild() || defaultBuild));
+  const [build, setBuild] = useState<CharacterBuild>(() => {
+    const loaded = loadBuild();
+    return loaded ? normalizeCharacterBuild(loaded, index) : defaultBuild;
+  });
   const [nameDraft, setNameDraft] = useState(build.name);
   const [savedCharacters, setSavedCharacters] = useState(() => loadSavedCharacters());
   const [selectedSavedCharacterId, setSelectedSavedCharacterId] = useState("");
@@ -837,14 +832,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   const [themeSearch, setThemeSearch] = useState("");
   const [paragonSearch, setParagonSearch] = useState("");
   const [epicSearch, setEpicSearch] = useState("");
-  const [mainWeaponSearch, setMainWeaponSearch] = useState("");
-  const [offHandWeaponSearch, setOffHandWeaponSearch] = useState("");
-  const [implementSearch, setImplementSearch] = useState("");
-  const [magicArmorSearch, setMagicArmorSearch] = useState("");
-  const [magicNeckSearch, setMagicNeckSearch] = useState("");
-  const [magicMainWeaponSearch, setMagicMainWeaponSearch] = useState("");
-  const [magicOffHandWeaponSearch, setMagicOffHandWeaponSearch] = useState("");
-  const [magicImplementSearch, setMagicImplementSearch] = useState("");
   const [jsonSearchInput, setJsonSearchInput] = useState("");
   const [jsonSearchQuery, setJsonSearchQuery] = useState("");
   const [jsonSearchResultIdx, setJsonSearchResultIdx] = useState(0);
@@ -861,11 +848,12 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   const selectedTheme = index.themes.find((t) => t.id === build.themeId);
   const selectedParagonPath = index.paragonPaths.find((p) => p.id === build.paragonPathId);
   const selectedEpicDestiny = index.epicDestinies.find((d) => d.id === build.epicDestinyId);
-  const selectedArmor = index.armors.find((a) => a.id === build.armorId);
-  const selectedShield = index.armors.find((a) => a.id === build.shieldId);
-  const selectedMainWeapon = (index.weapons ?? []).find((w) => w.id === build.mainWeaponId);
-  const selectedOffHandWeapon = (index.weapons ?? []).find((w) => w.id === build.offHandWeaponId);
-  const selectedImplement = (index.implements ?? []).find((i) => i.id === build.implementId);
+  const effectiveEquipmentIds = useMemo(() => resolveEffectiveEquipmentIds(build, index), [build, index]);
+  const selectedArmor = index.armors.find((a) => a.id === effectiveEquipmentIds.armorId);
+  const selectedShield = index.armors.find((a) => a.id === effectiveEquipmentIds.shieldId);
+  const selectedMainWeapon = (index.weapons ?? []).find((w) => w.id === effectiveEquipmentIds.mainWeaponId);
+  const selectedOffHandWeapon = (index.weapons ?? []).find((w) => w.id === effectiveEquipmentIds.offHandWeaponId);
+  const selectedImplement = (index.implements ?? []).find((i) => i.id === effectiveEquipmentIds.implementId);
   const isHybridBuild = build.characterStyle === "hybrid";
   const selectedHybridA: HybridClassDef | undefined = index.hybridClasses?.find((h) => h.id === build.hybridClassIdA);
   const selectedHybridB: HybridClassDef | undefined = index.hybridClasses?.find((h) => h.id === build.hybridClassIdB);
@@ -1113,103 +1101,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     [index, build.featIds]
   );
 
-  const weaponsSorted = useMemo(
-    () =>
-      [...(index.weapons ?? [])].sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
-      ),
-    [index.weapons]
-  );
-  const implementsSorted = useMemo(
-    () =>
-      [...(index.implements ?? [])].sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
-      ),
-    [index.implements]
-  );
-  const mainWeaponOptions = useMemo(
-    () =>
-      ensureSelectedEntityInFiltered(filterRulesEntitiesByQuery(weaponsSorted, mainWeaponSearch), build.mainWeaponId, weaponsSorted),
-    [weaponsSorted, mainWeaponSearch, build.mainWeaponId]
-  );
-  const offHandWeaponOptions = useMemo(
-    () =>
-      ensureSelectedEntityInFiltered(
-        filterRulesEntitiesByQuery(weaponsSorted, offHandWeaponSearch),
-        build.offHandWeaponId,
-        weaponsSorted
-      ),
-    [weaponsSorted, offHandWeaponSearch, build.offHandWeaponId]
-  );
-  const implementOptions = useMemo(
-    () =>
-      ensureSelectedEntityInFiltered(filterRulesEntitiesByQuery(implementsSorted, implementSearch), build.implementId, implementsSorted),
-    [implementsSorted, implementSearch, build.implementId]
-  );
-
-  const magicArmorCatalog = useMemo(
-    () => magicArmorOptions(index, build.level, selectedArmor),
-    [index, build.level, selectedArmor]
-  );
-  const magicNeckCatalog = useMemo(() => magicNeckOptions(index, build.level), [index, build.level]);
-  const magicMainWeaponCatalog = useMemo(
-    () => magicWeaponOptions(index, build.level, selectedMainWeapon),
-    [index, build.level, selectedMainWeapon]
-  );
-  const magicOffHandWeaponCatalog = useMemo(
-    () => magicWeaponOptions(index, build.level, selectedOffHandWeapon),
-    [index, build.level, selectedOffHandWeapon]
-  );
-  const magicImplementCatalog = useMemo(
-    () => magicImplementOptions(index, build.level),
-    [index, build.level]
-  );
-  const magicArmorOptionsFiltered = useMemo(
-    () =>
-      ensureSelectedEntityInFiltered(
-        filterRulesEntitiesByQuery(magicArmorCatalog, magicArmorSearch),
-        build.magicItemIds?.armor,
-        magicArmorCatalog
-      ),
-    [magicArmorCatalog, magicArmorSearch, build.magicItemIds?.armor]
-  );
-  const magicNeckOptionsFiltered = useMemo(
-    () =>
-      ensureSelectedEntityInFiltered(
-        filterRulesEntitiesByQuery(magicNeckCatalog, magicNeckSearch),
-        build.magicItemIds?.neck,
-        magicNeckCatalog
-      ),
-    [magicNeckCatalog, magicNeckSearch, build.magicItemIds?.neck]
-  );
-  const magicMainWeaponOptionsFiltered = useMemo(
-    () =>
-      ensureSelectedEntityInFiltered(
-        filterRulesEntitiesByQuery(magicMainWeaponCatalog, magicMainWeaponSearch),
-        build.magicItemIds?.mainWeapon,
-        magicMainWeaponCatalog
-      ),
-    [magicMainWeaponCatalog, magicMainWeaponSearch, build.magicItemIds?.mainWeapon]
-  );
-  const magicOffHandWeaponOptionsFiltered = useMemo(
-    () =>
-      ensureSelectedEntityInFiltered(
-        filterRulesEntitiesByQuery(magicOffHandWeaponCatalog, magicOffHandWeaponSearch),
-        build.magicItemIds?.offHandWeapon,
-        magicOffHandWeaponCatalog
-      ),
-    [magicOffHandWeaponCatalog, magicOffHandWeaponSearch, build.magicItemIds?.offHandWeapon]
-  );
-  const magicImplementOptionsFiltered = useMemo(
-    () =>
-      ensureSelectedEntityInFiltered(
-        filterRulesEntitiesByQuery(magicImplementCatalog, magicImplementSearch),
-        build.magicItemIds?.implement,
-        magicImplementCatalog
-      ),
-    [magicImplementCatalog, magicImplementSearch, build.magicItemIds?.implement]
-  );
-
   const magicCombat = useMemo(() => computeMagicItemCombatBonuses(index, build), [index, build]);
 
   const mainWeaponSummary = useMemo(
@@ -1428,8 +1319,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     () => [...index.skills].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })),
     [index.skills]
   );
-  const armorOptions = useMemo(() => index.armors.filter((a) => (a.armorType || "").toLowerCase() !== "shield"), [index.armors]);
-  const shieldOptions = useMemo(() => index.armors.filter((a) => (a.armorType || "").toLowerCase() === "shield"), [index.armors]);
   const abilityLoreByCode = useMemo(() => {
     const m = new Map<Ability, string>();
     for (const entry of index.abilityScores) {
@@ -1695,14 +1584,9 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
 
   function updateBuild(next: CharacterBuild): void {
     const pruned = pruneStalePowerSelections(index, next);
-    const normalized = normalizeCharacterBuild(pruned);
+    const normalized = normalizeCharacterBuild(pruned, index);
     setBuild(normalized);
     saveBuild(normalized);
-  }
-
-  function setMagicItemSlot(slot: keyof MagicItemSlotIds, id: string | undefined): void {
-    const nextIds = { ...(build.magicItemIds ?? {}), [slot]: id || undefined };
-    updateBuild({ ...build, magicItemIds: pruneMagicItemSlotIds(nextIds) });
   }
 
   useEffect(() => {
@@ -4262,274 +4146,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         )}
 
         {activeTab === "equipment" && (
-          <div>
-            <h3 style={sectionTitleStyle}>Equipment</h3>
-            <div style={{ ...ui.blockInset, marginTop: "0.35rem", display: "grid", gap: "0.75rem", backgroundColor: "var(--surface-1)" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "0.65rem" }}>
-                <label>
-                  Armor
-                  <select value={build.armorId || ""} onChange={(e) => updateBuild({ ...build, armorId: e.target.value || undefined })} style={{ width: "100%" }}>
-                    <option value="">None</option>
-                    {armorOptions.map((a) => <option key={a.id} value={a.id}>{a.name} (+{a.armorBonus || 0} AC)</option>)}
-                  </select>
-                </label>
-                <label>
-                  Shield
-                  <select value={build.shieldId || ""} onChange={(e) => updateBuild({ ...build, shieldId: e.target.value || undefined })} style={{ width: "100%" }}>
-                    <option value="">None</option>
-                    {shieldOptions.map((a) => <option key={a.id} value={a.id}>{a.name} (+{a.armorBonus || 0} AC)</option>)}
-                  </select>
-                </label>
-              </div>
-              <label style={{ fontSize: "0.88rem" }}>
-                Filter main-hand weapons
-                <input
-                  type="search"
-                  value={mainWeaponSearch}
-                  onChange={(e) => setMainWeaponSearch(e.target.value)}
-                  placeholder="Name, category…"
-                  style={{
-                    width: "100%",
-                    marginTop: "0.2rem",
-                    padding: "0.35rem 0.45rem",
-                    borderRadius: "6px",
-                    border: "1px solid var(--panel-border)",
-                    boxSizing: "border-box"
-                  }}
-                />
-              </label>
-              <label style={{ fontSize: "0.88rem" }}>
-                Main weapon
-                <select
-                  value={build.mainWeaponId || ""}
-                  onChange={(e) => updateBuild({ ...build, mainWeaponId: e.target.value || undefined })}
-                  style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem", borderRadius: "6px", border: "1px solid var(--panel-border)", boxSizing: "border-box" }}
-                >
-                  <option value="">None</option>
-                  {mainWeaponOptions.map((w: Weapon) => (
-                    <option key={w.id} value={w.id}>
-                      {w.name}
-                      {w.weaponCategory ? ` (${w.weaponCategory})` : ""}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label style={{ fontSize: "0.88rem" }}>
-                Filter off-hand weapon
-                <input
-                  type="search"
-                  value={offHandWeaponSearch}
-                  onChange={(e) => setOffHandWeaponSearch(e.target.value)}
-                  placeholder="Name, category…"
-                  style={{
-                    width: "100%",
-                    marginTop: "0.2rem",
-                    padding: "0.35rem 0.45rem",
-                    borderRadius: "6px",
-                    border: "1px solid var(--panel-border)",
-                    boxSizing: "border-box"
-                  }}
-                />
-              </label>
-              <label style={{ fontSize: "0.88rem" }}>
-                Off-hand weapon / second weapon
-                <select
-                  value={build.offHandWeaponId || ""}
-                  onChange={(e) => updateBuild({ ...build, offHandWeaponId: e.target.value || undefined })}
-                  style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem", borderRadius: "6px", border: "1px solid var(--panel-border)", boxSizing: "border-box" }}
-                >
-                  <option value="">None</option>
-                  {offHandWeaponOptions.map((w: Weapon) => (
-                    <option key={w.id} value={w.id}>
-                      {w.name}
-                      {w.weaponCategory ? ` (${w.weaponCategory})` : ""}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label style={{ fontSize: "0.88rem" }}>
-                Filter implements
-                <input
-                  type="search"
-                  value={implementSearch}
-                  onChange={(e) => setImplementSearch(e.target.value)}
-                  placeholder="Name, group…"
-                  style={{
-                    width: "100%",
-                    marginTop: "0.2rem",
-                    padding: "0.35rem 0.45rem",
-                    borderRadius: "6px",
-                    border: "1px solid var(--panel-border)",
-                    boxSizing: "border-box"
-                  }}
-                />
-              </label>
-              <label style={{ fontSize: "0.88rem" }}>
-                Superior implement
-                <select
-                  value={build.implementId || ""}
-                  onChange={(e) => updateBuild({ ...build, implementId: e.target.value || undefined })}
-                  style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem", borderRadius: "6px", border: "1px solid var(--panel-border)", boxSizing: "border-box" }}
-                >
-                  <option value="">None</option>
-                  {implementOptions.map((imp: Implement) => (
-                    <option key={imp.id} value={imp.id}>
-                      {imp.name}
-                      {imp.implementGroup ? ` (${imp.implementGroup})` : ""}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div style={{ marginTop: "0.35rem", paddingTop: "0.55rem", borderTop: "1px solid var(--panel-border)", display: "grid", gap: "0.65rem" }}>
-                <p
-                  style={{
-                    margin: "0 0 0.35rem 0",
-                    fontSize: "0.76rem",
-                    fontWeight: 700,
-                    letterSpacing: "0.04em",
-                    color: "var(--text-secondary)",
-                    textTransform: "uppercase"
-                  }}
-                >
-                  Magic items
-                </p>
-                <p style={{ margin: "0 0 0.45rem 0", fontSize: "0.78rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
-                  Bonuses come from compendium enhancement and stat adds. Lists items at or below your level; armor and
-                  weapons are filtered to your mundane picks when possible.
-                </p>
-                {(magicCombat.defenses.ac > 0 ||
-                  magicCombat.defenses.fortitude > 0 ||
-                  magicCombat.defenses.reflex > 0 ||
-                  magicCombat.defenses.will > 0 ||
-                  magicCombat.mainWeaponAttack > 0 ||
-                  magicCombat.offHandWeaponAttack > 0 ||
-                  magicCombat.implementAttack > 0) && (
-                  <p style={{ margin: "0 0 0.45rem 0", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
-                    Active: AC +{magicCombat.defenses.ac}, Fort +{magicCombat.defenses.fortitude}, Ref +{magicCombat.defenses.reflex},
-                    Will +{magicCombat.defenses.will}
-                    {magicCombat.mainWeaponAttack > 0 ? `; main attack +${magicCombat.mainWeaponAttack}` : ""}
-                    {magicCombat.offHandWeaponAttack > 0 ? `; off-hand attack +${magicCombat.offHandWeaponAttack}` : ""}
-                    {magicCombat.implementAttack > 0 ? `; implement attack +${magicCombat.implementAttack}` : ""}
-                  </p>
-                )}
-                <label style={{ fontSize: "0.88rem" }}>
-                  Filter magic armor
-                  <input
-                    type="search"
-                    value={magicArmorSearch}
-                    onChange={(e) => setMagicArmorSearch(e.target.value)}
-                    placeholder="Name"
-                    style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem 0.45rem", borderRadius: "6px", border: "1px solid var(--panel-border)", boxSizing: "border-box" }}
-                  />
-                </label>
-                <label style={{ fontSize: "0.88rem" }}>
-                  Magic armor
-                  <select
-                    value={build.magicItemIds?.armor || ""}
-                    onChange={(e) => setMagicItemSlot("armor", e.target.value || undefined)}
-                    style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem", borderRadius: "6px", border: "1px solid var(--panel-border)", boxSizing: "border-box" }}
-                  >
-                    <option value="">None</option>
-                    {magicArmorOptionsFiltered.map((item: MagicItem) => (
-                      <option key={item.id} value={item.id}>{formatMagicItemOptionLabel(item)}</option>
-                    ))}
-                  </select>
-                </label>
-                <label style={{ fontSize: "0.88rem" }}>
-                  Filter neck items
-                  <input
-                    type="search"
-                    value={magicNeckSearch}
-                    onChange={(e) => setMagicNeckSearch(e.target.value)}
-                    placeholder="Cloak, amulet"
-                    style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem 0.45rem", borderRadius: "6px", border: "1px solid var(--panel-border)", boxSizing: "border-box" }}
-                  />
-                </label>
-                <label style={{ fontSize: "0.88rem" }}>
-                  Neck slot
-                  <select
-                    value={build.magicItemIds?.neck || ""}
-                    onChange={(e) => setMagicItemSlot("neck", e.target.value || undefined)}
-                    style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem", borderRadius: "6px", border: "1px solid var(--panel-border)", boxSizing: "border-box" }}
-                  >
-                    <option value="">None</option>
-                    {magicNeckOptionsFiltered.map((item: MagicItem) => (
-                      <option key={item.id} value={item.id}>{formatMagicItemOptionLabel(item)}</option>
-                    ))}
-                  </select>
-                </label>
-                <label style={{ fontSize: "0.88rem" }}>
-                  Filter magic main-hand weapon
-                  <input
-                    type="search"
-                    value={magicMainWeaponSearch}
-                    onChange={(e) => setMagicMainWeaponSearch(e.target.value)}
-                    placeholder="Name"
-                    style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem 0.45rem", borderRadius: "6px", border: "1px solid var(--panel-border)", boxSizing: "border-box" }}
-                  />
-                </label>
-                <label style={{ fontSize: "0.88rem" }}>
-                  Magic main-hand weapon
-                  <select
-                    value={build.magicItemIds?.mainWeapon || ""}
-                    onChange={(e) => setMagicItemSlot("mainWeapon", e.target.value || undefined)}
-                    style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem", borderRadius: "6px", border: "1px solid var(--panel-border)", boxSizing: "border-box" }}
-                  >
-                    <option value="">None</option>
-                    {magicMainWeaponOptionsFiltered.map((item: MagicItem) => (
-                      <option key={item.id} value={item.id}>{formatMagicItemOptionLabel(item)}</option>
-                    ))}
-                  </select>
-                </label>
-                <label style={{ fontSize: "0.88rem" }}>
-                  Filter magic off-hand weapon
-                  <input
-                    type="search"
-                    value={magicOffHandWeaponSearch}
-                    onChange={(e) => setMagicOffHandWeaponSearch(e.target.value)}
-                    placeholder="Name"
-                    style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem 0.45rem", borderRadius: "6px", border: "1px solid var(--panel-border)", boxSizing: "border-box" }}
-                  />
-                </label>
-                <label style={{ fontSize: "0.88rem" }}>
-                  Magic off-hand weapon
-                  <select
-                    value={build.magicItemIds?.offHandWeapon || ""}
-                    onChange={(e) => setMagicItemSlot("offHandWeapon", e.target.value || undefined)}
-                    style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem", borderRadius: "6px", border: "1px solid var(--panel-border)", boxSizing: "border-box" }}
-                  >
-                    <option value="">None</option>
-                    {magicOffHandWeaponOptionsFiltered.map((item: MagicItem) => (
-                      <option key={item.id} value={item.id}>{formatMagicItemOptionLabel(item)}</option>
-                    ))}
-                  </select>
-                </label>
-                <label style={{ fontSize: "0.88rem" }}>
-                  Filter magic implement
-                  <input
-                    type="search"
-                    value={magicImplementSearch}
-                    onChange={(e) => setMagicImplementSearch(e.target.value)}
-                    placeholder="Staff, orb, holy symbol"
-                    style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem 0.45rem", borderRadius: "6px", border: "1px solid var(--panel-border)", boxSizing: "border-box" }}
-                  />
-                </label>
-                <label style={{ fontSize: "0.88rem" }}>
-                  Magic implement
-                  <select
-                    value={build.magicItemIds?.implement || ""}
-                    onChange={(e) => setMagicItemSlot("implement", e.target.value || undefined)}
-                    style={{ width: "100%", marginTop: "0.2rem", padding: "0.35rem", borderRadius: "6px", border: "1px solid var(--panel-border)", boxSizing: "border-box" }}
-                  >
-                    <option value="">None</option>
-                    {magicImplementOptionsFiltered.map((item: MagicItem) => (
-                      <option key={item.id} value={item.id}>{formatMagicItemOptionLabel(item)}</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            </div>
-          </div>
+          <EquipmentTab index={index} build={build} onBuildChange={updateBuild} magicCombat={magicCombat} />
         )}
 
         {activeTab === "summary" && (

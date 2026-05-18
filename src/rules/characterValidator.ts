@@ -38,6 +38,7 @@ import { autoGrantedTrainedSkillIds } from "./grantedSkillsQuery";
 import { validateInternalGrantFeats } from "./internalGrantValidation";
 import { validateMulticlassFeats } from "./multiclassValidation";
 import { validateParagonMulticlassing } from "./paragonMulticlassing";
+import { equipmentDuplicateEnchantmentWarnings } from "./equipment";
 
 export { getClassPowersForLevelRange };
 
@@ -747,6 +748,8 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
       }
     }
   }
+
+  warnings.push(...equipmentDuplicateEnchantmentWarnings(build, index));
 
   return { errors, warnings, classSkillRules, powerSlotRules, classDefenseBonuses };
 }

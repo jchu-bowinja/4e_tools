@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { normalizeCharacterBuild } from "../../src/rules/equipment";
 import {
   aggregateMagicItemDefenseBonuses,
   computeMagicItemCombatBonuses,
@@ -55,9 +56,9 @@ const index: RulesIndex = {
 };
 
 describe("magicItemEquipment", () => {
-  it("aggregates AC from armor magic item statAdds", () => {
+  it("excludes enhancement-only statAdds when aggregating enchantment defenses", () => {
     const d = aggregateMagicItemDefenseBonuses([blackIron], 9);
-    expect(d.ac).toBe(2);
+    expect(d.ac).toBe(0);
   });
 
   it("computes per-slot weapon attack bonuses", () => {

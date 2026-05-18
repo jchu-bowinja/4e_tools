@@ -3,7 +3,7 @@ import type { CharacterLegality } from "./characterValidator";
 import { validateCharacterBuild } from "./characterValidator";
 import { computeHybridDerivedStats, parseHybridDefenseBonuses } from "./hybridDerivedStats";
 import { computeDerivedStats, type DerivedStats } from "./statCalculator";
-import { magicItemDefenseBonusesFromBuild } from "./magicItemEquipment";
+import { equipmentDefenseBonusesFromBuild } from "./equipment";
 import { aggregateSupportPassiveDefenseBonuses, aggregateSupportPassiveOtherBonuses } from "./supportStatAdds";
 
 export interface ComputeBuilderLikeDerivedStatsOptions {
@@ -29,7 +29,7 @@ export function computeBuilderLikeDerivedStats(
 ): DerivedStats {
   const supportPassiveDefense = aggregateSupportPassiveDefenseBonuses(index, build);
   const supportPassiveOther = aggregateSupportPassiveOtherBonuses(index, build);
-  const magicItemDefense = magicItemDefenseBonusesFromBuild(index, build);
+  const magicItemDefense = equipmentDefenseBonusesFromBuild(index, build);
 
   const hybridA =
     build.characterStyle === "hybrid" && build.hybridClassIdA
