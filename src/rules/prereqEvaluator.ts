@@ -1,14 +1,7 @@
 import { CharacterBuild, PrereqToken, RulesIndex, Tier, ValidationResult } from "./models";
 import {
-  characterClassFeatureNames,
-  characterFeatNames,
-  characterHasClassFeature,
-  characterHeritageLabels,
-  characterNegatedClassIds,
-  characterPowerNames,
-  characterPowerSourceLabels,
-  characterRacialTraitNames,
-  characterSupportIds
+  buildPrereqCharacterContext,
+  type PrereqCharacterContext
 } from "./prereqContext";
 
 function tierFromLevel(level: number): Tier {
@@ -26,6 +19,8 @@ export type PrereqEvaluateOptions = {
   additionalClassNamesForMatch?: string[];
   /** Rules index for class features, power sources, feats, etc. */
   index?: RulesIndex;
+  /** Precomputed character facts; avoids rebuilding for every feat when resolving feat lists. */
+  context?: PrereqCharacterContext;
 };
 
 /** Resolve PHB base class names for hybrid builds (for feat/theme prereqs). */
@@ -67,7 +62,7 @@ function evaluateOneToken(
   className: string | undefined,
   extraClasses: string[],
   trainedSkillNames: Set<string>,
-  index: RulesIndex | undefined
+  context: PrereqCharacterContext | undefined
 ): string[] {
   const reasons: string[] = [];
 
@@ -85,7 +80,7 @@ function evaluateOneToken(
         className,
         extraClasses,
         trainedSkillNames,
-        index
+        context
       )
     );
     if (!childReasons.some((r) => r.length === 0)) {
@@ -109,7 +104,7 @@ function evaluateOneToken(
           className,
           extraClasses,
           trainedSkillNames,
-          index
+          context
         )
       );
     }
@@ -161,18 +156,17 @@ function evaluateOneToken(
     return reasons;
   }
 
-  if (token.kind === "powerSourceAny" && typeof token.value === "string" && index) {
+  if (token.kind === "powerSourceAny" && typeof token.value === "string" && context) {
     const want = norm(token.value);
-    const sources = characterPowerSourceLabels(index, build);
-    const ok = [...sources].some((s) => s.includes(want) || want.includes(s));
+    const ok = [...context.powerSourceLabels].some((s) => s.includes(want) || want.includes(s));
     if (!ok) {
       reasons.push(`Requires any ${token.value} class`);
     }
     return reasons;
   }
 
-  if (token.kind === "classFeature" && typeof token.value === "string" && index) {
-    if (!characterHasClassFeature(index, build, token.value)) {
+  if (token.kind === "classFeature" && typeof token.value === "string" && context) {
+    if (!nameInSet(token.value, context.classFeatureNames)) {
       reasons.push(`Requires ${token.value} class feature`);
     }
     return reasons;
@@ -181,44 +175,44 @@ function evaluateOneToken(
   if (
     (token.kind === "power" || token.kind === "racialPower") &&
     typeof token.value === "string" &&
-    index
+    context
   ) {
-    if (!nameInSet(token.value, characterPowerNames(index, build))) {
+    if (!nameInSet(token.value, context.powerNames)) {
       reasons.push(`Requires ${token.value} power`);
     }
     return reasons;
   }
 
-  if (token.kind === "feat" && typeof token.value === "string" && index) {
-    if (!nameInSet(token.value, characterFeatNames(index, build))) {
+  if (token.kind === "feat" && typeof token.value === "string" && context) {
+    if (!nameInSet(token.value, context.featNames)) {
       reasons.push(`Requires ${token.value} feat`);
     }
     return reasons;
   }
 
-  if (token.kind === "racialTrait" && typeof token.value === "string" && index) {
-    if (!nameInSet(token.value, characterRacialTraitNames(index, build))) {
+  if (token.kind === "racialTrait" && typeof token.value === "string" && context) {
+    if (!nameInSet(token.value, context.racialTraitNames)) {
       reasons.push(`Requires ${token.value} racial trait`);
     }
     return reasons;
   }
 
-  if (token.kind === "heritage" && typeof token.value === "string" && index) {
-    if (!nameInSet(token.value, characterHeritageLabels(index, build))) {
+  if (token.kind === "heritage" && typeof token.value === "string" && context) {
+    if (!nameInSet(token.value, context.heritageLabels)) {
       reasons.push(`Requires ${token.value} heritage`);
     }
     return reasons;
   }
 
-  if (token.kind === "negatedClass" && typeof token.value === "string") {
-    if (characterNegatedClassIds(build).has(token.value)) {
+  if (token.kind === "negatedClass" && typeof token.value === "string" && context) {
+    if (context.negatedClassIds.has(token.value)) {
       reasons.push(`Not available for this class`);
     }
     return reasons;
   }
 
   if (token.kind === "size" && typeof token.value === "string") {
-    const race = index?.races.find((r) => r.id === build.raceId);
+    const race = options?.index?.races.find((r) => r.id === build.raceId);
     const size = race?.size ?? "";
     if (size && size.toLowerCase() !== token.value.toLowerCase()) {
       reasons.push(`Requires ${token.value} size`);
@@ -259,6 +253,8 @@ export function evaluatePrereqs(
     build.trainedSkillIds.map((id) => (skillNameById.get(id) || "").toLowerCase())
   );
   const index = options?.index;
+  const context =
+    options?.context ?? (index ? buildPrereqCharacterContext(index, build) : undefined);
 
   for (const token of prereqTokens) {
     reasons.push(
@@ -274,7 +270,7 @@ export function evaluatePrereqs(
         className,
         extraClasses,
         trainedSkillNames,
-        index
+        context
       )
     );
   }

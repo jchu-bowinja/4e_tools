@@ -63,12 +63,15 @@ function actionTypeSortKey(actionType: string): number {
   return ACTION_TYPE_ORDER.length;
 }
 
+/** Case-insensitive map key so "Standard action" and "Standard Action" share one section. */
 function actionTypeSectionKey(actionType: string): string {
-  return actionType.trim() || "__other__";
+  const normalized = actionType.trim().toLowerCase().replace(/\s+/g, " ");
+  return normalized || "__other__";
 }
 
-function actionTypeSectionTitle(actionType: string): string {
-  return actionType.trim() || "Other";
+function actionTypeSectionTitle(sectionKey: string): string {
+  if (sectionKey === "__other__") return "Other";
+  return sectionKey.replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 export function buildPowerDisplaySections(
@@ -101,11 +104,11 @@ export function buildPowerDisplaySections(
       const bType = bKey === "__other__" ? "" : bKey;
       const orderDiff = actionTypeSortKey(aType) - actionTypeSortKey(bType);
       if (orderDiff !== 0) return orderDiff;
-      return actionTypeSectionTitle(aType).localeCompare(actionTypeSectionTitle(bType));
+      return actionTypeSectionTitle(aKey).localeCompare(actionTypeSectionTitle(bKey));
     })
     .map(([key, powers]) => ({
       key,
-      title: actionTypeSectionTitle(key === "__other__" ? "" : key),
+      title: actionTypeSectionTitle(key),
       powers: sortPowerCards(powers),
       sectionKind: "actionType" as const
     }));

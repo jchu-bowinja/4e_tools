@@ -43,6 +43,21 @@ describe("buildPowerDisplaySections", () => {
     expect(sections[2]?.powers.map((p) => p.id)).toEqual(["enc_minor"]);
   });
 
+  it("merges action types that differ only by casing", () => {
+    const mixedCase: GroupedPowerCards = {
+      atWill: [
+        power("std_lower", "Lower", "At-Will", "Standard action"),
+        power("std_upper", "Upper", "At-Will", "Standard Action")
+      ],
+      encounter: [],
+      daily: []
+    };
+    const sections = buildPowerDisplaySections(mixedCase, "actionType");
+    expect(sections).toHaveLength(1);
+    expect(sections[0]?.title).toBe("Standard Action");
+    expect(sections[0]?.powers.map((p) => p.id).sort()).toEqual(["std_lower", "std_upper"]);
+  });
+
   it("puts powers without action type in Other", () => {
     const withOther: GroupedPowerCards = {
       ...grouped,

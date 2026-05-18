@@ -19,6 +19,39 @@ function featureNameMatches(want: string, have: string): boolean {
   return h.includes(w) || w.includes(h);
 }
 
+/** Cached character facts for prereq evaluation (build once per resolveFeatOptions pass). */
+export interface PrereqCharacterContext {
+  powerNames: Set<string>;
+  featNames: Set<string>;
+  racialTraitNames: Set<string>;
+  classFeatureNames: Set<string>;
+  heritageLabels: Set<string>;
+  powerSourceLabels: Set<string>;
+  negatedClassIds: Set<string>;
+}
+
+export function buildPrereqCharacterContext(index: RulesIndex, build: CharacterBuild): PrereqCharacterContext {
+  const featNames = characterFeatNames(index, build);
+  const heritageLabels = new Set<string>();
+  for (const name of featNames) {
+    heritageLabels.add(name);
+    for (const suffix of [" Heritage", " Bloodline"]) {
+      if (name.endsWith(suffix)) {
+        heritageLabels.add(name.slice(0, -suffix.length).trim());
+      }
+    }
+  }
+  return {
+    powerNames: characterPowerNames(index, build),
+    featNames,
+    racialTraitNames: characterRacialTraitNames(index, build),
+    classFeatureNames: characterClassFeatureNames(index, build),
+    heritageLabels,
+    powerSourceLabels: characterPowerSourceLabels(index, build),
+    negatedClassIds: characterNegatedClassIds(build)
+  };
+}
+
 export function characterSupportIds(index: RulesIndex, build: CharacterBuild): string[] {
   const ids: string[] = [];
   if (build.raceId) ids.push(build.raceId);
@@ -134,9 +167,10 @@ export function characterHasClassFeature(
 export function characterPowerNames(index: RulesIndex, build: CharacterBuild): Set<string> {
   const names = new Set<string>();
   const powerIds = collectCharacterPowerIdsForSelections(index, build);
+  const powerById = new Map(index.powers.map((power) => [power.id, power]));
   for (const id of powerIds) {
-    const p = index.powers.find((x) => x.id === id);
-    if (p?.name) names.add(p.name);
+    const power = powerById.get(id);
+    if (power?.name) names.add(power.name);
   }
   return names;
 }
