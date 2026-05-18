@@ -44,10 +44,9 @@ import {
   ID_RACIAL_TRAIT_BONUS_AT_WILL,
   ID_RACIAL_TRAIT_HEROIC_EFFORT,
   ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION,
-  parseFeatAssociatedPowerNames,
+  collectFeatGrantedPowersForBuild,
   racePowerGroupsForRace,
-  racePowerSelectSelectionKey,
-  resolvePowersByLooseNames
+  racePowerSelectSelectionKey
 } from "../../rules/grantedPowersQuery";
 import { evaluatePrereqs, hybridBaseClassNames } from "../../rules/prereqEvaluator";
 import { applyRacialBonuses, getAbilityLabel, parseRaceAbilityBonusInfo } from "../../rules/abilityScores";
@@ -61,6 +60,10 @@ import { SkillModifierNameContent, SkillModifierTable } from "../../ui/SkillModi
 import { StatScoreTable } from "../../ui/StatScoreTable";
 import { multiclassFeatIds } from "../../rules/multiclassDetection";
 import { pruneStalePowerSelections } from "../../rules/powerSelections";
+import {
+  collectFeatProficiencyDisplayRows,
+  collectFeatProficiencyGrants
+} from "../../rules/featProficiencies";
 import { summarizeImplementAttack, summarizeMainWeaponAttack } from "../../rules/weaponAttack";
 import { GlossaryTooltipRichText, RulesRichText } from "./RulesRichText";
 import { NEUTRAL_PAGE_BG } from "../../ui/tokens";
@@ -1065,6 +1068,14 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       .filter((x): x is string => typeof x === "string")
       .join("; ");
   }, [isHybridBuild, selectedHybridA, selectedHybridB, classSpecific]);
+  const featProficiencyGrants = useMemo(
+    () => collectFeatProficiencyGrants(index, build.featIds),
+    [index, build.featIds]
+  );
+  const featProficiencyDisplayRows = useMemo(
+    () => collectFeatProficiencyDisplayRows(index, build.featIds),
+    [index, build.featIds]
+  );
 
   const weaponsSorted = useMemo(
     () =>
@@ -1107,9 +1118,10 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         effectiveAbilityScores,
         selectedMainWeapon,
         classWeaponProfText,
-        magicItemAttackBonus
+        magicItemAttackBonus,
+        featProficiencyGrants
       ),
-    [build.level, effectiveAbilityScores, selectedMainWeapon, classWeaponProfText, magicItemAttackBonus]
+    [build.level, effectiveAbilityScores, selectedMainWeapon, classWeaponProfText, magicItemAttackBonus, featProficiencyGrants]
   );
   const offHandWeaponSummary = useMemo(
     () =>
@@ -1118,9 +1130,10 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         effectiveAbilityScores,
         selectedOffHandWeapon,
         classWeaponProfText,
-        magicItemAttackBonus
+        magicItemAttackBonus,
+        featProficiencyGrants
       ),
-    [build.level, effectiveAbilityScores, selectedOffHandWeapon, classWeaponProfText, magicItemAttackBonus]
+    [build.level, effectiveAbilityScores, selectedOffHandWeapon, classWeaponProfText, magicItemAttackBonus, featProficiencyGrants]
   );
   const implementAttackSummary = useMemo(
     () =>
@@ -1130,9 +1143,19 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         hybridBaseClassDefA || selectedClass,
         selectedImplement,
         classImplementProfText,
-        magicItemAttackBonus
+        magicItemAttackBonus,
+        featProficiencyGrants
       ),
-    [build.level, effectiveAbilityScores, hybridBaseClassDefA, selectedClass, selectedImplement, classImplementProfText, magicItemAttackBonus]
+    [
+      build.level,
+      effectiveAbilityScores,
+      hybridBaseClassDefA,
+      selectedClass,
+      selectedImplement,
+      classImplementProfText,
+      magicItemAttackBonus,
+      featProficiencyGrants
+    ]
   );
   const multiclassFeatIdList = useMemo(() => multiclassFeatIds(index, build), [index, build]);
 
@@ -1265,18 +1288,10 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     }
     return autoGrantedClassPowers(index, build.classId);
   }, [index, build.classId, isHybridBuild, hybridBaseClassAId, hybridBaseClassBId]);
-  const featAssociatedPowers = useMemo(() => {
-    const rows: Array<{ feat: Feat; powers: Power[] }> = [];
-    for (const id of build.featIds) {
-      const feat = index.feats.find((f) => f.id === id);
-      if (!feat) continue;
-      const names = parseFeatAssociatedPowerNames(feat);
-      if (names.length === 0) continue;
-      const powers = resolvePowersByLooseNames(index, names);
-      if (powers.length > 0) rows.push({ feat, powers });
-    }
-    return rows;
-  }, [index, build.featIds]);
+  const featAssociatedPowers = useMemo(
+    () => collectFeatGrantedPowersForBuild(index, build),
+    [index, build.featIds]
+  );
   const selectedClassSkillNamesLower = new Set((legality.classSkillRules?.classSkillNames || []).map((s) => s.toLowerCase()));
   const skillsSortedAll = useMemo(
     () => [...index.skills].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })),
@@ -1336,7 +1351,10 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   const maxAdditionalTrainedSkills = legality.classSkillRules?.chooseAdditionalCount ?? 0;
   const trainedSkillSelectionMaxed = trainedOptionalClassSkillCount >= maxAdditionalTrainedSkills;
   const hybridPrereqOptions = useMemo(
-    () => ({ additionalClassNamesForMatch: hybridBaseClassNames(index, build) }),
+    () => ({
+      index,
+      additionalClassNamesForMatch: hybridBaseClassNames(index, build)
+    }),
     [index, build.characterStyle, build.hybridClassIdA, build.hybridClassIdB]
   );
 
@@ -3460,6 +3478,25 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                           <div style={{ marginTop: "0.2rem" }}>
                             {powers.map((p) => renderPowerCardWithSelections(p, `${feat.id}-${p.id}`))}
                           </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {featProficiencyDisplayRows.length > 0 && (
+                  <div style={{ marginTop: "0.65rem" }}>
+                    <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "0.25rem" }}>
+                      Proficiencies from feats
+                    </div>
+                    <ul style={{ margin: 0, paddingLeft: "1.1rem", fontSize: "0.82rem", color: "var(--text-primary)" }}>
+                      {featProficiencyDisplayRows.map((row) => (
+                        <li key={row.featId} style={{ marginBottom: "0.35rem" }}>
+                          <span style={{ fontWeight: 600 }}>{row.featName}</span>
+                          <ul style={{ margin: "0.15rem 0 0 0", paddingLeft: "1rem", color: "var(--text-secondary)" }}>
+                            {row.grants.map((g, i) => (
+                              <li key={i}>{g}</li>
+                            ))}
+                          </ul>
                         </li>
                       ))}
                     </ul>

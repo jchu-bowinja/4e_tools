@@ -1,4 +1,4 @@
-import type { ClassDef, ClassFeature, EpicDestiny, HybridClassDef, ParagonPath, RulesIndex, Theme } from "./models";
+import type { ClassDef, ClassFeature, EpicDestiny, Feat, HybridClassDef, ParagonPath, RacialTrait, RulesIndex, Theme } from "./models";
 
 export interface TraitDisplayRow {
   id: string;
@@ -45,7 +45,7 @@ export function traitDescriptionForDisplay(feature: ClassFeature): string | unde
   return `${oneLine.slice(0, TRAIT_BODY_FALLBACK_MAX_LEN - 1)}…`;
 }
 
-function specOf(entity: { raw: Record<string, unknown> } | undefined): Record<string, unknown> | undefined {
+export function specOf(entity: { raw: Record<string, unknown> } | undefined): Record<string, unknown> | undefined {
   return entity?.raw?.specific as Record<string, unknown> | undefined;
 }
 
@@ -183,4 +183,50 @@ export function getEpicDestinyTraitRows(
     includeLevelInName: true,
     maxLevel: characterLevel
   });
+}
+
+/** Class features and racial traits granted by selected feats (`rules.grant` via ETL). */
+export function getFeatGrantedTraitRows(index: RulesIndex, featIds: string[]): TraitDisplayRow[] {
+  const { byId: cfById } = buildClassFeatureLookups(index);
+  const racialById = new Map((index.racialTraits ?? []).map((t) => [t.id, t]));
+  const rows: TraitDisplayRow[] = [];
+  const seen = new Set<string>();
+
+  const pushFeature = (feature: ClassFeature | undefined, labelPrefix?: string) => {
+    if (!feature || seen.has(feature.id)) return;
+    seen.add(feature.id);
+    rows.push({
+      id: feature.id,
+      name: labelPrefix ? `${labelPrefix}: ${feature.name}` : feature.name,
+      shortDescription: traitDescriptionForDisplay(feature)
+    });
+  };
+
+  const pushRacialTrait = (trait: RacialTrait | undefined, labelPrefix?: string) => {
+    if (!trait || seen.has(trait.id)) return;
+    seen.add(trait.id);
+    const short =
+      typeof trait.shortDescription === "string" && trait.shortDescription.trim()
+        ? trait.shortDescription.trim()
+        : undefined;
+    rows.push({
+      id: trait.id,
+      name: labelPrefix ? `${labelPrefix}: ${trait.name}` : trait.name,
+      shortDescription: short
+    });
+  };
+
+  for (const fid of featIds) {
+    const feat: Feat | undefined = index.feats.find((f) => f.id === fid);
+    if (!feat) continue;
+    const prefix = feat.name;
+    for (const cfId of feat.grantedClassFeatureIds ?? []) {
+      pushFeature(cfById.get(cfId), prefix);
+    }
+    for (const rtId of feat.grantedRacialTraitIds ?? []) {
+      pushRacialTrait(racialById.get(rtId), prefix);
+    }
+  }
+
+  return rows;
 }
