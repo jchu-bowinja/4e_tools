@@ -8,6 +8,7 @@
     "build": "vite build && node tools/copy-generated-to-dist.mjs",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:perf": "vitest run tests/perf",
     "etl:rules": "python tools/etl/build_rules_index.py",
     "etl:monsters": "python tools/etl/build_monster_index.py",
     "etl:parse-template-paste": "python tools/etl/parse_pasted_monster_template_cli.py"
