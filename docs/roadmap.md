@@ -37,3 +37,5 @@ The final product will be a fully integrated suite of 4th Edition Dungeons and D
 ### 1.  Session hosting
         - Local webserver to host session
         - Integratation for DM to character sheets to encounter tracker
+
+### 2. Integrated VTT

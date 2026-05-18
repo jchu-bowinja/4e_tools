@@ -2493,8 +2493,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             <div className="character-sheet-overview-row character-sheet-overview-row--page-break" style={overviewThreeColumnGridStyle}>
             <div style={overviewSideColumnStyle}>
               <div style={{ display: "grid", gap: "0.45rem", alignContent: "start" }}>
-                {renderSpeedInitiativePanel()}
                 {renderDefensesPanel()}
+                {renderSpeedInitiativePanel()}
                 {renderAttackPreviewPanel()}
               </div>
             </div>
