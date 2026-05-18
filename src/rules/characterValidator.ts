@@ -22,6 +22,7 @@ import {
   validateArmorProficiencyForSelection,
   validateShieldProficiencyForSelection
 } from "./featProficiencies";
+import { resolveEffectiveEquipmentIds } from "./equipment";
 import { isProficientWithImplement, isProficientWithWeapon } from "./weaponAttack";
 import { mergeHybridProficiencyLines, parseHybridDefenseBonuses } from "./hybridDerivedStats";
 import { parseClassDefenseBonusesFromClassDef } from "./parseClassDefenseBonuses";
@@ -313,8 +314,9 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
       errors.push(`Trained skills must come from class skills list: ${offListNames.join(", ")}.`);
     }
 
-    const selectedArmor = index.armors.find((a) => a.id === build.armorId);
-    const selectedShield = index.armors.find((a) => a.id === build.shieldId);
+    const equipmentIds = resolveEffectiveEquipmentIds(build, index);
+    const selectedArmor = index.armors.find((a) => a.id === equipmentIds.armorId);
+    const selectedShield = index.armors.find((a) => a.id === equipmentIds.shieldId);
     const featProficiencyGrants = collectFeatProficiencyGrants(index, build.featIds);
     const legacyFeatNames = legacyFeatNamesSet(index, build);
 
@@ -330,8 +332,8 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
     const weaponProfText = String(specific["Weapon Proficiencies"] || "");
     const implementSupportText = [specific["Implements"], specific["Implement"]].filter((x) => typeof x === "string").join("; ");
 
-    if (build.mainWeaponId) {
-      const mw = weaponsIndex.find((w) => w.id === build.mainWeaponId);
+    if (equipmentIds.mainWeaponId) {
+      const mw = weaponsIndex.find((w) => w.id === equipmentIds.mainWeaponId);
       if (!mw) {
         errors.push("Selected main weapon is not in the rules index.");
       } else if (!isProficientWithWeapon(mw, weaponProfText, featProficiencyGrants)) {
@@ -340,8 +342,8 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
         );
       }
     }
-    if (build.offHandWeaponId) {
-      const ow = weaponsIndex.find((w) => w.id === build.offHandWeaponId);
+    if (equipmentIds.offHandWeaponId) {
+      const ow = weaponsIndex.find((w) => w.id === equipmentIds.offHandWeaponId);
       if (!ow) {
         errors.push("Selected off-hand weapon is not in the rules index.");
       } else if (!isProficientWithWeapon(ow, weaponProfText, featProficiencyGrants)) {
@@ -350,8 +352,8 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
         );
       }
     }
-    if (build.implementId) {
-      const imp = implementsIndex.find((x) => x.id === build.implementId);
+    if (equipmentIds.implementId) {
+      const imp = implementsIndex.find((x) => x.id === equipmentIds.implementId);
       if (!imp) {
         errors.push("Selected implement is not in the rules index.");
       } else if (!isProficientWithImplement(imp, implementSupportText, featProficiencyGrants)) {
@@ -541,8 +543,9 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
     const featProficiencyGrantsHy = collectFeatProficiencyGrants(index, build.featIds);
     const legacyFeatNamesHy = legacyFeatNamesSet(index, build);
 
-    const selectedArmorHy = index.armors.find((a) => a.id === build.armorId);
-    const selectedShieldHy = index.armors.find((a) => a.id === build.shieldId);
+    const equipmentIdsHy = resolveEffectiveEquipmentIds(build, index);
+    const selectedArmorHy = index.armors.find((a) => a.id === equipmentIdsHy.armorId);
+    const selectedShieldHy = index.armors.find((a) => a.id === equipmentIdsHy.shieldId);
 
     errors.push(
       ...validateArmorProficiencyForSelection(
@@ -566,8 +569,8 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
     const weaponProfTextHy = mergedProf.weaponLine;
     const implementSupportTextHy = mergedProf.implementLine;
 
-    if (build.mainWeaponId) {
-      const mw = weaponsIndex.find((w) => w.id === build.mainWeaponId);
+    if (equipmentIdsHy.mainWeaponId) {
+      const mw = weaponsIndex.find((w) => w.id === equipmentIdsHy.mainWeaponId);
       if (!mw) {
         errors.push("Selected main weapon is not in the rules index.");
       } else if (!isProficientWithWeapon(mw, weaponProfTextHy, featProficiencyGrantsHy)) {
@@ -576,8 +579,8 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
         );
       }
     }
-    if (build.offHandWeaponId) {
-      const ow = weaponsIndex.find((w) => w.id === build.offHandWeaponId);
+    if (equipmentIdsHy.offHandWeaponId) {
+      const ow = weaponsIndex.find((w) => w.id === equipmentIdsHy.offHandWeaponId);
       if (!ow) {
         errors.push("Selected off-hand weapon is not in the rules index.");
       } else if (!isProficientWithWeapon(ow, weaponProfTextHy, featProficiencyGrantsHy)) {
@@ -586,8 +589,8 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
         );
       }
     }
-    if (build.implementId) {
-      const imp = implementsIndex.find((x) => x.id === build.implementId);
+    if (equipmentIdsHy.implementId) {
+      const imp = implementsIndex.find((x) => x.id === equipmentIdsHy.implementId);
       if (!imp) {
         errors.push("Selected implement is not in the rules index.");
       } else if (!isProficientWithImplement(imp, implementSupportTextHy, featProficiencyGrantsHy)) {

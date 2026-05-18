@@ -70,6 +70,7 @@ import {
   sheetWeaponProficiencyText,
   toBuildLikeState
 } from "./selectors";
+import { characterEquipmentSummaryRows } from "./sheetEquipment";
 import { loadCharacterSheetState, saveCharacterSheetState } from "./storage";
 import { resolveUiGlossaryHoverPlainText, termHasPowerKeywordTooltipBody } from "../../data/glossaryHoverResolve";
 import { positionFixedTooltip } from "../../ui/glossaryTooltipPosition";
@@ -1011,13 +1012,12 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     [index, sheet, derived.cls]
   );
   const magicCombat = useMemo(() => {
-    const buildLike = toBuildLikeState(sheet);
-    return computeMagicItemCombatBonuses(index, {
-      ...buildLike,
-      level: sheet.level,
-      abilityScores: sheet.abilityScores
-    });
+    return computeMagicItemCombatBonuses(index, toBuildLikeState(sheet, index));
   }, [index, sheet]);
+  const equipmentSummaryRows = useMemo(
+    () => characterEquipmentSummaryRows(sheet, index),
+    [sheet, index]
+  );
   const mainWeaponSummary = useMemo(
     () =>
       summarizeMainWeaponAttack(
@@ -3002,6 +3002,30 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
 
           <div style={panelStyle}>
             <div style={{ fontWeight: 700, marginBottom: "0.5rem" }}>Equipment</div>
+            {equipmentSummaryRows.length > 0 && (
+              <div
+                style={{
+                  marginBottom: "0.65rem",
+                  padding: "0.5rem 0.6rem",
+                  borderRadius: "6px",
+                  border: "1px solid var(--panel-border)",
+                  backgroundColor: "var(--surface-1)",
+                  fontSize: "0.85rem"
+                }}
+              >
+                <div style={{ fontWeight: 600, marginBottom: "0.35rem", color: "var(--text-secondary)" }}>
+                  From builder (base / enchantment / plus)
+                </div>
+                <div style={{ display: "grid", gap: "0.2rem" }}>
+                  {equipmentSummaryRows.map((row) => (
+                    <div key={row.slotLabel} style={{ display: "flex", gap: "0.5rem" }}>
+                      <span style={{ fontWeight: 600, minWidth: "5.5rem" }}>{row.slotLabel}</span>
+                      <span>{row.detail}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.5rem" }}>
               {(["armor", "shield", "mainHand", "offHand", "implement"] as const).map((slot) => {
                 const equippedId = sheet.equipment[slot];

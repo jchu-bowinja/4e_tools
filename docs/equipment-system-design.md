@@ -262,8 +262,8 @@ Remove duplicate magic-only dropdown block from Equipment tab.
 1. **Types + migration** — `CharacterEquipment`, `normalizeCharacterBuild`, tests for migration examples. ✅ Done (`src/rules/equipment.ts`, `tests/rules/equipment.test.ts`).
 2. **Rules** — `computeEquipmentCombatBonuses` in `equipment.ts` (layer 2 plus + layer 3 enchantment `statAdds` with enhancement filtering); `magicItemEquipment` delegates; duplicate-hand warning in validator. ✅ Done.
 3. **Builder UI** — `EquipmentTab` three-step sections per slot; removed dual mundane/magic lists; no level filter on enchantments. ✅ Done.
-4. **Sheet + storage** — `CharacterSheetState.equipment`, sync from builder.
-5. **Cleanup** — remove `armorId` / `magicItemIds` from public API; update tests.
+4. **Sheet + storage** — `characterEquipment` on sheet state, `sheetStateFromBuild` / `toBuildLikeState` sync, inventory labels. ✅ Done.
+5. **Cleanup** — remove `armorId` / `magicItemIds` from public API; update tests. ✅ Done (`CharacterBuild` uses `equipment` only; `LegacyCharacterBuildInput` for import migration; sheet storage migrates old `magicItemIds`).
 
 ## Decisions log
 

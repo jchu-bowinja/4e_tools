@@ -69,7 +69,11 @@ describe("magicItemEquipment", () => {
       trainedSkillIds: [],
       featIds: [],
       powerIds: [],
-      magicItemIds: { armor: blackIron.id, mainWeapon: longswordPlus3.id }
+      equipment: {
+        armor: { enchantmentId: blackIron.id, enhancement: 2 },
+        mainHand: { enchantmentId: longswordPlus3.id, enhancement: 3 },
+        neck: { enhancement: 0 }
+      }
     };
     const bonuses = computeMagicItemCombatBonuses(index, build);
     expect(bonuses.defenses.ac).toBe(2);

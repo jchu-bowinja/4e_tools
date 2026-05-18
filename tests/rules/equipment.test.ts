@@ -4,11 +4,11 @@ import {
   defaultEnhancementFromMagicItem,
   enchantmentDefenseBonusesFromItem,
   equipmentDuplicateEnchantmentWarnings,
-  legacyFieldsFromEquipment,
   migrateLegacyEquipment,
   normalizeCharacterBuild,
   normalizeCharacterEquipment,
-  parseEnhancementLevel
+  parseEnhancementLevel,
+  type LegacyCharacterBuildInput
 } from "../../src/rules/equipment";
 import { computeDerivedStats } from "../../src/rules/statCalculator";
 import type { CharacterBuild, ClassDef, MagicItem, Race, RulesIndex } from "../../src/rules/models";
@@ -54,6 +54,18 @@ const index: RulesIndex = {
   magicItems: [blackIron, cloak]
 };
 
+function legacyBuild(extra: LegacyCharacterBuildInput): CharacterBuild & LegacyCharacterBuildInput {
+  return {
+    name: "Hero",
+    level: 9,
+    abilityScores: { STR: 10, CON: 10, DEX: 10, INT: 10, WIS: 10, CHA: 10 },
+    trainedSkillIds: [],
+    featIds: [],
+    powerIds: [],
+    ...extra
+  };
+}
+
 describe("equipment phase 1", () => {
   it("parses enhancement levels 0-6", () => {
     expect(parseEnhancementLevel(3)).toBe(3);
@@ -80,18 +92,14 @@ describe("equipment phase 1", () => {
   });
 
   it("migrates legacy flat ids to equipment", () => {
-    const legacy: CharacterBuild = {
-      name: "Hero",
-      level: 9,
-      abilityScores: { STR: 10, CON: 10, DEX: 10, INT: 10, WIS: 10, CHA: 10 },
-      trainedSkillIds: [],
-      featIds: [],
-      powerIds: [],
-      armorId: "ID_ARMOR_1",
-      mainWeaponId: "ID_WEAPON_1",
-      magicItemIds: { armor: blackIron.id, neck: cloak.id }
-    };
-    const equipment = migrateLegacyEquipment(legacy, index);
+    const equipment = migrateLegacyEquipment(
+      legacyBuild({
+        armorId: "ID_ARMOR_1",
+        mainWeaponId: "ID_WEAPON_1",
+        magicItemIds: { armor: blackIron.id, neck: cloak.id }
+      }),
+      index
+    );
     expect(equipment.armor?.baseId).toBe("ID_ARMOR_1");
     expect(equipment.armor?.enchantmentId).toBe(blackIron.id);
     expect(equipment.armor?.enhancement).toBe(2);
@@ -100,56 +108,37 @@ describe("equipment phase 1", () => {
     expect(equipment.neck?.enhancement).toBe(1);
   });
 
-  it("normalizeCharacterBuild syncs legacy fields from equipment", () => {
-    const legacy: CharacterBuild = {
-      name: "Hero",
-      level: 5,
-      abilityScores: { STR: 10, CON: 10, DEX: 10, INT: 10, WIS: 10, CHA: 10 },
-      trainedSkillIds: [],
-      featIds: [],
-      powerIds: [],
-      armorId: "ID_ARMOR_1",
-      implementId: "ID_IMP_1",
-      magicItemIds: { implement: "ID_MAGIC_IMP" }
-    };
-    const normalized = normalizeCharacterBuild(legacy, index);
+  it("normalizeCharacterBuild migrates legacy JSON and strips flat ids", () => {
+    const normalized = normalizeCharacterBuild(
+      legacyBuild({
+        level: 5,
+        armorId: "ID_ARMOR_1",
+        implementId: "ID_IMP_1",
+        magicItemIds: { implement: "ID_MAGIC_IMP" }
+      }),
+      index
+    );
     expect(normalized.equipment?.armor?.baseId).toBe("ID_ARMOR_1");
-    expect(normalized.armorId).toBe("ID_ARMOR_1");
     expect(normalized.equipment?.implement?.superiorImplementId).toBe("ID_IMP_1");
-    expect(normalized.implementId).toBe("ID_IMP_1");
     expect(normalized.equipment?.neck).toEqual({ enhancement: 0 });
+    expect("armorId" in normalized).toBe(false);
+    expect("magicItemIds" in normalized).toBe(false);
   });
 
-  it("legacyFieldsFromEquipment round-trips slot ids", () => {
-    const equipment = normalizeCharacterEquipment({
-      armor: { baseId: "A1", enchantmentId: "M1", enhancement: 2 },
-      mainHand: { baseId: "W1" },
-      neck: { enhancement: 0 }
-    });
-    expect(legacyFieldsFromEquipment(equipment)).toEqual({
-      armorId: "A1",
-      mainWeaponId: "W1",
-      magicItemIds: { armor: "M1" }
-    });
-  });
-
-  it("preserves explicit equipment without re-migrating from stale legacy", () => {
-    const build: CharacterBuild = {
-      name: "Hero",
-      level: 1,
-      abilityScores: { STR: 10, CON: 10, DEX: 10, INT: 10, WIS: 10, CHA: 10 },
-      trainedSkillIds: [],
-      featIds: [],
-      powerIds: [],
-      armorId: "STALE_ARMOR",
-      equipment: {
-        armor: { baseId: "NEW_ARMOR", enhancement: 0 },
-        neck: { enhancement: 0 }
-      }
-    };
-    const normalized = normalizeCharacterBuild(build, index);
+  it("preserves explicit equipment and drops stale legacy flat ids", () => {
+    const normalized = normalizeCharacterBuild(
+      legacyBuild({
+        level: 1,
+        armorId: "STALE_ARMOR",
+        equipment: {
+          armor: { baseId: "NEW_ARMOR", enhancement: 0 },
+          neck: { enhancement: 0 }
+        }
+      }),
+      index
+    );
     expect(normalized.equipment?.armor?.baseId).toBe("NEW_ARMOR");
-    expect(normalized.armorId).toBe("NEW_ARMOR");
+    expect("armorId" in normalized).toBe(false);
   });
 });
 
@@ -242,15 +231,11 @@ describe("equipment phase 2 combat bonuses", () => {
   });
 
   it("migrates legacy magicItemIds into equipment combat bonuses", () => {
-    const build: CharacterBuild = {
-      name: "Hero",
+    const build = legacyBuild({
       level: 9,
       abilityScores: { STR: 16, CON: 14, DEX: 12, INT: 10, WIS: 10, CHA: 8 },
-      trainedSkillIds: [],
-      featIds: [],
-      powerIds: [],
       magicItemIds: { armor: blackIron.id, neck: cloak.id }
-    };
+    });
     const bonuses = computeEquipmentCombatBonuses(index, build);
     expect(bonuses.defenses.ac).toBe(2);
     expect(bonuses.defenses.fortitude).toBe(1);

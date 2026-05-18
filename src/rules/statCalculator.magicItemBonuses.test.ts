@@ -62,7 +62,7 @@ describe("computeDerivedStats equipped magic items", () => {
     };
     const withNeck: CharacterBuild = {
       ...baseBuild,
-      magicItemIds: { neck: cloak.id }
+      equipment: { neck: { enchantmentId: cloak.id, enhancement: 1 } }
     };
     const magicDefense = computeMagicItemCombatBonuses(index, withNeck).defenses;
     const baseline = computeDerivedStats(baseBuild, race, cls, undefined, undefined);

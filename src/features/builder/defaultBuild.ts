@@ -13,8 +13,7 @@ export const defaultBuild: CharacterBuild = {
     CHA: 10
   },
   racialAbilityChoice: undefined,
-  armorId: undefined,
-  shieldId: undefined,
+  equipment: { neck: { enhancement: 0 } },
   trainedSkillIds: [],
   featIds: [],
   powerIds: []

@@ -437,20 +437,8 @@ export interface CharacterBuild {
   /** Paragon-tier power picks from the multiclass class when `paragonMulticlassing` is true. */
   paragonMulticlassPowers?: ParagonMulticlassPowers;
   epicDestinyId?: string;
-  /** Unified equipment per slot (base → enchantment → plus). Preferred after phase 1. */
+  /** Unified equipment per slot (base → enchantment → plus). */
   equipment?: CharacterEquipment;
-  /** @deprecated Use `equipment.armor.baseId`. Kept in sync by `normalizeCharacterBuild`. */
-  armorId?: string;
-  /** @deprecated Use `equipment.shield.baseId`. */
-  shieldId?: string;
-  /** @deprecated Use `equipment.mainHand.baseId`. */
-  mainWeaponId?: string;
-  /** @deprecated Use `equipment.offHand.baseId`. */
-  offHandWeaponId?: string;
-  /** @deprecated Use `equipment.implement.superiorImplementId`. */
-  implementId?: string;
-  /** @deprecated Use `equipment.*.enchantmentId`. */
-  magicItemIds?: MagicItemSlotIds;
   abilityScores: Record<Ability, number>;
   /** Point-buy / starting base only; level bumps live in `asiChoices` and automatic 11/21 bonuses. */
   asiChoices?: AsiChoices;

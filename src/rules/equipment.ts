@@ -73,13 +73,24 @@ export function resolveEffectiveEquipmentIds(
 } {
   const equipment = resolveEquipmentForBuild(build, index);
   return {
-    armorId: equipment.armor?.baseId ?? build.armorId,
-    shieldId: equipment.shield?.baseId ?? build.shieldId,
-    mainWeaponId: equipment.mainHand?.baseId ?? build.mainWeaponId,
-    offHandWeaponId: equipment.offHand?.baseId ?? build.offHandWeaponId,
-    implementId: equipment.implement?.superiorImplementId ?? build.implementId
+    armorId: equipment.armor?.baseId,
+    shieldId: equipment.shield?.baseId,
+    mainWeaponId: equipment.mainHand?.baseId,
+    offHandWeaponId: equipment.offHand?.baseId,
+    implementId: equipment.implement?.superiorImplementId
   };
 }
+
+/** Legacy flat ids on stored JSON before migration; stripped by `normalizeCharacterBuild`. */
+export type LegacyCharacterBuildInput = {
+  armorId?: string;
+  shieldId?: string;
+  mainWeaponId?: string;
+  offHandWeaponId?: string;
+  implementId?: string;
+  magicItemIds?: MagicItemSlotIds;
+  magicItemBonuses?: unknown;
+};
 
 export function isEnhancementOnlyStatAdd(entry: StatAddEntry): boolean {
   const type = String(entry.type || "").toLowerCase();
@@ -262,7 +273,10 @@ function slotFromLegacy(
   return out;
 }
 
-export function migrateLegacyEquipment(build: CharacterBuild, index?: RulesIndex): CharacterEquipment {
+export function migrateLegacyEquipment(
+  build: CharacterBuild & LegacyCharacterBuildInput,
+  index?: RulesIndex
+): CharacterEquipment {
   const magic = build.magicItemIds;
   const armor = slotFromLegacy(build.armorId, magic?.armor, index);
   const shield = slotFromLegacy(build.shieldId, undefined, index);
@@ -300,56 +314,29 @@ export function migrateLegacyEquipment(build: CharacterBuild, index?: RulesIndex
   });
 }
 
-/** Sync legacy flat ids from `equipment` so existing readers keep working until phase 2. */
-export function legacyFieldsFromEquipment(equipment: CharacterEquipment | undefined): {
-  armorId?: string;
-  shieldId?: string;
-  mainWeaponId?: string;
-  offHandWeaponId?: string;
-  implementId?: string;
-  magicItemIds?: MagicItemSlotIds;
-} {
-  if (!equipment) return {};
-  const magicItemIds: MagicItemSlotIds = {};
-  if (equipment.armor?.enchantmentId) magicItemIds.armor = equipment.armor.enchantmentId;
-  if (equipment.mainHand?.enchantmentId) magicItemIds.mainWeapon = equipment.mainHand.enchantmentId;
-  if (equipment.offHand?.enchantmentId) magicItemIds.offHandWeapon = equipment.offHand.enchantmentId;
-  if (equipment.implement?.enchantmentId) magicItemIds.implement = equipment.implement.enchantmentId;
-  if (equipment.neck?.enchantmentId) magicItemIds.neck = equipment.neck.enchantmentId;
-
-  const out: {
-    armorId?: string;
-    shieldId?: string;
-    mainWeaponId?: string;
-    offHandWeaponId?: string;
-    implementId?: string;
-    magicItemIds?: MagicItemSlotIds;
-  } = {};
-  if (equipment.armor?.baseId) out.armorId = equipment.armor.baseId;
-  if (equipment.shield?.baseId) out.shieldId = equipment.shield.baseId;
-  if (equipment.mainHand?.baseId) out.mainWeaponId = equipment.mainHand.baseId;
-  if (equipment.offHand?.baseId) out.offHandWeaponId = equipment.offHand.baseId;
-  if (equipment.implement?.superiorImplementId) out.implementId = equipment.implement.superiorImplementId;
-  if (Object.keys(magicItemIds).length > 0) out.magicItemIds = magicItemIds;
-  return out;
-}
-
-export function normalizeCharacterBuild(build: CharacterBuild, index?: RulesIndex): CharacterBuild {
+export function normalizeCharacterBuild(
+  build: CharacterBuild & LegacyCharacterBuildInput,
+  index?: RulesIndex
+): CharacterBuild {
   const stripped = stripLegacyMagicItemBonuses(build);
   const equipment =
     stripped.equipment !== undefined
       ? normalizeCharacterEquipment(stripped.equipment)
       : migrateLegacyEquipment(stripped, index);
-  const legacy = legacyFieldsFromEquipment(equipment);
+
+  const {
+    armorId: _armorId,
+    shieldId: _shieldId,
+    mainWeaponId: _mainWeaponId,
+    offHandWeaponId: _offHandWeaponId,
+    implementId: _implementId,
+    magicItemIds: _magicItemIds,
+    magicItemBonuses: _magicItemBonuses,
+    ...rest
+  } = stripped;
 
   return {
-    ...stripped,
-    equipment,
-    armorId: legacy.armorId,
-    shieldId: legacy.shieldId,
-    mainWeaponId: legacy.mainWeaponId,
-    offHandWeaponId: legacy.offHandWeaponId,
-    implementId: legacy.implementId,
-    magicItemIds: legacy.magicItemIds
+    ...rest,
+    equipment
   };
 }

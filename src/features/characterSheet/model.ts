@@ -1,4 +1,4 @@
-import type { Ability, CharacterStyle, MagicItemSlotIds } from "../../rules/models";
+import type { Ability, CharacterEquipment, CharacterStyle } from "../../rules/models";
 
 export type AbilityScores = Record<Ability, number>;
 
@@ -75,8 +75,8 @@ export interface CharacterSheetState {
   themeId?: string;
   paragonPathId?: string;
   epicDestinyId?: string;
-  /** Equipped magic items (bonuses derived from compendium data). */
-  magicItemIds?: MagicItemSlotIds;
+  /** Builder-aligned equipment (base, enchantment, plus per slot). Drives derived combat bonuses. */
+  characterEquipment?: CharacterEquipment;
   abilityScores: AbilityScores;
   trainedSkillIds: string[];
   featIds?: string[];

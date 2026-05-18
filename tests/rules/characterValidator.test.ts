@@ -126,7 +126,7 @@ const legalLevel1Base = {
   classId: "class1",
   abilityScores: { STR: 16, CON: 14, DEX: 12, INT: 10, WIS: 11, CHA: 8 },
   trainedSkillIds: ["s1", "s2", "s3"],
-  armorId: "a1",
+  equipment: { armor: { baseId: "a1", enhancement: 0 }, neck: { enhancement: 0 } },
   featIds: ["feat1"],
   powerIds: ["p1", "p2", "p3", "p4"],
   classPowerSlots: {
@@ -433,7 +433,7 @@ describe("validateCharacterBuild", () => {
       classId: undefined,
       abilityScores: { STR: 16, CON: 14, DEX: 12, INT: 10, WIS: 11, CHA: 8 },
       trainedSkillIds: ["s1", "s2", "s3", "s4"],
-      armorId: "a1",
+      equipment: { armor: { baseId: "a1", enhancement: 0 }, neck: { enhancement: 0 } },
       featIds: ["feat1"],
       powerIds: ["p1", "pw2_aw", "p3", "p4"],
       classPowerSlots: {
@@ -512,7 +512,7 @@ describe("validateCharacterBuild", () => {
       classId: undefined,
       abilityScores: { STR: 16, CON: 14, DEX: 12, INT: 10, WIS: 11, CHA: 8 },
       trainedSkillIds: ["s1", "s2", "s3", "s4"],
-      armorId: "a1",
+      equipment: { armor: { baseId: "a1", enhancement: 0 }, neck: { enhancement: 0 } },
       featIds: ["feat1"],
       powerIds: ["p1", "pw2_aw", "p3", "p4"],
       classPowerSlots: {
@@ -611,7 +611,7 @@ describe("validateCharacterBuild", () => {
       classId: undefined,
       abilityScores: { STR: 16, CON: 14, DEX: 12, INT: 10, WIS: 11, CHA: 8 },
       trainedSkillIds: ["s1", "s2", "s3", "s4"],
-      armorId: "a1",
+      equipment: { armor: { baseId: "a1", enhancement: 0 }, neck: { enhancement: 0 } },
       featIds: ["feat1"],
       powerIds: ["p1", "pw2_aw", "p3", "p4"],
       classPowerSlots: {

@@ -11,13 +11,12 @@ import type { AcBreakdown } from "../../rules/defenseCalculator";
 import type { StatScoreBreakdown } from "../../rules/statScoreBreakdown";
 import { mergeHybridProficiencyLines } from "../../rules/hybridDerivedStats";
 import type { PassiveOtherBonuses } from "../../rules/supportStatAdds";
-import { findMagicItem } from "../../rules/magicItemEquipment";
+import { normalizeCharacterBuild, normalizeCharacterEquipment } from "../../rules/equipment";
 import type {
   Armor,
   CharacterBuild,
   ClassDef,
   Implement,
-  MagicItem,
   Power,
   Race,
   RacialTrait,
@@ -25,6 +24,11 @@ import type {
   Weapon
 } from "../../rules/models";
 import type { CharacterSheetState, EquipmentSlot, InventoryItem } from "./model";
+import {
+  buildLikeStateFromSheet,
+  inventoryAndSlotsFromCharacterEquipment,
+  sheetCharacterEquipment
+} from "./sheetEquipment";
 
 export interface SheetDerivedData {
   race?: Race;
@@ -84,24 +88,8 @@ export function canEquipItem(item: InventoryItem, slot: EquipmentSlot): boolean 
   return item.quantity > 0 && item.slotHints.includes(slot);
 }
 
-export function toBuildLikeState(state: CharacterSheetState): CharacterBuild {
-  return {
-    name: state.name,
-    level: state.level,
-    raceId: state.raceId,
-    classId: state.classId,
-    characterStyle: state.characterStyle,
-    hybridClassIdA: state.hybridClassIdA,
-    hybridClassIdB: state.hybridClassIdB,
-    themeId: state.themeId,
-    paragonPathId: state.paragonPathId,
-    epicDestinyId: state.epicDestinyId,
-    magicItemIds: state.magicItemIds ? { ...state.magicItemIds } : undefined,
-    abilityScores: state.abilityScores,
-    trainedSkillIds: state.trainedSkillIds,
-    featIds: state.featIds ?? [],
-    powerIds: state.powers.selectedPowerIds
-  };
+export function toBuildLikeState(state: CharacterSheetState, index: RulesIndex): CharacterBuild {
+  return normalizeCharacterBuild(buildLikeStateFromSheet(state, index), index);
 }
 
 export function computeSheetDerivedData(state: CharacterSheetState, index: RulesIndex): SheetDerivedData {
@@ -120,7 +108,7 @@ export function computeSheetDerivedData(state: CharacterSheetState, index: Rules
     (item) => String(item.armorType || "").toLowerCase().includes("shield")
   );
 
-  const build = toBuildLikeState(state);
+  const build = toBuildLikeState(state, index);
   const derived = computeBuilderLikeDerivedStats(index, build, race, armor, shield);
   return {
     race,
@@ -276,21 +264,25 @@ export function groupCombatPowers(state: CharacterSheetState, index: RulesIndex)
 }
 
 export function sheetStateFromBuild(build: CharacterBuild, index: RulesIndex): CharacterSheetState {
+  const normalized = normalizeCharacterBuild(build, index);
+  const characterEquipment = normalizeCharacterEquipment(normalized.equipment);
+  const { inventory, equipment } = inventoryAndSlotsFromCharacterEquipment(characterEquipment, index);
+
   const tempSheet: CharacterSheetState = {
-    name: build.name || "Unnamed Character",
-    level: build.level,
-    raceId: build.raceId,
-    classId: build.classId,
-    characterStyle: build.characterStyle,
-    hybridClassIdA: build.hybridClassIdA,
-    hybridClassIdB: build.hybridClassIdB,
-    themeId: build.themeId,
-    paragonPathId: build.paragonPathId,
-    epicDestinyId: build.epicDestinyId,
-    magicItemIds: build.magicItemIds ? { ...build.magicItemIds } : undefined,
-    abilityScores: build.abilityScores,
-    trainedSkillIds: [...build.trainedSkillIds],
-    featIds: [...(build.featIds ?? [])],
+    name: normalized.name || "Unnamed Character",
+    level: normalized.level,
+    raceId: normalized.raceId,
+    classId: normalized.classId,
+    characterStyle: normalized.characterStyle,
+    hybridClassIdA: normalized.hybridClassIdA,
+    hybridClassIdB: normalized.hybridClassIdB,
+    themeId: normalized.themeId,
+    paragonPathId: normalized.paragonPathId,
+    epicDestinyId: normalized.epicDestinyId,
+    characterEquipment,
+    abilityScores: normalized.abilityScores,
+    trainedSkillIds: [...normalized.trainedSkillIds],
+    featIds: [...(normalized.featIds ?? [])],
     resources: {
       currentHp: 1,
       tempHp: 0,
@@ -299,127 +291,17 @@ export function sheetStateFromBuild(build: CharacterBuild, index: RulesIndex): C
       deathSaves: 0,
       conditions: []
     },
-    inventory: [],
-    equipment: {},
+    inventory,
+    equipment,
     powers: {
-      selectedPowerIds: [...build.powerIds],
+      selectedPowerIds: [...normalized.powerIds],
       expendedPowerIds: [],
       manualOrderIds: [],
       groupBy: "usage"
     }
   };
 
-  const inventory: InventoryItem[] = [];
-  const equipment: CharacterSheetState["equipment"] = {};
-  const pushEquip = (slot: EquipmentSlot, item: InventoryItem): void => {
-    inventory.push(item);
-    equipment[slot] = item.id;
-  };
-
-  if (build.armorId) {
-    const armor = index.armors.find((item) => item.id === build.armorId);
-    if (armor) {
-      pushEquip("armor", {
-        id: `eq-armor-${armor.id}`,
-        name: armor.name,
-        kind: "armor",
-        quantity: 1,
-        sourceId: armor.id,
-        slotHints: ["armor"]
-      });
-    }
-  }
-  if (build.shieldId) {
-    const shield = index.armors.find((item) => item.id === build.shieldId);
-    if (shield) {
-      pushEquip("shield", {
-        id: `eq-shield-${shield.id}`,
-        name: shield.name,
-        kind: "armor",
-        quantity: 1,
-        sourceId: shield.id,
-        slotHints: ["shield"]
-      });
-    }
-  }
-  if (build.mainWeaponId) {
-    const weapon = (index.weapons ?? []).find((item) => item.id === build.mainWeaponId);
-    if (weapon) {
-      pushEquip("mainHand", {
-        id: `eq-main-${weapon.id}`,
-        name: weapon.name,
-        kind: "weapon",
-        quantity: 1,
-        sourceId: weapon.id,
-        slotHints: ["mainHand", "offHand"]
-      });
-    }
-  }
-  if (build.offHandWeaponId) {
-    const weapon = (index.weapons ?? []).find((item) => item.id === build.offHandWeaponId);
-    if (weapon) {
-      pushEquip("offHand", {
-        id: `eq-off-${weapon.id}`,
-        name: weapon.name,
-        kind: "weapon",
-        quantity: 1,
-        sourceId: weapon.id,
-        slotHints: ["mainHand", "offHand"]
-      });
-    }
-  }
-  if (build.implementId) {
-    const implement = (index.implements ?? []).find((item) => item.id === build.implementId);
-    if (implement) {
-      pushEquip("implement", {
-        id: `eq-implement-${implement.id}`,
-        name: implement.name,
-        kind: "implement",
-        quantity: 1,
-        sourceId: implement.id,
-        slotHints: ["implement", "mainHand", "offHand"]
-      });
-    }
-  }
-
-  const pushMagicInventory = (mi: MagicItem, label: string): void => {
-    inventory.push({
-      id: `eq-magic-${mi.id}`,
-      name: mi.name,
-      kind: "gear",
-      quantity: 1,
-      sourceId: mi.id,
-      slotHints: [],
-      notes: label
-    });
-  };
-  const magicSlots = build.magicItemIds;
-  if (magicSlots?.armor) {
-    const mi = findMagicItem(index, magicSlots.armor);
-    if (mi) pushMagicInventory(mi, "Magic armor");
-  }
-  if (magicSlots?.neck) {
-    const mi = findMagicItem(index, magicSlots.neck);
-    if (mi) pushMagicInventory(mi, "Neck slot");
-  }
-  if (magicSlots?.mainWeapon) {
-    const mi = findMagicItem(index, magicSlots.mainWeapon);
-    if (mi) pushMagicInventory(mi, "Magic weapon (main)");
-  }
-  if (magicSlots?.offHandWeapon) {
-    const mi = findMagicItem(index, magicSlots.offHandWeapon);
-    if (mi) pushMagicInventory(mi, "Magic weapon (off-hand)");
-  }
-  if (magicSlots?.implement) {
-    const mi = findMagicItem(index, magicSlots.implement);
-    if (mi) pushMagicInventory(mi, "Magic implement");
-  }
-
-  const withEquipment: CharacterSheetState = {
-    ...tempSheet,
-    inventory,
-    equipment
-  };
+  const withEquipment: CharacterSheetState = tempSheet;
   const derived = computeSheetDerivedData(withEquipment, index);
   return {
     ...withEquipment,
