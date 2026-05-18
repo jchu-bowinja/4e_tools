@@ -143,7 +143,8 @@ function evaluateOneToken(
     const want = token.value.toLowerCase();
     const primaryOk = className && className.toLowerCase() === want;
     const hybridOk = extraClasses.some((n) => n.toLowerCase() === want);
-    if (!primaryOk && !hybridOk) {
+    const countsAsOk = context?.countsAsClassNames.has(want) ?? false;
+    if (!primaryOk && !hybridOk && !countsAsOk) {
       reasons.push(`Requires class: ${token.value}`);
     }
     return reasons;
@@ -183,7 +184,21 @@ function evaluateOneToken(
     return reasons;
   }
 
+  if (token.kind === "multiclassEntry" && context) {
+    if (!context.hasMulticlassEntryFeat) {
+      reasons.push("Requires a class-specific multiclass training feat");
+    }
+    return reasons;
+  }
+
   if (token.kind === "feat" && typeof token.value === "string" && context) {
+    const want = token.value.toLowerCase();
+    if (want.includes("class-specific multiclass") || want === "any class-specific multiclass") {
+      if (!context.hasMulticlassEntryFeat) {
+        reasons.push("Requires a class-specific multiclass training feat");
+      }
+      return reasons;
+    }
     if (!nameInSet(token.value, context.featNames)) {
       reasons.push(`Requires ${token.value} feat`);
     }
@@ -198,7 +213,10 @@ function evaluateOneToken(
   }
 
   if (token.kind === "heritage" && typeof token.value === "string" && context) {
-    if (!nameInSet(token.value, context.heritageLabels)) {
+    const bloodlineKey = `${token.value.toUpperCase().replace(/\s+/g, "_")}_BLOODLINE`;
+    const hasHeritage =
+      nameInSet(token.value, context.heritageLabels) || context.internalGrantKeys.has(bloodlineKey);
+    if (!hasHeritage) {
       reasons.push(`Requires ${token.value} heritage`);
     }
     return reasons;
@@ -220,12 +238,31 @@ function evaluateOneToken(
     return reasons;
   }
 
-  if (
-    token.kind === "tag" ||
-    token.kind === "negatedTag" ||
-    token.kind === "deity" ||
-    token.kind === "implement"
-  ) {
+  if (token.kind === "negatedTag" && typeof token.value === "string" && context) {
+    if (token.value.toLowerCase() === "bloodline" && context.hasBloodline) {
+      reasons.push("Already has a bloodline feat");
+    }
+    return reasons;
+  }
+
+  if (token.kind === "tag" && typeof token.value === "string" && context) {
+    const tag = token.value.toLowerCase();
+    if (tag === "bloodline" && !context.hasBloodline) {
+      reasons.push("Requires a bloodline feat");
+    }
+    if (tag === "multiclass") {
+      const slotOpen = !context.hasMulticlassEntryFeat || context.hasUnlimitedMulticlass;
+      if (!slotOpen) {
+        reasons.push("Multiclass training slot already used");
+      }
+    }
+    if (tag === "unlimited multiclass" && !context.hasUnlimitedMulticlass) {
+      reasons.push("Requires unlimited multiclass");
+    }
+    return reasons;
+  }
+
+  if (token.kind === "deity" || token.kind === "implement") {
     return reasons;
   }
 

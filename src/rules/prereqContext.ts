@@ -1,4 +1,14 @@
 import type { CharacterBuild, ClassFeature, RulesIndex } from "./models";
+import {
+  collectCountsAsClassNames,
+  collectInternalGrantKeys,
+  characterHasBloodline,
+  characterHasKiFocusUser,
+  characterHasPsionicSecondClass,
+  characterHasUnlimitedMulticlass,
+  hasMulticlassEntryFeat
+} from "./featGrantFlags";
+import { featureNameMatches } from "./featureNameMatch";
 import { collectCharacterPowerIdsForSelections } from "./powerSelections";
 import { parseRacialTraitIdsFromRace } from "./racialTraits";
 import {
@@ -12,13 +22,6 @@ function norm(s: string): string {
   return s.trim().toLowerCase();
 }
 
-function featureNameMatches(want: string, have: string): boolean {
-  const w = norm(want);
-  const h = norm(have);
-  if (w === h) return true;
-  return h.includes(w) || w.includes(h);
-}
-
 /** Cached character facts for prereq evaluation (build once per resolveFeatOptions pass). */
 export interface PrereqCharacterContext {
   powerNames: Set<string>;
@@ -28,6 +31,17 @@ export interface PrereqCharacterContext {
   heritageLabels: Set<string>;
   powerSourceLabels: Set<string>;
   negatedClassIds: Set<string>;
+  /** Class names from CountsAsClass on selected feats (multiclass training). */
+  countsAsClassNames: Set<string>;
+  /** Internal grant keys on selected feats (bloodline, ki focus, etc.). */
+  internalGrantKeys: Set<string>;
+  /** Has a class-specific multiclass training feat (CountsAsClass + Multiclass grant). */
+  hasMulticlassEntryFeat: boolean;
+  /** Character already has a bloodline internal grant. */
+  hasBloodline: boolean;
+  hasKiFocusUser: boolean;
+  hasPsionicSecondClass: boolean;
+  hasUnlimitedMulticlass: boolean;
 }
 
 export function buildPrereqCharacterContext(index: RulesIndex, build: CharacterBuild): PrereqCharacterContext {
@@ -48,7 +62,14 @@ export function buildPrereqCharacterContext(index: RulesIndex, build: CharacterB
     classFeatureNames: characterClassFeatureNames(index, build),
     heritageLabels,
     powerSourceLabels: characterPowerSourceLabels(index, build),
-    negatedClassIds: characterNegatedClassIds(build)
+    negatedClassIds: characterNegatedClassIds(build),
+    countsAsClassNames: new Set(collectCountsAsClassNames(index, build).map((n) => norm(n))),
+    internalGrantKeys: new Set(collectInternalGrantKeys(index, build)),
+    hasMulticlassEntryFeat: hasMulticlassEntryFeat(index, build),
+    hasBloodline: characterHasBloodline(index, build),
+    hasKiFocusUser: characterHasKiFocusUser(index, build),
+    hasPsionicSecondClass: characterHasPsionicSecondClass(index, build),
+    hasUnlimitedMulticlass: characterHasUnlimitedMulticlass(index, build)
   };
 }
 
@@ -145,6 +166,12 @@ export function characterClassFeatureNames(index: RulesIndex, build: CharacterBu
   for (const fid of build.featIds) {
     const feat = index.feats.find((f) => f.id === fid);
     for (const cfId of feat?.grantedClassFeatureIds ?? []) {
+      addFeature(byId.get(cfId));
+    }
+    for (const fname of feat?.countsAsFeatureNames ?? []) {
+      names.add(fname);
+    }
+    for (const cfId of feat?.countsAsFeatureIds ?? []) {
       addFeature(byId.get(cfId));
     }
   }

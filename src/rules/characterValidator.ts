@@ -35,6 +35,9 @@ import {
 import { getChildTraitIdsForSubrace, getRaceSubraceData } from "./raceSubraces";
 import { getRaceSecondarySelectSlots, selectableStartingLanguages } from "./raceRuleSelects";
 import { autoGrantedTrainedSkillIds } from "./grantedSkillsQuery";
+import { validateInternalGrantFeats } from "./internalGrantValidation";
+import { validateMulticlassFeats } from "./multiclassValidation";
+import { validateParagonMulticlassing } from "./paragonMulticlassing";
 
 export { getClassPowersForLevelRange };
 
@@ -260,6 +263,9 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
         `Select exactly ${expectedFeats} feat${expectedFeats === 1 ? "" : "s"} for level ${build.level} (currently ${build.featIds.length}).`
       );
     }
+    errors.push(...validateMulticlassFeats(index, build));
+    errors.push(...validateInternalGrantFeats(index, build));
+    errors.push(...validateParagonMulticlassing(index, build));
 
     const asiMilestones = requiredAsiMilestonesUpTo(build.level);
     for (const m of asiMilestones) {
@@ -481,6 +487,9 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
         `Select exactly ${expectedFeats} feat${expectedFeats === 1 ? "" : "s"} for level ${build.level} (currently ${build.featIds.length}).`
       );
     }
+    errors.push(...validateMulticlassFeats(index, build));
+    errors.push(...validateInternalGrantFeats(index, build));
+    errors.push(...validateParagonMulticlassing(index, build));
 
     const asiMilestones = requiredAsiMilestonesUpTo(build.level);
     for (const m of asiMilestones) {
@@ -686,9 +695,15 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
     }
   }
 
+  if (build.paragonMulticlassing && build.paragonPathId) {
+    errors.push("Paragon multiclassing and paragon path cannot both be selected.");
+  }
+
   if (build.paragonPathId) {
     if (build.level < 11) {
       errors.push("Paragon path can only be selected at level 11 or higher.");
+    } else if (build.paragonMulticlassing) {
+      errors.push("Clear paragon multiclassing to select a paragon path.");
     } else {
       const path = paragonPaths.find((p) => p.id === build.paragonPathId);
       if (!path) {
@@ -700,6 +715,8 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
         }
       }
     }
+  } else if (build.level >= 11 && !build.paragonMulticlassing) {
+    // Paragon path optional; no error if omitted
   }
 
   if (build.epicDestinyId) {

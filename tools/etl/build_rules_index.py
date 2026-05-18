@@ -772,13 +772,123 @@ def _parse_proficiency_grant_internal_id(internal_id: str) -> Optional[Dict[str,
     }
 
 
-def extract_grants_from_rules(rules: Any) -> Dict[str, Any]:
-    """Flatten `rules.grant` into compendium internal_ids and proficiency grants."""
+def _internal_grant_key_from_id(internal_id: str) -> Optional[str]:
+    """Stable key for Internal grant rows (bloodline flags, ki focus, etc.)."""
+    if internal_id.startswith("ID_INTERNAL_INTERNAL_"):
+        return internal_id[len("ID_INTERNAL_INTERNAL_") :]
+    if internal_id.startswith("ID_INTERNAL_"):
+        return internal_id[len("ID_INTERNAL_") :]
+    return None
+
+
+def _class_feature_lookup_priority(name: str) -> int:
+    """Prefer base class features over Hybrid / Multiclass rows when keys collide."""
+    lower = name.lower()
+    if "(hybrid)" in lower or "(multiclass)" in lower:
+        return 0
+    return 1
+
+
+def _build_class_feature_name_lookup(
+    class_features_raw: List[Dict[str, Any]],
+) -> Dict[str, str]:
+    """Lowercase / normalized keys -> canonical class feature display name."""
+    lookup: Dict[str, str] = {}
+    sorted_rows = sorted(
+        class_features_raw,
+        key=lambda r: _class_feature_lookup_priority(str(r.get("name") or "")),
+    )
+    for row in sorted_rows:
+        name = row.get("name")
+        if not isinstance(name, str) or not name.strip():
+            continue
+        canonical = name.strip()
+        keys = {
+            canonical.lower(),
+            re.sub(r"\s*\([^)]+\)\s*$", "", canonical).strip().lower(),
+            canonical.replace(" ", "").lower(),
+        }
+        for k in keys:
+            if k:
+                lookup[k] = canonical
+    return lookup
+
+
+def _resolve_class_feature_label(label: str, feature_name_lookup: Dict[str, str]) -> str:
+    if not label:
+        return label
+    candidates = [
+        label.lower(),
+        label.replace(" ", "").lower(),
+        re.sub(r"\s+", " ", label).strip().lower(),
+    ]
+    for key in candidates:
+        if key in feature_name_lookup:
+            return feature_name_lookup[key]
+    return label
+
+
+def _counts_as_feature_label_from_id(internal_id: str) -> Optional[str]:
+    """Human label from ID_INTERNAL_COUNTSASFEATURE_* (e.g. CHANNEL_DIVINITY -> Channel Divinity)."""
+    prefix = "ID_INTERNAL_COUNTSASFEATURE_"
+    if not internal_id.startswith(prefix):
+        return None
+    suffix = internal_id[len(prefix) :]
+    words = [w for w in suffix.split("_") if w]
+    return " ".join(w.title() for w in words) if words else None
+
+
+def _skill_training_from_grant(
+    internal_id: str,
+    skill_training_by_id: Dict[str, Dict[str, Any]],
+    skill_name_to_id: Dict[str, str],
+) -> tuple[Optional[str], Optional[str]]:
+    """Resolve Skill Training grant id -> (skill name, skill id)."""
+    row = skill_training_by_id.get(internal_id)
+    if row:
+        nm = str(row.get("name") or "").strip()
+        if nm:
+            return nm, skill_name_to_id.get(nm.lower())
+    if internal_id.startswith("ID_INTERNAL_SKILL_TRAINING_"):
+        suffix = internal_id[len("ID_INTERNAL_SKILL_TRAINING_") :].replace("_", " ").title()
+        return suffix, skill_name_to_id.get(suffix.lower())
+    return None, None
+
+
+def _counts_as_class_label_from_id(internal_id: str) -> Optional[str]:
+    """Human label from ID_INTERNAL_COUNTSASCLASS_* (e.g. ROGUE -> Rogue, [Dilettante])."""
+    prefix = "ID_INTERNAL_COUNTSASCLASS_"
+    if not internal_id.startswith(prefix):
+        return None
+    suffix = internal_id[len(prefix) :]
+    if suffix.startswith("[") and suffix.endswith("]"):
+        inner = suffix[1:-1].replace("_", " ").strip()
+        return inner.title() if inner else inner
+    return suffix.replace("_", " ").title()
+
+
+def extract_grants_from_rules(
+    rules: Any,
+    class_name_to_id: Optional[Dict[str, str]] = None,
+    skill_training_by_id: Optional[Dict[str, Dict[str, Any]]] = None,
+    skill_name_to_id: Optional[Dict[str, str]] = None,
+    class_feature_name_lookup: Optional[Dict[str, str]] = None,
+    class_feature_id_by_name: Optional[Dict[str, str]] = None,
+) -> Dict[str, Any]:
+    """Flatten `rules.grant` into compendium internal_ids and structured grant flags."""
     empty: Dict[str, Any] = {
         "grantedPowerIds": [],
         "grantedClassFeatureIds": [],
         "grantedRacialTraitIds": [],
         "proficiencyGrants": [],
+        "hasMulticlassGrant": False,
+        "countsAsClassNames": [],
+        "countsAsClassIds": [],
+        "internalGrantKeys": [],
+        "grantedSkillTrainingNames": [],
+        "grantedSkillTrainingIds": [],
+        "countsAsFeatureNames": [],
+        "countsAsFeatureIds": [],
     }
     if not isinstance(rules, dict):
         return empty
@@ -787,10 +897,32 @@ def extract_grants_from_rules(rules: Any) -> Dict[str, Any]:
     feature_ids: List[str] = []
     trait_ids: List[str] = []
     proficiency_grants: List[Dict[str, str]] = []
+    counts_as_names: List[str] = []
+    counts_as_ids: List[str] = []
+    internal_keys: List[str] = []
+    skill_training_names: List[str] = []
+    skill_training_ids: List[str] = []
+    counts_as_features: List[str] = []
+    counts_as_feature_ids: List[str] = []
+    has_multiclass = False
     seen_p: Set[str] = set()
     seen_f: Set[str] = set()
     seen_t: Set[str] = set()
     seen_prof: Set[str] = set()
+    seen_counts_name: Set[str] = set()
+    seen_counts_id: Set[str] = set()
+    seen_internal: Set[str] = set()
+    seen_skill_name: Set[str] = set()
+    seen_skill_id: Set[str] = set()
+    seen_feature_name: Set[str] = set()
+    seen_feature_id: Set[str] = set()
+    class_lookup = class_name_to_id or {}
+    feature_name_lookup: Dict[str, str] = {}
+    st_lookup = skill_training_by_id or {}
+    skill_lookup = skill_name_to_id or {}
+    if class_feature_name_lookup:
+        feature_name_lookup = class_feature_name_lookup
+    feature_id_lookup = class_feature_id_by_name or {}
 
     for gr in rules.get("grant") or []:
         if not isinstance(gr, dict):
@@ -807,6 +939,47 @@ def extract_grants_from_rules(rules: Any) -> Dict[str, Any]:
                 if key not in seen_prof:
                     seen_prof.add(key)
                     proficiency_grants.append(parsed)
+            continue
+        if gtype == "multiclass" or name == "ID_INTERNAL_MULTICLASS_MULTICLASS":
+            has_multiclass = True
+            continue
+        if gtype == "countsasclass":
+            label = _counts_as_class_label_from_id(name)
+            if label and label not in seen_counts_name:
+                seen_counts_name.add(label)
+                counts_as_names.append(label)
+                cid = class_lookup.get(label.lower())
+                if cid and cid not in seen_counts_id:
+                    seen_counts_id.add(cid)
+                    counts_as_ids.append(cid)
+            continue
+        if gtype == "internal":
+            ikey = _internal_grant_key_from_id(name)
+            if ikey and ikey not in seen_internal:
+                seen_internal.add(ikey)
+                internal_keys.append(ikey)
+            continue
+        if gtype == "skill training":
+            sk_name, sk_id = _skill_training_from_grant(name, st_lookup, skill_lookup)
+            if sk_name and sk_name not in seen_skill_name:
+                seen_skill_name.add(sk_name)
+                skill_training_names.append(sk_name)
+            if sk_id and sk_id not in seen_skill_id:
+                seen_skill_id.add(sk_id)
+                skill_training_ids.append(sk_id)
+            continue
+        if gtype == "countsasfeature":
+            raw_label = _counts_as_feature_label_from_id(name)
+            if not raw_label:
+                continue
+            flabel = _resolve_class_feature_label(raw_label, feature_name_lookup)
+            if flabel not in seen_feature_name:
+                seen_feature_name.add(flabel)
+                counts_as_features.append(flabel)
+            fid = feature_id_lookup.get(flabel.lower())
+            if fid and fid not in seen_feature_id:
+                seen_feature_id.add(fid)
+                counts_as_feature_ids.append(fid)
             continue
         if not name.startswith("ID_"):
             continue
@@ -828,6 +1001,14 @@ def extract_grants_from_rules(rules: Any) -> Dict[str, Any]:
         "grantedClassFeatureIds": feature_ids,
         "grantedRacialTraitIds": trait_ids,
         "proficiencyGrants": proficiency_grants,
+        "hasMulticlassGrant": has_multiclass,
+        "countsAsClassNames": counts_as_names,
+        "countsAsClassIds": counts_as_ids,
+        "internalGrantKeys": internal_keys,
+        "grantedSkillTrainingNames": skill_training_names,
+        "grantedSkillTrainingIds": skill_training_ids,
+        "countsAsFeatureNames": counts_as_features,
+        "countsAsFeatureIds": counts_as_feature_ids,
     }
 
 
@@ -1145,6 +1326,34 @@ def build_index(input_path: Path, output_dir: Path) -> None:
 
     support_traits_by_power_id = index_support_traits_by_power_id(racial_traits_raw)
 
+    class_feature_name_lookup = _build_class_feature_name_lookup(class_features_raw)
+    class_feature_id_by_name: Dict[str, str] = {}
+    for row in sorted(
+        class_features_raw,
+        key=lambda r: _class_feature_lookup_priority(str(r.get("name") or "")),
+    ):
+        cid = row.get("internal_id")
+        cname = row.get("name")
+        if isinstance(cid, str) and isinstance(cname, str) and cname.strip():
+            class_feature_id_by_name[cname.strip().lower()] = cid
+            base = re.sub(r"\s*\([^)]+\)\s*$", "", cname.strip()).strip().lower()
+            if base:
+                class_feature_id_by_name[base] = cid
+
+    class_name_to_id: Dict[str, str] = {}
+    for cls in classes_raw:
+        cid = cls.get("internal_id")
+        cname = cls.get("name")
+        if isinstance(cid, str) and isinstance(cname, str) and cname.strip():
+            class_name_to_id[cname.strip().lower()] = cid
+
+    skill_name_to_id: Dict[str, str] = {}
+    for skill in skills_raw:
+        sid = skill.get("internal_id")
+        sname = skill.get("name")
+        if isinstance(sid, str) and isinstance(sname, str) and sname.strip():
+            skill_name_to_id[sname.strip().lower()] = sid
+
     feats: List[Dict[str, Any]] = []
     for feat in feats_raw:
         parse = parse_prereqs(feat.get("prereqs"), known_races, known_classes)
@@ -1159,7 +1368,14 @@ def build_index(input_path: Path, output_dir: Path) -> None:
                         "detail": a,
                     }
                 )
-        feat_grants = extract_grants_from_rules(feat.get("rules"))
+        feat_grants = extract_grants_from_rules(
+            feat.get("rules"),
+            class_name_to_id,
+            skill_training_by_id,
+            skill_name_to_id,
+            class_feature_name_lookup,
+            class_feature_id_by_name,
+        )
         feats.append(
             {
                 "id": feat.get("internal_id"),

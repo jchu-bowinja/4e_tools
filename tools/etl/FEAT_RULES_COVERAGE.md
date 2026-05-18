@@ -10,6 +10,13 @@ For feats (and the same helpers for themes, paragon paths, epic destinies):
 |--------|----------------|------------------------------|
 | `raw.rules.statadd` | `statAdds` | `passiveDefenseBonusesFromStatAdds` (+ other future always-on stats) |
 | `raw.specific["Bonus to Defense"]` | `nadBonusesFromSpecific` | NAD bumps alongside `statAdds` |
+| `rules.grant` type Power / Class Feature / Racial Trait | `grantedPowerIds`, `grantedClassFeatureIds`, `grantedRacialTraitIds` | Feat powers, class features on sheet/builder |
+| `rules.grant` type Proficiency | `proficiencyGrants` | Weapon/armor/shield/implement validation and attack previews |
+| `rules.grant` type Multiclass | `hasMulticlassGrant` | Multiclass feat detection in builder summary |
+| `rules.grant` type CountsAsClass | `countsAsClassNames`, `countsAsClassIds` | Class prereqs (e.g. paragon feats for trained class) |
+| `rules.grant` type Internal | `internalGrantKeys` | Bloodline, ki focus, psionic second class flags; bloodline prereqs |
+| `rules.grant` type Skill Training | `grantedSkillTrainingNames`, `grantedSkillTrainingIds` | Auto-trained skills (multiclass entry feats, etc.) |
+| `rules.grant` type CountsAsFeature | `countsAsFeatureNames`, `countsAsFeatureIds` | Class feature prereqs (resolved to compendium feature names) |
 
 Everything else in `raw` (body text, prereqs, `rules.grant`, etc.) is still available on the serialized `raw` object for display or future parsers.
 
@@ -66,6 +73,12 @@ python tools/etl/list_feat_rules_beyond_statadd.py --json -o generated/feat_heav
 ```
 
 Add `generated/feat_heavy_rules.json` to `.gitignore` if you do not want it committed (large, regenerable).
+
+## Runtime follow-ups (multiclass pass 2)
+
+- **Paragon multiclassing** — `paragonMulticlassing` + `paragonMulticlassPowers` on `CharacterBuild`; requires Novice/Acolyte/Adept + one training feat; power picks from multiclass class at 11/12/20.
+- **Internal grants** — `KI_FOCUS_USER`, `PSIONIC_SECOND_CLASS`, bloodline heritage limits in `internalGrantValidation.ts`.
+- **Compendium tags** — `MULTICLASS` / `Unlimited Multiclass` prereq tags on entry feats evaluated in `prereqEvaluator`.
 
 ## Themes, paragon paths, epic destinies
 

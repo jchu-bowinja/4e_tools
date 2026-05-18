@@ -9,6 +9,7 @@ describe("autoGrantedTrainedSkillIds", () => {
         { id: "SK_ARC", name: "Arcana", slug: "arcana", raw: {} },
         { id: "SK_REL", name: "Religion", slug: "religion", raw: {} }
       ],
+      feats: [],
       autoGrantedSkillTrainingNamesBySupportId: {
         ID_FMP_CLASS_9: ["Arcana"],
         ID_FMP_CLASS_2: ["Religion"]

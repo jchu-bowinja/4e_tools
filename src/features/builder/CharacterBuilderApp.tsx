@@ -59,7 +59,27 @@ import { computeSkillSheetRows } from "../../rules/skillCalculator";
 import { DEFENSE_SCORE_COLUMNS, MOTION_INITIATIVE_COLUMNS } from "../../rules/statScoreBreakdown";
 import { SkillModifierNameContent, SkillModifierTable } from "../../ui/SkillModifierTable";
 import { StatScoreTable } from "../../ui/StatScoreTable";
+import {
+  collectCountsAsClassNames,
+  collectCountsAsFeatureNames,
+  collectInternalGrantKeys,
+  collectMulticlassEntryFeatIds,
+  formatInternalGrantKey
+} from "../../rules/featGrantFlags";
 import { multiclassFeatIds } from "../../rules/multiclassDetection";
+import {
+  canChooseParagonMulticlassing,
+  filterParagonMulticlassAtWillOptions,
+  filterParagonMulticlassDailyOptions,
+  filterParagonMulticlassEncounterOptions,
+  multiclassEntryClassId,
+  paragonMulticlassAttackPowers,
+  paragonMulticlassUtilityPowers
+} from "../../rules/paragonMulticlassing";
+import {
+  characterHasKiFocusUser,
+  characterHasPsionicSecondClass
+} from "../../rules/featGrantFlags";
 import { pruneStalePowerSelections } from "../../rules/powerSelections";
 import {
   collectFeatProficiencyDisplayRows,
@@ -1159,6 +1179,36 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     ]
   );
   const multiclassFeatIdList = useMemo(() => multiclassFeatIds(index, build), [index, build]);
+  const multiclassEntryFeatIdList = useMemo(
+    () => collectMulticlassEntryFeatIds(index, build),
+    [index, build]
+  );
+  const countsAsClassLabels = useMemo(() => collectCountsAsClassNames(index, build), [index, build]);
+  const countsAsFeatureLabels = useMemo(() => collectCountsAsFeatureNames(index, build), [index, build]);
+  const internalGrantKeyList = useMemo(() => collectInternalGrantKeys(index, build), [index, build]);
+  const paragonMcEligible = useMemo(() => canChooseParagonMulticlassing(index, build), [index, build]);
+  const paragonMcClassId = useMemo(() => multiclassEntryClassId(index, build), [index, build]);
+  const paragonMcClassName = useMemo(
+    () => (paragonMcClassId ? index.classes.find((c) => c.id === paragonMcClassId)?.name : undefined),
+    [index.classes, paragonMcClassId]
+  );
+  const paragonMcPowerOptions = useMemo(() => {
+    if (!paragonMcClassId) {
+      return { atWill: [], encounter: [], utility: [], daily: [] };
+    }
+    const atk7 = paragonMulticlassAttackPowers(index, paragonMcClassId, 7);
+    const atkAll = paragonMulticlassAttackPowers(index, paragonMcClassId, build.level);
+    const atk19 = paragonMulticlassAttackPowers(index, paragonMcClassId, 19);
+    const util10 = paragonMulticlassUtilityPowers(index, paragonMcClassId, 10);
+    return {
+      atWill: filterParagonMulticlassAtWillOptions(atkAll),
+      encounter: filterParagonMulticlassEncounterOptions(atk7),
+      utility: util10,
+      daily: filterParagonMulticlassDailyOptions(atk19)
+    };
+  }, [index, paragonMcClassId, build.level]);
+  const hasKiFocus = useMemo(() => characterHasKiFocusUser(index, build), [index, build]);
+  const hasPsionicSecond = useMemo(() => characterHasPsionicSecondClass(index, build), [index, build]);
 
   const featOptions = useMemo(() => resolveFeatOptions(index, effectiveBuild), [index, effectiveBuild]);
   const allLegalFeats = useMemo(() => featOptions.filter((f) => f.legal), [featOptions]);
@@ -3778,6 +3828,143 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               {build.level < 11 && (
                 <p style={{ margin: "0 0 0.5rem 0", fontSize: "0.85rem", color: "var(--status-warning)" }}>Set level to 11 or higher to choose a paragon path.</p>
               )}
+              {paragonMcEligible && (
+                <div
+                  style={{
+                    marginBottom: "0.85rem",
+                    padding: "0.55rem 0.65rem",
+                    border: "1px solid var(--panel-border)",
+                    borderRadius: "8px",
+                    background: "var(--surface-1)"
+                  }}
+                >
+                  <label style={{ display: "flex", alignItems: "center", gap: "0.45rem", fontSize: "0.88rem", cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(build.paragonMulticlassing)}
+                      onChange={(e) =>
+                        updateBuild({
+                          ...build,
+                          paragonMulticlassing: e.target.checked,
+                          paragonPathId: e.target.checked ? undefined : build.paragonPathId,
+                          paragonMulticlassPowers: e.target.checked ? build.paragonMulticlassPowers : undefined
+                        })
+                      }
+                    />
+                    <span>
+                      <strong>Paragon multiclassing</strong>
+                      {paragonMcClassName ? ` (${paragonMcClassName})` : ""}
+                    </span>
+                  </label>
+                  <p style={{ margin: "0.35rem 0 0 1.55rem", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                    Requires Novice, Acolyte, and Adept Power. Replaces paragon path benefits with powers from your multiclass class.
+                  </p>
+                  {build.paragonMulticlassing && paragonMcClassId && (
+                    <div style={{ marginTop: "0.5rem", marginLeft: "1.55rem", display: "grid", gap: "0.4rem" }}>
+                      {build.level >= 11 && (
+                        <>
+                          <label style={{ fontSize: "0.82rem" }}>
+                            At-will swap (optional)
+                            <select
+                              value={build.paragonMulticlassPowers?.atWillSwapPowerId ?? ""}
+                              onChange={(e) =>
+                                updateBuild({
+                                  ...build,
+                                  paragonMulticlassPowers: {
+                                    ...build.paragonMulticlassPowers,
+                                    atWillSwapPowerId: e.target.value || undefined
+                                  }
+                                })
+                              }
+                              style={{ display: "block", width: "100%", maxWidth: "24rem", marginTop: "0.15rem" }}
+                            >
+                              <option value="">—</option>
+                              {paragonMcPowerOptions.atWill.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.name} (Lv {p.level})
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label style={{ fontSize: "0.82rem" }}>
+                            Paragon encounter (7th or lower)
+                            <select
+                              value={build.paragonMulticlassPowers?.encounterPowerId ?? ""}
+                              onChange={(e) =>
+                                updateBuild({
+                                  ...build,
+                                  paragonMulticlassPowers: {
+                                    ...build.paragonMulticlassPowers,
+                                    encounterPowerId: e.target.value || undefined
+                                  }
+                                })
+                              }
+                              style={{ display: "block", width: "100%", maxWidth: "24rem", marginTop: "0.15rem" }}
+                            >
+                              <option value="">—</option>
+                              {paragonMcPowerOptions.encounter.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.name} (Lv {p.level})
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        </>
+                      )}
+                      {build.level >= 12 && (
+                        <label style={{ fontSize: "0.82rem" }}>
+                          Paragon utility (10th or lower)
+                          <select
+                            value={build.paragonMulticlassPowers?.utilityPowerId ?? ""}
+                            onChange={(e) =>
+                              updateBuild({
+                                ...build,
+                                paragonMulticlassPowers: {
+                                  ...build.paragonMulticlassPowers,
+                                  utilityPowerId: e.target.value || undefined
+                                }
+                              })
+                            }
+                            style={{ display: "block", width: "100%", maxWidth: "24rem", marginTop: "0.15rem" }}
+                          >
+                            <option value="">—</option>
+                            {paragonMcPowerOptions.utility.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name} (Lv {p.level})
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
+                      {build.level >= 20 && (
+                        <label style={{ fontSize: "0.82rem" }}>
+                          Paragon daily (19th or lower)
+                          <select
+                            value={build.paragonMulticlassPowers?.dailyPowerId ?? ""}
+                            onChange={(e) =>
+                              updateBuild({
+                                ...build,
+                                paragonMulticlassPowers: {
+                                  ...build.paragonMulticlassPowers,
+                                  dailyPowerId: e.target.value || undefined
+                                }
+                              })
+                            }
+                            style={{ display: "block", width: "100%", maxWidth: "24rem", marginTop: "0.15rem" }}
+                          >
+                            <option value="">—</option>
+                            {paragonMcPowerOptions.daily.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name} (Lv {p.level})
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
               <label style={{ display: "block", fontSize: "0.88rem", marginBottom: "0.4rem" }}>
                 Search paragon paths
                 <input
@@ -3822,9 +4009,11 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                         <li key={p.id} style={{ marginBottom: "0.2rem" }}>
                           <button
                             type="button"
-                            disabled={!legal}
+                            disabled={!legal || Boolean(build.paragonMulticlassing)}
                             onClick={() => {
-                              if (legal) updateBuild({ ...build, paragonPathId: p.id });
+                              if (legal && !build.paragonMulticlassing) {
+                                updateBuild({ ...build, paragonPathId: p.id, paragonMulticlassing: false });
+                              }
                             }}
                             style={{
                               width: "100%",
@@ -4478,6 +4667,40 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                       return <li key={fid}>{f?.name ?? fid}</li>;
                     })}
                   </ul>
+                  {multiclassEntryFeatIdList.length > 0 && (
+                    <p style={{ margin: "0.35rem 0 0 0" }}>
+                      <strong>Training feats:</strong>{" "}
+                      {multiclassEntryFeatIdList
+                        .map((fid) => index.feats.find((x) => x.id === fid)?.name ?? fid)
+                        .join(", ")}
+                    </p>
+                  )}
+                  {countsAsClassLabels.length > 0 && (
+                    <p style={{ margin: "0.35rem 0 0 0" }}>
+                      <strong>Counts as class:</strong> {countsAsClassLabels.join(", ")}
+                    </p>
+                  )}
+                  {countsAsFeatureLabels.length > 0 && (
+                    <p style={{ margin: "0.35rem 0 0 0" }}>
+                      <strong>Counts as feature:</strong> {countsAsFeatureLabels.join(", ")}
+                    </p>
+                  )}
+                  {internalGrantKeyList.length > 0 && (
+                    <p style={{ margin: "0.35rem 0 0 0" }}>
+                      <strong>Internal flags:</strong>{" "}
+                      {internalGrantKeyList.map(formatInternalGrantKey).join(", ")}
+                    </p>
+                  )}
+                  {hasKiFocus && (
+                    <p style={{ margin: "0.35rem 0 0 0" }}>
+                      <strong>Ki focus:</strong> may use ki focuses as implements
+                    </p>
+                  )}
+                  {hasPsionicSecond && (
+                    <p style={{ margin: "0.35rem 0 0 0" }}>
+                      <strong>Psionic second class:</strong> second psionic class talent active
+                    </p>
+                  )}
                 </details>
               )}
             </div>

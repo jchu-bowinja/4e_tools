@@ -15,6 +15,7 @@ export interface PrereqToken {
     | "power"
     | "racialPower"
     | "feat"
+    | "multiclassEntry"
     | "racialTrait"
     | "heritage"
     | "deity"
@@ -141,6 +142,22 @@ export interface Feat extends RulesEntity {
   grantedRacialTraitIds?: string[];
   /** ETL: `rules.grant` entries with type Proficiency (armor, shield, weapon, implement). */
   proficiencyGrants?: ProficiencyGrant[];
+  /** ETL: `rules.grant` type Multiclass (multiclass training / paragon chain feats). */
+  hasMulticlassGrant?: boolean;
+  /** ETL: class names from CountsAsClass grants (e.g. Rogue from Sneak of Shadows). */
+  countsAsClassNames?: string[];
+  /** ETL: resolved class ids for CountsAsClass grants when name matches a base class. */
+  countsAsClassIds?: string[];
+  /** ETL: Internal grant keys (bloodline, ki focus, psionic second class, etc.). */
+  internalGrantKeys?: string[];
+  /** ETL: trained skill names from Skill Training grants. */
+  grantedSkillTrainingNames?: string[];
+  /** ETL: resolved skill ids for Skill Training grants. */
+  grantedSkillTrainingIds?: string[];
+  /** ETL: class feature names from CountsAsFeature grants. */
+  countsAsFeatureNames?: string[];
+  /** ETL: resolved class feature ids for CountsAsFeature grants. */
+  countsAsFeatureIds?: string[];
   raw: Record<string, unknown>;
 }
 
@@ -296,6 +313,14 @@ export type AsiChoices = Partial<Record<string, { first: Ability; second: Abilit
 
 export type CharacterStyle = "standard" | "hybrid";
 
+/** Paragon-tier picks from a multiclass class (PHB paragon multiclassing). */
+export interface ParagonMulticlassPowers {
+  atWillSwapPowerId?: string;
+  encounterPowerId?: string;
+  utilityPowerId?: string;
+  dailyPowerId?: string;
+}
+
 export interface CharacterBuild {
   name: string;
   level: number;
@@ -315,6 +340,10 @@ export interface CharacterBuild {
   hybridSideBSelections?: Record<string, string>;
   themeId?: string;
   paragonPathId?: string;
+  /** Use PHB paragon multiclassing instead of a paragon path (requires Novice/Acolyte/Adept chain). */
+  paragonMulticlassing?: boolean;
+  /** Paragon-tier power picks from the multiclass class when `paragonMulticlassing` is true. */
+  paragonMulticlassPowers?: ParagonMulticlassPowers;
   epicDestinyId?: string;
   armorId?: string;
   shieldId?: string;

@@ -1,4 +1,5 @@
 import type { CharacterBuild, RulesIndex } from "./models";
+import { collectFeatGrantedSkillTrainingIds } from "./featGrantFlags";
 
 function normalized(s: string): string {
   return s.trim().toLowerCase();
@@ -29,9 +30,19 @@ export function autoGrantedTrainedSkillIds(index: RulesIndex, build: CharacterBu
 
   const bySkillName = new Map(index.skills.map((s) => [normalized(s.name), s.id]));
   const out: string[] = [];
+  const seen = new Set<string>();
   for (const n of names) {
     const id = bySkillName.get(n);
-    if (id) out.push(id);
+    if (id && !seen.has(id)) {
+      seen.add(id);
+      out.push(id);
+    }
+  }
+  for (const id of collectFeatGrantedSkillTrainingIds(index, build)) {
+    if (!seen.has(id)) {
+      seen.add(id);
+      out.push(id);
+    }
   }
   return out.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
 }

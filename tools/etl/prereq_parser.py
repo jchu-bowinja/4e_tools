@@ -171,6 +171,11 @@ def _parse_one_prereq_clause(
         tokens.append({"kind": "racialTrait", "value": _normalize_feature_label(m_rt.group(1))})
         return
 
+    # Multiclass power chain: "Any class-specific multiclass feat"
+    if "class-specific multiclass" in lowered:
+        tokens.append({"kind": "multiclassEntry", "value": True})
+        return
+
     # {name} feat
     m_feat = re.match(r"^(.+?)\s+feat\s*$", part, re.I)
     if m_feat:

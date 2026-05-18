@@ -73,6 +73,54 @@ describe("evaluatePrereqs", () => {
     expect(result.reasons[0]).toContain("Requires class");
   });
 
+  it("accepts Novice Power when a multiclass entry feat is selected", () => {
+    const tokens: PrereqToken[] = [
+      { kind: "multiclassEntry", value: true },
+      { kind: "levelAtLeast", value: 4 }
+    ];
+    const indexWithMc = {
+      ...miniIndex,
+      feats: [
+        {
+          id: "mc1",
+          name: "Sneak of Shadows",
+          slug: "sneak",
+          hasMulticlassGrant: true,
+          countsAsClassNames: ["Rogue"],
+          prereqTokens: [],
+          raw: {}
+        }
+      ]
+    } as unknown as RulesIndex;
+    const mcBuild = { ...build, featIds: ["mc1"], level: 4 };
+    const result = evaluatePrereqs(tokens, mcBuild, raceMap, classMap, skillMap, {
+      index: indexWithMc
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("accepts class prereq satisfied by CountsAsClass on a selected feat", () => {
+    const tokens: PrereqToken[] = [{ kind: "class", value: "Rogue" }];
+    const indexWithMc = {
+      ...miniIndex,
+      feats: [
+        {
+          id: "mc1",
+          name: "Sneak of Shadows",
+          slug: "sneak-of-shadows",
+          countsAsClassNames: ["Rogue"],
+          prereqTokens: [],
+          raw: {}
+        }
+      ]
+    } as unknown as RulesIndex;
+    const mcBuild = { ...build, featIds: ["mc1"] };
+    const result = evaluatePrereqs(tokens, mcBuild, raceMap, classMap, skillMap, {
+      index: indexWithMc
+    });
+    expect(result.ok).toBe(true);
+  });
+
   it("accepts divine power source for cleric", () => {
     const tokens: PrereqToken[] = [{ kind: "powerSourceAny", value: "divine" }];
     const result = evaluatePrereqs(tokens, build, raceMap, classMap, skillMap, { index: miniIndex });
@@ -83,6 +131,51 @@ describe("evaluatePrereqs", () => {
     const tokens: PrereqToken[] = [{ kind: "classFeature", value: "Channel Divinity" }];
     const result = evaluatePrereqs(tokens, build, raceMap, classMap, skillMap, { index: miniIndex });
     expect(result.ok).toBe(true);
+  });
+
+  it("evaluates bloodline anyOf for heritage feats", () => {
+    const tokens: PrereqToken[] = [
+      {
+        kind: "anyOf",
+        options: [
+          { kind: "negatedTag", value: "bloodline" },
+          { kind: "heritage", value: "Vampire" }
+        ]
+      }
+    ];
+    const indexVamp = {
+      ...miniIndex,
+      feats: [
+        {
+          id: "vh1",
+          name: "Vampiric Heritage",
+          slug: "vampiric",
+          internalGrantKeys: ["BLOODLINE", "VAMPIRE_BLOODLINE"],
+          prereqTokens: [],
+          raw: {}
+        }
+      ]
+    } as unknown as RulesIndex;
+    const vampBuild = { ...build, featIds: ["vh1"] };
+    const ok = evaluatePrereqs(tokens, vampBuild, raceMap, classMap, skillMap, { index: indexVamp });
+    expect(ok.ok).toBe(true);
+
+    const indexElan = {
+      ...miniIndex,
+      feats: [
+        {
+          id: "eh1",
+          name: "Elan Heritage",
+          slug: "elan",
+          internalGrantKeys: ["BLOODLINE", "ELAN_BLOODLINE"],
+          prereqTokens: [],
+          raw: {}
+        }
+      ]
+    } as unknown as RulesIndex;
+    const elanBuild = { ...build, featIds: ["eh1"] };
+    const blocked = evaluatePrereqs(tokens, elanBuild, raceMap, classMap, skillMap, { index: indexElan });
+    expect(blocked.ok).toBe(false);
   });
 
   it("evaluates anyOf as alternative requirements", () => {

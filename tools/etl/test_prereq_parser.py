@@ -39,6 +39,11 @@ class PrereqParserTests(unittest.TestCase):
         kinds = self._kinds("Ritual Caster feat")
         self.assertEqual(kinds, ["feat"])
 
+    def test_multiclass_entry_prereq(self) -> None:
+        kinds = self._kinds("Any class-specific multiclass feat, 4th level")
+        self.assertIn("multiclassEntry", kinds)
+        self.assertIn("levelAtLeast", kinds)
+
     def test_or_group(self) -> None:
         result = parse_prereqs("Cha 13 or dragonborn race", self.races, self.classes)
         self.assertEqual(result.tokens[0]["kind"], "anyOf")
