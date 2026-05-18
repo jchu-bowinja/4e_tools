@@ -1,4 +1,4 @@
-import { normalizeCharacterEquipment } from "../../rules/equipment";
+import { normalizeCharacterBuild, normalizeCharacterEquipment } from "../../rules/equipment";
 import { magicItemFamilyDisplayName } from "../../rules/enchantmentFamilies";
 import { findMagicItem } from "../../rules/magicItemEquipment";
 import type {
@@ -205,6 +205,41 @@ export function characterEquipmentSummaryRows(
     });
   }
   return rows;
+}
+
+/** Inventory rows generated from `characterEquipment` (ids prefixed with `eq-`). */
+export function isEquipmentDerivedInventoryItem(item: InventoryItem): boolean {
+  return item.id.startsWith("eq-");
+}
+
+/** Apply builder equipment updates to sheet state; keeps manually added inventory rows. */
+export function updateSheetEquipmentFromBuild(
+  state: CharacterSheetState,
+  index: RulesIndex,
+  updater: (build: CharacterBuild) => CharacterBuild
+): CharacterSheetState {
+  const build = buildLikeStateFromSheet(state, index);
+  const nextBuild = normalizeCharacterBuild(updater(build), index);
+  return sheetStateWithCharacterEquipment(state, index, nextBuild.equipment);
+}
+
+export function sheetStateWithCharacterEquipment(
+  state: CharacterSheetState,
+  index: RulesIndex,
+  equipment: CharacterEquipment | undefined
+): CharacterSheetState {
+  const characterEquipment = normalizeCharacterEquipment(equipment);
+  const manualInventory = state.inventory.filter((item) => !isEquipmentDerivedInventoryItem(item));
+  const { inventory: derivedInventory, equipment: derivedSlots } = inventoryAndSlotsFromCharacterEquipment(
+    characterEquipment,
+    index
+  );
+  return {
+    ...state,
+    characterEquipment,
+    inventory: [...derivedInventory, ...manualInventory],
+    equipment: derivedSlots
+  };
 }
 
 export function buildLikeStateFromSheet(state: CharacterSheetState, index: RulesIndex): CharacterBuild {

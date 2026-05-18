@@ -1,13 +1,22 @@
-import { useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import type { Armor, CharacterBuild, EnhancementLevel, Implement, MagicItem, RulesIndex, Weapon } from "../../rules/models";
 import type { EquipmentCombatBonuses } from "../../rules/equipment";
 import { normalizeCharacterEquipment } from "../../rules/equipment";
 import { equipmentEnchantmentEffects } from "../../rules/equipmentEnchantmentEffects";
 import {
+  describeArmor,
+  describeImplement,
+  describeMagicItem,
+  describeWeapon
+} from "../../rules/equipmentDescriptions";
+import { findMagicItem } from "../../rules/magicItemEquipment";
+import { EquipmentSelectionDetails } from "./EquipmentSelectionDetails";
+import {
   enchantmentFamilyKeyFromId,
   equipmentDuplicateEnchantmentWarnings,
   findEnchantmentFamilyById,
   formatEnchantmentFamilyLabel,
+  magicItemFamilyDisplayName,
   type EnchantmentFamily
 } from "../../rules/enchantmentFamilies";
 import { AdjustableNumberInput } from "../../ui/AdjustableNumberInput";
@@ -34,11 +43,19 @@ import {
   magicWeaponOptions
 } from "./magicItemOptions";
 
+export type EquipmentEditorSlot = "armor" | "shield" | "mainHand" | "offHand" | "implement" | "neck";
+/** Sheet inventory picker: both weapon hands share one category. */
+export type EquipmentEditorSlotFilter = EquipmentEditorSlot | "weapon";
+
 interface EquipmentTabProps {
   index: RulesIndex;
   build: CharacterBuild;
   onBuildChange: (next: CharacterBuild) => void;
   magicCombat: EquipmentCombatBonuses;
+  /** When embedded in another panel (e.g. character sheet), omit the tab title. */
+  hideTitle?: boolean;
+  /** When set, only render the editor for this equipment slot. */
+  activeSlotOnly?: EquipmentEditorSlotFilter;
 }
 
 const selectStyle: CSSProperties = {
@@ -59,6 +76,52 @@ const searchStyle: CSSProperties = {
   boxSizing: "border-box"
 };
 
+const fieldLabelStyle: CSSProperties = {
+  fontSize: "0.88rem",
+  display: "grid",
+  gap: "0.2rem"
+};
+
+const selectInlineStyle: CSSProperties = {
+  ...selectStyle,
+  marginTop: 0
+};
+
+const pickerRowStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr minmax(6.5rem, 9.5rem)",
+  gap: "0.45rem",
+  alignItems: "center"
+};
+
+const inlineFilterStyle: CSSProperties = {
+  ...searchStyle,
+  marginTop: 0,
+  width: "100%"
+};
+
+function EquipmentPickerRow(props: {
+  filterValue: string;
+  onFilterChange: (value: string) => void;
+  filterPlaceholder: string;
+  filterAriaLabel: string;
+  children: ReactNode;
+}): JSX.Element {
+  return (
+    <div style={pickerRowStyle}>
+      <div style={{ minWidth: 0 }}>{props.children}</div>
+      <input
+        type="search"
+        value={props.filterValue}
+        onChange={(e) => props.onFilterChange(e.target.value)}
+        placeholder={props.filterPlaceholder}
+        aria-label={props.filterAriaLabel}
+        style={inlineFilterStyle}
+      />
+    </div>
+  );
+}
+
 const slotSectionStyle: CSSProperties = {
   padding: "0.65rem 0.75rem",
   borderRadius: "8px",
@@ -74,6 +137,23 @@ const slotTitleStyle: CSSProperties = {
   fontWeight: 700,
   color: "var(--text-primary)"
 };
+
+function slotLabelForEditor(slot: EquipmentEditorSlot): string {
+  switch (slot) {
+    case "armor":
+      return "Armor";
+    case "shield":
+      return "Shield";
+    case "mainHand":
+      return "Main hand";
+    case "offHand":
+      return "Off hand";
+    case "implement":
+      return "Implement";
+    case "neck":
+      return "Neck";
+  }
+}
 
 function filterEnchantmentFamilies(families: EnchantmentFamily[], query: string): EnchantmentFamily[] {
   const q = query.trim().toLowerCase();
@@ -131,10 +211,13 @@ function EnchantmentPlusInput(props: {
 }
 
 interface StandardSlotSectionProps {
+  index: RulesIndex;
   title: string;
   baseLabel: string;
+  baseKind: "armor" | "weapon";
   baseOptions: Armor[] | Weapon[];
   baseValue: string | undefined;
+  enchantmentId?: string;
   onBaseChange: (id: string | undefined) => void;
   baseSearch: string;
   onBaseSearchChange: (value: string) => void;
@@ -151,10 +234,13 @@ interface StandardSlotSectionProps {
 
 function StandardSlotSection(props: StandardSlotSectionProps): JSX.Element {
   const {
+    index,
     title,
     baseLabel,
+    baseKind,
     baseOptions,
     baseValue,
+    enchantmentId,
     onBaseChange,
     baseSearch,
     onBaseSearchChange,
@@ -170,6 +256,15 @@ function StandardSlotSection(props: StandardSlotSectionProps): JSX.Element {
   } = props;
 
   const selectedFamily = enchantmentFamilies.find((f) => f.key === selectedFamilyKey);
+  const baseItem = baseValue ? baseOptions.find((item) => item.id === baseValue) : undefined;
+  const baseDescription =
+    baseItem && baseKind === "armor"
+      ? describeArmor(baseItem as Armor)
+      : baseItem && baseKind === "weapon"
+        ? describeWeapon(baseItem as Weapon)
+        : undefined;
+  const enchantmentItem = enchantmentId ? findMagicItem(index, enchantmentId) : undefined;
+  const enchantmentDescription = enchantmentItem ? describeMagicItem(enchantmentItem) : undefined;
 
   const filteredBase = useMemo(
     () => ensureSelectedEntityInFiltered(filterRulesEntitiesByQuery(baseOptions, baseSearch), baseValue, baseOptions),
@@ -188,51 +283,49 @@ function StandardSlotSection(props: StandardSlotSectionProps): JSX.Element {
   return (
     <section style={slotSectionStyle}>
       <h4 style={slotTitleStyle}>{title}</h4>
-      <label style={{ fontSize: "0.88rem" }}>
-        Filter {baseLabel.toLowerCase()}
-        <input
-          type="search"
-          value={baseSearch}
-          onChange={(e) => onBaseSearchChange(e.target.value)}
-          placeholder={basePlaceholder}
-          style={searchStyle}
-        />
-      </label>
-      <label style={{ fontSize: "0.88rem" }}>
+      <label style={fieldLabelStyle}>
         1. {baseLabel}
-        <select value={baseValue || ""} onChange={(e) => onBaseChange(e.target.value || undefined)} style={selectStyle}>
-          <option value="">None</option>
-          {filteredBase.map((item) => (
-            <option key={item.id} value={item.id}>
-              {formatBaseOption(item)}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label style={{ fontSize: "0.88rem" }}>
-        Filter enchantment
-        <input
-          type="search"
-          value={enchantmentSearch}
-          onChange={(e) => onEnchantmentSearchChange(e.target.value)}
-          placeholder="Magic item name"
-          style={searchStyle}
-        />
-      </label>
-      <label style={{ fontSize: "0.88rem" }}>
-        2. Enchantment
-        <select
-          value={selectedFamilyKey || ""}
-          onChange={(e) => onEnchantmentFamilyChange(e.target.value || undefined)}
-          style={selectStyle}
+        <EquipmentPickerRow
+          filterValue={baseSearch}
+          onFilterChange={onBaseSearchChange}
+          filterPlaceholder={basePlaceholder}
+          filterAriaLabel={`Filter ${baseLabel.toLowerCase()}`}
         >
-          <option value="">None (mundane)</option>
-          {filteredFamilies.map((family) => (
-            <option key={family.key} value={family.key}>
-              {formatEnchantmentFamilyLabel(family)}
-            </option>
-          ))}
-        </select>
+          <select
+            value={baseValue || ""}
+            onChange={(e) => onBaseChange(e.target.value || undefined)}
+            style={selectInlineStyle}
+          >
+            <option value="">None</option>
+            {filteredBase.map((item) => (
+              <option key={item.id} value={item.id}>
+                {formatBaseOption(item)}
+              </option>
+            ))}
+          </select>
+        </EquipmentPickerRow>
+      </label>
+      <label style={fieldLabelStyle}>
+        2. Enchantment
+        <EquipmentPickerRow
+          filterValue={enchantmentSearch}
+          onFilterChange={onEnchantmentSearchChange}
+          filterPlaceholder="Magic item name"
+          filterAriaLabel="Filter enchantment"
+        >
+          <select
+            value={selectedFamilyKey || ""}
+            onChange={(e) => onEnchantmentFamilyChange(e.target.value || undefined)}
+            style={selectInlineStyle}
+          >
+            <option value="">None (mundane)</option>
+            {filteredFamilies.map((family) => (
+              <option key={family.key} value={family.key}>
+                {formatEnchantmentFamilyLabel(family)}
+              </option>
+            ))}
+          </select>
+        </EquipmentPickerRow>
       </label>
       <label style={{ fontSize: "0.88rem", display: "block" }}>
         3. Plus {selectedFamily ? `(+${selectedFamily.allowedEnhancements.join(", +")})` : "(+0–+6)"}
@@ -244,11 +337,24 @@ function StandardSlotSection(props: StandardSlotSectionProps): JSX.Element {
           onChange={onEnhancementChange}
         />
       </label>
+      <EquipmentSelectionDetails
+        baseName={baseItem?.name}
+        baseDescription={baseDescription}
+        enchantmentName={enchantmentItem ? magicItemFamilyDisplayName(enchantmentItem.name) : undefined}
+        enchantmentDescription={enchantmentDescription}
+      />
     </section>
   );
 }
 
-export function EquipmentTab({ index, build, onBuildChange, magicCombat }: EquipmentTabProps): JSX.Element {
+export function EquipmentTab({
+  index,
+  build,
+  onBuildChange,
+  magicCombat,
+  hideTitle,
+  activeSlotOnly
+}: EquipmentTabProps): JSX.Element {
   const equipment = useMemo(() => normalizeCharacterEquipment(build.equipment), [build.equipment]);
   const equipmentWarnings = useMemo(() => equipmentDuplicateEnchantmentWarnings(build, index), [build, index]);
   const enchantmentEffects = useMemo(
@@ -337,6 +443,11 @@ export function EquipmentTab({ index, build, onBuildChange, magicCombat }: Equip
   const implementFamilyKey = enchantmentFamilyKeyFromId(index, equipment.implement?.enchantmentId);
   const neckSelectedFamily = findEnchantmentFamilyById(index, equipment.neck?.enchantmentId);
   const implementSelectedFamily = findEnchantmentFamilyById(index, equipment.implement?.enchantmentId);
+  const selectedSuperiorImplement = implementsSorted.find((i) => i.id === equipment.implement?.superiorImplementId);
+  const implementEnchantmentItem = equipment.implement?.enchantmentId
+    ? findMagicItem(index, equipment.implement.enchantmentId)
+    : undefined;
+  const neckEnchantmentItem = equipment.neck?.enchantmentId ? findMagicItem(index, equipment.neck.enchantmentId) : undefined;
 
   const filteredNeckFamilies = useMemo(
     () =>
@@ -373,12 +484,28 @@ export function EquipmentTab({ index, build, onBuildChange, magicCombat }: Equip
     magicCombat.offHandWeaponAttack > 0 ||
     magicCombat.implementAttack > 0;
 
+  const showSlot = (slot: EquipmentEditorSlot): boolean => {
+    if (!activeSlotOnly) return true;
+    if (activeSlotOnly === "weapon") return slot === "mainHand" || slot === "offHand";
+    return activeSlotOnly === slot;
+  };
+  const filteredEnchantmentEffects = activeSlotOnly
+    ? activeSlotOnly === "weapon"
+      ? enchantmentEffects.filter(
+          (row) =>
+            row.slotLabel.toLowerCase() === "main hand" || row.slotLabel.toLowerCase() === "off hand"
+        )
+      : enchantmentEffects.filter(
+          (row) => row.slotLabel.toLowerCase() === slotLabelForEditor(activeSlotOnly).toLowerCase()
+        )
+    : enchantmentEffects;
+
   return (
     <>
-    <h3 style={{ margin: "0 0 0.5rem 0", fontSize: "1.05rem", fontWeight: 700 }}>Equipment</h3>
+    {!hideTitle && <h3 style={{ margin: "0 0 0.5rem 0", fontSize: "1.05rem", fontWeight: 700 }}>Equipment</h3>}
     <div
       style={{
-        marginTop: "0.35rem",
+        marginTop: hideTitle ? 0 : "0.35rem",
         display: "grid",
         gap: "0.85rem",
         padding: "0.75rem",
@@ -387,10 +514,12 @@ export function EquipmentTab({ index, build, onBuildChange, magicCombat }: Equip
         backgroundColor: "var(--surface-1)"
       }}
     >
-      <p style={{ margin: 0, fontSize: "0.78rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
-        Per slot: pick base gear, an optional magic enchantment, then plus. Enchantments group all compendium +1…+6
-        variants into one entry; plus is limited to tiers that exist for that enchantment.
-      </p>
+      {!activeSlotOnly && (
+        <p style={{ margin: 0, fontSize: "0.78rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
+          Per slot: pick base gear, an optional magic enchantment, then plus. Enchantments group all compendium +1…+6
+          variants into one entry; plus is limited to tiers that exist for that enchantment.
+        </p>
+      )}
       {equipmentWarnings.map((msg) => (
         <p key={msg} style={{ margin: 0, fontSize: "0.82rem", color: "var(--warning-text, #b45309)" }}>
           {msg}
@@ -405,7 +534,7 @@ export function EquipmentTab({ index, build, onBuildChange, magicCombat }: Equip
           {magicCombat.implementAttack > 0 ? `; implement attack +${magicCombat.implementAttack}` : ""}
         </p>
       )}
-      {enchantmentEffects.length > 0 && (
+      {filteredEnchantmentEffects.length > 0 && (
         <div
           style={{
             display: "grid",
@@ -419,7 +548,7 @@ export function EquipmentTab({ index, build, onBuildChange, magicCombat }: Equip
           <p style={{ margin: 0, fontSize: "0.76rem", fontWeight: 700, color: "var(--text-secondary)" }}>
             Enchantment effects
           </p>
-          {enchantmentEffects.map((row) => (
+          {filteredEnchantmentEffects.map((row) => (
             <div key={row.slotLabel} style={{ fontSize: "0.78rem", lineHeight: 1.45, color: "var(--text-primary)" }}>
               <span style={{ fontWeight: 600 }}>{row.slotLabel}</span>
               <span style={{ color: "var(--text-muted)" }}> — {row.name}</span>
@@ -446,12 +575,15 @@ export function EquipmentTab({ index, build, onBuildChange, magicCombat }: Equip
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "0.75rem" }}>
+      {showSlot("armor") && (
         <StandardSlotSection
+          index={index}
           title="Armor"
           baseLabel="Armor"
+          baseKind="armor"
           baseOptions={armorOptions}
           baseValue={equipment.armor?.baseId}
+          enchantmentId={equipment.armor?.enchantmentId}
           onBaseChange={(id) => patchStandard("armor", (b) => setStandardSlotBase(b, "armor", id))}
           baseSearch={armorBaseSearch}
           onBaseSearchChange={setArmorBaseSearch}
@@ -469,11 +601,17 @@ export function EquipmentTab({ index, build, onBuildChange, magicCombat }: Equip
             patchStandard("armor", (b) => setStandardSlotEnhancement(b, index, "armor", n, magicArmorCatalog))
           }
         />
+      )}
+
+      {showSlot("shield") && (
         <StandardSlotSection
+          index={index}
           title="Shield"
           baseLabel="Shield"
+          baseKind="armor"
           baseOptions={shieldOptions}
           baseValue={equipment.shield?.baseId}
+          enchantmentId={equipment.shield?.enchantmentId}
           onBaseChange={(id) => patchStandard("shield", (b) => setStandardSlotBase(b, "shield", id))}
           baseSearch={shieldBaseSearch}
           onBaseSearchChange={setShieldBaseSearch}
@@ -491,13 +629,17 @@ export function EquipmentTab({ index, build, onBuildChange, magicCombat }: Equip
             patchStandard("shield", (b) => setStandardSlotEnhancement(b, index, "shield", n, magicShieldCatalog))
           }
         />
-      </div>
+      )}
 
+      {showSlot("mainHand") && (
       <StandardSlotSection
+        index={index}
         title="Main hand"
         baseLabel="Weapon"
+        baseKind="weapon"
         baseOptions={weaponsSorted}
         baseValue={equipment.mainHand?.baseId}
+        enchantmentId={equipment.mainHand?.enchantmentId}
         onBaseChange={(id) => patchStandard("mainHand", (b) => setStandardSlotBase(b, "mainHand", id))}
         baseSearch={mainWeaponBaseSearch}
         onBaseSearchChange={setMainWeaponBaseSearch}
@@ -520,12 +662,17 @@ export function EquipmentTab({ index, build, onBuildChange, magicCombat }: Equip
           patchStandard("mainHand", (b) => setStandardSlotEnhancement(b, index, "mainHand", n, magicMainWeaponCatalog))
         }
       />
+      )}
 
+      {showSlot("offHand") && (
       <StandardSlotSection
+        index={index}
         title="Off hand"
         baseLabel="Weapon"
+        baseKind="weapon"
         baseOptions={weaponsSorted}
         baseValue={equipment.offHand?.baseId}
+        enchantmentId={equipment.offHand?.enchantmentId}
         onBaseChange={(id) => patchStandard("offHand", (b) => setStandardSlotBase(b, "offHand", id))}
         baseSearch={offHandBaseSearch}
         onBaseSearchChange={setOffHandBaseSearch}
@@ -548,61 +695,59 @@ export function EquipmentTab({ index, build, onBuildChange, magicCombat }: Equip
           patchStandard("offHand", (b) => setStandardSlotEnhancement(b, index, "offHand", n, magicOffHandCatalog))
         }
       />
+      )}
 
+      {showSlot("implement") && (
       <section style={slotSectionStyle}>
         <h4 style={slotTitleStyle}>Implement</h4>
-        <label style={{ fontSize: "0.88rem" }}>
-          Filter superior implement
-          <input
-            type="search"
-            value={implementBaseSearch}
-            onChange={(e) => setImplementBaseSearch(e.target.value)}
-            placeholder="Name, group…"
-            style={searchStyle}
-          />
-        </label>
-        <label style={{ fontSize: "0.88rem" }}>
+        <label style={fieldLabelStyle}>
           1. Superior implement
-          <select
-            value={equipment.implement?.superiorImplementId || ""}
-            onChange={(e) => onBuildChange(setImplementSuperior(build, e.target.value || undefined))}
-            style={selectStyle}
+          <EquipmentPickerRow
+            filterValue={implementBaseSearch}
+            onFilterChange={setImplementBaseSearch}
+            filterPlaceholder="Name, group…"
+            filterAriaLabel="Filter superior implement"
           >
-            <option value="">None</option>
-            {filteredImplements.map((imp: Implement) => (
-              <option key={imp.id} value={imp.id}>
-                {imp.name}
-                {imp.implementGroup ? ` (${imp.implementGroup})` : ""}
-              </option>
-            ))}
-          </select>
+            <select
+              value={equipment.implement?.superiorImplementId || ""}
+              onChange={(e) => onBuildChange(setImplementSuperior(build, e.target.value || undefined))}
+              style={selectInlineStyle}
+            >
+              <option value="">None</option>
+              {filteredImplements.map((imp: Implement) => (
+                <option key={imp.id} value={imp.id}>
+                  {imp.name}
+                  {imp.implementGroup ? ` (${imp.implementGroup})` : ""}
+                </option>
+              ))}
+            </select>
+          </EquipmentPickerRow>
         </label>
-        <label style={{ fontSize: "0.88rem" }}>
-          Filter enchantment
-          <input
-            type="search"
-            value={implementEnchantSearch}
-            onChange={(e) => setImplementEnchantSearch(e.target.value)}
-            placeholder="Staff, orb, holy symbol…"
-            style={searchStyle}
-          />
-        </label>
-        <label style={{ fontSize: "0.88rem" }}>
+        <label style={fieldLabelStyle}>
           2. Enchantment
-          <select
-            value={implementFamilyKey || ""}
-            onChange={(e) =>
-              onBuildChange(setImplementEnchantmentFamily(build, index, e.target.value || undefined, magicImplementCatalog))
-            }
-            style={selectStyle}
+          <EquipmentPickerRow
+            filterValue={implementEnchantSearch}
+            onFilterChange={setImplementEnchantSearch}
+            filterPlaceholder="Staff, orb, holy symbol…"
+            filterAriaLabel="Filter enchantment"
           >
-            <option value="">None (mundane)</option>
-            {filteredImplementFamilies.map((family) => (
-              <option key={family.key} value={family.key}>
-                {formatEnchantmentFamilyLabel(family)}
-              </option>
-            ))}
-          </select>
+            <select
+              value={implementFamilyKey || ""}
+              onChange={(e) =>
+                onBuildChange(
+                  setImplementEnchantmentFamily(build, index, e.target.value || undefined, magicImplementCatalog)
+                )
+              }
+              style={selectInlineStyle}
+            >
+              <option value="">None (mundane)</option>
+              {filteredImplementFamilies.map((family) => (
+                <option key={family.key} value={family.key}>
+                  {formatEnchantmentFamilyLabel(family)}
+                </option>
+              ))}
+            </select>
+          </EquipmentPickerRow>
         </label>
         <label style={{ fontSize: "0.88rem", display: "block" }}>
           3. Plus{" "}
@@ -617,39 +762,48 @@ export function EquipmentTab({ index, build, onBuildChange, magicCombat }: Equip
             onChange={(n) => onBuildChange(setImplementEnhancement(build, index, n, magicImplementCatalog))}
           />
         </label>
+        <EquipmentSelectionDetails
+          baseName={selectedSuperiorImplement?.name}
+          baseDescription={selectedSuperiorImplement ? describeImplement(selectedSuperiorImplement) : undefined}
+          enchantmentName={
+            implementEnchantmentItem ? magicItemFamilyDisplayName(implementEnchantmentItem.name) : undefined
+          }
+          enchantmentDescription={
+            implementEnchantmentItem ? describeMagicItem(implementEnchantmentItem) : undefined
+          }
+        />
       </section>
+      )}
 
+      {showSlot("neck") && (
       <section style={slotSectionStyle}>
         <h4 style={slotTitleStyle}>Neck</h4>
         <p style={{ margin: 0, fontSize: "0.78rem", color: "var(--text-muted)" }}>
           No mundane base — magic enchantment and plus only.
         </p>
-        <label style={{ fontSize: "0.88rem" }}>
-          Filter enchantment
-          <input
-            type="search"
-            value={neckEnchantSearch}
-            onChange={(e) => setNeckEnchantSearch(e.target.value)}
-            placeholder="Cloak, amulet…"
-            style={searchStyle}
-          />
-        </label>
-        <label style={{ fontSize: "0.88rem" }}>
+        <label style={fieldLabelStyle}>
           1. Enchantment
-          <select
-            value={neckFamilyKey || ""}
-            onChange={(e) =>
-              onBuildChange(setNeckEnchantmentFamily(build, index, e.target.value || undefined, magicNeckCatalog))
-            }
-            style={selectStyle}
+          <EquipmentPickerRow
+            filterValue={neckEnchantSearch}
+            onFilterChange={setNeckEnchantSearch}
+            filterPlaceholder="Cloak, amulet…"
+            filterAriaLabel="Filter enchantment"
           >
-            <option value="">None</option>
-            {filteredNeckFamilies.map((family) => (
-              <option key={family.key} value={family.key}>
-                {formatEnchantmentFamilyLabel(family)}
-              </option>
-            ))}
-          </select>
+            <select
+              value={neckFamilyKey || ""}
+              onChange={(e) =>
+                onBuildChange(setNeckEnchantmentFamily(build, index, e.target.value || undefined, magicNeckCatalog))
+              }
+              style={selectInlineStyle}
+            >
+              <option value="">None</option>
+              {filteredNeckFamilies.map((family) => (
+                <option key={family.key} value={family.key}>
+                  {formatEnchantmentFamilyLabel(family)}
+                </option>
+              ))}
+            </select>
+          </EquipmentPickerRow>
         </label>
         <label style={{ fontSize: "0.88rem", display: "block" }}>
           2. Plus {neckSelectedFamily ? `(+${neckSelectedFamily.allowedEnhancements.join(", +")})` : "(+0–+6)"}
@@ -661,7 +815,16 @@ export function EquipmentTab({ index, build, onBuildChange, magicCombat }: Equip
             onChange={(n) => onBuildChange(setNeckEnhancement(build, index, n, magicNeckCatalog))}
           />
         </label>
+        <EquipmentSelectionDetails
+          enchantmentName={
+            neckEnchantmentItem ? magicItemFamilyDisplayName(neckEnchantmentItem.name) : undefined
+          }
+          enchantmentDescription={
+            neckEnchantmentItem ? describeMagicItem(neckEnchantmentItem) : undefined
+          }
+        />
       </section>
+      )}
     </div>
     </>
   );

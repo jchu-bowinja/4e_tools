@@ -70,7 +70,8 @@ import {
   sheetWeaponProficiencyText,
   toBuildLikeState
 } from "./selectors";
-import { characterEquipmentSummaryRows } from "./sheetEquipment";
+import { buildLikeStateFromSheet, updateSheetEquipmentFromBuild } from "./sheetEquipment";
+import { SheetEquipmentEditor } from "./SheetEquipmentEditor";
 import { loadCharacterSheetState, saveCharacterSheetState } from "./storage";
 import { resolveUiGlossaryHoverPlainText, termHasPowerKeywordTooltipBody } from "../../data/glossaryHoverResolve";
 import { positionFixedTooltip } from "../../ui/glossaryTooltipPosition";
@@ -560,15 +561,6 @@ function usageAccentCardStyle(bucket: "atWill" | "encounter" | "daily" | "utilit
   };
 }
 
-function classifyArmorSlots(armor: Armor): EquipmentSlot[] {
-  const type = String(armor.armorType || "").toLowerCase();
-  return type.includes("shield") ? ["shield"] : ["armor"];
-}
-
-function createInventoryId(): string {
-  return `inv-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
-}
-
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
@@ -814,10 +806,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   const [sheet, setSheet] = useState<CharacterSheetState>(() => loadCharacterSheetState());
   const [tab, setTab] = useState<SheetTab>("overview");
   const [draggingPowerId, setDraggingPowerId] = useState<string | null>(null);
-  const [newItemName, setNewItemName] = useState("");
-  const [selectedArmorId, setSelectedArmorId] = useState("");
-  const [selectedWeaponId, setSelectedWeaponId] = useState("");
-  const [selectedImplementId, setSelectedImplementId] = useState("");
   const [savedCharacters, setSavedCharacters] = useState<SavedCharacterEntry[]>(() => loadSavedCharacters());
   const [selectedSavedCharacterId, setSelectedSavedCharacterId] = useState("");
   const [selectedConditionOption, setSelectedConditionOption] = useState("");
@@ -1014,10 +1002,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   const magicCombat = useMemo(() => {
     return computeMagicItemCombatBonuses(index, toBuildLikeState(sheet, index));
   }, [index, sheet]);
-  const equipmentSummaryRows = useMemo(
-    () => characterEquipmentSummaryRows(sheet, index),
-    [sheet, index]
-  );
+  const sheetEquipmentBuild = useMemo(() => buildLikeStateFromSheet(sheet, index), [sheet, index]);
   const mainWeaponSummary = useMemo(
     () =>
       summarizeMainWeaponAttack(
@@ -1183,10 +1168,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
 
   function updateSheet(mutator: (prev: CharacterSheetState) => CharacterSheetState): void {
     setSheet((prev) => mutator(prev));
-  }
-
-  function addInventoryItem(item: InventoryItem): void {
-    updateSheet((prev) => ({ ...prev, inventory: [...prev.inventory, item] }));
   }
 
   function removeInventoryItem(itemId: string): void {
@@ -2898,154 +2879,19 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
 
       {tab === "inventory" && (
         <div style={{ display: "grid", gap: "0.55rem" }}>
-          <div style={{ ...panelStyle, display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-            <select value={selectedArmorId} onChange={(e) => setSelectedArmorId(e.target.value)}>
-              <option value="">Add armor/shield from rules...</option>
-              {index.armors.map((armor) => (
-                <option key={armor.id} value={armor.id}>
-                  {armor.name}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={() => {
-                const armor = index.armors.find((a) => a.id === selectedArmorId);
-                if (!armor) return;
-                addInventoryItem({
-                  id: createInventoryId(),
-                  name: armor.name,
-                  kind: "armor",
-                  quantity: 1,
-                  sourceId: armor.id,
-                  slotHints: classifyArmorSlots(armor)
-                });
-                setSelectedArmorId("");
-              }}
-            >
-              Add Armor
-            </button>
-
-            <select value={selectedWeaponId} onChange={(e) => setSelectedWeaponId(e.target.value)}>
-              <option value="">Add weapon from rules...</option>
-              {index.weapons?.map((weapon: Weapon) => (
-                <option key={weapon.id} value={weapon.id}>
-                  {weapon.name}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={() => {
-                const weapon = index.weapons?.find((w) => w.id === selectedWeaponId);
-                if (!weapon) return;
-                addInventoryItem({
-                  id: createInventoryId(),
-                  name: weapon.name,
-                  kind: "weapon",
-                  quantity: 1,
-                  sourceId: weapon.id,
-                  slotHints: ["mainHand", "offHand"]
-                });
-                setSelectedWeaponId("");
-              }}
-            >
-              Add Weapon
-            </button>
-
-            <select value={selectedImplementId} onChange={(e) => setSelectedImplementId(e.target.value)}>
-              <option value="">Add implement from rules...</option>
-              {index.implements?.map((implement: Implement) => (
-                <option key={implement.id} value={implement.id}>
-                  {implement.name}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={() => {
-                const implement = index.implements?.find((imp) => imp.id === selectedImplementId);
-                if (!implement) return;
-                addInventoryItem({
-                  id: createInventoryId(),
-                  name: implement.name,
-                  kind: "implement",
-                  quantity: 1,
-                  sourceId: implement.id,
-                  slotHints: ["implement", "mainHand", "offHand"]
-                });
-                setSelectedImplementId("");
-              }}
-            >
-              Add Implement
-            </button>
-
-            <input value={newItemName} placeholder="Custom gear name" onChange={(e) => setNewItemName(e.target.value)} />
-            <button
-              type="button"
-              onClick={() => {
-                const trimmed = newItemName.trim();
-                if (!trimmed) return;
-                addInventoryItem({
-                  id: createInventoryId(),
-                  name: trimmed,
-                  kind: "gear",
-                  quantity: 1,
-                  slotHints: []
-                });
-                setNewItemName("");
-              }}
-            >
-              Add Gear
-            </button>
-          </div>
-
           <div style={panelStyle}>
             <div style={{ fontWeight: 700, marginBottom: "0.5rem" }}>Equipment</div>
-            {equipmentSummaryRows.length > 0 && (
-              <div
-                style={{
-                  marginBottom: "0.65rem",
-                  padding: "0.5rem 0.6rem",
-                  borderRadius: "6px",
-                  border: "1px solid var(--panel-border)",
-                  backgroundColor: "var(--surface-1)",
-                  fontSize: "0.85rem"
-                }}
-              >
-                <div style={{ fontWeight: 600, marginBottom: "0.35rem", color: "var(--text-secondary)" }}>
-                  From builder (base / enchantment / plus)
-                </div>
-                <div style={{ display: "grid", gap: "0.2rem" }}>
-                  {equipmentSummaryRows.map((row) => (
-                    <div key={row.slotLabel} style={{ display: "flex", gap: "0.5rem" }}>
-                      <span style={{ fontWeight: 600, minWidth: "5.5rem" }}>{row.slotLabel}</span>
-                      <span>{row.detail}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.5rem" }}>
-              {(["armor", "shield", "mainHand", "offHand", "implement"] as const).map((slot) => {
-                const equippedId = sheet.equipment[slot];
-                return (
-                  <div key={slot}>
-                    <div style={{ fontSize: "0.85rem", fontWeight: 600 }}>{slot}</div>
-                    <select value={equippedId || ""} onChange={(e) => (e.target.value ? setEquipped(slot, e.target.value) : unequip(slot))}>
-                      <option value="">Unequipped</option>
-                      {sheet.inventory
-                        .filter((item) => canEquipItem(item, slot))
-                        .map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {item.name}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                );
-              })}
-            </div>
+            <SheetEquipmentEditor
+              index={index}
+              build={sheetEquipmentBuild}
+              magicCombat={magicCombat}
+              sheet={sheet}
+              onEquipInventory={setEquipped}
+              onUnequipInventory={unequip}
+              onBuildChange={(next) =>
+                updateSheet((prev) => updateSheetEquipmentFromBuild(prev, index, () => next))
+              }
+            />
           </div>
 
           <div style={panelStyle}>

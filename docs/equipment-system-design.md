@@ -255,7 +255,7 @@ Remove duplicate magic-only dropdown block from Equipment tab.
 ## UI (character sheet)
 
 - `sheetStateFromBuild` maps `equipment` → inventory rows + `toBuildLikeState` for derived stats.
-- Equipment tab on sheet (future): edit same shape or read-only from builder sync.
+- Equipment tab on sheet: full base / enchantment / plus editor (reuses builder `EquipmentTab`); inventory slot dropdowns remain for custom gear.
 
 ## Implementation phases
 

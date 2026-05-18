@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { sheetStateFromBuild, toBuildLikeState, computeSheetDerivedData } from "../../src/features/characterSheet/selectors";
+import {
+  isEquipmentDerivedInventoryItem,
+  updateSheetEquipmentFromBuild
+} from "../../src/features/characterSheet/sheetEquipment";
+import { setStandardSlotBase } from "../../src/features/builder/equipmentBuildUpdates";
 import type { CharacterBuild, MagicItem, RulesIndex } from "../../src/rules/models";
 
 const plate: { id: string; name: string; slug: string; armorBonus: number; raw: Record<string, unknown> } = {
@@ -110,5 +115,34 @@ describe("sheetStateFromBuild equipment", () => {
       index
     );
     expect(derived.defenses.fortitude).toBe(baseline.defenses.fortitude + 1);
+  });
+});
+
+describe("sheet equipment editing", () => {
+  it("updateSheetEquipmentFromBuild preserves manual inventory items", () => {
+    const build: CharacterBuild = {
+      name: "Hero",
+      level: 9,
+      raceId: "race_human",
+      classId: "class_fighter",
+      abilityScores: { STR: 16, CON: 14, DEX: 12, INT: 10, WIS: 10, CHA: 8 },
+      trainedSkillIds: [],
+      featIds: [],
+      powerIds: [],
+      equipment: { neck: { enhancement: 0 } }
+    };
+    const sheet = {
+      ...sheetStateFromBuild(build, index),
+      inventory: [
+        ...sheetStateFromBuild(build, index).inventory,
+        { id: "manual-potion", name: "Potion", kind: "gear" as const, quantity: 2, slotHints: [] }
+      ]
+    };
+    const next = updateSheetEquipmentFromBuild(sheet, index, (b) =>
+      setStandardSlotBase(b, "armor", plate.id)
+    );
+    expect(next.characterEquipment?.armor?.baseId).toBe(plate.id);
+    expect(next.inventory.some((i) => i.id === "manual-potion")).toBe(true);
+    expect(isEquipmentDerivedInventoryItem(next.inventory.find((i) => i.id === next.equipment.armor)!)).toBe(true);
   });
 });
