@@ -4575,11 +4575,17 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
           </LiveSheetCollapsibleSection>
         </div>
 
-        <div style={{ ...ui.sidebarPanel, ...ui.sidebarColumn }}>
-          <h3 style={{ ...sectionTitleStyle, marginBottom: "0.75rem" }}>Live Character Sheet</h3>
-          <div style={{ display: "grid", gap: "0.5rem" }}>
+        <div
+          style={{
+            ...ui.sidebarPanel,
+            ...ui.sidebarColumn,
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.5rem"
+          }}
+        >
+          <h3 style={{ ...sectionTitleStyle, margin: 0 }}>Live Character Sheet</h3>
           <LiveSheetCollapsibleSection title="Character">
-            <div style={{ display: "grid", gap: "0.25rem" }}>
               <p style={{ margin: 0, fontSize: "0.88rem" }}>
                 <strong {...glossaryTooltipUi.hoverA11y("race")}>Race:</strong> {selectedRace?.name || "None"}
               </p>
@@ -4680,7 +4686,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   )}
                 </details>
               )}
-            </div>
           </LiveSheetCollapsibleSection>
 
           <LiveSheetCollapsibleSection title="Combat Stats">
@@ -4824,17 +4829,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             )}
           </LiveSheetCollapsibleSection>
 
-          <LiveSheetCollapsibleSection title="Equipped">
-            <CharacterEquippedSlotsPanel
-              inventory={build.inventory ?? []}
-              equippedSlots={build.equippedSlots ?? {}}
-              characterEquipment={build.equipment}
-              index={index}
-              onEquipItem={(itemId, slot) => updateBuild(equipInventoryItemOnBuild(build, itemId, slot, index))}
-              onUnequipItem={(itemId, slot) => updateBuild(unequipInventoryItemOnBuild(build, itemId, slot))}
-            />
-          </LiveSheetCollapsibleSection>
-
           <LiveSheetCollapsibleSection
             title="Ability Scores"
             summaryA11y={glossaryTooltipUi.hoverA11y("abilityScores")}
@@ -4881,6 +4875,17 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             />
           </LiveSheetCollapsibleSection>
 
+          <LiveSheetCollapsibleSection title="Equipped">
+            <CharacterEquippedSlotsPanel
+              inventory={build.inventory ?? []}
+              equippedSlots={build.equippedSlots ?? {}}
+              characterEquipment={build.equipment}
+              index={index}
+              onEquipItem={(itemId, slot) => updateBuild(equipInventoryItemOnBuild(build, itemId, slot, index))}
+              onUnequipItem={(itemId, slot) => updateBuild(unequipInventoryItemOnBuild(build, itemId, slot))}
+            />
+          </LiveSheetCollapsibleSection>
+
           <BuilderSidebarItemsPanel
             index={index}
             build={build}
@@ -4907,7 +4912,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             </div>
           )}
         </div>
-      </div>
       </div>
     </div>
     </div>

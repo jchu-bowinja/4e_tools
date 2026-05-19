@@ -9,12 +9,9 @@ export const liveSheetSummaryStyle: CSSProperties = {
   color: "var(--text-secondary)"
 };
 
+/** Body layout inside a sidebar panel; border/chrome comes from `ui.sidebarPanel`. */
 export const liveSheetSectionBodyStyle: CSSProperties = {
   marginTop: "0.35rem",
-  padding: "0.65rem 0.75rem",
-  borderRadius: "8px",
-  border: "1px solid var(--panel-border)",
-  backgroundColor: "var(--surface-1)",
   display: "grid",
   gap: "0.35rem",
   minWidth: 0,
@@ -41,11 +38,13 @@ export function LiveSheetCollapsibleSection({
   bodyStyle
 }: LiveSheetCollapsibleSectionProps): JSX.Element {
   return (
-    <details open={defaultOpen}>
+    <details className="live-sheet-collapsible" open={defaultOpen}>
       <summary style={{ ...liveSheetSummaryStyle, ...summaryStyle }} {...summaryA11y}>
         {title}
       </summary>
-      <div style={{ ...liveSheetSectionBodyStyle, ...bodyStyle }}>{children}</div>
+      <div className="live-sheet-collapsible__body" style={{ ...liveSheetSectionBodyStyle, ...bodyStyle }}>
+        {children}
+      </div>
     </details>
   );
 }
