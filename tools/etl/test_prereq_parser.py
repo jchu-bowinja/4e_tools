@@ -68,6 +68,16 @@ class PrereqParserTests(unittest.TestCase):
         kinds = self._kinds("star pact")
         self.assertEqual(kinds, ["classFeature"])
 
+    def test_paragon_path_prereq(self) -> None:
+        result = parse_prereqs("Iron Vanguard paragon path", self.races, self.classes)
+        self.assertEqual(result.tokens[0]["kind"], "paragonPath")
+        self.assertEqual(result.tokens[0]["value"], "Iron Vanguard")
+
+    def test_epic_destiny_prereq(self) -> None:
+        result = parse_prereqs("Demigod epic destiny", self.races, self.classes)
+        self.assertEqual(result.tokens[0]["kind"], "epicDestiny")
+        self.assertEqual(result.tokens[0]["value"], "Demigod")
+
 
 if __name__ == "__main__":
     unittest.main()

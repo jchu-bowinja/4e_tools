@@ -125,6 +125,42 @@ function evaluateOneToken(
     return reasons;
   }
 
+  if (token.kind === "paragonPath") {
+    if (!build.paragonPathId) {
+      reasons.push(
+        typeof token.value === "string" && token.value
+          ? `Requires paragon path: ${token.value}`
+          : "Requires a paragon path"
+      );
+      return reasons;
+    }
+    if (typeof token.value === "string" && token.value && options?.index) {
+      const path = options.index.paragonPaths.find((p) => p.id === build.paragonPathId);
+      if (path && !nameInSet(token.value, new Set([path.name]))) {
+        reasons.push(`Requires paragon path: ${token.value}`);
+      }
+    }
+    return reasons;
+  }
+
+  if (token.kind === "epicDestiny") {
+    if (!build.epicDestinyId) {
+      reasons.push(
+        typeof token.value === "string" && token.value
+          ? `Requires epic destiny: ${token.value}`
+          : "Requires an epic destiny"
+      );
+      return reasons;
+    }
+    if (typeof token.value === "string" && token.value && options?.index) {
+      const destiny = options.index.epicDestinies.find((d) => d.id === build.epicDestinyId);
+      if (destiny && !nameInSet(token.value, new Set([destiny.name]))) {
+        reasons.push(`Requires epic destiny: ${token.value}`);
+      }
+    }
+    return reasons;
+  }
+
   if (token.kind === "abilityAtLeast" && token.ability && typeof token.value === "number") {
     if ((build.abilityScores[token.ability] || 0) < token.value) {
       reasons.push(`Requires ${token.ability} ${token.value}+`);

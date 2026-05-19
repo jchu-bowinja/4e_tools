@@ -567,6 +567,97 @@ def _normalize_ws(value: Optional[str]) -> Optional[str]:
     return collapsed if collapsed else None
 
 
+PARAGON_FEAT_MIN_LEVEL = 11
+EPIC_FEAT_MIN_LEVEL = 21
+
+
+def _max_level_at_least(tokens: List[Dict[str, Any]]) -> Optional[int]:
+    max_level: Optional[int] = None
+    for token in tokens:
+        if token.get("kind") != "levelAtLeast":
+            continue
+        value = token.get("value")
+        if not isinstance(value, int):
+            continue
+        if max_level is None or value > max_level:
+            max_level = value
+    return max_level
+
+
+def _tier_from_prereq_tokens(tokens: List[Dict[str, Any]]) -> Optional[str]:
+    for token in tokens:
+        if token.get("kind") != "tier":
+            continue
+        value = str(token.get("value") or "").strip().upper()
+        if value == "PARAGON":
+            return "Paragon"
+        if value == "EPIC":
+            return "Epic"
+        if value == "HEROIC":
+            return "Heroic"
+    for token in tokens:
+        kind = token.get("kind")
+        if kind == "paragonPath":
+            return "Paragon"
+        if kind == "epicDestiny":
+            return "Epic"
+    max_level = _max_level_at_least(tokens)
+    if max_level is not None and max_level >= EPIC_FEAT_MIN_LEVEL:
+        return "Epic"
+    if max_level is not None and max_level >= PARAGON_FEAT_MIN_LEVEL:
+        return "Paragon"
+    return None
+
+
+def _tier_from_prereqs_raw(prereqs_raw: Optional[str]) -> Optional[str]:
+    if not prereqs_raw:
+        return None
+    lowered = prereqs_raw.lower()
+    if "epic tier" in lowered:
+        return "Epic"
+    if "paragon tier" in lowered:
+        return "Paragon"
+    return None
+
+
+def _normalize_feat_tier_label(tier: Optional[str]) -> Optional[str]:
+    if not tier:
+        return None
+    text = str(tier).strip()
+    if not text:
+        return None
+    lowered = text.lower()
+    if lowered == "heroic":
+        return "Heroic"
+    if lowered == "paragon":
+        return "Paragon"
+    if lowered == "epic":
+        return "Epic"
+    return text
+
+
+def resolve_feat_tier_and_prereqs(
+    spec_tier: Any,
+    prereq_tokens: List[Dict[str, Any]],
+    prereqs_raw: Optional[str],
+) -> tuple[Optional[str], List[Dict[str, Any]]]:
+    """Infer feat tier from compendium + prereqs; inject 11+/21+ level when paragon/epic lacks it."""
+    tier = _normalize_feat_tier_label(str(spec_tier or "").strip() or None)
+    if not tier:
+        tier = _tier_from_prereq_tokens(prereq_tokens)
+    if not tier:
+        tier = _tier_from_prereqs_raw(prereqs_raw)
+
+    tokens = list(prereq_tokens)
+    max_level = _max_level_at_least(tokens)
+    tier_key = (tier or "").lower()
+    if tier_key == "paragon" and (max_level is None or max_level < PARAGON_FEAT_MIN_LEVEL):
+        tokens.insert(0, {"kind": "levelAtLeast", "value": PARAGON_FEAT_MIN_LEVEL})
+    elif tier_key == "epic" and (max_level is None or max_level < EPIC_FEAT_MIN_LEVEL):
+        tokens.insert(0, {"kind": "levelAtLeast", "value": EPIC_FEAT_MIN_LEVEL})
+    return tier, tokens
+
+
 def _feat_prereq_summary(tokens: List[Dict[str, Any]]) -> Optional[str]:
     if not tokens:
         return None
@@ -625,14 +716,19 @@ def _feat_prereq_summary(tokens: List[Dict[str, Any]]) -> Optional[str]:
     return "; ".join(parts)
 
 
-def _feat_metadata(feat: Dict[str, Any], prereq_tokens: List[Dict[str, Any]]) -> Dict[str, Any]:
+def _feat_metadata(
+    feat: Dict[str, Any],
+    prereq_tokens: List[Dict[str, Any]],
+    *,
+    tier: Optional[str] = None,
+) -> Dict[str, Any]:
     spec = feat.get("specific") or {}
     name = str(feat.get("name") or "")
     short_desc = str(spec.get("Short Description") or "")
     special = str(spec.get("Special") or "")
     body = str(feat.get("body") or "")
     prereqs = str(feat.get("prereqs") or "")
-    tier = str(spec.get("Tier") or "").strip()
+    tier = _normalize_feat_tier_label(tier or str(spec.get("Tier") or "").strip() or None) or ""
     haystack = " ".join([name, short_desc, special, body, prereqs]).lower()
 
     tags: Set[str] = set()
@@ -1159,12 +1255,24 @@ def _enhancement_bonus_from_magic_item(row: Dict[str, Any]) -> Optional[int]:
     return None
 
 
+def _is_enchant_from_specific(spec: Dict[str, Any]) -> Optional[str]:
+    """Character Builder tags shield/armor/weapon enchantments via `_IsEnchant` on magic rows."""
+    raw = spec.get("_IsEnchant")
+    if raw is None:
+        return None
+    if isinstance(raw, list):
+        raw = raw[0] if raw else None
+    text = str(raw).strip() if raw is not None else ""
+    return text or None
+
+
 def _magic_item_index_entry(row: Dict[str, Any]) -> Dict[str, Any]:
     spec = row.get("specific") or {}
     name = row.get("name") or ""
     stat_adds = extract_stat_adds_from_rules(row.get("rules"))
     armor_types = _split_csv_field(spec.get("Armor"))
     weapon_types = _split_csv_field(spec.get("Weapon"))
+    is_enchant = _is_enchant_from_specific(spec)
     entry: Dict[str, Any] = {
         "id": row.get("internal_id"),
         "name": name,
@@ -1179,6 +1287,7 @@ def _magic_item_index_entry(row: Dict[str, Any]) -> Dict[str, Any]:
         "rarity": spec.get("Rarity") or None,
         "armorTypes": armor_types or None,
         "weaponTypes": weapon_types or None,
+        "isEnchant": is_enchant,
         "enhancement": spec.get("Enhancement"),
         "enhancementBonus": _enhancement_bonus_from_magic_item(row),
         "property": spec.get("Property") or None,
@@ -1198,6 +1307,8 @@ def _magic_item_index_entry(row: Dict[str, Any]) -> Dict[str, Any]:
         entry.pop("armorTypes", None)
     if not entry["weaponTypes"]:
         entry.pop("weaponTypes", None)
+    if not entry["isEnchant"]:
+        entry.pop("isEnchant", None)
     if not entry["property"]:
         entry.pop("property", None)
     if not entry["power"]:
@@ -1524,7 +1635,13 @@ def build_index(input_path: Path, output_dir: Path) -> None:
     feats: List[Dict[str, Any]] = []
     for feat in feats_raw:
         parse = parse_prereqs(feat.get("prereqs"), known_races, known_classes)
-        feat_meta = _feat_metadata(feat, parse.tokens)
+        spec = feat.get("specific") or {}
+        feat_tier, feat_prereq_tokens = resolve_feat_tier_and_prereqs(
+            spec.get("Tier"),
+            parse.tokens,
+            feat.get("prereqs"),
+        )
+        feat_meta = _feat_metadata(feat, feat_prereq_tokens, tier=feat_tier)
         if parse.anomalies:
             for a in parse.anomalies:
                 anomalies.append(
@@ -1549,10 +1666,10 @@ def build_index(input_path: Path, output_dir: Path) -> None:
                 "name": feat.get("name"),
                 "slug": normalize_name(feat.get("name", "")),
                 "source": feat.get("source"),
-                "tier": (feat.get("specific") or {}).get("Tier"),
-                "shortDescription": (feat.get("specific") or {}).get("Short Description"),
+                "tier": feat_tier,
+                "shortDescription": spec.get("Short Description"),
                 "prereqsRaw": feat.get("prereqs"),
-                "prereqTokens": parse.tokens,
+                "prereqTokens": feat_prereq_tokens,
                 "category": feat_meta["category"],
                 "tags": feat_meta["tags"],
                 "prereqSummary": feat_meta["prereqSummary"],

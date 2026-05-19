@@ -176,6 +176,26 @@ def _parse_one_prereq_clause(
         tokens.append({"kind": "multiclassEntry", "value": True})
         return
 
+    # {name} paragon path (optional name)
+    m_pp = re.match(r"^(?:(.+?)\s+)?paragon\s+path\s*$", part, re.I)
+    if m_pp:
+        label = _normalize_feature_label(m_pp.group(1)) if m_pp.group(1) else None
+        token: Dict[str, Any] = {"kind": "paragonPath"}
+        if label:
+            token["value"] = label
+        tokens.append(token)
+        return
+
+    # {name} epic destiny (optional name)
+    m_ed = re.match(r"^(?:(.+?)\s+)?epic\s+destiny\s*$", part, re.I)
+    if m_ed:
+        label = _normalize_feature_label(m_ed.group(1)) if m_ed.group(1) else None
+        token = {"kind": "epicDestiny"}
+        if label:
+            token["value"] = label
+        tokens.append(token)
+        return
+
     # {name} feat
     m_feat = re.match(r"^(.+?)\s+feat\s*$", part, re.I)
     if m_feat:

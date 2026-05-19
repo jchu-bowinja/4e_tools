@@ -5,6 +5,8 @@ export interface PrereqToken {
   kind:
     | "levelAtLeast"
     | "tier"
+    | "paragonPath"
+    | "epicDestiny"
     | "abilityAtLeast"
     | "trainedSkill"
     | "race"
@@ -380,6 +382,8 @@ export interface MagicItem extends RulesEntity {
   rarity?: string | null;
   armorTypes?: string[] | null;
   weaponTypes?: string[] | null;
+  /** Compendium `_IsEnchant` (e.g. `Shield` for shield property enchants). */
+  isEnchant?: string | null;
   enhancement?: string | null;
   enhancementBonus?: number | null;
   property?: string | null;
