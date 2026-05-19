@@ -97,7 +97,7 @@ import { positionFixedTooltip } from "../../ui/glossaryTooltipPosition";
 import { GLOSSARY_TOOLTIP_OPEN_DELAY_MS, STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE } from "../../ui/glossaryTooltip";
 import { useGlossaryTooltip } from "../../ui/useGlossaryTooltip";
 import { AdjustableNumberInput } from "../../ui/AdjustableNumberInput";
-import { findCaseInsensitiveMatches, scrollTextareaToMatch } from "../../ui/jsonSearch";
+import { JsonCollapsiblePanel } from "../../ui/JsonCollapsiblePanel";
 import { summarizeImplementAttack, summarizeMainWeaponAttack } from "../../rules/weaponAttack";
 
 type SheetTab = "overview" | "equipment";
@@ -155,10 +155,7 @@ const sectionTitleStyle: CSSProperties = {
 };
 
 const overviewCollapsiblePanelStyle: CSSProperties = {
-  border: "1px solid var(--panel-border)",
-  borderRadius: "0.35rem",
-  padding: "0.5rem",
-  backgroundColor: "var(--surface-0)",
+  padding: "0.15rem 0",
   minWidth: 0
 };
 
@@ -169,13 +166,8 @@ const overviewCollapsibleSummaryStyle: CSSProperties = {
 };
 
 const characterOverviewPanelStyle: CSSProperties = {
-  border: "1px solid var(--panel-border)",
-  borderRadius: "0.4rem",
-  padding: "0.55rem",
-  backgroundColor: "var(--surface-0)",
   display: "grid",
   gap: "0.35rem",
-  boxShadow: "inset 0 0 0 1px var(--surface-2)",
   minWidth: 0
 };
 
@@ -306,14 +298,6 @@ function OverviewCollapsibleSection({
   );
 }
 
-const jsonSummaryStyle: CSSProperties = {
-  cursor: "pointer",
-  fontWeight: 700,
-  letterSpacing: "0.04em",
-  textTransform: "uppercase",
-  color: "var(--text-primary)"
-};
-
 const detailsSummaryStyle: CSSProperties = {
   cursor: "pointer",
   fontSize: "0.82rem",
@@ -334,11 +318,8 @@ const labelStyle: CSSProperties = {
 };
 
 const characterOverviewFieldValueStyle: CSSProperties = {
-  border: "1px solid var(--panel-border)",
-  backgroundColor: "var(--surface-0)",
-  borderRadius: "0.32rem",
-  padding: "0.24rem 0.45rem",
-  lineHeight: 1.2
+  lineHeight: 1.25,
+  color: "var(--text-primary)"
 };
 
 /** HP panel resource labels (Hit Points, Temp HP, Healing Surges, etc.). */
@@ -607,24 +588,24 @@ const GLOSSARY_CONDITION_OPTIONS = [
 
 
 const CONDITION_COLORS: Record<string, { background: string; text: string }> = {
-  bloodied: { background: "#b91c1c", text: "#ffffff" },
-  dying: { background: "#9a3412", text: "#ffffff" },
-  dead: { background: "#7f1d1d", text: "#ffffff" },
-  blinded: { background: "#111827", text: "#f9fafb" },
-  dazed: { background: "#92400e", text: "#ffffff" },
-  deafened: { background: "#374151", text: "#f9fafb" },
-  dominated: { background: "#5b21b6", text: "#ffffff" },
-  helpless: { background: "#475569", text: "#f8fafc" },
-  immobilized: { background: "#166534", text: "#ffffff" },
-  marked: { background: "#a16207", text: "#ffffff" },
-  petrified: { background: "#4b5563", text: "#f9fafb" },
-  prone: { background: "#9a3412", text: "#ffffff" },
-  restrained: { background: "#065f46", text: "#ffffff" },
-  slowed: { background: "#155e75", text: "#ffffff" },
-  stunned: { background: "#92400e", text: "#ffffff" },
-  surprised: { background: "#075985", text: "#ffffff" },
-  unconscious: { background: "#1f2937", text: "#ffffff" },
-  weakened: { background: "#9d174d", text: "#ffffff" }
+  bloodied: { background: "var(--condition-bloodied-bg)", text: "var(--condition-bloodied-fg)" },
+  dying: { background: "var(--condition-dying-bg)", text: "var(--condition-dying-fg)" },
+  dead: { background: "var(--condition-dead-bg)", text: "var(--condition-dead-fg)" },
+  blinded: { background: "var(--condition-blinded-bg)", text: "var(--condition-blinded-fg)" },
+  dazed: { background: "var(--condition-dazed-bg)", text: "var(--condition-dazed-fg)" },
+  deafened: { background: "var(--condition-deafened-bg)", text: "var(--condition-deafened-fg)" },
+  dominated: { background: "var(--condition-dominated-bg)", text: "var(--condition-dominated-fg)" },
+  helpless: { background: "var(--condition-helpless-bg)", text: "var(--condition-helpless-fg)" },
+  immobilized: { background: "var(--condition-immobilized-bg)", text: "var(--condition-immobilized-fg)" },
+  marked: { background: "var(--condition-marked-bg)", text: "var(--condition-marked-fg)" },
+  petrified: { background: "var(--condition-petrified-bg)", text: "var(--condition-petrified-fg)" },
+  prone: { background: "var(--condition-prone-bg)", text: "var(--condition-prone-fg)" },
+  restrained: { background: "var(--condition-restrained-bg)", text: "var(--condition-restrained-fg)" },
+  slowed: { background: "var(--condition-slowed-bg)", text: "var(--condition-slowed-fg)" },
+  stunned: { background: "var(--condition-stunned-bg)", text: "var(--condition-stunned-fg)" },
+  surprised: { background: "var(--condition-surprised-bg)", text: "var(--condition-surprised-fg)" },
+  unconscious: { background: "var(--condition-unconscious-bg)", text: "var(--condition-unconscious-fg)" },
+  weakened: { background: "var(--condition-weakened-bg)", text: "var(--condition-weakened-fg)" }
 };
 
 const CONDITION_EMOJIS: Record<string, string> = {
@@ -840,15 +821,9 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     left: number;
     transform?: "translateY(-100%)";
   } | null>(null);
-  const [jsonSearchInput, setJsonSearchInput] = useState("");
-  const [jsonSearchQuery, setJsonSearchQuery] = useState("");
-  const [jsonSearchResultIdx, setJsonSearchResultIdx] = useState(0);
-  const [jsonSearchJumpTick, setJsonSearchJumpTick] = useState(0);
   const glossaryTooltipUi = useGlossaryTooltip({ tooltipId: CHARACTER_SHEET_GLOSSARY_TOOLTIP_ID });
   const raceHoverTimerRef = useRef<number | null>(null);
   const classHoverTimerRef = useRef<number | null>(null);
-  const jsonTextareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const lastHandledJsonSearchJumpTickRef = useRef(0);
   const glossaryTermLookupCacheRef = useRef<Map<string, boolean>>(new Map());
 
   const derived = useMemo(() => computeSheetDerivedData(sheet, index), [sheet, index]);
@@ -860,10 +835,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   );
   const rulesById = useMemo(() => buildRulesIdLookup(index), [index]);
   const expandedSheetJson = useMemo(() => JSON.stringify(expandJsonIds(sheet, rulesById), null, 2), [sheet, rulesById]);
-  const jsonSearchMatches = useMemo(
-    () => findCaseInsensitiveMatches(expandedSheetJson, jsonSearchQuery),
-    [expandedSheetJson, jsonSearchQuery]
-  );
   const skillById = useMemo(() => new Map(index.skills.map((skill) => [skill.id, skill])), [index.skills]);
   const featsById = useMemo(() => new Map(index.feats.map((feat) => [feat.id, feat])), [index.feats]);
   const racialTraitsById = useMemo(
@@ -1104,26 +1075,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   useEffect(() => {
     saveCharacterSheetState(sheet);
   }, [sheet]);
-
-  useEffect(() => {
-    setJsonSearchResultIdx(0);
-  }, [jsonSearchQuery, expandedSheetJson]);
-
-  useEffect(() => {
-    if (jsonSearchJumpTick === 0) return;
-    if (lastHandledJsonSearchJumpTickRef.current === jsonSearchJumpTick) return;
-    lastHandledJsonSearchJumpTickRef.current = jsonSearchJumpTick;
-    if (!jsonSearchQuery.trim()) return;
-    if (jsonSearchMatches.length === 0) return;
-    const textarea = jsonTextareaRef.current;
-    if (!textarea) return;
-    const safeIdx = Math.min(jsonSearchResultIdx, jsonSearchMatches.length - 1);
-    const start = jsonSearchMatches[safeIdx];
-    const end = start + jsonSearchQuery.trim().length;
-    textarea.focus();
-    textarea.setSelectionRange(start, end);
-    scrollTextareaToMatch(textarea, expandedSheetJson, start);
-  }, [expandedSheetJson, jsonSearchJumpTick, jsonSearchMatches, jsonSearchQuery, jsonSearchResultIdx]);
 
   useEffect(() => {
     return () => {
@@ -1377,10 +1328,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     }));
   }
 
-  function refreshSavedCharacters(): void {
-    setSavedCharacters(loadSavedCharacters());
-  }
-
   function buildSelectedConditionDuration() {
     return buildDurationFromPreset(selectedDurationPreset, conditionDurationRounds);
   }
@@ -1614,28 +1561,22 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               gap: "0.22rem"
             }}
           >
-            <button
-              type="button"
-              onClick={applyShortRest}
-              onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "shortRest")}
-              onMouseLeave={glossaryTooltipUi.leaveHover}
-              onFocus={(event) => glossaryTooltipUi.startHover(event, "shortRest")}
-              onBlur={glossaryTooltipUi.leaveHover}
-              style={restButtonStyle}
-            >
-              Short rest
-            </button>
-            <button
-              type="button"
-              onClick={applyLongRest}
-              onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "extendedRest")}
-              onMouseLeave={glossaryTooltipUi.leaveHover}
-              onFocus={(event) => glossaryTooltipUi.startHover(event, "extendedRest")}
-              onBlur={glossaryTooltipUi.leaveHover}
-              style={restButtonStyle}
-            >
-              Long rest
-            </button>
+            <label style={{ display: "grid", gap: "0.12rem", margin: 0 }}>
+              <span {...glossaryTooltipUi.hoverA11y("shortRest")} style={{ fontSize: "0.68rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                Short rest
+              </span>
+              <button type="button" onClick={applyShortRest} style={restButtonStyle}>
+                Take
+              </button>
+            </label>
+            <label style={{ display: "grid", gap: "0.12rem", margin: 0 }}>
+              <span {...glossaryTooltipUi.hoverA11y("extendedRest")} style={{ fontSize: "0.68rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                Long rest
+              </span>
+              <button type="button" onClick={applyLongRest} style={restButtonStyle}>
+                Take
+              </button>
+            </label>
           </div>
         </div>
         <div
@@ -1743,23 +1684,24 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   >
                     Spend Surge
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => useSecondWind()}
-                    disabled={!canUseSecondWind(sheet.resources)}
-                    aria-label="Use second wind"
-                    onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "secondWind")}
-                    onMouseLeave={glossaryTooltipUi.leaveHover}
-                    onFocus={(event) => glossaryTooltipUi.startHover(event, "secondWind")}
-                    onBlur={glossaryTooltipUi.leaveHover}
-                    style={{
-                      ...hpPanelHealButtonStyle,
-                      cursor: canUseSecondWind(sheet.resources) ? "pointer" : "not-allowed",
-                      opacity: canUseSecondWind(sheet.resources) ? 1 : 0.55
-                    }}
-                  >
-                    Second Wind
-                  </button>
+                  <label style={{ display: "grid", gap: "0.08rem", margin: 0 }}>
+                    <span {...glossaryTooltipUi.hoverA11y("secondWind")} style={{ fontSize: "0.65rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em" }}>
+                      Second Wind
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => useSecondWind()}
+                      disabled={!canUseSecondWind(sheet.resources)}
+                      aria-label="Use second wind"
+                      style={{
+                        ...hpPanelHealButtonStyle,
+                        cursor: canUseSecondWind(sheet.resources) ? "pointer" : "not-allowed",
+                        opacity: canUseSecondWind(sheet.resources) ? 1 : 0.55
+                      }}
+                    >
+                      Use
+                    </button>
+                  </label>
                 </div>
                 <HealingSurgeValueHint
                   surgeValue={derived.surgeValue}
@@ -1775,12 +1717,11 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     );
   }
 
-  function renderGlossaryStatLabel(row: ScoreBreakdownRowDef, stripe: string): ReactNode {
+  function renderGlossaryStatLabel(row: ScoreBreakdownRowDef, _stripe: string): ReactNode {
     const glossaryKey = row.glossaryKey ?? row.rowKey;
     return (
       <span
-        onMouseEnter={(event) => glossaryTooltipUi.startHover(event, glossaryKey)}
-        onMouseLeave={glossaryTooltipUi.leaveHover}
+        {...glossaryTooltipUi.hoverA11y(glossaryKey)}
         style={{
           fontWeight: 600,
           color: "var(--text-primary)",
@@ -1820,11 +1761,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
 
   function renderSpeedInitiativePanel(): JSX.Element {
     return (
-      <div
-        className="character-sheet-motion-panel"
-        style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.3rem 0.35rem", backgroundColor: "var(--surface-0)" }}
-      >
-        <ScoreBreakdownTable
+      <ScoreBreakdownTable
+          className="character-sheet-motion-panel"
           variant="stat"
           compact
           columns={MOTION_SCORE_COLUMNS}
@@ -1849,8 +1787,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             }
           ]}
           renderLabel={renderGlossaryStatLabel}
-        />
-      </div>
+      />
     );
   }
 
@@ -2045,7 +1982,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     const magicAcBonus = derived.defenses.ac - bd.total;
     const acComponents = buildAcScoreComponents(bd, { magicItemBonus: magicAcBonus, secondWindBonus });
     return (
-      <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.4rem", backgroundColor: "var(--surface-0)" }}>
+      <>
         <ScoreBreakdownTable
           variant="stat"
           compact
@@ -2090,7 +2027,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             Armor check penalty -{derived.armorCheckPenalty} on untrained Strength / Dexterity skills (see Skills).
           </p>
         )}
-      </div>
+      </>
     );
   }
 
@@ -2244,10 +2181,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             >
               Load Into Sheet
             </button>
-            <button type="button" onClick={refreshSavedCharacters}>
-              Refresh Saved List
-            </button>
-          </div>
+          </motion.div>
           <div className="character-sheet-overview-row" style={{ ...overviewThreeColumnGridStyle, gridColumn: "1 / -1" }}>
             <div style={overviewSideColumnStyle}>
               <section style={characterOverviewPanelStyle}>
@@ -2809,102 +2743,18 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         </div>
       )}
 
-      <div style={{ marginTop: "0.75rem", border: "1px solid var(--panel-border)", borderRadius: "0.35rem", backgroundColor: "var(--surface-0)", padding: "0.5rem" }}>
-        <details>
-          <summary style={jsonSummaryStyle}>
-            JSON
-          </summary>
-          <div style={{ marginTop: "0.45rem", display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>
-            <input
-              value={jsonSearchInput}
-              onChange={(event) => setJsonSearchInput(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key !== "Enter") return;
-                event.preventDefault();
-                const committed = jsonSearchInput.trim();
-                setJsonSearchQuery(committed);
-                setJsonSearchResultIdx(0);
-                setJsonSearchJumpTick((prev) => prev + 1);
-              }}
-              placeholder="Search JSON..."
-              style={{
-                minWidth: 260,
-                border: "1px solid var(--panel-border)",
-                borderRadius: "0.28rem",
-                padding: "0.22rem 0.3rem"
-              }}
-            />
-            <button
-              type="button"
-              disabled={jsonSearchMatches.length === 0}
-              onClick={() =>
-                setJsonSearchResultIdx((prev) => {
-                  const nextIdx = jsonSearchMatches.length === 0 ? 0 : (prev - 1 + jsonSearchMatches.length) % jsonSearchMatches.length;
-                  setJsonSearchJumpTick((tick) => tick + 1);
-                  return nextIdx;
-                })
-              }
-            >
-              Previous
-            </button>
-            <button
-              type="button"
-              disabled={jsonSearchMatches.length === 0}
-              onClick={() =>
-                setJsonSearchResultIdx((prev) => {
-                  const nextIdx = jsonSearchMatches.length === 0 ? 0 : (prev + 1) % jsonSearchMatches.length;
-                  setJsonSearchJumpTick((tick) => tick + 1);
-                  return nextIdx;
-                })
-              }
-            >
-              Next
-            </button>
-            <span style={{ color: "var(--text-secondary)", fontSize: "0.8rem" }}>
-              {jsonSearchQuery.trim()
-                ? jsonSearchMatches.length > 0
-                  ? `${Math.min(jsonSearchResultIdx + 1, jsonSearchMatches.length)} of ${jsonSearchMatches.length}`
-                  : "0 matches"
-                : "Type and press Enter"}
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                if (!navigator.clipboard?.writeText) {
-                  alert("Clipboard API unavailable in this browser.");
-                  return;
-                }
-                void navigator.clipboard.writeText(expandedSheetJson);
-              }}
-              style={{ marginLeft: "auto" }}
-            >
-              Copy Contents
-            </button>
-          </div>
-          <textarea
-            ref={jsonTextareaRef}
-            value={expandedSheetJson}
-            readOnly
-            style={{
-              margin: "0.5rem 0 0 0",
-              padding: "0.5rem",
-              borderRadius: "0.3rem",
-              border: "1px solid var(--panel-border)",
-              backgroundColor: "var(--surface-1)",
-              color: "var(--text-primary)",
-              overflow: "auto",
-              height: "44rem",
-              minHeight: "12rem",
-              width: "100%",
-              boxSizing: "border-box",
-              resize: "vertical",
-              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
-              fontSize: "0.76rem",
-              lineHeight: 1.35
-            }}
-          />
-        </details>
-      </div>
+      <JsonCollapsiblePanel
+        title="JSON"
+        jsonText={expandedSheetJson}
+        shellStyle={{
+          marginTop: "0.75rem",
+          border: "1px solid var(--panel-border)",
+          borderRadius: "0.35rem",
+          backgroundColor: "var(--surface-0)",
+          padding: "0.5rem"
+        }}
+      />
+
 
     </div>
   );

@@ -120,7 +120,9 @@ import { STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE } from "../../ui/glossaryTooltip"
 import { useGlossaryTooltip } from "../../ui/useGlossaryTooltip";
 import { SupportPassiveMotionBreakdown } from "../shared/SupportPassiveMotionBreakdown";
 import { AdjustableNumberInput } from "../../ui/AdjustableNumberInput";
-import { findCaseInsensitiveMatches, scrollTextareaToMatch } from "../../ui/jsonSearch";
+import { CollapsibleDisclosure } from "../../ui/CollapsibleDisclosure";
+import { blockSubsectionStyle, disclosureSummaryStyle } from "../../ui/disclosureStyles";
+import { JsonCollapsiblePanel } from "../../ui/JsonCollapsiblePanel";
 import { resolveUiGlossaryHoverPlainText, termHasPowerKeywordTooltipBody } from "../../data/glossaryHoverResolve";
 import {
   ensureSelectedEntityInFiltered,
@@ -510,24 +512,30 @@ function HybridClassDetailPanel(props: {
         </p>
       ) : null}
       {spec["Build Options"] ? (
-        <details open style={{ marginTop: "0.45rem" }}>
-          <summary style={detailsSummaryStyle}>Build Options</summary>
-          <div style={{ marginTop: "0.35rem", fontSize: "0.82rem", color: "var(--text-secondary)" }}>
+        <CollapsibleDisclosure
+          open
+          style={{ marginTop: "0.45rem" }}
+          summary="Build Options"
+          summaryStyle={disclosureSummaryStyle}
+          bodyStyle={{ marginTop: "0.35rem", fontSize: "0.82rem", color: "var(--text-secondary)" }}
+        >
             <RulesRichText
               text={String(spec["Build Options"])}
               paragraphStyle={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}
               listItemStyle={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}
             />
-          </div>
-        </details>
+        </CollapsibleDisclosure>
       ) : null}
       {body ? (
-        <details open style={{ marginTop: "0.45rem" }}>
-          <summary style={detailsSummaryStyle}>Description</summary>
-          <div style={{ marginTop: "0.35rem", fontSize: "0.82rem", color: "var(--text-secondary)" }}>
+        <CollapsibleDisclosure
+          open
+          style={{ marginTop: "0.45rem" }}
+          summary="Description"
+          summaryStyle={disclosureSummaryStyle}
+          bodyStyle={{ marginTop: "0.35rem", fontSize: "0.82rem", color: "var(--text-secondary)" }}
+        >
             <RulesRichText text={body} paragraphStyle={{ fontSize: "0.82rem", color: "var(--text-secondary)" }} listItemStyle={{ fontSize: "0.82rem", color: "var(--text-secondary)" }} />
-          </div>
-        </details>
+        </CollapsibleDisclosure>
       ) : null}
     </div>
   );
@@ -662,12 +670,15 @@ const ui = {
     padding: "0.55rem 0.65rem",
     marginBottom: "1rem"
   },
+  /** Bordered inset for standalone panels (sidebar, JSON shell). */
   blockInset: {
     backgroundColor: "var(--surface-2)",
     border: "1px solid var(--panel-border)",
     borderRadius: "var(--ui-panel-radius, 8px)",
     padding: "0.65rem 0.85rem"
   },
+  /** Subsection inside `mainColumn` — no second border (see UI bible). */
+  blockSubsection: blockSubsectionStyle,
   blockSheetSection: {
     backgroundColor: "var(--surface-3)",
     border: "1px solid var(--panel-border)",
@@ -711,23 +722,6 @@ const subsectionTitleStyle: CSSProperties = {
   color: "var(--text-secondary)"
 };
 
-const detailsSummaryStyle: CSSProperties = {
-  cursor: "pointer",
-  fontSize: "0.82rem",
-  fontWeight: 700,
-  letterSpacing: "0.04em",
-  textTransform: "uppercase",
-  color: "var(--text-secondary)"
-};
-
-const jsonSummaryStyle: CSSProperties = {
-  cursor: "pointer",
-  fontWeight: 700,
-  letterSpacing: "0.04em",
-  textTransform: "uppercase",
-  color: "var(--text-primary)"
-};
-
 function exportBuild(build: CharacterBuild): void {
   const blob = new Blob([JSON.stringify(build, null, 2)], { type: "application/json" });
   const link = document.createElement("a");
@@ -769,14 +763,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   const [themeSearch, setThemeSearch] = useState("");
   const [paragonSearch, setParagonSearch] = useState("");
   const [epicSearch, setEpicSearch] = useState("");
-  const [jsonSearchInput, setJsonSearchInput] = useState("");
-  const [jsonSearchQuery, setJsonSearchQuery] = useState("");
-  const [jsonSearchResultIdx, setJsonSearchResultIdx] = useState(0);
-  const [jsonSearchJumpTick, setJsonSearchJumpTick] = useState(0);
   const [useSingleColumnLayout, setUseSingleColumnLayout] = useState(() => window.innerWidth <= 1380);
   const glossaryTooltipUi = useGlossaryTooltip({ tooltipId: BUILDER_GLOSSARY_TOOLTIP_ID });
-  const jsonTextareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const lastHandledJsonSearchJumpTickRef = useRef(0);
   const glossaryTermLookupCacheRef = useRef<Map<string, boolean>>(new Map());
   const rulesById = useMemo(() => buildRulesIdLookup(index), [index]);
 
@@ -814,11 +802,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     () => JSON.stringify(expandJsonIds(build, rulesById), null, 2),
     [build, rulesById]
   );
-  const jsonSearchMatches = useMemo(
-    () => findCaseInsensitiveMatches(expandedBuildJson, jsonSearchQuery),
-    [expandedBuildJson, jsonSearchQuery]
-  );
-
   const skillById = useMemo(() => new Map(index.skills.map((skill) => [skill.id, skill])), [index.skills]);
 
   const raceAbilityBonusInfo = useMemo(() => parseRaceAbilityBonusInfo(selectedRace), [selectedRace]);
@@ -875,26 +858,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     mediaQuery.addListener(onLayoutChange);
     return () => mediaQuery.removeListener(onLayoutChange);
   }, []);
-
-  useEffect(() => {
-    setJsonSearchResultIdx(0);
-  }, [jsonSearchQuery, expandedBuildJson]);
-
-  useEffect(() => {
-    if (jsonSearchJumpTick === 0) return;
-    if (lastHandledJsonSearchJumpTickRef.current === jsonSearchJumpTick) return;
-    lastHandledJsonSearchJumpTickRef.current = jsonSearchJumpTick;
-    if (!jsonSearchQuery.trim()) return;
-    if (jsonSearchMatches.length === 0) return;
-    const textarea = jsonTextareaRef.current;
-    if (!textarea) return;
-    const safeIdx = Math.min(jsonSearchResultIdx, jsonSearchMatches.length - 1);
-    const start = jsonSearchMatches[safeIdx];
-    const end = start + jsonSearchQuery.trim().length;
-    textarea.focus();
-    textarea.setSelectionRange(start, end);
-    scrollTextareaToMatch(textarea, expandedBuildJson, start);
-  }, [expandedBuildJson, jsonSearchJumpTick, jsonSearchMatches, jsonSearchQuery, jsonSearchResultIdx]);
 
   useEffect(() => {
     glossaryTermLookupCacheRef.current.clear();
@@ -1830,7 +1793,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 raceSecondarySlots.length > 0 ||
                 racePowerGroups.some((g) => g.choiceOnly) ||
                 parseRacialTraitIdsFromRace(selectedRace).includes(ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION)) && (
-                <div style={{ marginTop: "0.65rem", ...ui.blockInset, backgroundColor: "var(--surface-1)", borderColor: "var(--panel-border)" }}>
+                <div style={{ marginTop: "0.65rem", ...ui.blockSubsection, backgroundColor: "var(--surface-1)", borderColor: "var(--panel-border)" }}>
                   <h4 style={subsectionTitleStyle}>Race choices</h4>
                   {parseRacialTraitIdsFromRace(selectedRace).includes(ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION) && (
                     <label style={{ display: "block", marginBottom: "0.75rem" }}>
@@ -1970,7 +1933,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 </div>
               )}
             {selectedRace && (
-              <div style={{ ...ui.blockInset, marginTop: "0.65rem" }}>
+              <div style={{ ...ui.blockSubsection, marginTop: "0.65rem" }}>
                 <p style={{ margin: 0 }}><strong>Source:</strong> {selectedRace.source || "Unknown"}</p>
                 <p style={{ margin: "0.25rem 0 0 0" }}><strong>Speed:</strong> {String(raceSpecific["Speed"] || selectedRace.speed || "-")}</p>
                 <p style={{ margin: "0.25rem 0 0 0" }}><strong>Size:</strong> {String(raceSpecific["Size"] || selectedRace.size || "-")}</p>
@@ -1981,7 +1944,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     <h4 style={subsectionTitleStyle}>Racial traits</h4>
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
                       {displayedRacialTraitRows.map(({ id, trait }) => (
-                        <details
+                        <CollapsibleDisclosure
                           key={id}
                           style={{
                             backgroundColor: "var(--surface-1)",
@@ -1989,21 +1952,22 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                             borderRadius: "8px",
                             padding: "0.45rem 0.55rem"
                           }}
+                          summary={
+                            <>
+                              {trait?.name || id}
+                              {trait?.shortDescription ? (
+                                <span style={{ fontWeight: 400, color: "var(--text-muted)" }}> — {trait.shortDescription}</span>
+                              ) : null}
+                            </>
+                          }
+                          summaryStyle={{
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            fontSize: "0.88rem",
+                            lineHeight: 1.4
+                          }}
+                          bodyStyle={{ marginTop: "0.4rem", fontSize: "0.86rem", lineHeight: 1.45 }}
                         >
-                          <summary
-                            style={{
-                              fontWeight: 600,
-                              cursor: "pointer",
-                              fontSize: "0.88rem",
-                              lineHeight: 1.4
-                            }}
-                          >
-                            {trait?.name || id}
-                            {trait?.shortDescription ? (
-                              <span style={{ fontWeight: 400, color: "var(--text-muted)" }}> — {trait.shortDescription}</span>
-                            ) : null}
-                          </summary>
-                          <div style={{ marginTop: "0.4rem", fontSize: "0.86rem", lineHeight: 1.45 }}>
                             {trait?.source && (
                               <p style={{ margin: "0 0 0.35rem 0", color: "var(--text-muted)" }}>
                                 <strong>Source:</strong> {trait.source}
@@ -2015,8 +1979,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                               </p>
                             )}
                             {trait?.body ? <RulesRichText text={trait.body} /> : null}
-                          </div>
-                        </details>
+                        </CollapsibleDisclosure>
                       ))}
                     </div>
                   </div>
@@ -2101,28 +2064,37 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   </p>
                 )}
                 {selectedRace.raw.body && (
-                  <details open style={{ marginTop: "0.5rem" }}>
-                    <summary style={detailsSummaryStyle}>Lore Overview</summary>
-                    <div style={{ marginTop: "0.4rem" }}>
-                      <RulesRichText text={String(selectedRace.raw.body)} />
-                    </div>
-                  </details>
+                  <CollapsibleDisclosure
+          open
+          style={{ marginTop: "0.5rem" }}
+          summary="Lore Overview"
+          summaryStyle={disclosureSummaryStyle}
+          bodyStyle={{ marginTop: "0.4rem" }}
+        >
+          <RulesRichText text={String(selectedRace.raw.body)} />
+        </CollapsibleDisclosure>
                 )}
                 {raceSpecific["Physical Qualities"] && (
-                  <details open style={{ marginTop: "0.4rem" }}>
-                    <summary style={detailsSummaryStyle}>Physical Qualities</summary>
-                    <div style={{ marginTop: "0.4rem" }}>
-                      <RulesRichText text={String(raceSpecific["Physical Qualities"])} />
-                    </div>
-                  </details>
+                  <CollapsibleDisclosure
+          open
+          style={{ marginTop: "0.4rem" }}
+          summary="Physical Qualities"
+          summaryStyle={disclosureSummaryStyle}
+          bodyStyle={{ marginTop: "0.4rem" }}
+        >
+          <RulesRichText text={String(raceSpecific["Physical Qualities"])} />
+        </CollapsibleDisclosure>
                 )}
                 {raceSpecific["Playing"] && (
-                  <details open style={{ marginTop: "0.4rem" }}>
-                    <summary style={detailsSummaryStyle}>Playing This Race</summary>
-                    <div style={{ marginTop: "0.4rem" }}>
-                      <RulesRichText text={String(raceSpecific["Playing"])} />
-                    </div>
-                  </details>
+                  <CollapsibleDisclosure
+          open
+          style={{ marginTop: "0.4rem" }}
+          summary="Playing This Race"
+          summaryStyle={disclosureSummaryStyle}
+          bodyStyle={{ marginTop: "0.4rem" }}
+        >
+          <RulesRichText text={String(raceSpecific["Playing"])} />
+        </CollapsibleDisclosure>
                 )}
               </div>
             )}
@@ -2483,7 +2455,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 {hybridClassSelectionComplete && classAutoGrantedPowers.length > 0 && (
                   <div
                     style={{
-                      ...ui.blockInset,
+                      ...ui.blockSubsection,
                       marginTop: "0.35rem",
                       paddingTop: "0.65rem",
                       borderTop: "1px solid var(--panel-border)"
@@ -2497,7 +2469,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             )}
 
             {selectedClass && (
-              <div style={{ ...ui.blockInset, marginTop: "0.65rem" }}>
+              <div style={{ ...ui.blockSubsection, marginTop: "0.65rem" }}>
                 <p style={{ margin: 0 }}><strong>Role:</strong> {String(classSpecific["Role"] || selectedClass.role || "-")}</p>
                 <p style={{ margin: "0.25rem 0 0 0" }}><strong>Power Source:</strong> {String(classSpecific["Power Source"] || selectedClass.powerSource || "-")}</p>
                 <p style={{ margin: "0.25rem 0 0 0" }}><strong>Key Abilities:</strong> {String(classSpecific["Key Abilities"] || selectedClass.keyAbilities || "-")}</p>
@@ -2509,20 +2481,26 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   </p>
                 )}
                 {selectedClass.raw.body && (
-                  <details open style={{ marginTop: "0.5rem" }}>
-                    <summary style={detailsSummaryStyle}>Class Lore Overview</summary>
-                    <div style={{ marginTop: "0.4rem" }}>
-                      <RulesRichText text={String(selectedClass.raw.body)} />
-                    </div>
-                  </details>
+                  <CollapsibleDisclosure
+          open
+          style={{ marginTop: "0.5rem" }}
+          summary="Class Lore Overview"
+          summaryStyle={disclosureSummaryStyle}
+          bodyStyle={{ marginTop: "0.4rem" }}
+        >
+          <RulesRichText text={String(selectedClass.raw.body)} />
+        </CollapsibleDisclosure>
                 )}
                 {classSpecific["Build Options"] && (
-                  <details open style={{ marginTop: "0.4rem" }}>
-                    <summary style={detailsSummaryStyle}>Build Options</summary>
-                    <div style={{ marginTop: "0.4rem" }}>
-                      <RulesRichText text={String(classSpecific["Build Options"])} />
-                    </div>
-                  </details>
+                  <CollapsibleDisclosure
+          open
+          style={{ marginTop: "0.4rem" }}
+          summary="Build Options"
+          summaryStyle={disclosureSummaryStyle}
+          bodyStyle={{ marginTop: "0.4rem" }}
+        >
+          <RulesRichText text={String(classSpecific["Build Options"])} />
+        </CollapsibleDisclosure>
                 )}
                 {classAutoGrantedPowers.length > 0 && (
                   <div style={{ marginTop: "0.8rem" }}>
@@ -2596,12 +2574,15 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   </div>
                 )}
                 {classSpecific["Role"] && (
-                  <details open style={{ marginTop: "0.4rem" }}>
-                    <summary style={detailsSummaryStyle}>Role Details</summary>
-                    <div style={{ marginTop: "0.4rem" }}>
-                      <RulesRichText text={String(classSpecific["Role"])} />
-                    </div>
-                  </details>
+                  <CollapsibleDisclosure
+          open
+          style={{ marginTop: "0.4rem" }}
+          summary="Role Details"
+          summaryStyle={disclosureSummaryStyle}
+          bodyStyle={{ marginTop: "0.4rem" }}
+        >
+          <RulesRichText text={String(classSpecific["Role"])} />
+        </CollapsibleDisclosure>
                 )}
               </div>
             )}
@@ -2617,7 +2598,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             </p>
 
             {build.level >= 11 && (
-              <p style={{ ...ui.blockInset, marginBottom: "0.75rem", backgroundColor: "var(--surface-2)", fontSize: "0.88rem", color: "var(--text-primary)" }}>
+              <p style={{ ...ui.blockSubsection, marginBottom: "0.75rem", backgroundColor: "var(--surface-2)", fontSize: "0.88rem", color: "var(--text-primary)" }}>
                 <strong>PHB tier bumps:</strong> At 11th level and 21st level, each ability score gains +1 automatically (included below). At 4, 8, 14, 18, 24, and 28, assign two different +1s in{" "}
                 <strong>Level-up ability increases</strong>.
               </p>
@@ -2626,7 +2607,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             {(raceAbilityBonusInfo.fixed.length > 0 || raceAbilityBonusInfo.chooseOne.length > 0) && (
               <div
                 style={{
-                  ...ui.blockInset,
+                  ...ui.blockSubsection,
                   marginBottom: "0.75rem",
                   backgroundColor: "var(--surface-1)",
                   fontSize: "0.88rem"
@@ -2660,7 +2641,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             )}
 
             {requiredAsiMilestonesUpTo(build.level).length > 0 && (
-              <section style={{ ...ui.blockInset, marginBottom: "0.85rem", backgroundColor: "var(--surface-1)" }}>
+              <section style={{ ...ui.blockSubsection, marginBottom: "0.85rem", backgroundColor: "var(--surface-1)" }}>
                 <h4 style={subsectionTitleStyle}>Level-up ability increases</h4>
                 <p style={{ margin: "0 0 0.75rem 0", fontSize: "0.85rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
                   At each listed level, pick two <strong>different</strong> abilities for +1 each (Player&apos;s Handbook). These stack with automatic +1 to all abilities at levels 11 and 21.
@@ -2726,7 +2707,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             )}
 
             {(build.level >= 11 || build.level >= 21) && (
-              <section style={{ ...ui.blockInset, marginBottom: "0.85rem", backgroundColor: "var(--surface-1)" }}>
+              <section style={{ ...ui.blockSubsection, marginBottom: "0.85rem", backgroundColor: "var(--surface-1)" }}>
                 {build.level >= 11 && (
                   <div style={{ marginBottom: build.level >= 21 ? "0.55rem" : 0 }}>
                     <div style={{ fontWeight: 700, marginBottom: "0.2rem", fontSize: "0.88rem" }}>Paragon Tier</div>
@@ -2742,7 +2723,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               </section>
             )}
 
-            <section style={{ ...ui.blockInset, marginBottom: "0.85rem", backgroundColor: "var(--surface-1)", borderColor: "var(--panel-border)" }}>
+            <section style={{ ...ui.blockSubsection, marginBottom: "0.85rem", backgroundColor: "var(--surface-1)", borderColor: "var(--panel-border)" }}>
               <div style={{ marginBottom: "0.55rem", fontSize: "0.82rem", fontWeight: 700, color: "var(--text-secondary)", letterSpacing: "0.01em" }}>
                 Point-Buy Budget
               </div>
@@ -2788,7 +2769,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
 
             <div
               style={{
-                ...ui.blockInset,
+                ...ui.blockSubsection,
                 marginTop: "0.35rem",
                 display: "grid",
                 gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
@@ -2862,12 +2843,12 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                               />
                             </td>
                             <td style={{ padding: "0.35rem 0", verticalAlign: "middle", fontSize: "0.82rem", textAlign: "right" }}>
-                              <span style={levelDelta === 0 ? { color: "#888" } : undefined}>
+                              <span style={levelDelta === 0 ? { color: "var(--text-muted)" } : undefined}>
                                 {levelDelta > 0 ? `+${levelDelta}` : levelDelta}
                               </span>
                             </td>
                             <td style={{ padding: "0.35rem 0", verticalAlign: "middle", fontSize: "0.82rem", textAlign: "right" }}>
-                              <span style={racialDelta === 0 ? { color: "#888" } : undefined}>
+                              <span style={racialDelta === 0 ? { color: "var(--text-muted)" } : undefined}>
                                 {racialDelta > 0 ? `+${racialDelta}` : racialDelta}
                               </span>
                             </td>
@@ -2895,9 +2876,12 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               ))}
             </div>
 
-            <details style={{ ...ui.blockInset, marginTop: "1rem", backgroundColor: "var(--surface-0)" }}>
-              <summary style={detailsSummaryStyle}>What do these abilities mean?</summary>
-              <div style={{ marginTop: "0.65rem", display: "flex", flexDirection: "column", gap: "0.65rem" }}>
+            <CollapsibleDisclosure
+              style={{ ...ui.blockSubsection, marginTop: "1rem" }}
+              summary="What do these abilities mean?"
+              summaryStyle={disclosureSummaryStyle}
+              bodyStyle={{ marginTop: "0.65rem", display: "flex", flexDirection: "column", gap: "0.65rem" }}
+            >
                 {abilities.map((ability) => {
                   const lore = abilityLoreByCode.get(ability);
                   if (!lore) return null;
@@ -2912,8 +2896,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     </div>
                   );
                 })}
-              </div>
-            </details>
+            </CollapsibleDisclosure>
           </div>
         )}
 
@@ -2936,7 +2919,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 </strong>
               </p>
             )}
-            <div style={{ ...ui.blockInset, backgroundColor: "var(--surface-1)" }}>
+            <div style={{ ...ui.blockSubsection, backgroundColor: "var(--surface-1)" }}>
               <ScoreBreakdownTable
                 variant="skill"
                 columns={SKILL_BREAKDOWN_COLUMNS}
@@ -3004,12 +2987,16 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 const skillBody = typeof skill.raw?.body === "string" ? skill.raw.body : "";
                 if (!skillBody) return null;
                 return (
-                  <details key={`${skill.id}-desc`} open style={{ margin: "0.25rem 0 0.35rem 1.25rem" }}>
-                    <summary style={detailsSummaryStyle}>{skill.name} — description</summary>
-                    <div style={{ fontSize: "0.8rem", margin: "0.25rem 0 0 0", color: "var(--text-secondary)" }}>
+                  <CollapsibleDisclosure
+                    key={`${skill.id}-desc`}
+                    open
+                    style={{ margin: "0.25rem 0 0.35rem 1.25rem" }}
+                    summary={`${skill.name} — description`}
+                    summaryStyle={disclosureSummaryStyle}
+                    bodyStyle={{ fontSize: "0.8rem", margin: "0.25rem 0 0 0", color: "var(--text-secondary)" }}
+                  >
                       <RulesRichText text={skillBody} paragraphStyle={{ fontSize: "0.8rem", color: "var(--text-secondary)" }} listItemStyle={{ fontSize: "0.8rem", color: "var(--text-secondary)" }} />
-                    </div>
-                  </details>
+                  </CollapsibleDisclosure>
                 );
               })}
             </div>
@@ -3133,7 +3120,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 Reset feat filters
               </button>
             </div>
-            <div style={{ ...ui.blockInset, maxHeight: "280px", overflow: "auto", backgroundColor: "var(--surface-1)", padding: "0.35rem" }}>
+            <div style={{ ...ui.blockSubsection, maxHeight: "280px", overflow: "auto", backgroundColor: "var(--surface-1)", padding: "0.35rem" }}>
               {filteredFeatRows.length === 0 ? (
                 <p style={{ margin: "0.5rem", color: "var(--text-muted)", fontSize: "0.9rem" }}>
                   {allLegalFeats.length === 0 && !showInvalidFeats
@@ -3215,7 +3202,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 </ul>
               )}
             </div>
-            <div style={{ ...ui.blockInset, marginTop: "0.75rem", backgroundColor: "var(--surface-1)" }}>
+            <div style={{ ...ui.blockSubsection, marginTop: "0.75rem", backgroundColor: "var(--surface-1)" }}>
               <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--text-secondary)", marginBottom: "0.3rem" }}>Selected Feats</div>
               {selectedFeats.length === 0 ? (
                 <p style={{ margin: 0, fontSize: "0.84rem", color: "var(--text-muted)" }}>No feats selected yet.</p>
@@ -3564,7 +3551,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                           {slotBucketSectionTitle(def.bucket)}
                         </h4>
                       )}
-                      <div style={{ ...ui.blockInset, backgroundColor: "var(--surface-1)", padding: "0.65rem 0.75rem" }}>
+                      <div style={{ ...ui.blockSubsection, backgroundColor: "var(--surface-1)", padding: "0.65rem 0.75rem" }}>
                         <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.35rem", color: "var(--text-primary)" }}>
                           {def.label}
                         </label>
@@ -3657,7 +3644,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   </span>
                 )}
               </div>
-              <div style={{ ...ui.blockInset, maxHeight: "220px", overflow: "auto", backgroundColor: "var(--surface-1)", padding: "0.35rem" }}>
+              <div style={{ ...ui.blockSubsection, maxHeight: "220px", overflow: "auto", backgroundColor: "var(--surface-1)", padding: "0.35rem" }}>
                 {filteredThemes.length === 0 ? (
                   <p style={{ margin: "0.5rem", color: "var(--text-muted)", fontSize: "0.9rem" }}>No themes match this search.</p>
                 ) : (
@@ -3707,15 +3694,18 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 )}
               </div>
               {selectedTheme?.raw?.flavor && typeof selectedTheme.raw.flavor === "string" && (
-                <p style={{ ...ui.blockInset, marginTop: "0.65rem", fontStyle: "italic", fontSize: "0.9rem" }}>{selectedTheme.raw.flavor}</p>
+                <p style={{ ...ui.blockSubsection, marginTop: "0.65rem", fontStyle: "italic", fontSize: "0.9rem" }}>{selectedTheme.raw.flavor}</p>
               )}
               {selectedTheme?.raw?.body && typeof selectedTheme.raw.body === "string" && (
-                <details open style={{ marginTop: "0.5rem" }}>
-                  <summary style={detailsSummaryStyle}>Theme details</summary>
-                  <div style={{ marginTop: "0.4rem" }}>
-                    <RulesRichText text={String(selectedTheme.raw.body)} paragraphStyle={{ fontSize: "0.9rem" }} listItemStyle={{ fontSize: "0.9rem" }} />
-                  </div>
-                </details>
+                <CollapsibleDisclosure
+          open
+          style={{ marginTop: "0.5rem" }}
+          summary="Theme details"
+          summaryStyle={disclosureSummaryStyle}
+          bodyStyle={{ marginTop: "0.4rem" }}
+        >
+          <RulesRichText text={String(selectedTheme.raw.body)} paragraphStyle={{ fontSize: "0.9rem" }} listItemStyle={{ fontSize: "0.9rem" }} />
+        </CollapsibleDisclosure>
               )}
               {themeGrantedPowers.length > 0 && (
                 <div style={{ marginTop: "0.75rem" }}>
@@ -3910,7 +3900,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   </span>
                 )}
               </div>
-              <div style={{ ...ui.blockInset, maxHeight: "240px", overflow: "auto", backgroundColor: "var(--surface-1)", padding: "0.35rem" }}>
+              <div style={{ ...ui.blockSubsection, maxHeight: "240px", overflow: "auto", backgroundColor: "var(--surface-1)", padding: "0.35rem" }}>
                 {filteredParagonPaths.length === 0 ? (
                   <p style={{ margin: "0.5rem", color: "var(--text-muted)", fontSize: "0.9rem" }}>No paragon paths match this search.</p>
                 ) : (
@@ -3967,16 +3957,19 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 </p>
               )}
               {selectedParagonPath?.raw?.body && typeof selectedParagonPath.raw.body === "string" && (
-                <details open style={{ marginTop: "0.5rem" }}>
-                  <summary style={detailsSummaryStyle}>Paragon path details</summary>
-                  <div style={{ marginTop: "0.4rem" }}>
-                    <RulesRichText
+                <CollapsibleDisclosure
+          open
+          style={{ marginTop: "0.5rem" }}
+          summary="Paragon path details"
+          summaryStyle={disclosureSummaryStyle}
+          bodyStyle={{ marginTop: "0.4rem" }}
+        >
+          <RulesRichText
                       text={String(selectedParagonPath.raw.body)}
                       paragraphStyle={{ fontSize: "0.9rem" }}
                       listItemStyle={{ fontSize: "0.9rem" }}
                     />
-                  </div>
-                </details>
+        </CollapsibleDisclosure>
               )}
             </section>
           </div>
@@ -4025,7 +4018,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   </span>
                 )}
               </div>
-              <div style={{ ...ui.blockInset, maxHeight: "240px", overflow: "auto", backgroundColor: "var(--surface-1)", padding: "0.35rem" }}>
+              <div style={{ ...ui.blockSubsection, maxHeight: "240px", overflow: "auto", backgroundColor: "var(--surface-1)", padding: "0.35rem" }}>
                 {filteredEpicDestinies.length === 0 ? (
                   <p style={{ margin: "0.5rem", color: "var(--text-muted)", fontSize: "0.9rem" }}>No epic destinies match this search.</p>
                 ) : (
@@ -4080,16 +4073,19 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 </p>
               )}
               {selectedEpicDestiny?.raw?.body && typeof selectedEpicDestiny.raw.body === "string" && (
-                <details open style={{ marginTop: "0.5rem" }}>
-                  <summary style={detailsSummaryStyle}>Epic destiny details</summary>
-                  <div style={{ marginTop: "0.4rem" }}>
-                    <RulesRichText
+                <CollapsibleDisclosure
+          open
+          style={{ marginTop: "0.5rem" }}
+          summary="Epic destiny details"
+          summaryStyle={disclosureSummaryStyle}
+          bodyStyle={{ marginTop: "0.4rem" }}
+        >
+          <RulesRichText
                       text={String(selectedEpicDestiny.raw.body)}
                       paragraphStyle={{ fontSize: "0.9rem" }}
                       listItemStyle={{ fontSize: "0.9rem" }}
                     />
-                  </div>
-                </details>
+        </CollapsibleDisclosure>
               )}
             </section>
           </div>
@@ -4256,102 +4252,11 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             </label>
           </div>
         )}
-        <div style={{ ...ui.blockInset, marginTop: "0.75rem", backgroundColor: "var(--surface-0)" }}>
-          <details>
-            <summary style={jsonSummaryStyle}>
-              JSON
-            </summary>
-            <div style={{ marginTop: "0.45rem", display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>
-              <input
-                value={jsonSearchInput}
-                onChange={(event) => setJsonSearchInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key !== "Enter") return;
-                  event.preventDefault();
-                  const committed = jsonSearchInput.trim();
-                  setJsonSearchQuery(committed);
-                  setJsonSearchResultIdx(0);
-                  setJsonSearchJumpTick((prev) => prev + 1);
-                }}
-                placeholder="Search JSON..."
-                style={{
-                  minWidth: 260,
-                  border: "1px solid var(--panel-border)",
-                  borderRadius: "0.28rem",
-                  padding: "0.22rem 0.3rem"
-                }}
-              />
-              <button
-                type="button"
-                disabled={jsonSearchMatches.length === 0}
-                onClick={() =>
-                  setJsonSearchResultIdx((prev) => {
-                    const nextIdx = jsonSearchMatches.length === 0 ? 0 : (prev - 1 + jsonSearchMatches.length) % jsonSearchMatches.length;
-                    setJsonSearchJumpTick((tick) => tick + 1);
-                    return nextIdx;
-                  })
-                }
-              >
-                Previous
-              </button>
-              <button
-                type="button"
-                disabled={jsonSearchMatches.length === 0}
-                onClick={() =>
-                  setJsonSearchResultIdx((prev) => {
-                    const nextIdx = jsonSearchMatches.length === 0 ? 0 : (prev + 1) % jsonSearchMatches.length;
-                    setJsonSearchJumpTick((tick) => tick + 1);
-                    return nextIdx;
-                  })
-                }
-              >
-                Next
-              </button>
-              <span style={{ color: "var(--text-secondary)", fontSize: "0.8rem" }}>
-                {jsonSearchQuery.trim()
-                  ? jsonSearchMatches.length > 0
-                    ? `${Math.min(jsonSearchResultIdx + 1, jsonSearchMatches.length)} of ${jsonSearchMatches.length}`
-                    : "0 matches"
-                  : "Type and press Enter"}
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!navigator.clipboard?.writeText) {
-                    alert("Clipboard API unavailable in this browser.");
-                    return;
-                  }
-                  void navigator.clipboard.writeText(expandedBuildJson);
-                }}
-                style={{ marginLeft: "auto" }}
-              >
-                Copy Contents
-              </button>
-            </div>
-            <textarea
-              ref={jsonTextareaRef}
-              value={expandedBuildJson}
-              readOnly
-              style={{
-                margin: "0.5rem 0 0 0",
-                padding: "0.5rem",
-                borderRadius: "0.3rem",
-                border: "1px solid var(--panel-border)",
-                backgroundColor: "var(--surface-1)",
-                color: "var(--text-primary)",
-                overflow: "auto",
-                height: "44rem",
-                minHeight: "12rem",
-                width: "100%",
-                boxSizing: "border-box",
-                resize: "vertical",
-                fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
-                fontSize: "0.76rem",
-                lineHeight: 1.35
-              }}
-            />
-          </details>
-        </div>
+        <JsonCollapsiblePanel
+          title="JSON"
+          jsonText={expandedBuildJson}
+          shellStyle={{ ...ui.blockInset, marginTop: "0.75rem", backgroundColor: "var(--surface-0)" }}
+        />
       </div>
 
       <div
@@ -4501,10 +4406,12 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Paragon Path:</strong> {selectedParagonPath?.name || "None"}</p>
               <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Epic Destiny:</strong> {selectedEpicDestiny?.name || "None"}</p>
               {multiclassFeatIdList.length > 0 && (
-                <details style={{ marginTop: "0.35rem", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
-                  <summary style={detailsSummaryStyle}>
-                    Multiclass-related feats ({multiclassFeatIdList.length})
-                  </summary>
+                <CollapsibleDisclosure
+                  style={{ marginTop: "0.35rem", fontSize: "0.8rem", color: "var(--text-secondary)" }}
+                  summary={`Multiclass-related feats (${multiclassFeatIdList.length})`}
+                  summaryStyle={disclosureSummaryStyle}
+                  bodyStyle={{ marginTop: "0.35rem" }}
+                >
                   <ul style={{ margin: "0.35rem 0 0 0", paddingLeft: "1.1rem" }}>
                     {multiclassFeatIdList.map((fid) => {
                       const f = index.feats.find((x) => x.id === fid);
@@ -4545,7 +4452,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                       <strong>Psionic second class:</strong> second psionic class talent active
                     </p>
                   )}
-                </details>
+                </CollapsibleDisclosure>
               )}
           </LiveSheetCollapsibleSection>
 
@@ -4645,7 +4552,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 />
               </div>
             </div>
-            <SupportPassiveMotionBreakdown o={derived.supportPassiveOther} summaryStyle={detailsSummaryStyle} />
+            <SupportPassiveMotionBreakdown o={derived.supportPassiveOther} summaryStyle={disclosureSummaryStyle} />
             {derived.armorCheckPenalty > 0 && (
               <p style={{ margin: "0.45rem 0 0 0", fontSize: "0.82rem", color: "var(--status-warning)" }}>
                 Armor check penalty −{derived.armorCheckPenalty} on untrained Strength / Dexterity skills (see Skills).

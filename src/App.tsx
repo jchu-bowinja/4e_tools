@@ -44,41 +44,6 @@ function loadSavedTheme(): AppTheme {
   return stored === "dark" ? "dark" : "light";
 }
 
-const THEME_COLORS: Record<
-  AppTheme,
-  {
-    appBackground: string;
-    headerBackground: string;
-    headerBorder: string;
-    text: string;
-    mutedText: string;
-    errorText: string;
-    toggleBackground: string;
-    toggleBorder: string;
-  }
-> = {
-  light: {
-    appBackground: "#e4e5e9",
-    headerBackground: "#f8fafc",
-    headerBorder: "#d1d5db",
-    text: "#111827",
-    mutedText: "#3a3a42",
-    errorText: "crimson",
-    toggleBackground: "#ffffff",
-    toggleBorder: "#cbd5e1"
-  },
-  dark: {
-    appBackground: "#111827",
-    headerBackground: "#0f172a",
-    headerBorder: "#334155",
-    text: "#e5e7eb",
-    mutedText: "#cbd5e1",
-    errorText: "#fda4af",
-    toggleBackground: "#1f2937",
-    toggleBorder: "#475569"
-  }
-};
-
 export default function App(): JSX.Element {
   const [index, setIndex] = useState<RulesIndex | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -134,26 +99,24 @@ export default function App(): JSX.Element {
     setEditorOverlay(resetResourceEditorOverlay());
   }
 
-  const colors = THEME_COLORS[theme];
-
   if (error) {
     return (
-      <pre role="alert" style={{ padding: "1rem", color: colors.errorText }}>
+      <pre role="alert" style={{ padding: "1rem", color: "var(--app-error-fg)" }}>
         {error}
       </pre>
     );
   }
   if (!index) {
     return (
-      <div style={{ ...appLoadingShell, backgroundColor: colors.appBackground, color: colors.text }}>
+      <div style={{ ...appLoadingShell, backgroundColor: "var(--app-chrome-bg)", color: "var(--app-chrome-fg)" }}>
         <div
           role="status"
           aria-live="polite"
           style={{
             ...appLoadingCard,
-            backgroundColor: colors.toggleBackground,
-            borderColor: colors.toggleBorder,
-            color: colors.mutedText
+            backgroundColor: "var(--surface-0)",
+            borderColor: "var(--panel-border)",
+            color: "var(--app-chrome-muted)"
           }}
         >
           Loading rules index…
@@ -174,8 +137,8 @@ export default function App(): JSX.Element {
       style={{
         minHeight: "100vh",
         minWidth: "var(--app-min-width, 56rem)",
-        backgroundColor: colors.appBackground,
-        color: colors.text,
+        backgroundColor: "var(--app-chrome-bg)",
+        color: "var(--app-chrome-fg)",
         ["--app-header-sticky-offset" as string]: "3.25rem"
       }}
     >
@@ -190,8 +153,8 @@ export default function App(): JSX.Element {
           gap: "0.75rem",
           flexWrap: "wrap",
           padding: "0.65rem 1rem",
-          borderBottom: `1px solid ${colors.headerBorder}`,
-          backgroundColor: colors.headerBackground,
+          borderBottom: "1px solid var(--app-header-border)",
+          backgroundColor: "var(--app-header-bg)",
           position: "sticky",
           top: 0,
           zIndex: 20
@@ -231,9 +194,9 @@ export default function App(): JSX.Element {
             title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
             onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
             style={{
-              backgroundColor: colors.toggleBackground,
-              borderColor: colors.toggleBorder,
-              color: colors.text
+              backgroundColor: "var(--surface-0)",
+              borderColor: "var(--panel-border)",
+              color: "var(--app-chrome-fg)"
             }}
           >
             {theme === "dark" ? "Light Mode" : "Dark Mode"}
@@ -265,13 +228,13 @@ export default function App(): JSX.Element {
       <ReportingFloatingControl
         getHashRoute={() => (typeof window !== "undefined" ? window.location.hash || "#/builder" : "#/builder")}
         colors={{
-          text: colors.text,
-          mutedText: colors.mutedText,
-          errorText: colors.errorText,
-          toggleBackground: colors.toggleBackground,
-          toggleBorder: colors.toggleBorder,
-          surfaceBackground: colors.headerBackground,
-          headerBorder: colors.headerBorder
+          text: "var(--app-chrome-fg)",
+          mutedText: "var(--app-chrome-muted)",
+          errorText: "var(--app-error-fg)",
+          toggleBackground: "var(--surface-0)",
+          toggleBorder: "var(--panel-border)",
+          surfaceBackground: "var(--app-header-bg)",
+          headerBorder: "var(--app-header-border)"
         }}
       />
     </div>

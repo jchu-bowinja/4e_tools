@@ -19,6 +19,8 @@ export type CollapsibleDisclosureProps = {
   summaryStyle?: CSSProperties;
   bodyStyle?: CSSProperties;
   summaryTabIndex?: number;
+  /** Extra attributes for the summary element (e.g. glossary hoverA11y handlers). */
+  summaryExtraProps?: Record<string, unknown>;
   onSummaryMouseEnter?: (event: MouseEvent<HTMLElement>) => void;
   onSummaryMouseLeave?: () => void;
   onSummaryFocus?: (event: FocusEvent<HTMLElement>) => void;
@@ -35,6 +37,7 @@ export function CollapsibleDisclosure({
   summaryStyle,
   bodyStyle,
   summaryTabIndex,
+  summaryExtraProps,
   onSummaryMouseEnter,
   onSummaryMouseLeave,
   onSummaryFocus,
@@ -52,6 +55,7 @@ export function CollapsibleDisclosure({
         onMouseLeave={onSummaryMouseLeave}
         onFocus={onSummaryFocus}
         onBlur={onSummaryBlur}
+        {...summaryExtraProps}
       >
         <CollapsibleDisclosureArrow />
         {summary}

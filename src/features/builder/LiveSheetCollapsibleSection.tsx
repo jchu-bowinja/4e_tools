@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import { CollapsibleDisclosure } from "../../ui/CollapsibleDisclosure";
 
 export const liveSheetSummaryStyle: CSSProperties = {
   cursor: "pointer",
@@ -11,7 +12,6 @@ export const liveSheetSummaryStyle: CSSProperties = {
 
 /** Body layout inside a sidebar panel; border/chrome comes from `ui.sidebarPanel`. */
 export const liveSheetSectionBodyStyle: CSSProperties = {
-  marginTop: "0.35rem",
   display: "grid",
   gap: "0.35rem",
   minWidth: 0,
@@ -38,13 +38,15 @@ export function LiveSheetCollapsibleSection({
   bodyStyle
 }: LiveSheetCollapsibleSectionProps): JSX.Element {
   return (
-    <details className="live-sheet-collapsible" open={defaultOpen}>
-      <summary style={{ ...liveSheetSummaryStyle, ...summaryStyle }} {...summaryA11y}>
-        {title}
-      </summary>
-      <div className="live-sheet-collapsible__body" style={{ ...liveSheetSectionBodyStyle, ...bodyStyle }}>
-        {children}
-      </div>
-    </details>
+    <CollapsibleDisclosure
+      className="template-json-collapsible live-sheet-collapsible"
+      open={defaultOpen}
+      summary={title}
+      summaryStyle={{ ...liveSheetSummaryStyle, ...summaryStyle }}
+      summaryExtraProps={summaryA11y}
+      bodyStyle={{ ...liveSheetSectionBodyStyle, ...bodyStyle }}
+    >
+      {children}
+    </CollapsibleDisclosure>
   );
 }

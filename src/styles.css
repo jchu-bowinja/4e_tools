@@ -66,10 +66,58 @@
   --monster-stat-block-gloss-underline: rgba(44, 36, 26, 0.38);
   /* Below this width the page scrolls horizontally instead of crushing layout. */
   --app-min-width: 56rem;
+  --condition-bloodied-bg: #b91c1c;
+  --condition-bloodied-fg: #ffffff;
+  --condition-dying-bg: #9a3412;
+  --condition-dying-fg: #ffffff;
+  --condition-dead-bg: #7f1d1d;
+  --condition-dead-fg: #ffffff;
+  --condition-blinded-bg: #111827;
+  --condition-blinded-fg: #f9fafb;
+  --condition-dazed-bg: #92400e;
+  --condition-dazed-fg: #ffffff;
+  --condition-deafened-bg: #374151;
+  --condition-deafened-fg: #f9fafb;
+  --condition-dominated-bg: #5b21b6;
+  --condition-dominated-fg: #ffffff;
+  --condition-helpless-bg: #475569;
+  --condition-helpless-fg: #f8fafc;
+  --condition-immobilized-bg: #166534;
+  --condition-immobilized-fg: #ffffff;
+  --condition-marked-bg: #a16207;
+  --condition-marked-fg: #ffffff;
+  --condition-petrified-bg: #4b5563;
+  --condition-petrified-fg: #f9fafb;
+  --condition-prone-bg: #9a3412;
+  --condition-prone-fg: #ffffff;
+  --condition-restrained-bg: #065f46;
+  --condition-restrained-fg: #ffffff;
+  --condition-slowed-bg: #155e75;
+  --condition-slowed-fg: #ffffff;
+  --condition-stunned-bg: #92400e;
+  --condition-stunned-fg: #ffffff;
+  --condition-surprised-bg: #075985;
+  --condition-surprised-fg: #ffffff;
+  --condition-unconscious-bg: #1f2937;
+  --condition-unconscious-fg: #ffffff;
+  --condition-weakened-bg: #9d174d;
+  --condition-weakened-fg: #ffffff;
+  --app-chrome-bg: #e4e5e9;
+  --app-header-bg: #f8fafc;
+  --app-header-border: #d1d5db;
+  --app-chrome-fg: #111827;
+  --app-chrome-muted: #3a3a42;
+  --app-error-fg: crimson;
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
+  --app-chrome-bg: #111827;
+  --app-header-bg: #0f172a;
+  --app-header-border: #334155;
+  --app-chrome-fg: #e5e7eb;
+  --app-chrome-muted: #cbd5e1;
+  --app-error-fg: #fda4af;
 }
 
 .skip-link {
@@ -480,6 +528,10 @@ textarea:hover {
 
 .character-sheet-overview-collapsible > :not(summary) {
   margin-top: 0.25rem;
+}
+
+.live-sheet-collapsible > :not(summary) {
+  margin-top: 0.35rem;
 }
 
 .character-sheet-overview-row--page-break {
