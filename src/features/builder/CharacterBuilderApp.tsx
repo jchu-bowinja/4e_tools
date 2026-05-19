@@ -3393,6 +3393,25 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 minWidth="10rem"
                 detailsName="feat-facet-filters"
               />
+              <button
+                type="button"
+                onClick={() => {
+                  setFeatTierFilter([]);
+                  setFeatCategoryFilter([]);
+                  setFeatSourceFilter(EMPTY_FEAT_SOURCE_FILTER);
+                }}
+                style={{
+                  padding: "0.35rem 0.65rem",
+                  borderRadius: "6px",
+                  border: "1px solid var(--panel-border)",
+                  background: "var(--surface-0)",
+                  cursor: "pointer",
+                  fontSize: "0.82rem",
+                  flexShrink: 0
+                }}
+              >
+                Clear filters
+              </button>
             </div>
             <div style={{ ...ui.blockSubsection, maxHeight: "280px", overflow: "auto", backgroundColor: "var(--surface-1)", padding: "0.35rem" }}>
               {filteredFeatRows.length === 0 ? (
