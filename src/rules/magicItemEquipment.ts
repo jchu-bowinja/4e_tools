@@ -1,4 +1,12 @@
-import type { Armor, CharacterBuild, MagicItem, MagicItemSlotIds, RulesIndex, Weapon } from "./models";
+import type {
+  Armor,
+  CharacterBuild,
+  MagicItem,
+  MagicItemSlotIds,
+  MagicOnlyEquipmentSlotKey,
+  RulesIndex,
+  Weapon
+} from "./models";
 import { mergePassiveDefenseBonuses, type PassiveDefenseBonuses } from "./supportStatAdds";
 import {
   computeEquipmentCombatBonuses,
@@ -78,14 +86,82 @@ export function isWeaponMagicItem(item: MagicItem): boolean {
     .toLowerCase() === "weapon";
 }
 
+/** Compendium `Magic Item Type` for each magic-only equipment slot. */
+export const MAGIC_ITEM_TYPE_BY_SLOT: Record<MagicOnlyEquipmentSlotKey, string> = {
+  neck: "neck slot item",
+  head: "head slot item",
+  arms: "arms slot item",
+  hands: "hands slot item",
+  feet: "feet slot item",
+  waist: "waist slot item",
+  ring1: "ring",
+  ring2: "ring",
+  companion: "companion slot item",
+  mount: "mount slot item",
+  familiar: "familiar slot item"
+};
+
+export const MAGIC_ONLY_EQUIPMENT_SLOT_KEYS: MagicOnlyEquipmentSlotKey[] = [
+  "neck",
+  "head",
+  "arms",
+  "hands",
+  "waist",
+  "feet",
+  "ring1",
+  "ring2",
+  "companion",
+  "mount",
+  "familiar"
+];
+
+export const MAGIC_ONLY_SLOT_LABELS: Record<MagicOnlyEquipmentSlotKey, string> = {
+  neck: "Neck",
+  head: "Head",
+  arms: "Arms",
+  hands: "Hands",
+  feet: "Feet",
+  waist: "Waist",
+  ring1: "Ring 1",
+  ring2: "Ring 2",
+  companion: "Companion",
+  mount: "Mount",
+  familiar: "Familiar"
+};
+
+function magicItemTypes(item: MagicItem): string[] {
+  const raw = item.magicItemType;
+  if (Array.isArray(raw)) {
+    return raw.map((v) => String(v).trim().toLowerCase()).filter(Boolean);
+  }
+  const single = String(raw || "")
+    .trim()
+    .toLowerCase();
+  return single ? [single] : [];
+}
+
+export function isMagicItemForSlot(item: MagicItem, slot: MagicOnlyEquipmentSlotKey): boolean {
+  const types = magicItemTypes(item);
+  const expected = MAGIC_ITEM_TYPE_BY_SLOT[slot];
+  if (types.includes(expected)) return true;
+  const itemSlot = String(item.itemSlot || "")
+    .trim()
+    .toLowerCase();
+  if (slot === "neck" && itemSlot === "neck") return true;
+  if (slot === "head" && itemSlot === "head") return true;
+  if (slot === "arms" && itemSlot === "arms") return true;
+  if (slot === "hands" && itemSlot === "hands") return true;
+  if (slot === "feet" && itemSlot === "feet") return true;
+  if (slot === "waist" && itemSlot === "waist") return true;
+  if ((slot === "ring1" || slot === "ring2") && itemSlot === "ring") return true;
+  if (slot === "companion" && itemSlot === "companion") return true;
+  if (slot === "mount" && itemSlot === "mount") return true;
+  if (slot === "familiar" && itemSlot === "familiar") return true;
+  return false;
+}
+
 export function isNeckMagicItem(item: MagicItem): boolean {
-  const typ = String(item.magicItemType || "")
-    .trim()
-    .toLowerCase();
-  const slot = String(item.itemSlot || "")
-    .trim()
-    .toLowerCase();
-  return typ === "neck slot item" || slot === "neck";
+  return isMagicItemForSlot(item, "neck");
 }
 
 export function isImplementMagicItem(item: MagicItem): boolean {

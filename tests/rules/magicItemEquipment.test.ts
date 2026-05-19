@@ -4,6 +4,7 @@ import {
   aggregateMagicItemDefenseBonuses,
   computeMagicItemCombatBonuses,
   isArmorMagicItem,
+  isMagicItemForSlot,
   magicItemAttackBonus,
   stripLegacyMagicItemBonuses,
   weaponMatchesMagicItem
@@ -92,6 +93,29 @@ describe("magicItemEquipment", () => {
     expect(weaponMatchesMagicItem(weapon, longswordPlus3)).toBe(true);
     expect(isArmorMagicItem(blackIron)).toBe(true);
     expect(magicItemAttackBonus(longswordPlus3)).toBe(3);
+  });
+
+  it("classifies magic-only equipment slots by type and item slot", () => {
+    const head: MagicItem = {
+      id: "head1",
+      name: "Helm of Eyes",
+      slug: "helm-of-eyes",
+      magicItemType: "Head Slot Item",
+      itemSlot: "Head",
+      raw: {}
+    };
+    const ring: MagicItem = {
+      id: "ring1",
+      name: "Ring of Protection",
+      slug: "ring-of-protection",
+      magicItemType: "Ring",
+      itemSlot: "Ring",
+      raw: {}
+    };
+    expect(isMagicItemForSlot(head, "head")).toBe(true);
+    expect(isMagicItemForSlot(head, "ring1")).toBe(false);
+    expect(isMagicItemForSlot(ring, "ring1")).toBe(true);
+    expect(isMagicItemForSlot(ring, "ring2")).toBe(true);
   });
 
   it("strips legacy manual magicItemBonuses", () => {

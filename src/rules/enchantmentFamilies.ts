@@ -154,17 +154,31 @@ export function clampEnhancementToFamily(
   return family.allowedEnhancements[0];
 }
 
+function sameEnchantmentFamily(
+  index: RulesIndex | undefined,
+  idA: string,
+  idB: string
+): boolean {
+  if (idA === idB) return true;
+  if (!index) return false;
+  const keyA = enchantmentFamilyKeyFromId(index, idA);
+  const keyB = enchantmentFamilyKeyFromId(index, idB);
+  return Boolean(keyA && keyB && keyA === keyB);
+}
+
 export function equipmentDuplicateEnchantmentWarnings(build: CharacterBuild, index?: RulesIndex): string[] {
   const equipment = build.equipment;
   if (!equipment) return [];
+  const warnings: string[] = [];
   const main = equipment.mainHand?.enchantmentId;
   const off = equipment.offHand?.enchantmentId;
-  if (!main || !off) return [];
-  if (main === off) {
-    return ["The same magic enchantment is selected for both main-hand and off-hand weapons."];
+  if (main && off && sameEnchantmentFamily(index, main, off)) {
+    warnings.push("The same magic enchantment is selected for both main-hand and off-hand weapons.");
   }
-  if (index && enchantmentFamilyKeyFromId(index, main) === enchantmentFamilyKeyFromId(index, off)) {
-    return ["The same magic enchantment is selected for both main-hand and off-hand weapons."];
+  const ring1 = equipment.ring1?.enchantmentId;
+  const ring2 = equipment.ring2?.enchantmentId;
+  if (ring1 && ring2 && sameEnchantmentFamily(index, ring1, ring2)) {
+    warnings.push("The same magic enchantment is selected for both ring slots.");
   }
-  return [];
+  return warnings;
 }

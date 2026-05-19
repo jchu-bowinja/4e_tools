@@ -35,34 +35,65 @@ import {
   setImplementEnchantmentFamily,
   setImplementEnhancement,
   setImplementSuperior,
-  setNeckEnchantmentFamily,
-  setNeckEnhancement,
+  setMagicOnlySlotEnchantmentFamily,
+  setMagicOnlySlotEnhancement,
   setStandardSlotBase,
   setStandardSlotEnchantmentFamily,
   setStandardSlotEnhancement,
+  type MagicOnlyEquipmentSlotKey,
   type StandardEquipmentSlotKey
 } from "./equipmentBuildUpdates";
 import {
   magicArmorEnchantmentFamilies,
   magicArmorOptions,
+  magicEnchantmentFamiliesForSlot,
   magicImplementEnchantmentFamilies,
   magicImplementOptions,
-  magicNeckEnchantmentFamilies,
-  magicNeckOptions,
+  magicOptionsForSlot,
   magicWeaponEnchantmentFamilies,
   magicWeaponOptions
 } from "./magicItemOptions";
+import { MAGIC_ONLY_EQUIPMENT_SLOT_KEYS, MAGIC_ONLY_SLOT_LABELS } from "../../rules/magicItemEquipment";
+import type { MagicOnlySlotSelection } from "../../rules/models";
 
-export type EquipmentEditorSlot = "armor" | "shield" | "mainHand" | "offHand" | "implement" | "neck";
-/** Sheet inventory picker: both weapon hands share one category. */
-export type EquipmentEditorSlotFilter = EquipmentEditorSlot | "weapon";
+export type EquipmentEditorSlot =
+  | "armor"
+  | "shield"
+  | "weapon"
+  | "implement"
+  | MagicOnlyEquipmentSlotKey;
+export type EquipmentEditorSlotFilter = EquipmentEditorSlot;
+
+const MAGIC_ONLY_SLOT_PLACEHOLDERS: Partial<Record<MagicOnlyEquipmentSlotKey, string>> = {
+  neck: "Cloak, amulet…",
+  head: "Helm, circlet…",
+  arms: "Bracers, armbands…",
+  hands: "Gauntlets, gloves…",
+  feet: "Boots, greaves…",
+  waist: "Belt, girdle…",
+  ring1: "Ring…",
+  ring2: "Ring…",
+  companion: "Companion item…",
+  mount: "Mount item…",
+  familiar: "Familiar item…"
+};
 
 export const ADD_EQUIPMENT_OPTIONS: { value: EquipmentEditorSlotFilter; label: string }[] = [
   { value: "armor", label: "Armor" },
   { value: "shield", label: "Shield" },
   { value: "weapon", label: "Weapon" },
   { value: "implement", label: "Implement" },
-  { value: "neck", label: "Neck" }
+  { value: "neck", label: MAGIC_ONLY_SLOT_LABELS.neck },
+  { value: "head", label: MAGIC_ONLY_SLOT_LABELS.head },
+  { value: "arms", label: MAGIC_ONLY_SLOT_LABELS.arms },
+  { value: "hands", label: MAGIC_ONLY_SLOT_LABELS.hands },
+  { value: "waist", label: MAGIC_ONLY_SLOT_LABELS.waist },
+  { value: "feet", label: MAGIC_ONLY_SLOT_LABELS.feet },
+  { value: "ring1", label: MAGIC_ONLY_SLOT_LABELS.ring1 },
+  { value: "ring2", label: MAGIC_ONLY_SLOT_LABELS.ring2 },
+  { value: "companion", label: MAGIC_ONLY_SLOT_LABELS.companion },
+  { value: "mount", label: MAGIC_ONLY_SLOT_LABELS.mount },
+  { value: "familiar", label: MAGIC_ONLY_SLOT_LABELS.familiar }
 ];
 
 export const equipmentPickerSelectStyle: CSSProperties = {
@@ -167,12 +198,20 @@ function EquipmentPickerRow(props: {
 }
 
 const slotSectionStyle: CSSProperties = {
-  padding: "0.65rem 0.75rem",
-  borderRadius: "8px",
-  border: "1px solid var(--panel-border)",
-  backgroundColor: "var(--surface-0)",
   display: "grid",
   gap: "0.55rem"
+};
+
+const tabContentStyle: CSSProperties = {
+  display: "grid",
+  gap: "0.85rem"
+};
+
+const goldRowStyle: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  alignItems: "center",
+  gap: "0.5rem"
 };
 
 const slotTitleStyle: CSSProperties = {
@@ -306,6 +345,111 @@ function EnchantmentPlusInput(props: {
   );
 }
 
+interface MagicOnlySlotSectionProps {
+  index: RulesIndex;
+  slotKey: MagicOnlyEquipmentSlotKey;
+  selection: MagicOnlySlotSelection | undefined;
+  enchantmentFamilies: EnchantmentFamily[];
+  selectedFamilyKey: string | undefined;
+  onEnchantmentFamilyChange: (familyKey: string | undefined) => void;
+  enchantmentSearch: string;
+  onEnchantmentSearchChange: (value: string) => void;
+  onEnhancementChange: (value: EnhancementLevel) => void;
+  equipment: CharacterEquipment;
+  gold: number;
+  showAddToInventory: boolean;
+  onAddToInventory?: () => void;
+  onBuy?: () => void;
+}
+
+function MagicOnlySlotSection(props: MagicOnlySlotSectionProps): JSX.Element {
+  const {
+    index,
+    slotKey,
+    selection,
+    enchantmentFamilies,
+    selectedFamilyKey,
+    onEnchantmentFamilyChange,
+    enchantmentSearch,
+    onEnchantmentSearchChange,
+    onEnhancementChange,
+    equipment,
+    gold,
+    showAddToInventory,
+    onAddToInventory,
+    onBuy
+  } = props;
+
+  const title = MAGIC_ONLY_SLOT_LABELS[slotKey];
+  const enhancement = selection?.enhancement ?? 0;
+  const selectedFamily = enchantmentFamilies.find((f) => f.key === selectedFamilyKey);
+  const enchantmentItem = selection?.enchantmentId ? findMagicItem(index, selection.enchantmentId) : undefined;
+  const filteredFamilies = useMemo(
+    () =>
+      ensureSelectedFamilyInFiltered(
+        filterEnchantmentFamilies(enchantmentFamilies, enchantmentSearch),
+        selectedFamilyKey,
+        enchantmentFamilies
+      ),
+    [enchantmentFamilies, enchantmentSearch, selectedFamilyKey]
+  );
+
+  return (
+    <div style={slotSectionStyle}>
+      <h4 style={slotTitleStyle}>{title}</h4>
+      <p style={{ margin: 0, fontSize: "0.78rem", color: "var(--text-muted)" }}>
+        No mundane base — magic enchantment and plus only.
+      </p>
+      <label style={fieldLabelStyle}>
+        1. Enchantment
+        <EquipmentPickerRow
+          filterValue={enchantmentSearch}
+          onFilterChange={onEnchantmentSearchChange}
+          filterPlaceholder={MAGIC_ONLY_SLOT_PLACEHOLDERS[slotKey] ?? "Magic item name"}
+          filterAriaLabel="Filter enchantment"
+          between={
+            <EnchantmentPlusInput
+              title={title}
+              allowedEnhancements={selectedFamily?.allowedEnhancements ?? []}
+              value={enhancement}
+              onChange={onEnhancementChange}
+            />
+          }
+        >
+          <select
+            value={selectedFamilyKey || ""}
+            onChange={(e) => onEnchantmentFamilyChange(e.target.value || undefined)}
+            style={selectInlineStyle}
+          >
+            <option value="">None</option>
+            {filteredFamilies.map((family) => (
+              <option key={family.key} value={family.key}>
+                {formatEnchantmentFamilyLabel(family)}
+              </option>
+            ))}
+          </select>
+        </EquipmentPickerRow>
+      </label>
+      <EquipmentSelectionDetails
+        enchantmentName={
+          enchantmentItem ? magicItemFamilyDisplayName(enchantmentItem.name) : undefined
+        }
+        enchantmentDescription={
+          enchantmentItem ? describeMagicItem(enchantmentItem) : undefined
+        }
+      />
+      <EquipmentSlotActions
+        price={equipmentSlotGoldCost(index, slotKey, equipment)}
+        gold={gold}
+        hasSelection={Boolean(selection?.enchantmentId)}
+        showAddToInventory={showAddToInventory}
+        onAddToInventory={onAddToInventory}
+        onBuy={onBuy}
+      />
+    </div>
+  );
+}
+
 interface StandardSlotSectionProps {
   index: RulesIndex;
   title: string;
@@ -392,7 +536,7 @@ function StandardSlotSection(props: StandardSlotSectionProps): JSX.Element {
   );
 
   return (
-    <section style={slotSectionStyle}>
+    <div style={slotSectionStyle}>
       <h4 style={slotTitleStyle}>{title}</h4>
       <label style={fieldLabelStyle}>
         1. {baseLabel}
@@ -460,7 +604,7 @@ function StandardSlotSection(props: StandardSlotSectionProps): JSX.Element {
         onAddToInventory={onAddToInventory}
         onBuy={onBuy}
       />
-    </section>
+    </div>
   );
 }
 
@@ -530,20 +674,28 @@ export function EquipmentTab({
 
   const selectedArmor = armorOptions.find((a) => a.id === equipment.armor?.baseId);
   const selectedShield = shieldOptions.find((a) => a.id === equipment.shield?.baseId);
-  const selectedMainWeapon = weaponsSorted.find((w) => w.id === equipment.mainHand?.baseId);
-  const selectedOffHandWeapon = weaponsSorted.find((w) => w.id === equipment.offHand?.baseId);
+  const selectedWeapon = weaponsSorted.find((w) => w.id === equipment.mainHand?.baseId);
 
   const magicArmorCatalog = useMemo(() => magicArmorOptions(index, selectedArmor), [index, selectedArmor]);
   const magicShieldCatalog = useMemo(() => magicArmorOptions(index, selectedShield), [index, selectedShield]);
-  const magicMainWeaponCatalog = useMemo(
-    () => magicWeaponOptions(index, selectedMainWeapon),
-    [index, selectedMainWeapon]
+  const magicWeaponCatalog = useMemo(
+    () => magicWeaponOptions(index, selectedWeapon),
+    [index, selectedWeapon]
   );
-  const magicOffHandCatalog = useMemo(
-    () => magicWeaponOptions(index, selectedOffHandWeapon),
-    [index, selectedOffHandWeapon]
-  );
-  const magicNeckCatalog = useMemo(() => magicNeckOptions(index), [index]);
+  const magicOnlyCatalogs = useMemo(() => {
+    const catalogs: Partial<Record<MagicOnlyEquipmentSlotKey, MagicItem[]>> = {};
+    for (const slotKey of MAGIC_ONLY_EQUIPMENT_SLOT_KEYS) {
+      catalogs[slotKey] = magicOptionsForSlot(index, slotKey);
+    }
+    return catalogs;
+  }, [index]);
+  const magicOnlyFamilies = useMemo(() => {
+    const families: Partial<Record<MagicOnlyEquipmentSlotKey, EnchantmentFamily[]>> = {};
+    for (const slotKey of MAGIC_ONLY_EQUIPMENT_SLOT_KEYS) {
+      families[slotKey] = magicEnchantmentFamiliesForSlot(index, slotKey);
+    }
+    return families;
+  }, [index]);
   const magicImplementCatalog = useMemo(() => magicImplementOptions(index), [index]);
 
   const magicArmorFamilies = useMemo(
@@ -554,27 +706,22 @@ export function EquipmentTab({
     () => magicArmorEnchantmentFamilies(index, selectedShield),
     [index, selectedShield]
   );
-  const magicMainWeaponFamilies = useMemo(
-    () => magicWeaponEnchantmentFamilies(index, selectedMainWeapon),
-    [index, selectedMainWeapon]
+  const magicWeaponFamilies = useMemo(
+    () => magicWeaponEnchantmentFamilies(index, selectedWeapon),
+    [index, selectedWeapon]
   );
-  const magicOffHandFamilies = useMemo(
-    () => magicWeaponEnchantmentFamilies(index, selectedOffHandWeapon),
-    [index, selectedOffHandWeapon]
-  );
-  const magicNeckFamilies = useMemo(() => magicNeckEnchantmentFamilies(index), [index]);
   const magicImplementFamilies = useMemo(() => magicImplementEnchantmentFamilies(index), [index]);
 
   const [armorBaseSearch, setArmorBaseSearch] = useState("");
   const [shieldBaseSearch, setShieldBaseSearch] = useState("");
-  const [mainWeaponBaseSearch, setMainWeaponBaseSearch] = useState("");
-  const [offHandBaseSearch, setOffHandBaseSearch] = useState("");
+  const [weaponBaseSearch, setWeaponBaseSearch] = useState("");
   const [implementBaseSearch, setImplementBaseSearch] = useState("");
   const [armorEnchantSearch, setArmorEnchantSearch] = useState("");
   const [shieldEnchantSearch, setShieldEnchantSearch] = useState("");
-  const [mainEnchantSearch, setMainEnchantSearch] = useState("");
-  const [offHandEnchantSearch, setOffHandEnchantSearch] = useState("");
-  const [neckEnchantSearch, setNeckEnchantSearch] = useState("");
+  const [weaponEnchantSearch, setWeaponEnchantSearch] = useState("");
+  const [magicOnlyEnchantSearch, setMagicOnlyEnchantSearch] = useState<
+    Partial<Record<MagicOnlyEquipmentSlotKey, string>>
+  >({});
   const [implementEnchantSearch, setImplementEnchantSearch] = useState("");
 
   const filteredImplements = useMemo(
@@ -586,25 +733,12 @@ export function EquipmentTab({
       ),
     [implementsSorted, implementBaseSearch, equipment.implement?.superiorImplementId]
   );
-  const neckFamilyKey = enchantmentFamilyKeyFromId(index, equipment.neck?.enchantmentId);
   const implementFamilyKey = enchantmentFamilyKeyFromId(index, equipment.implement?.enchantmentId);
-  const neckSelectedFamily = findEnchantmentFamilyById(index, equipment.neck?.enchantmentId);
   const implementSelectedFamily = findEnchantmentFamilyById(index, equipment.implement?.enchantmentId);
   const selectedSuperiorImplement = implementsSorted.find((i) => i.id === equipment.implement?.superiorImplementId);
   const implementEnchantmentItem = equipment.implement?.enchantmentId
     ? findMagicItem(index, equipment.implement.enchantmentId)
     : undefined;
-  const neckEnchantmentItem = equipment.neck?.enchantmentId ? findMagicItem(index, equipment.neck.enchantmentId) : undefined;
-
-  const filteredNeckFamilies = useMemo(
-    () =>
-      ensureSelectedFamilyInFiltered(
-        filterEnchantmentFamilies(magicNeckFamilies, neckEnchantSearch),
-        neckFamilyKey,
-        magicNeckFamilies
-      ),
-    [magicNeckFamilies, neckEnchantSearch, neckFamilyKey]
-  );
   const filteredImplementFamilies = useMemo(
     () =>
       ensureSelectedFamilyInFiltered(
@@ -633,36 +767,20 @@ export function EquipmentTab({
 
   const showSlot = (slot: EquipmentEditorSlot): boolean => {
     if (!activeSlotFilter) return false;
-    if (activeSlotFilter === "weapon") return slot === "mainHand" || slot === "offHand";
     return activeSlotFilter === slot;
   };
+
+  function patchMagicOnly(
+    slotKey: MagicOnlyEquipmentSlotKey,
+    fn: (b: CharacterBuild) => CharacterBuild
+  ): void {
+    onBuildChange(fn(build));
+  }
   return (
-    <>
-    {!hideTitle && <h3 style={{ margin: "0 0 0.5rem 0", fontSize: "1.05rem", fontWeight: 700 }}>Equipment</h3>}
-    <div
-      style={{
-        marginTop: hideTitle ? 0 : "0.35rem",
-        display: "grid",
-        gap: "0.85rem",
-        padding: "0.75rem",
-        borderRadius: "8px",
-        border: "1px solid var(--panel-border)",
-        backgroundColor: "var(--surface-1)"
-      }}
-    >
+    <div style={tabContentStyle}>
+      {!hideTitle && <h3 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700 }}>Equipment</h3>}
       {onGoldChange && (
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "center",
-            gap: "0.5rem",
-            padding: "0.45rem 0.55rem",
-            borderRadius: "6px",
-            border: "1px solid var(--panel-border)",
-            backgroundColor: "var(--surface-0)"
-          }}
-        >
+        <label style={goldRowStyle}>
           <span style={{ fontSize: "0.88rem", fontWeight: 600 }}>Gold</span>
           <AdjustableNumberInput
             compact
@@ -673,7 +791,7 @@ export function EquipmentTab({
             ariaLabel="Gold pieces"
           />
           <span style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>gp</span>
-        </div>
+        </label>
       )}
       {!useParentSlotPicker && (
         <select
@@ -768,76 +886,42 @@ export function EquipmentTab({
         />
       )}
 
-      {showSlot("mainHand") && (
-      <StandardSlotSection
-        index={index}
-        title="Main hand"
-        baseLabel="Weapon"
-        baseKind="weapon"
-        baseOptions={weaponsSorted}
-        baseValue={equipment.mainHand?.baseId}
-        enchantmentId={equipment.mainHand?.enchantmentId}
-        onBaseChange={(id) => patchStandard("mainHand", (b) => setStandardSlotBase(b, "mainHand", id))}
-        baseSearch={mainWeaponBaseSearch}
-        onBaseSearchChange={setMainWeaponBaseSearch}
-        basePlaceholder="Name, category…"
-        formatBaseOption={(w) => {
-          const weapon = w as Weapon;
-          return `${weapon.name}${weapon.weaponCategory ? ` (${weapon.weaponCategory})` : ""}`;
-        }}
-        enchantmentFamilies={magicMainWeaponFamilies}
-        selectedFamilyKey={enchantmentFamilyKeyFromId(index, equipment.mainHand?.enchantmentId)}
-        onEnchantmentFamilyChange={(familyKey) =>
-          patchStandard("mainHand", (b) =>
-            setStandardSlotEnchantmentFamily(b, index, "mainHand", familyKey, magicMainWeaponCatalog)
-          )
-        }
-        enchantmentSearch={mainEnchantSearch}
-        onEnchantmentSearchChange={setMainEnchantSearch}
-        enhancement={equipment.mainHand?.enhancement ?? 0}
-        onEnhancementChange={(n) =>
-          patchStandard("mainHand", (b) => setStandardSlotEnhancement(b, index, "mainHand", n, magicMainWeaponCatalog))
-        }
-        {...slotActionProps("mainHand")}
-      />
-      )}
-
-      {showSlot("offHand") && (
-      <StandardSlotSection
-        index={index}
-        title="Off hand"
-        baseLabel="Weapon"
-        baseKind="weapon"
-        baseOptions={weaponsSorted}
-        baseValue={equipment.offHand?.baseId}
-        enchantmentId={equipment.offHand?.enchantmentId}
-        onBaseChange={(id) => patchStandard("offHand", (b) => setStandardSlotBase(b, "offHand", id))}
-        baseSearch={offHandBaseSearch}
-        onBaseSearchChange={setOffHandBaseSearch}
-        basePlaceholder="Name, category…"
-        formatBaseOption={(w) => {
-          const weapon = w as Weapon;
-          return `${weapon.name}${weapon.weaponCategory ? ` (${weapon.weaponCategory})` : ""}`;
-        }}
-        enchantmentFamilies={magicOffHandFamilies}
-        selectedFamilyKey={enchantmentFamilyKeyFromId(index, equipment.offHand?.enchantmentId)}
-        onEnchantmentFamilyChange={(familyKey) =>
-          patchStandard("offHand", (b) =>
-            setStandardSlotEnchantmentFamily(b, index, "offHand", familyKey, magicOffHandCatalog)
-          )
-        }
-        enchantmentSearch={offHandEnchantSearch}
-        onEnchantmentSearchChange={setOffHandEnchantSearch}
-        enhancement={equipment.offHand?.enhancement ?? 0}
-        onEnhancementChange={(n) =>
-          patchStandard("offHand", (b) => setStandardSlotEnhancement(b, index, "offHand", n, magicOffHandCatalog))
-        }
-        {...slotActionProps("offHand")}
-      />
+      {showSlot("weapon") && (
+        <StandardSlotSection
+          index={index}
+          title="Weapon"
+          baseLabel="Weapon"
+          baseKind="weapon"
+          baseOptions={weaponsSorted}
+          baseValue={equipment.mainHand?.baseId}
+          enchantmentId={equipment.mainHand?.enchantmentId}
+          onBaseChange={(id) => patchStandard("mainHand", (b) => setStandardSlotBase(b, "mainHand", id))}
+          baseSearch={weaponBaseSearch}
+          onBaseSearchChange={setWeaponBaseSearch}
+          basePlaceholder="Name, category…"
+          formatBaseOption={(w) => {
+            const weapon = w as Weapon;
+            return `${weapon.name}${weapon.weaponCategory ? ` (${weapon.weaponCategory})` : ""}`;
+          }}
+          enchantmentFamilies={magicWeaponFamilies}
+          selectedFamilyKey={enchantmentFamilyKeyFromId(index, equipment.mainHand?.enchantmentId)}
+          onEnchantmentFamilyChange={(familyKey) =>
+            patchStandard("mainHand", (b) =>
+              setStandardSlotEnchantmentFamily(b, index, "mainHand", familyKey, magicWeaponCatalog)
+            )
+          }
+          enchantmentSearch={weaponEnchantSearch}
+          onEnchantmentSearchChange={setWeaponEnchantSearch}
+          enhancement={equipment.mainHand?.enhancement ?? 0}
+          onEnhancementChange={(n) =>
+            patchStandard("mainHand", (b) => setStandardSlotEnhancement(b, index, "mainHand", n, magicWeaponCatalog))
+          }
+          {...slotActionProps("weapon")}
+        />
       )}
 
       {showSlot("implement") && (
-      <section style={slotSectionStyle}>
+      <div style={slotSectionStyle}>
         <h4 style={slotTitleStyle}>Implement</h4>
         <label style={fieldLabelStyle}>
           1. Superior implement
@@ -916,66 +1000,42 @@ export function EquipmentTab({
           onAddToInventory={slotActionProps("implement").onAddToInventory}
           onBuy={slotActionProps("implement").onBuy}
         />
-      </section>
+      </div>
       )}
 
-      {showSlot("neck") && (
-      <section style={slotSectionStyle}>
-        <h4 style={slotTitleStyle}>Neck</h4>
-        <p style={{ margin: 0, fontSize: "0.78rem", color: "var(--text-muted)" }}>
-          No mundane base — magic enchantment and plus only.
-        </p>
-        <label style={fieldLabelStyle}>
-          1. Enchantment
-          <EquipmentPickerRow
-            filterValue={neckEnchantSearch}
-            onFilterChange={setNeckEnchantSearch}
-            filterPlaceholder="Cloak, amulet…"
-            filterAriaLabel="Filter enchantment"
-            between={
-              <EnchantmentPlusInput
-                title="Neck"
-                allowedEnhancements={neckSelectedFamily?.allowedEnhancements ?? []}
-                value={equipment.neck?.enhancement ?? 0}
-                onChange={(n) => onBuildChange(setNeckEnhancement(build, index, n, magicNeckCatalog))}
-              />
+      {MAGIC_ONLY_EQUIPMENT_SLOT_KEYS.map((slotKey) =>
+        showSlot(slotKey) ? (
+          <MagicOnlySlotSection
+            key={slotKey}
+            index={index}
+            slotKey={slotKey}
+            selection={equipment[slotKey]}
+            enchantmentFamilies={magicOnlyFamilies[slotKey] ?? []}
+            selectedFamilyKey={enchantmentFamilyKeyFromId(index, equipment[slotKey]?.enchantmentId)}
+            onEnchantmentFamilyChange={(familyKey) =>
+              patchMagicOnly(slotKey, (b) =>
+                setMagicOnlySlotEnchantmentFamily(
+                  b,
+                  index,
+                  slotKey,
+                  familyKey,
+                  magicOnlyCatalogs[slotKey] ?? []
+                )
+              )
             }
-          >
-            <select
-              value={neckFamilyKey || ""}
-              onChange={(e) =>
-                onBuildChange(setNeckEnchantmentFamily(build, index, e.target.value || undefined, magicNeckCatalog))
-              }
-              style={selectInlineStyle}
-            >
-              <option value="">None</option>
-              {filteredNeckFamilies.map((family) => (
-                <option key={family.key} value={family.key}>
-                  {formatEnchantmentFamilyLabel(family)}
-                </option>
-              ))}
-            </select>
-          </EquipmentPickerRow>
-        </label>
-        <EquipmentSelectionDetails
-          enchantmentName={
-            neckEnchantmentItem ? magicItemFamilyDisplayName(neckEnchantmentItem.name) : undefined
-          }
-          enchantmentDescription={
-            neckEnchantmentItem ? describeMagicItem(neckEnchantmentItem) : undefined
-          }
-        />
-        <EquipmentSlotActions
-          price={equipmentSlotGoldCost(index, "neck", equipment)}
-          gold={gold}
-          hasSelection={Boolean(equipment.neck?.enchantmentId)}
-          showAddToInventory={showAddToInventory}
-          onAddToInventory={slotActionProps("neck").onAddToInventory}
-          onBuy={slotActionProps("neck").onBuy}
-        />
-      </section>
+            enchantmentSearch={magicOnlyEnchantSearch[slotKey] ?? ""}
+            onEnchantmentSearchChange={(value) =>
+              setMagicOnlyEnchantSearch((prev) => ({ ...prev, [slotKey]: value }))
+            }
+            onEnhancementChange={(n) =>
+              patchMagicOnly(slotKey, (b) =>
+                setMagicOnlySlotEnhancement(b, index, slotKey, n, magicOnlyCatalogs[slotKey] ?? [])
+              )
+            }
+            {...slotActionProps(slotKey)}
+          />
+        ) : null
       )}
     </div>
-    </>
   );
 }

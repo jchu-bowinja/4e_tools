@@ -1,5 +1,12 @@
 import type { Ability, ClassDef, Implement, ProficiencyGrant, Weapon } from "./models";
 import {
+  formatWeaponDamageNotation,
+  offHandWeaponAttackPenalty,
+  versatileTwoHandedDamageBonus,
+  type WeaponHandSlot
+} from "./weaponWielding";
+import type { EquippedSlotKey } from "./models";
+import {
   isProficientWithImplementIncludingFeats,
   isProficientWithWeaponIncludingFeats
 } from "./featProficiencies";
@@ -87,7 +94,9 @@ export function summarizeMainWeaponAttack(
   weapon: Weapon | undefined,
   classWeaponProficienciesText: string | null | undefined,
   magicItemAttackBonus?: number,
-  featProficiencyGrants: ProficiencyGrant[] = []
+  featProficiencyGrants: ProficiencyGrant[] = [],
+  handSlot?: WeaponHandSlot,
+  equippedSlots?: Partial<Record<EquippedSlotKey, string>>
 ): WeaponAttackSummary | null {
   if (!weapon) return null;
   const abilityCode = weaponAttackAbility(weapon);
@@ -97,12 +106,15 @@ export function summarizeMainWeaponAttack(
   const pb = weapon.proficiencyBonus ?? 0;
   const itemBonus =
     typeof magicItemAttackBonus === "number" && Number.isFinite(magicItemAttackBonus) ? magicItemAttackBonus : 0;
-  const attackBonus = half + mod + (prof ? pb : -2) + itemBonus;
+  const wieldPenalty = handSlot ? offHandWeaponAttackPenalty(weapon, handSlot) : 0;
+  const attackBonus = half + mod + (prof ? pb : -2) + itemBonus + wieldPenalty;
+  const versatileDamageBonus =
+    handSlot && equippedSlots ? versatileTwoHandedDamageBonus(weapon, handSlot, equippedSlots) : 0;
   return {
     attackBonus,
     abilityCode,
     proficient: prof,
-    damageNotation: String(weapon.damage || "—")
+    damageNotation: formatWeaponDamageNotation(weapon.damage, versatileDamageBonus)
   };
 }
 

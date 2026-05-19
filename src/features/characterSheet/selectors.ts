@@ -23,12 +23,8 @@ import type {
   RulesIndex,
   Weapon
 } from "../../rules/models";
-import type { CharacterSheetState, EquipmentSlot, InventoryItem } from "./model";
-import {
-  buildLikeStateFromSheet,
-  inventoryAndSlotsFromCharacterEquipment,
-  sheetCharacterEquipment
-} from "./sheetEquipment";
+import type { CharacterSheetState, EquippedSlotKey, EquipmentSlot, InventoryItem } from "./model";
+import { buildLikeStateFromSheet, sheetCharacterEquipment } from "./sheetEquipment";
 
 export interface SheetDerivedData {
   race?: Race;
@@ -84,7 +80,7 @@ function findArmorByInventorySlot(
   return predicate(armor) ? armor : undefined;
 }
 
-export function canEquipItem(item: InventoryItem, slot: EquipmentSlot): boolean {
+export function canEquipItem(item: InventoryItem, slot: EquippedSlotKey): boolean {
   return item.quantity > 0 && item.slotHints.includes(slot);
 }
 
@@ -104,7 +100,7 @@ export function computeSheetDerivedData(state: CharacterSheetState, index: Rules
   const shield = findArmorByInventorySlot(
     state,
     index,
-    "shield",
+    "offHand",
     (item) => String(item.armorType || "").toLowerCase().includes("shield")
   );
 
@@ -266,7 +262,6 @@ export function groupCombatPowers(state: CharacterSheetState, index: RulesIndex)
 export function sheetStateFromBuild(build: CharacterBuild, index: RulesIndex): CharacterSheetState {
   const normalized = normalizeCharacterBuild(build, index);
   const characterEquipment = normalizeCharacterEquipment(normalized.equipment);
-  const { inventory, equipment } = inventoryAndSlotsFromCharacterEquipment(characterEquipment, index);
 
   const tempSheet: CharacterSheetState = {
     name: normalized.name || "Unnamed Character",
@@ -292,8 +287,8 @@ export function sheetStateFromBuild(build: CharacterBuild, index: RulesIndex): C
       conditions: []
     },
     gold: normalized.gold ?? 0,
-    inventory,
-    equipment,
+    inventory: [...(normalized.inventory ?? [])],
+    equipment: { ...(normalized.equippedSlots ?? {}) },
     powers: {
       selectedPowerIds: [...normalized.powerIds],
       expendedPowerIds: [],

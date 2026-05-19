@@ -1,19 +1,16 @@
-import type { Ability, CharacterEquipment, CharacterStyle } from "../../rules/models";
+import type {
+  Ability,
+  CharacterEquipment,
+  CharacterStyle,
+  EquippedSlotKey,
+  EquipmentSlot,
+  InventoryItem,
+  InventoryItemKind
+} from "../../rules/models";
 
 export type AbilityScores = Record<Ability, number>;
 
-export type EquipmentSlot = "armor" | "shield" | "mainHand" | "offHand" | "implement";
-export type InventoryItemKind = "armor" | "weapon" | "implement" | "gear";
-
-export interface InventoryItem {
-  id: string;
-  name: string;
-  kind: InventoryItemKind;
-  quantity: number;
-  sourceId?: string;
-  slotHints: EquipmentSlot[];
-  notes?: string;
-}
+export type { EquippedSlotKey, EquipmentSlot, InventoryItem, InventoryItemKind };
 
 export type ConditionDurationKind =
   | "none"
@@ -84,6 +81,6 @@ export interface CharacterSheetState {
   featIds?: string[];
   resources: CharacterSheetResources;
   inventory: InventoryItem[];
-  equipment: Partial<Record<EquipmentSlot, string>>;
+  equipment: Partial<Record<EquippedSlotKey, string>>;
   powers: CharacterSheetPowerSelection;
 }

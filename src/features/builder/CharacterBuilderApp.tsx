@@ -3,6 +3,8 @@ import {
   Ability,
   AsiChoices,
   CharacterBuild,
+  EquippedSlotKey,
+  EquipmentSlot,
   Feat,
   HybridClassDef,
   Power,
@@ -90,6 +92,15 @@ import {
 } from "../../rules/equipment";
 import { computeMagicItemCombatBonuses } from "../../rules/magicItemEquipment";
 import { equipmentSlotGoldCost } from "../../rules/equipmentItemPrice";
+import {
+  addAcquiredEquipmentToBuild,
+  characterBuildInventoryItems,
+  equipInventoryItemOnBuild,
+  unequipInventoryItemOnBuild
+} from "../characterSheet/sheetEquipment";
+import { CharacterEquippedSlotsPanel } from "../characterSheet/CharacterEquippedSlotsPanel";
+import { CharacterInventoryList } from "../characterSheet/CharacterInventoryList";
+import type { EquipmentPriceSlot } from "../../rules/equipmentItemPrice";
 import { summarizeImplementAttack, summarizeMainWeaponAttack } from "../../rules/weaponAttack";
 import { BuilderSidebarItemsPanel } from "./BuilderSidebarItemsPanel";
 import { EquipmentTab, type EquipmentEditorSlot } from "./EquipmentTab";
@@ -800,6 +811,13 @@ const ui = {
     borderRadius: "var(--ui-panel-radius, 8px)",
     padding: "0.75rem 0.9rem",
     marginTop: "0.75rem"
+  },
+  equipmentSubPanel: {
+    backgroundColor: "var(--surface-0)",
+    border: "1px solid var(--panel-border)",
+    borderRadius: "var(--ui-panel-radius, 0.35rem)",
+    padding: "0.55rem",
+    boxShadow: "var(--ui-panel-shadow, 0 1px 2px rgba(40, 30, 10, 0.08))"
   }
 };
 
@@ -1158,6 +1176,20 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   );
 
   const magicCombat = useMemo(() => computeMagicItemCombatBonuses(index, build), [index, build]);
+  const builderInventoryItems = useMemo(
+    () => characterBuildInventoryItems(build, index),
+    [build, index]
+  );
+
+  const wieldSlotsForPreview = useMemo(() => {
+    const slots: Partial<Record<EquippedSlotKey, string>> = {
+      ...build.equippedSlots
+    };
+    if (effectiveEquipmentIds.offHandWeaponId || effectiveEquipmentIds.shieldId) {
+      slots.offHand = slots.offHand ?? "config";
+    }
+    return slots;
+  }, [build.equippedSlots, effectiveEquipmentIds.offHandWeaponId, effectiveEquipmentIds.shieldId]);
 
   const mainWeaponSummary = useMemo(
     () =>
@@ -1167,9 +1199,19 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         selectedMainWeapon,
         classWeaponProfText,
         magicCombat.mainWeaponAttack,
-        featProficiencyGrants
+        featProficiencyGrants,
+        "mainHand",
+        wieldSlotsForPreview
       ),
-    [build.level, effectiveAbilityScores, selectedMainWeapon, classWeaponProfText, magicCombat.mainWeaponAttack, featProficiencyGrants]
+    [
+      build.level,
+      effectiveAbilityScores,
+      selectedMainWeapon,
+      classWeaponProfText,
+      magicCombat.mainWeaponAttack,
+      featProficiencyGrants,
+      wieldSlotsForPreview
+    ]
   );
   const offHandWeaponSummary = useMemo(
     () =>
@@ -1179,9 +1221,19 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         selectedOffHandWeapon,
         classWeaponProfText,
         magicCombat.offHandWeaponAttack,
-        featProficiencyGrants
+        featProficiencyGrants,
+        "offHand",
+        wieldSlotsForPreview
       ),
-    [build.level, effectiveAbilityScores, selectedOffHandWeapon, classWeaponProfText, magicCombat.offHandWeaponAttack, featProficiencyGrants]
+    [
+      build.level,
+      effectiveAbilityScores,
+      selectedOffHandWeapon,
+      classWeaponProfText,
+      magicCombat.offHandWeaponAttack,
+      featProficiencyGrants,
+      wieldSlotsForPreview
+    ]
   );
   const implementAttackSummary = useMemo(
     () =>
@@ -4173,22 +4225,70 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         )}
 
         {activeTab === "equipment" && (
-          <EquipmentTab
-            index={index}
-            build={build}
-            onBuildChange={updateBuild}
-            magicCombat={magicCombat}
-            gold={build.gold ?? 0}
-            onGoldChange={(nextGold) => updateBuild({ ...build, gold: Math.max(0, Math.trunc(nextGold)) })}
-            onBuy={(slot: EquipmentEditorSlot) => {
-              const equipment = normalizeCharacterEquipment(build.equipment);
-              const cost = equipmentSlotGoldCost(index, slot, equipment);
-              if (cost == null) return;
-              const currentGold = build.gold ?? 0;
-              if (currentGold < cost) return;
-              updateBuild({ ...build, gold: currentGold - cost });
-            }}
-          />
+          <div style={{ display: "grid", gap: "0.55rem" }}>
+            <EquipmentTab
+              index={index}
+              build={build}
+              onBuildChange={updateBuild}
+              magicCombat={magicCombat}
+              gold={build.gold ?? 0}
+              onGoldChange={(nextGold) => updateBuild({ ...build, gold: Math.max(0, Math.trunc(nextGold)) })}
+              onAddToInventory={(slot: EquipmentEditorSlot) => {
+                updateBuild(addAcquiredEquipmentToBuild(build, index, slot));
+              }}
+              onBuy={(slot: EquipmentEditorSlot) => {
+                const equipment = normalizeCharacterEquipment(build.equipment);
+                const cost = equipmentSlotGoldCost(index, slot, equipment);
+                if (cost == null) return;
+                const currentGold = build.gold ?? 0;
+                if (currentGold < cost) return;
+                updateBuild({
+                  ...addAcquiredEquipmentToBuild(build, index, slot),
+                  gold: currentGold - cost
+                });
+              }}
+            />
+            <div style={ui.equipmentSubPanel}>
+              <div style={{ fontWeight: 700, marginBottom: "0.5rem" }}>Equipped</div>
+              <CharacterEquippedSlotsPanel
+                inventory={build.inventory ?? []}
+                equippedSlots={build.equippedSlots ?? {}}
+                characterEquipment={build.equipment}
+                index={index}
+                onEquipItem={(itemId, slot) => updateBuild(equipInventoryItemOnBuild(build, itemId, slot, index))}
+                onUnequipItem={(itemId, slot) => updateBuild(unequipInventoryItemOnBuild(build, itemId, slot, index))}
+                onEquipFromConfig={(slot) => {
+                  const priceSlot: EquipmentPriceSlot =
+                    slot === "mainHand" ? "weapon" : (slot as EquipmentPriceSlot);
+                  updateBuild(addAcquiredEquipmentToBuild(build, index, priceSlot));
+                }}
+              />
+            </div>
+            <div style={ui.equipmentSubPanel}>
+              <div style={{ fontWeight: 700, marginBottom: "0.5rem" }}>
+                {builderInventoryItems.length > 0
+                  ? `Items (${builderInventoryItems.length})`
+                  : "Items"}
+              </div>
+              <CharacterInventoryList
+                items={builderInventoryItems}
+                emptyMessage="No items yet. Use Add to inventory or Buy on a slot above."
+                onEquipItem={(itemId, slot) => updateBuild(equipInventoryItemOnBuild(build, itemId, slot, index))}
+                onUnequipItem={(itemId, slot) => updateBuild(unequipInventoryItemOnBuild(build, itemId, slot, index))}
+                onRemoveItem={(itemId) => {
+                  const nextEquipped = { ...(build.equippedSlots ?? {}) };
+                  for (const [slot, id] of Object.entries(nextEquipped)) {
+                    if (id === itemId) delete nextEquipped[slot as EquippedSlotKey];
+                  }
+                  updateBuild({
+                    ...build,
+                    inventory: (build.inventory ?? []).filter((item) => item.id !== itemId),
+                    equippedSlots: nextEquipped
+                  });
+                }}
+              />
+            </div>
+          </div>
         )}
 
         {activeTab === "summary" && (
@@ -4718,14 +4818,20 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             )}
           </LiveSheetCollapsibleSection>
 
-          <LiveSheetCollapsibleSection title="Equipment">
-            <div style={{ display: "grid", gap: "0.25rem" }}>
-              <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Armor:</strong> {selectedArmor?.name || "None"}</p>
-              <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Shield:</strong> {selectedShield?.name || "None"}</p>
-              <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Main weapon:</strong> {selectedMainWeapon?.name || "None"}</p>
-              <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Off-hand:</strong> {selectedOffHandWeapon?.name || "None"}</p>
-              <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Implement:</strong> {selectedImplement?.name || "None"}</p>
-            </div>
+          <LiveSheetCollapsibleSection title="Equipped">
+            <CharacterEquippedSlotsPanel
+              inventory={build.inventory ?? []}
+              equippedSlots={build.equippedSlots ?? {}}
+              characterEquipment={build.equipment}
+              index={index}
+              onEquipItem={(itemId, slot) => updateBuild(equipInventoryItemOnBuild(build, itemId, slot, index))}
+              onUnequipItem={(itemId, slot) => updateBuild(unequipInventoryItemOnBuild(build, itemId, slot))}
+              onEquipFromConfig={(slot) => {
+                const priceSlot: EquipmentPriceSlot =
+                  slot === "mainHand" ? "weapon" : (slot as EquipmentPriceSlot);
+                updateBuild(addAcquiredEquipmentToBuild(build, index, priceSlot));
+              }}
+            />
           </LiveSheetCollapsibleSection>
 
           <LiveSheetCollapsibleSection
@@ -4768,7 +4874,12 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             />
           </LiveSheetCollapsibleSection>
 
-          <BuilderSidebarItemsPanel index={index} build={build} />
+          <BuilderSidebarItemsPanel
+            index={index}
+            build={build}
+            onEquipItem={(itemId, slot) => updateBuild(equipInventoryItemOnBuild(build, itemId, slot, index))}
+            onUnequipItem={(itemId, slot) => updateBuild(unequipInventoryItemOnBuild(build, itemId, slot))}
+          />
           </div>
 
           {glossaryTooltipUi.showPanel && glossaryTooltipUi.hoverKey && glossaryTooltipUi.panelPos && (

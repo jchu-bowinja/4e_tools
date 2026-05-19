@@ -3,11 +3,11 @@ import {
   armorMatchesMagicItem,
   isArmorMagicItem,
   isImplementMagicItem,
-  isNeckMagicItem,
+  isMagicItemForSlot,
   isWeaponMagicItem,
   weaponMatchesMagicItem
 } from "../../rules/magicItemEquipment";
-import type { Armor, MagicItem, RulesIndex, Weapon } from "../../rules/models";
+import type { Armor, MagicItem, MagicOnlyEquipmentSlotKey, RulesIndex, Weapon } from "../../rules/models";
 
 function sortByName(items: MagicItem[]): MagicItem[] {
   return [...items].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
@@ -19,8 +19,48 @@ export function magicArmorOptions(index: RulesIndex, selectedArmor: Armor | unde
   );
 }
 
+export function magicOptionsForSlot(index: RulesIndex, slot: MagicOnlyEquipmentSlotKey): MagicItem[] {
+  return sortByName((index.magicItems ?? []).filter((item) => isMagicItemForSlot(item, slot)));
+}
+
 export function magicNeckOptions(index: RulesIndex): MagicItem[] {
-  return sortByName((index.magicItems ?? []).filter(isNeckMagicItem));
+  return magicOptionsForSlot(index, "neck");
+}
+
+export function magicHeadOptions(index: RulesIndex): MagicItem[] {
+  return magicOptionsForSlot(index, "head");
+}
+
+export function magicArmsOptions(index: RulesIndex): MagicItem[] {
+  return magicOptionsForSlot(index, "arms");
+}
+
+export function magicHandsOptions(index: RulesIndex): MagicItem[] {
+  return magicOptionsForSlot(index, "hands");
+}
+
+export function magicFeetOptions(index: RulesIndex): MagicItem[] {
+  return magicOptionsForSlot(index, "feet");
+}
+
+export function magicWaistOptions(index: RulesIndex): MagicItem[] {
+  return magicOptionsForSlot(index, "waist");
+}
+
+export function magicRingOptions(index: RulesIndex): MagicItem[] {
+  return magicOptionsForSlot(index, "ring1");
+}
+
+export function magicCompanionOptions(index: RulesIndex): MagicItem[] {
+  return magicOptionsForSlot(index, "companion");
+}
+
+export function magicMountOptions(index: RulesIndex): MagicItem[] {
+  return magicOptionsForSlot(index, "mount");
+}
+
+export function magicFamiliarOptions(index: RulesIndex): MagicItem[] {
+  return magicOptionsForSlot(index, "familiar");
 }
 
 export function magicWeaponOptions(index: RulesIndex, selectedWeapon: Weapon | undefined): MagicItem[] {
@@ -40,8 +80,51 @@ export function magicArmorEnchantmentFamilies(
   return groupMagicItemsIntoFamilies(magicArmorOptions(index, selectedArmor));
 }
 
+export function magicEnchantmentFamiliesForSlot(
+  index: RulesIndex,
+  slot: MagicOnlyEquipmentSlotKey
+): EnchantmentFamily[] {
+  return groupMagicItemsIntoFamilies(magicOptionsForSlot(index, slot));
+}
+
 export function magicNeckEnchantmentFamilies(index: RulesIndex): EnchantmentFamily[] {
-  return groupMagicItemsIntoFamilies(magicNeckOptions(index));
+  return magicEnchantmentFamiliesForSlot(index, "neck");
+}
+
+export function magicHeadEnchantmentFamilies(index: RulesIndex): EnchantmentFamily[] {
+  return magicEnchantmentFamiliesForSlot(index, "head");
+}
+
+export function magicArmsEnchantmentFamilies(index: RulesIndex): EnchantmentFamily[] {
+  return magicEnchantmentFamiliesForSlot(index, "arms");
+}
+
+export function magicHandsEnchantmentFamilies(index: RulesIndex): EnchantmentFamily[] {
+  return magicEnchantmentFamiliesForSlot(index, "hands");
+}
+
+export function magicFeetEnchantmentFamilies(index: RulesIndex): EnchantmentFamily[] {
+  return magicEnchantmentFamiliesForSlot(index, "feet");
+}
+
+export function magicWaistEnchantmentFamilies(index: RulesIndex): EnchantmentFamily[] {
+  return magicEnchantmentFamiliesForSlot(index, "waist");
+}
+
+export function magicRingEnchantmentFamilies(index: RulesIndex): EnchantmentFamily[] {
+  return magicEnchantmentFamiliesForSlot(index, "ring1");
+}
+
+export function magicCompanionEnchantmentFamilies(index: RulesIndex): EnchantmentFamily[] {
+  return magicEnchantmentFamiliesForSlot(index, "companion");
+}
+
+export function magicMountEnchantmentFamilies(index: RulesIndex): EnchantmentFamily[] {
+  return magicEnchantmentFamiliesForSlot(index, "mount");
+}
+
+export function magicFamiliarEnchantmentFamilies(index: RulesIndex): EnchantmentFamily[] {
+  return magicEnchantmentFamiliesForSlot(index, "familiar");
 }
 
 export function magicWeaponEnchantmentFamilies(

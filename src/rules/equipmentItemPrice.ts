@@ -3,9 +3,11 @@ import type {
   CharacterEquipment,
   EquipmentSlotSelection,
   ImplementSlotSelection,
-  NeckSlotSelection,
+  MagicOnlyEquipmentSlotKey,
+  MagicOnlySlotSelection,
   RulesIndex
 } from "./models";
+import { MAGIC_ONLY_EQUIPMENT_SLOT_KEYS } from "./magicItemEquipment";
 import { armorGold, implementGold, magicItemGold, weaponGold } from "./itemGold";
 
 function standardSlotGold(
@@ -28,7 +30,7 @@ function implementSlotGold(index: RulesIndex, selection: ImplementSlotSelection 
   return implementGold(index, selection.superiorImplementId);
 }
 
-function neckSlotGold(index: RulesIndex, selection: NeckSlotSelection | undefined): number | undefined {
+function magicOnlySlotGold(index: RulesIndex, selection: MagicOnlySlotSelection | undefined): number | undefined {
   if (!selection?.enchantmentId) return undefined;
   return magicItemGold(findMagicItem(index, selection.enchantmentId));
 }
@@ -36,10 +38,11 @@ function neckSlotGold(index: RulesIndex, selection: NeckSlotSelection | undefine
 export type EquipmentPriceSlot =
   | "armor"
   | "shield"
+  | "weapon"
   | "mainHand"
   | "offHand"
   | "implement"
-  | "neck";
+  | MagicOnlyEquipmentSlotKey;
 
 /** Market price in gp for the current slot configuration (magic price overrides mundane base). */
 export function equipmentSlotGoldCost(
@@ -52,13 +55,18 @@ export function equipmentSlotGoldCost(
       return standardSlotGold(index, equipment.armor, "armor");
     case "shield":
       return standardSlotGold(index, equipment.shield, "armor");
+    case "weapon":
     case "mainHand":
       return standardSlotGold(index, equipment.mainHand, "weapon");
     case "offHand":
       return standardSlotGold(index, equipment.offHand, "weapon");
     case "implement":
       return implementSlotGold(index, equipment.implement);
-    case "neck":
-      return neckSlotGold(index, equipment.neck);
+    default: {
+      if ((MAGIC_ONLY_EQUIPMENT_SLOT_KEYS as readonly string[]).includes(slot)) {
+        return magicOnlySlotGold(index, equipment[slot as MagicOnlyEquipmentSlotKey]);
+      }
+      return undefined;
+    }
   }
 }

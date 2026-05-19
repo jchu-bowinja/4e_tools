@@ -310,11 +310,46 @@ export interface ImplementSlotSelection {
   enhancement?: EnhancementLevel;
 }
 
-/** Neck slot: no mundane base; always includes `enhancement` (0 when empty). */
-export interface NeckSlotSelection {
+/** Equipped gear slot (inventory item id per slot). */
+export type EquipmentSlot = "armor" | "shield" | "mainHand" | "offHand" | "implement";
+
+export type InventoryItemKind = "armor" | "weapon" | "implement" | "gear";
+
+export interface InventoryItem {
+  id: string;
+  name: string;
+  kind: InventoryItemKind;
+  quantity: number;
+  sourceId?: string;
+  slotHints: EquippedSlotKey[];
+  notes?: string;
+}
+
+/** Magic-only slot: enchantment + plus; no mundane base. */
+export interface MagicOnlySlotSelection {
   enchantmentId?: string;
   enhancement: EnhancementLevel;
 }
+
+/** Neck slot: no mundane base; always includes `enhancement` (0 when empty). */
+export type NeckSlotSelection = MagicOnlySlotSelection;
+
+/** Equipment slots that use {@link MagicOnlySlotSelection} (no mundane base). */
+export type MagicOnlyEquipmentSlotKey =
+  | "neck"
+  | "head"
+  | "arms"
+  | "hands"
+  | "feet"
+  | "waist"
+  | "ring1"
+  | "ring2"
+  | "companion"
+  | "mount"
+  | "familiar";
+
+/** Any slot that can appear in the equipped-slots UI (gear + magic-only). */
+export type EquippedSlotKey = EquipmentSlot | MagicOnlyEquipmentSlotKey;
 
 export interface CharacterEquipment {
   armor?: EquipmentSlotSelection;
@@ -323,6 +358,16 @@ export interface CharacterEquipment {
   offHand?: EquipmentSlotSelection;
   implement?: ImplementSlotSelection;
   neck?: NeckSlotSelection;
+  head?: MagicOnlySlotSelection;
+  arms?: MagicOnlySlotSelection;
+  hands?: MagicOnlySlotSelection;
+  feet?: MagicOnlySlotSelection;
+  waist?: MagicOnlySlotSelection;
+  ring1?: MagicOnlySlotSelection;
+  ring2?: MagicOnlySlotSelection;
+  companion?: MagicOnlySlotSelection;
+  mount?: MagicOnlySlotSelection;
+  familiar?: MagicOnlySlotSelection;
 }
 
 export interface MagicItem extends RulesEntity {
@@ -441,6 +486,10 @@ export interface CharacterBuild {
   equipment?: CharacterEquipment;
   /** Gold pieces available for equipment purchases. */
   gold?: number;
+  /** Acquired gear rows (via Buy / Add on equipment tab). */
+  inventory?: InventoryItem[];
+  /** Inventory item id equipped per gear slot. */
+  equippedSlots?: Partial<Record<EquippedSlotKey, string>>;
   abilityScores: Record<Ability, number>;
   /** Point-buy / starting base only; level bumps live in `asiChoices` and automatic 11/21 bonuses. */
   asiChoices?: AsiChoices;

@@ -1,17 +1,42 @@
 import { normalizeCharacterBuild, normalizeCharacterEquipment } from "../../rules/equipment";
 import { magicItemFamilyDisplayName } from "../../rules/enchantmentFamilies";
-import { findMagicItem } from "../../rules/magicItemEquipment";
+import { findMagicItem, isMagicItemForSlot } from "../../rules/magicItemEquipment";
 import type { EquipmentPriceSlot } from "../../rules/equipmentItemPrice";
+import { MAGIC_ONLY_EQUIPMENT_SLOT_KEYS, MAGIC_ONLY_SLOT_LABELS } from "../../rules/magicItemEquipment";
 import type {
   CharacterBuild,
   CharacterEquipment,
+  EquippedSlotKey,
+  EquipmentSlot,
   EquipmentSlotSelection,
   ImplementSlotSelection,
+  InventoryItem,
+  InventoryItemKind,
   MagicItem,
-  NeckSlotSelection,
+  MagicOnlyEquipmentSlotKey,
+  MagicOnlySlotSelection,
   RulesIndex
 } from "../../rules/models";
-import type { CharacterSheetState, EquipmentSlot, InventoryItem } from "./model";
+import type { CharacterSheetState } from "./model";
+import {
+  applyEquipWithHandRules,
+  canEquipShield,
+  canEquipWeaponToHand,
+  clearItemFromOtherEquippedSlots,
+  equippedSlotLabel,
+  equipOptionsForInventoryItem,
+  firstValidWeaponEquipSlot,
+  isShieldArmor,
+  itemFitsOffHandSlot,
+  normalizeEquippedSlots,
+  resolveArmorFromInventoryItem,
+  resolveWeaponFromInventoryItem,
+  unequipOptionsForInventoryItem,
+  wieldNoteForWeaponInHand,
+  type InventoryEquipOption,
+  type InventoryUnequipOption,
+  type WeaponHandSlot
+} from "../../rules/weaponWielding";
 
 function newManualInventoryId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -112,19 +137,19 @@ export function manualInventoryItemForSlot(
   slot: EquipmentPriceSlot,
   equipment: CharacterEquipment
 ): InventoryItem | undefined {
-  if (slot === "neck") {
-    const neck = equipment.neck;
-    if (!neck?.enchantmentId) return undefined;
-    const enchantment = findMagicItem(index, neck.enchantmentId);
+  if ((MAGIC_ONLY_EQUIPMENT_SLOT_KEYS as readonly string[]).includes(slot)) {
+    const selection = equipment[slot as MagicOnlyEquipmentSlotKey];
+    if (!selection?.enchantmentId) return undefined;
+    const enchantment = findMagicItem(index, selection.enchantmentId);
     if (!enchantment) return undefined;
     return {
       id: newManualInventoryId(),
-      name: formatSheetItemLabel(undefined, enchantment, neck.enhancement),
+      name: formatSheetItemLabel(undefined, enchantment, selection.enhancement),
       kind: "gear",
       quantity: 1,
-      sourceId: neck.enchantmentId,
-      slotHints: [],
-      notes: "Neck slot"
+      sourceId: selection.enchantmentId,
+      slotHints: [slot as MagicOnlyEquipmentSlotKey],
+      notes: `${MAGIC_ONLY_SLOT_LABELS[slot as MagicOnlyEquipmentSlotKey]} slot`
     };
   }
 
@@ -148,6 +173,10 @@ export function manualInventoryItemForSlot(
     };
   }
 
+  if (slot === "weapon") {
+    return manualInventoryItemForSlot(index, "mainHand", equipment);
+  }
+
   const equipmentSlot = slot as EquipmentSlot;
   const selection = equipment[equipmentSlot];
   const kind = equipmentSlot === "mainHand" || equipmentSlot === "offHand" ? "weapon" : "armor";
@@ -160,9 +189,11 @@ export function manualInventoryItemForSlot(
   const sourceId = selection.baseId ?? selection.enchantmentId;
   if (!sourceId) return undefined;
   const slotHints: EquipmentSlot[] =
-    equipmentSlot === "mainHand" || equipmentSlot === "offHand"
-      ? ["mainHand", "offHand"]
-      : [equipmentSlot];
+    equipmentSlot === "shield"
+      ? ["offHand"]
+      : equipmentSlot === "mainHand" || equipmentSlot === "offHand"
+        ? ["mainHand", "offHand"]
+        : [equipmentSlot];
   return {
     id: newManualInventoryId(),
     name: formatSheetItemLabel(baseName, enchantment, selection.enhancement),
@@ -174,19 +205,110 @@ export function manualInventoryItemForSlot(
   };
 }
 
-function pushNeckInventory(inventory: InventoryItem[], neck: NeckSlotSelection | undefined, index: RulesIndex): void {
-  if (!neck?.enchantmentId) return;
-  const enchantment = findMagicItem(index, neck.enchantmentId);
+function pushMagicOnlySlotInventory(
+  inventory: InventoryItem[],
+  slotKey: MagicOnlyEquipmentSlotKey,
+  selection: MagicOnlySlotSelection | undefined,
+  index: RulesIndex
+): void {
+  if (!selection?.enchantmentId) return;
+  const enchantment = findMagicItem(index, selection.enchantmentId);
   if (!enchantment) return;
   inventory.push({
-    id: `eq-neck-${neck.enchantmentId}`,
-    name: formatSheetItemLabel(undefined, enchantment, neck.enhancement),
+    id: `eq-${slotKey}-${selection.enchantmentId}`,
+    name: formatSheetItemLabel(undefined, enchantment, selection.enhancement),
     kind: "gear",
     quantity: 1,
-    sourceId: neck.enchantmentId,
-    slotHints: [],
-    notes: "Neck slot"
+    sourceId: selection.enchantmentId,
+    slotHints: [slotKey],
+    notes: `${MAGIC_ONLY_SLOT_LABELS[slotKey]} slot`
   });
+}
+
+function canEquipItemInSlot(item: InventoryItem, slot: EquippedSlotKey, index: RulesIndex): boolean {
+  return item.quantity > 0 && itemFitsEquipSlot(item, slot, index);
+}
+
+export function isMagicOnlyEquipSlot(slot: EquippedSlotKey): slot is MagicOnlyEquipmentSlotKey {
+  return (MAGIC_ONLY_EQUIPMENT_SLOT_KEYS as readonly string[]).includes(slot);
+}
+
+const EQUIP_SLOT_BY_PRICE_SLOT: Partial<Record<EquipmentPriceSlot, EquipmentSlot>> = {
+  armor: "armor",
+  shield: "offHand",
+  mainHand: "mainHand",
+  offHand: "offHand",
+  implement: "implement"
+};
+
+function addAcquiredEquipmentToInventory(
+  inventory: InventoryItem[],
+  equippedSlots: Partial<Record<EquippedSlotKey, string>>,
+  index: RulesIndex,
+  slot: EquipmentPriceSlot,
+  characterEquipment: CharacterEquipment
+): { inventory: InventoryItem[]; equippedSlots: Partial<Record<EquippedSlotKey, string>> } | undefined {
+  const item = manualInventoryItemForSlot(index, slot, characterEquipment);
+  if (!item) return undefined;
+
+  const nextInventory = [...inventory, item];
+  const nextEquipped: Partial<Record<EquippedSlotKey, string>> = { ...equippedSlots };
+
+  if ((MAGIC_ONLY_EQUIPMENT_SLOT_KEYS as readonly string[]).includes(slot)) {
+    const magicSlot = slot as MagicOnlyEquipmentSlotKey;
+    if (!nextEquipped[magicSlot]) {
+      const cleared = clearItemFromOtherEquippedSlots(nextEquipped, item.id, magicSlot);
+      return { inventory: nextInventory, equippedSlots: { ...cleared, [magicSlot]: item.id } };
+    }
+    return { inventory: nextInventory, equippedSlots: nextEquipped };
+  }
+
+  if (slot === "weapon") {
+    const hand = firstValidWeaponEquipSlot(item, nextInventory, nextEquipped, index);
+    if (hand) {
+      const applied = applyEquipWithHandRules(nextInventory, nextEquipped, item.id, hand, index);
+      if (applied) return { inventory: nextInventory, equippedSlots: applied };
+    }
+    return { inventory: nextInventory, equippedSlots: nextEquipped };
+  }
+
+  const equipSlot = EQUIP_SLOT_BY_PRICE_SLOT[slot];
+  const slotIsEmpty = equipSlot ? !nextEquipped[equipSlot] : false;
+  if (equipSlot && slotIsEmpty && canEquipItemInSlot(item, equipSlot, index)) {
+    const cleared = clearItemFromOtherEquippedSlots(nextEquipped, item.id, equipSlot);
+    return { inventory: nextInventory, equippedSlots: { ...cleared, [equipSlot]: item.id } };
+  }
+
+  return { inventory: nextInventory, equippedSlots: nextEquipped };
+}
+
+/** Add the current slot configuration to inventory; auto-equip only if the gear slot is empty. */
+export function addAcquiredEquipmentToBuild(
+  build: CharacterBuild,
+  index: RulesIndex,
+  slot: EquipmentPriceSlot
+): CharacterBuild {
+  const characterEquipment = normalizeCharacterEquipment(build.equipment);
+  const result = addAcquiredEquipmentToInventory(
+    build.inventory ?? [],
+    build.equippedSlots ?? {},
+    index,
+    slot,
+    characterEquipment
+  );
+  if (!result) return build;
+  return { ...build, inventory: result.inventory, equippedSlots: result.equippedSlots };
+}
+
+export function addAcquiredEquipmentToSheet(
+  state: CharacterSheetState,
+  index: RulesIndex,
+  slot: EquipmentPriceSlot
+): CharacterSheetState {
+  const characterEquipment = sheetCharacterEquipment(state, index);
+  const result = addAcquiredEquipmentToInventory(state.inventory, state.equipment, index, slot, characterEquipment);
+  if (!result) return state;
+  return { ...state, inventory: result.inventory, equipment: result.equippedSlots };
 }
 
 /** Build inventory rows and slot equip ids from normalized `CharacterEquipment`. */
@@ -198,7 +320,6 @@ export function inventoryAndSlotsFromCharacterEquipment(
   const equipment: Partial<Record<EquipmentSlot, string>> = {};
 
   pushStandardSlotInventory(inventory, equipment, "armor", characterEquipment.armor, index, "armor", ["armor"]);
-  pushStandardSlotInventory(inventory, equipment, "shield", characterEquipment.shield, index, "armor", ["shield"]);
   pushStandardSlotInventory(inventory, equipment, "mainHand", characterEquipment.mainHand, index, "weapon", [
     "mainHand",
     "offHand"
@@ -207,8 +328,13 @@ export function inventoryAndSlotsFromCharacterEquipment(
     "mainHand",
     "offHand"
   ]);
+  if (!equipment.offHand) {
+    pushStandardSlotInventory(inventory, equipment, "offHand", characterEquipment.shield, index, "armor", ["offHand"]);
+  }
   pushImplementSlotInventory(inventory, equipment, characterEquipment.implement, index);
-  pushNeckInventory(inventory, characterEquipment.neck, index);
+  for (const slotKey of MAGIC_ONLY_EQUIPMENT_SLOT_KEYS) {
+    pushMagicOnlySlotInventory(inventory, slotKey, characterEquipment[slotKey], index);
+  }
 
   return { inventory, equipment };
 }
@@ -250,7 +376,7 @@ function rowForStandardSlot(
   };
 }
 
-const EQUIPMENT_SLOT_LABELS: Record<EquipmentSlot, string> = {
+export const EQUIPMENT_SLOT_LABELS: Record<EquipmentSlot, string> = {
   armor: "Armor",
   shield: "Shield",
   mainHand: "Main hand",
@@ -258,45 +384,366 @@ const EQUIPMENT_SLOT_LABELS: Record<EquipmentSlot, string> = {
   implement: "Implement"
 };
 
+export const EQUIPPED_SLOT_LABELS: Record<EquippedSlotKey, string> = {
+  ...EQUIPMENT_SLOT_LABELS,
+  ...MAGIC_ONLY_SLOT_LABELS
+};
+
+export const EQUIPPED_SLOT_ORDER: EquippedSlotKey[] = [
+  "mainHand",
+  "offHand",
+  "armor",
+  "implement",
+  ...MAGIC_ONLY_EQUIPMENT_SLOT_KEYS
+];
+
+export const CONFIG_EQUIP_SLOT_PREFIX = "config:";
+
+export function isConfigEquipInventoryId(id: string): boolean {
+  return id.startsWith(CONFIG_EQUIP_SLOT_PREFIX);
+}
+
+export function equipSlotFromConfigInventoryId(id: string): EquippedSlotKey | undefined {
+  if (!isConfigEquipInventoryId(id)) return undefined;
+  const slot = id.slice(CONFIG_EQUIP_SLOT_PREFIX.length);
+  return (EQUIPPED_SLOT_ORDER as string[]).includes(slot) ? (slot as EquippedSlotKey) : undefined;
+}
+
+/** Stable inventory row for equipment-tab configuration not yet bought. */
+export function configInventoryItemForSlot(
+  index: RulesIndex,
+  slot: EquippedSlotKey,
+  equipment: CharacterEquipment
+): InventoryItem | undefined {
+  const draft = manualInventoryItemForSlot(index, slot as EquipmentPriceSlot, equipment);
+  if (!draft) return undefined;
+  return { ...draft, id: `${CONFIG_EQUIP_SLOT_PREFIX}${slot}` };
+}
+
+export function inventoryForEquipUi(
+  inventory: InventoryItem[],
+  characterEquipment: CharacterEquipment | undefined,
+  index: RulesIndex
+): InventoryItem[] {
+  const merged = [...inventory];
+  if (!characterEquipment) return merged;
+  const normalized = normalizeCharacterEquipment(characterEquipment);
+  for (const slot of EQUIPPED_SLOT_ORDER) {
+    const configItem = configInventoryItemForSlot(index, slot, normalized);
+    if (!configItem) continue;
+    const duplicate = merged.some(
+      (item) =>
+        item.sourceId &&
+        configItem.sourceId &&
+        item.sourceId === configItem.sourceId &&
+        itemFitsEquipSlot(item, slot, index)
+    );
+    if (!duplicate) merged.push(configItem);
+  }
+  const shieldConfig = configInventoryItemForSlot(index, "shield", normalized);
+  if (shieldConfig && !merged.some((item) => item.id === shieldConfig.id)) {
+    const duplicate = merged.some(
+      (item) =>
+        item.sourceId &&
+        shieldConfig.sourceId &&
+        item.sourceId === shieldConfig.sourceId &&
+        itemFitsEquipSlot(item, "offHand", index)
+    );
+    if (!duplicate) merged.push({ ...shieldConfig, slotHints: ["offHand"] });
+  }
+  return merged;
+}
+
+/** Inventory item id currently equipped in a slot (empty when the slot is bare). */
+export function selectedEquipSlotItemId(
+  slot: EquippedSlotKey,
+  inventory: InventoryItem[],
+  equippedSlots: Partial<Record<EquippedSlotKey, string>>,
+  _characterEquipment?: CharacterEquipment,
+  _index?: RulesIndex
+): string {
+  return normalizeEquippedSlots(equippedSlots)[slot] ?? "";
+}
+
+export interface EquipSlotDropdownChoice {
+  itemId: string;
+  label: string;
+  disabled: boolean;
+  hint?: string;
+}
+
+function itemFitsEquipSlot(item: InventoryItem, slot: EquippedSlotKey, index: RulesIndex): boolean {
+  if (isMagicOnlyEquipSlot(slot)) {
+    if (item.slotHints.includes(slot)) return true;
+    if (item.kind === "gear" && item.sourceId) {
+      const magic = findMagicItem(index, item.sourceId);
+      return magic ? isMagicItemForSlot(magic, slot) : false;
+    }
+    return false;
+  }
+  if (slot === "offHand") {
+    if (itemFitsOffHandSlot(item, index)) {
+      if (item.kind !== "armor") return true;
+      const armor = resolveArmorFromInventoryItem(item, index);
+      return armor ? isShieldArmor(armor) : false;
+    }
+    return item.slotHints.includes("offHand");
+  }
+  if (!item.slotHints.includes(slot)) return false;
+  if (item.kind !== "armor") return true;
+  const armor = resolveArmorFromInventoryItem(item, index);
+  if (!armor) return true;
+  if (slot === "armor" && isShieldArmor(armor)) return false;
+  return true;
+}
+
+export function canSelectInventoryItemForEquipSlot(
+  item: InventoryItem,
+  slot: EquippedSlotKey,
+  inventory: InventoryItem[],
+  equippedSlots: Partial<Record<EquippedSlotKey, string>>,
+  index: RulesIndex
+): { allowed: boolean; hint?: string } {
+  if (item.quantity <= 0 || !itemFitsEquipSlot(item, slot, index)) {
+    return { allowed: false };
+  }
+  if (equippedSlots[slot] === item.id) {
+    return { allowed: true };
+  }
+  if (isMagicOnlyEquipSlot(slot)) {
+    return { allowed: true };
+  }
+  const weapon = resolveWeaponFromInventoryItem(item, index);
+  const normalized = normalizeEquippedSlots(equippedSlots) as Partial<Record<EquipmentSlot, string>>;
+  if (weapon && (slot === "mainHand" || slot === "offHand")) {
+    const check = canEquipWeaponToHand(weapon, slot as WeaponHandSlot, normalized, inventory, index, item.id);
+    return { allowed: check.allowed, hint: check.hint };
+  }
+  if (slot === "offHand" && item.kind === "armor") {
+    const check = canEquipShield(normalized, inventory, index);
+    return { allowed: check.allowed, hint: check.hint };
+  }
+  return { allowed: true };
+}
+
+/** Inventory rows eligible for a gear-slot dropdown (includes currently equipped). */
+export function equipSlotDropdownChoices(
+  inventory: InventoryItem[],
+  equippedSlots: Partial<Record<EquippedSlotKey, string>>,
+  slot: EquippedSlotKey,
+  index: RulesIndex,
+  characterEquipment?: CharacterEquipment
+): EquipSlotDropdownChoice[] {
+  const merged = inventoryForEquipUi(inventory, characterEquipment, index);
+  const currentId = selectedEquipSlotItemId(slot, inventory, equippedSlots, characterEquipment, index);
+  const choices: EquipSlotDropdownChoice[] = [];
+  for (const item of merged) {
+    if (!itemFitsEquipSlot(item, slot, index)) continue;
+    const check = canSelectInventoryItemForEquipSlot(item, slot, merged, equippedSlots, index);
+    if (!check.allowed && item.id !== currentId) continue;
+    const fromConfig = isConfigEquipInventoryId(item.id);
+    choices.push({
+      itemId: item.id,
+      label: fromConfig ? `${item.name} (configured)` : item.name,
+      disabled: item.id !== currentId && !check.allowed,
+      hint: fromConfig ? "Add to inventory when equipped" : check.hint
+    });
+  }
+  return choices.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+}
+
+/** True when the slot is filled or the character has inventory/config items that fit it. */
+export function equipSlotShouldDisplay(
+  inventory: InventoryItem[],
+  equippedSlots: Partial<Record<EquippedSlotKey, string>>,
+  slot: EquippedSlotKey,
+  index: RulesIndex,
+  characterEquipment?: CharacterEquipment
+): boolean {
+  if (selectedEquipSlotItemId(slot, inventory, equippedSlots, characterEquipment, index)) {
+    return true;
+  }
+  return equipSlotDropdownChoices(inventory, equippedSlots, slot, index, characterEquipment).length > 0;
+}
+
+export function equippedSlotWieldHint(
+  inventory: InventoryItem[],
+  equippedSlots: Partial<Record<EquippedSlotKey, string>>,
+  slot: EquippedSlotKey,
+  index: RulesIndex,
+  characterEquipment?: CharacterEquipment
+): string | undefined {
+  if (slot !== "mainHand" && slot !== "offHand") return undefined;
+  const itemId = selectedEquipSlotItemId(slot, inventory, equippedSlots, characterEquipment, index);
+  if (!itemId) return undefined;
+  const merged = inventoryForEquipUi(inventory, characterEquipment, index);
+  const item = merged.find((entry) => entry.id === itemId);
+  if (!item) return undefined;
+  const weapon = resolveWeaponFromInventoryItem(item, index);
+  if (!weapon) return undefined;
+  return wieldNoteForWeaponInHand(weapon, slot, equippedSlots);
+}
+
 export interface CharacterBuildItemRow {
   id: string;
   name: string;
   kind: InventoryItem["kind"];
   quantity: number;
+  slotHints: EquippedSlotKey[];
   equippedSlot?: string;
+  /** Gear slots this item is currently equipped in. */
+  equippedInSlots: EquippedSlotKey[];
+  equipOptions: InventoryEquipOption[];
+  unequipOptions: InventoryUnequipOption[];
   notes?: string;
+}
+
+const INVENTORY_KIND_SORT_ORDER: Record<InventoryItemKind, number> = {
+  armor: 0,
+  weapon: 1,
+  implement: 2,
+  gear: 3
+};
+
+function compareInventoryItemRows(a: CharacterBuildItemRow, b: CharacterBuildItemRow): number {
+  const byKind = INVENTORY_KIND_SORT_ORDER[a.kind] - INVENTORY_KIND_SORT_ORDER[b.kind];
+  if (byKind !== 0) return byKind;
+  return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+}
+
+function formatEquippedInSlotsLabel(
+  equippedInSlots: EquippedSlotKey[],
+  item: InventoryItem,
+  inventory: InventoryItem[],
+  index: RulesIndex,
+  equippedBySlot: Partial<Record<EquippedSlotKey, string>>
+): string | undefined {
+  if (equippedInSlots.length === 0) return undefined;
+  const labels = equippedInSlots.map((slot) => {
+    if (slot === "mainHand" || slot === "offHand") {
+      return equippedSlotLabel([slot], item, inventory, index, equippedBySlot as Partial<Record<EquipmentSlot, string>>);
+    }
+    return EQUIPPED_SLOT_LABELS[slot];
+  });
+  return labels.filter(Boolean).join(", ");
 }
 
 function inventoryItemRows(
   inventory: InventoryItem[],
-  equippedBySlot: Partial<Record<EquipmentSlot, string>>
+  equippedBySlot: Partial<Record<EquippedSlotKey, string>>,
+  index: RulesIndex
 ): CharacterBuildItemRow[] {
-  const equippedSlotByItemId = new Map<string, string>();
-  for (const [slot, itemId] of Object.entries(equippedBySlot)) {
-    if (itemId) {
-      equippedSlotByItemId.set(itemId, EQUIPMENT_SLOT_LABELS[slot as EquipmentSlot]);
-    }
-  }
-  return inventory.map((item) => ({
-    id: item.id,
-    name: item.name,
-    kind: item.kind,
-    quantity: item.quantity,
-    equippedSlot: equippedSlotByItemId.get(item.id),
-    notes: item.notes
-  }));
+  const normalizedEquipped = normalizeEquippedSlots(equippedBySlot);
+  const rows = inventory.map((item) => {
+    const equippedInSlots = (Object.entries(normalizedEquipped) as [EquippedSlotKey, string | undefined][])
+      .filter(([, itemId]) => itemId === item.id)
+      .map(([slot]) => slot);
+    const equippedSlot = formatEquippedInSlotsLabel(equippedInSlots, item, inventory, index, normalizedEquipped);
+    return {
+      id: item.id,
+      name: item.name,
+      kind: item.kind,
+      quantity: item.quantity,
+      slotHints: item.slotHints,
+      equippedSlot,
+      equippedInSlots,
+      equipOptions: equipOptionsForInventoryItem(item, inventory, normalizedEquipped, index),
+      unequipOptions: unequipOptionsForInventoryItem(item, normalizedEquipped),
+      notes: item.notes
+    };
+  });
+  return rows.sort(compareInventoryItemRows);
 }
 
-/** Inventory rows for a builder `CharacterBuild` (equipment-derived items only). */
+/** Equip an inventory row into a gear slot (replaces whatever was equipped there). */
+export function equipInventoryItem(
+  inventory: InventoryItem[],
+  equippedSlots: Partial<Record<EquippedSlotKey, string>>,
+  itemId: string,
+  slot: EquippedSlotKey,
+  index: RulesIndex
+): Partial<Record<EquippedSlotKey, string>> | undefined {
+  const item = inventory.find((entry) => entry.id === itemId);
+  if (!item || !canEquipItemInSlot(item, slot, index)) return undefined;
+  const normalized = normalizeEquippedSlots(equippedSlots);
+  if (isMagicOnlyEquipSlot(slot)) {
+    const cleared = clearItemFromOtherEquippedSlots(normalized, itemId, slot);
+    return { ...cleared, [slot]: itemId };
+  }
+  const applied = applyEquipWithHandRules(
+    inventory,
+    normalized as Partial<Record<EquipmentSlot, string>>,
+    itemId,
+    slot as EquipmentSlot,
+    index
+  );
+  return applied as Partial<Record<EquippedSlotKey, string>> | undefined;
+}
+
+export function equipInventoryItemOnBuild(
+  build: CharacterBuild,
+  itemId: string,
+  slot: EquippedSlotKey,
+  index: RulesIndex
+): CharacterBuild {
+  const inventory = build.inventory ?? [];
+  const nextEquipped = equipInventoryItem(inventory, build.equippedSlots ?? {}, itemId, slot, index);
+  if (!nextEquipped) return build;
+  return { ...build, equippedSlots: nextEquipped };
+}
+
+export function equipInventoryItemOnSheet(
+  state: CharacterSheetState,
+  itemId: string,
+  slot: EquippedSlotKey,
+  index: RulesIndex
+): CharacterSheetState {
+  const nextEquipped = equipInventoryItem(state.inventory, state.equipment, itemId, slot, index);
+  if (!nextEquipped) return state;
+  return { ...state, equipment: nextEquipped };
+}
+
+/** Remove an inventory item from a gear slot (item stays in inventory). */
+export function unequipInventoryItem(
+  equippedSlots: Partial<Record<EquippedSlotKey, string>>,
+  itemId: string,
+  slot: EquippedSlotKey
+): Partial<Record<EquippedSlotKey, string>> | undefined {
+  const normalized = normalizeEquippedSlots(equippedSlots);
+  if (normalized[slot] !== itemId) return undefined;
+  const next = { ...normalized };
+  delete next[slot];
+  return next;
+}
+
+export function unequipInventoryItemOnBuild(
+  build: CharacterBuild,
+  itemId: string,
+  slot: EquippedSlotKey
+): CharacterBuild {
+  const nextEquipped = unequipInventoryItem(build.equippedSlots ?? {}, itemId, slot);
+  if (!nextEquipped) return build;
+  return { ...build, equippedSlots: nextEquipped };
+}
+
+export function unequipInventoryItemOnSheet(
+  state: CharacterSheetState,
+  itemId: string,
+  slot: EquippedSlotKey
+): CharacterSheetState {
+  const nextEquipped = unequipInventoryItem(state.equipment, itemId, slot);
+  if (!nextEquipped) return state;
+  return { ...state, equipment: nextEquipped };
+}
+
+/** Inventory rows for a builder `CharacterBuild` (acquired via Buy / Add on equipment tab). */
 export function characterBuildInventoryItems(build: CharacterBuild, index: RulesIndex): CharacterBuildItemRow[] {
-  const characterEquipment = normalizeCharacterEquipment(build.equipment);
-  const { inventory, equipment: equippedBySlot } = inventoryAndSlotsFromCharacterEquipment(characterEquipment, index);
-  return inventoryItemRows(inventory, equippedBySlot);
+  return inventoryItemRows(build.inventory ?? [], build.equippedSlots ?? {}, index);
 }
 
 /** All inventory rows on a character sheet (derived equipment + manual items). */
-export function characterSheetInventoryItems(state: CharacterSheetState): CharacterBuildItemRow[] {
-  return inventoryItemRows(state.inventory, state.equipment);
+export function characterSheetInventoryItems(state: CharacterSheetState, index: RulesIndex): CharacterBuildItemRow[] {
+  return inventoryItemRows(state.inventory, state.equipment, index);
 }
 
 export function characterEquipmentSummaryRows(
@@ -322,11 +769,13 @@ export function characterEquipmentSummaryRows(
       detail: formatSheetItemLabel(base, enchantment, eq.implement?.enhancement)
     });
   }
-  if (eq.neck?.enchantmentId || (eq.neck?.enhancement ?? 0) > 0) {
-    const enchantment = eq.neck?.enchantmentId ? findMagicItem(index, eq.neck.enchantmentId) : undefined;
+  for (const slotKey of MAGIC_ONLY_EQUIPMENT_SLOT_KEYS) {
+    const selection = eq[slotKey];
+    if (!selection?.enchantmentId && (selection?.enhancement ?? 0) === 0) continue;
+    const enchantment = selection?.enchantmentId ? findMagicItem(index, selection.enchantmentId) : undefined;
     rows.push({
-      slotLabel: "Neck",
-      detail: formatSheetItemLabel(undefined, enchantment, eq.neck?.enhancement)
+      slotLabel: MAGIC_ONLY_SLOT_LABELS[slotKey],
+      detail: formatSheetItemLabel(undefined, enchantment, selection?.enhancement)
     });
   }
   return rows;
@@ -348,22 +797,33 @@ export function updateSheetEquipmentFromBuild(
   return sheetStateWithCharacterEquipment(state, index, nextBuild.equipment);
 }
 
+function stripAutoDerivedInventory(state: CharacterSheetState): {
+  inventory: InventoryItem[];
+  equipment: Partial<Record<EquippedSlotKey, string>>;
+} {
+  const inventory = state.inventory.filter((item) => !isEquipmentDerivedInventoryItem(item));
+  const equipment: Partial<Record<EquippedSlotKey, string>> = { ...state.equipment };
+  for (const slot of Object.keys(equipment) as EquippedSlotKey[]) {
+    const itemId = equipment[slot];
+    if (itemId && !inventory.some((item) => item.id === itemId)) {
+      delete equipment[slot];
+    }
+  }
+  return { inventory, equipment };
+}
+
 export function sheetStateWithCharacterEquipment(
   state: CharacterSheetState,
-  index: RulesIndex,
+  _index: RulesIndex,
   equipment: CharacterEquipment | undefined
 ): CharacterSheetState {
   const characterEquipment = normalizeCharacterEquipment(equipment);
-  const manualInventory = state.inventory.filter((item) => !isEquipmentDerivedInventoryItem(item));
-  const { inventory: derivedInventory, equipment: derivedSlots } = inventoryAndSlotsFromCharacterEquipment(
-    characterEquipment,
-    index
-  );
+  const { inventory, equipment: equipped } = stripAutoDerivedInventory(state);
   return {
     ...state,
     characterEquipment,
-    inventory: [...derivedInventory, ...manualInventory],
-    equipment: derivedSlots
+    inventory,
+    equipment: equipped
   };
 }
 
@@ -385,6 +845,8 @@ export function buildLikeStateFromSheet(state: CharacterSheetState, index: Rules
     featIds: state.featIds ?? [],
     powerIds: state.powers.selectedPowerIds,
     equipment: characterEquipment,
-    gold: state.gold
+    gold: state.gold,
+    inventory: [...state.inventory],
+    equippedSlots: normalizeEquippedSlots(state.equipment)
   };
 }

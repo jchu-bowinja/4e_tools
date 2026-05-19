@@ -13,9 +13,12 @@ import type {
   EquipmentSlotSelection,
   ImplementSlotSelection,
   MagicItem,
-  NeckSlotSelection,
+  MagicOnlyEquipmentSlotKey,
+  MagicOnlySlotSelection,
   RulesIndex
 } from "../../rules/models";
+
+export type { MagicOnlyEquipmentSlotKey };
 
 export type StandardEquipmentSlotKey = "armor" | "shield" | "mainHand" | "offHand";
 
@@ -213,39 +216,64 @@ export function setImplementEnhancement(
   });
 }
 
-export function setNeckEnchantmentFamily(
+function pruneMagicOnlySlot(slot: MagicOnlySlotSelection | undefined): MagicOnlySlotSelection | undefined {
+  if (!slot) return undefined;
+  if (!slot.enchantmentId && (slot.enhancement ?? 0) === 0) return undefined;
+  const out: MagicOnlySlotSelection = { enhancement: slot.enhancement ?? 0 };
+  if (slot.enchantmentId) out.enchantmentId = slot.enchantmentId;
+  return out;
+}
+
+function assignMagicOnlySlot(
+  equipment: CharacterEquipment,
+  slotKey: MagicOnlyEquipmentSlotKey,
+  slot: MagicOnlySlotSelection | undefined
+): void {
+  if (slotKey === "neck") {
+    equipment.neck = slot ?? { enhancement: 0 };
+    return;
+  }
+  if (slot) equipment[slotKey] = slot;
+  else delete equipment[slotKey];
+}
+
+export function setMagicOnlySlotEnchantmentFamily(
   build: CharacterBuild,
   index: RulesIndex,
+  slotKey: MagicOnlyEquipmentSlotKey,
   familyKey: string | undefined,
   catalog: MagicItem[]
 ): CharacterBuild {
   const equipment = baseEquipment(build);
-  const prevEnh = equipment.neck?.enhancement ?? 0;
-  let neck: NeckSlotSelection;
+  const prevEnh = equipment[slotKey]?.enhancement ?? 0;
+  let next: MagicOnlySlotSelection | undefined;
   if (!familyKey) {
-    neck = { enhancement: prevEnh };
+    next = slotKey === "neck" || prevEnh > 0 ? { enhancement: prevEnh } : undefined;
   } else {
     const family = findEnchantmentFamilyByKey(index, familyKey, catalog);
     if (!family) {
-      neck = equipment.neck ?? { enhancement: 0 };
+      next = equipment[slotKey] ?? (slotKey === "neck" ? { enhancement: 0 } : undefined);
     } else {
       const enhancement = clampEnhancementToFamily(family, prevEnh || family.allowedEnhancements[0]);
       const enchantmentId = resolveEnchantmentIdForFamily(index, familyKey, enhancement, family.items[0]);
-      neck = { enchantmentId, enhancement };
+      next = { enchantmentId, enhancement };
     }
   }
-  return withEquipment(build, { ...equipment, neck });
+  const updated: CharacterEquipment = { ...equipment };
+  assignMagicOnlySlot(updated, slotKey, slotKey === "neck" ? next : pruneMagicOnlySlot(next));
+  return withEquipment(build, updated);
 }
 
-export function setNeckEnhancement(
+export function setMagicOnlySlotEnhancement(
   build: CharacterBuild,
   index: RulesIndex,
+  slotKey: MagicOnlyEquipmentSlotKey,
   enhancement: EnhancementLevel,
   catalog: MagicItem[]
 ): CharacterBuild {
   const equipment = baseEquipment(build);
-  const prev = equipment.neck ?? { enhancement: 0 };
-  let neck: NeckSlotSelection = { ...prev, enhancement };
+  const prev = equipment[slotKey] ?? { enhancement: 0 };
+  let next: MagicOnlySlotSelection = { ...prev, enhancement };
   if (prev.enchantmentId) {
     const family =
       findEnchantmentFamilyById(index, prev.enchantmentId) ??
@@ -255,11 +283,31 @@ export function setNeckEnhancement(
       })();
     if (family) {
       const clamped = clampEnhancementToFamily(family, enhancement);
-      neck.enhancement = clamped;
+      next.enhancement = clamped;
       const id = resolveEnchantmentIdForFamily(index, family.key, clamped, family.items[0]);
-      if (id) neck.enchantmentId = id;
+      if (id) next.enchantmentId = id;
     }
   }
-  if (!neck.enchantmentId) delete neck.enchantmentId;
-  return withEquipment(build, { ...equipment, neck });
+  if (!next.enchantmentId) delete next.enchantmentId;
+  const updated: CharacterEquipment = { ...equipment };
+  assignMagicOnlySlot(updated, slotKey, slotKey === "neck" ? next : pruneMagicOnlySlot(next));
+  return withEquipment(build, updated);
+}
+
+export function setNeckEnchantmentFamily(
+  build: CharacterBuild,
+  index: RulesIndex,
+  familyKey: string | undefined,
+  catalog: MagicItem[]
+): CharacterBuild {
+  return setMagicOnlySlotEnchantmentFamily(build, index, "neck", familyKey, catalog);
+}
+
+export function setNeckEnhancement(
+  build: CharacterBuild,
+  index: RulesIndex,
+  enhancement: EnhancementLevel,
+  catalog: MagicItem[]
+): CharacterBuild {
+  return setMagicOnlySlotEnhancement(build, index, "neck", enhancement, catalog);
 }

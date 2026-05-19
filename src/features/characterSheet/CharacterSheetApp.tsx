@@ -47,7 +47,7 @@ import {
   type ConditionDurationPresetKey
 } from "./conditionDurationPresets";
 import { createDefaultCharacterSheetState } from "./defaultState";
-import type { CharacterSheetState, EquipmentSlot, PowerSheetGroupBy } from "./model";
+import type { CharacterSheetState, EquippedSlotKey, EquipmentSlot, PowerSheetGroupBy } from "./model";
 import { buildPowerDisplaySections, powerUsageBucket } from "./powerDisplay";
 import {
   canUseSecondWind,
@@ -70,12 +70,16 @@ import {
   toBuildLikeState
 } from "./selectors";
 import { EquipmentTab, type EquipmentEditorSlot } from "../builder/EquipmentTab";
+import type { EquipmentPriceSlot } from "../../rules/equipmentItemPrice";
+import { CharacterEquippedSlotsPanel } from "./CharacterEquippedSlotsPanel";
 import { CharacterInventoryList } from "./CharacterInventoryList";
 import { equipmentSlotGoldCost } from "../../rules/equipmentItemPrice";
 import {
+  addAcquiredEquipmentToSheet,
   buildLikeStateFromSheet,
   characterSheetInventoryItems,
-  manualInventoryItemForSlot,
+  equipInventoryItemOnSheet,
+  unequipInventoryItemOnSheet,
   sheetCharacterEquipment,
   updateSheetEquipmentFromBuild
 } from "./sheetEquipment";
@@ -1010,7 +1014,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     return computeMagicItemCombatBonuses(index, toBuildLikeState(sheet, index));
   }, [index, sheet]);
   const sheetEquipmentBuild = useMemo(() => buildLikeStateFromSheet(sheet, index), [sheet, index]);
-  const inventoryItems = useMemo(() => characterSheetInventoryItems(sheet), [sheet]);
+  const inventoryItems = useMemo(() => characterSheetInventoryItems(sheet, index), [sheet, index]);
   const mainWeaponSummary = useMemo(
     () =>
       summarizeMainWeaponAttack(
@@ -1019,9 +1023,19 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         mainHandWeapon,
         sheetWeaponProfText,
         magicCombat.mainWeaponAttack,
-        featProficiencyGrants
+        featProficiencyGrants,
+        "mainHand",
+        sheet.equipment
       ),
-    [sheet.level, sheet.abilityScores, mainHandWeapon, sheetWeaponProfText, magicCombat.mainWeaponAttack, featProficiencyGrants]
+    [
+      sheet.level,
+      sheet.abilityScores,
+      mainHandWeapon,
+      sheetWeaponProfText,
+      magicCombat.mainWeaponAttack,
+      featProficiencyGrants,
+      sheet.equipment
+    ]
   );
   const offHandWeaponSummary = useMemo(
     () =>
@@ -1031,9 +1045,19 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         offHandWeapon,
         sheetWeaponProfText,
         magicCombat.offHandWeaponAttack,
-        featProficiencyGrants
+        featProficiencyGrants,
+        "offHand",
+        sheet.equipment
       ),
-    [sheet.level, sheet.abilityScores, offHandWeapon, sheetWeaponProfText, magicCombat.offHandWeaponAttack, featProficiencyGrants]
+    [
+      sheet.level,
+      sheet.abilityScores,
+      offHandWeapon,
+      sheetWeaponProfText,
+      magicCombat.offHandWeaponAttack,
+      featProficiencyGrants,
+      sheet.equipment
+    ]
   );
   const implementAttackSummary = useMemo(
     () =>
@@ -1183,33 +1207,36 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   }
 
   function addEquipmentSlotToInventory(slot: EquipmentEditorSlot): void {
-    const eq = sheetCharacterEquipment(sheet, index);
-    const item = manualInventoryItemForSlot(index, slot, eq);
-    if (!item) return;
-    updateSheet((prev) => ({ ...prev, inventory: [...prev.inventory, item] }));
+    updateSheet((prev) => addAcquiredEquipmentToSheet(prev, index, slot));
   }
 
   function buyEquipmentSlot(slot: EquipmentEditorSlot): void {
     const eq = sheetCharacterEquipment(sheet, index);
     const cost = equipmentSlotGoldCost(index, slot, eq);
     if (cost == null) return;
-    const item = manualInventoryItemForSlot(index, slot, eq);
-    if (!item) return;
     updateSheet((prev) => {
       const currentGold = prev.gold ?? 0;
       if (currentGold < cost) return prev;
-      return {
-        ...prev,
-        gold: currentGold - cost,
-        inventory: [...prev.inventory, item]
-      };
+      return addAcquiredEquipmentToSheet(
+        { ...prev, gold: currentGold - cost },
+        index,
+        slot
+      );
     });
+  }
+
+  function equipInventoryItem(itemId: string, slot: EquippedSlotKey): void {
+    updateSheet((prev) => equipInventoryItemOnSheet(prev, itemId, slot, index));
+  }
+
+  function unequipInventoryItem(itemId: string, slot: EquippedSlotKey): void {
+    updateSheet((prev) => unequipInventoryItemOnSheet(prev, itemId, slot));
   }
 
   function removeInventoryItem(itemId: string): void {
     updateSheet((prev) => {
       const equipment: CharacterSheetState["equipment"] = { ...prev.equipment };
-      (Object.keys(equipment) as EquipmentSlot[]).forEach((slot) => {
+      (Object.keys(equipment) as EquippedSlotKey[]).forEach((slot) => {
         if (equipment[slot] === itemId) {
           delete equipment[slot];
         }
@@ -2906,10 +2933,30 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             }
           />
           <div style={panelStyle}>
+            <div style={{ fontWeight: 700, marginBottom: "0.5rem" }}>Equipped</div>
+            <CharacterEquippedSlotsPanel
+              inventory={sheet.inventory}
+              equippedSlots={sheet.equipment}
+              characterEquipment={sheet.characterEquipment}
+              index={index}
+              onEquipItem={equipInventoryItem}
+              onUnequipItem={unequipInventoryItem}
+              onEquipFromConfig={(slot) => {
+                const priceSlot: EquipmentPriceSlot = slot === "mainHand" ? "weapon" : (slot as EquipmentPriceSlot);
+                updateSheet((prev) => addAcquiredEquipmentToSheet(prev, index, priceSlot));
+              }}
+            />
+          </div>
+          <div style={panelStyle}>
             <div style={{ fontWeight: 700, marginBottom: "0.5rem" }}>
               {inventoryItems.length > 0 ? `Items (${inventoryItems.length})` : "Items"}
             </div>
-            <CharacterInventoryList items={inventoryItems} onRemoveItem={removeInventoryItem} />
+            <CharacterInventoryList
+              items={inventoryItems}
+              onEquipItem={equipInventoryItem}
+              onUnequipItem={unequipInventoryItem}
+              onRemoveItem={removeInventoryItem}
+            />
           </div>
         </div>
       )}

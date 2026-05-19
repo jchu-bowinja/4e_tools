@@ -2,13 +2,10 @@ import type { CSSProperties } from "react";
 import { RulesRichText } from "./RulesRichText";
 import { hasMagicItemDescription, type MagicItemDescription } from "../../rules/equipmentDescriptions";
 
-const panelStyle: CSSProperties = {
+const detailsStyle: CSSProperties = {
   display: "grid",
   gap: "0.4rem",
-  padding: "0.5rem 0.6rem",
-  borderRadius: "6px",
-  border: "1px solid var(--panel-border)",
-  backgroundColor: "var(--surface-0)"
+  marginTop: "0.15rem"
 };
 
 const headingStyle: CSSProperties = {
@@ -86,7 +83,7 @@ export function EquipmentSelectionDetails({
   if (!hasBase && !hasEnchantment) return null;
 
   return (
-    <div style={panelStyle}>
+    <div style={detailsStyle}>
       {hasBase && (
         <div>
           <p style={headingStyle}>{baseName ? `Item — ${baseName}` : "Item"}</p>

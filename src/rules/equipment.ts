@@ -6,10 +6,13 @@ import type {
   ImplementSlotSelection,
   MagicItem,
   MagicItemSlotIds,
+  MagicOnlyEquipmentSlotKey,
+  MagicOnlySlotSelection,
   NeckSlotSelection,
   RulesIndex,
   StatAddEntry
 } from "./models";
+import { MAGIC_ONLY_EQUIPMENT_SLOT_KEYS } from "./magicItemEquipment";
 import { mergePassiveDefenseBonuses, passiveDefenseBonusesFromStatAdds, type PassiveDefenseBonuses } from "./supportStatAdds";
 
 export { equipmentDuplicateEnchantmentWarnings } from "./enchantmentFamilies";
@@ -31,6 +34,8 @@ export type {
   EnhancementLevel,
   EquipmentSlotSelection,
   ImplementSlotSelection,
+  MagicOnlyEquipmentSlotKey,
+  MagicOnlySlotSelection,
   NeckSlotSelection
 };
 
@@ -144,10 +149,12 @@ export function computeEquipmentCombatBonuses(index: RulesIndex, build: Characte
 
   defenses = addEnchantmentDefense(defenses, index, equipment.armor?.enchantmentId, level);
   defenses = addEnchantmentDefense(defenses, index, equipment.shield?.enchantmentId, level);
-  defenses = addEnchantmentDefense(defenses, index, equipment.neck?.enchantmentId, level);
   defenses = addEnchantmentDefense(defenses, index, equipment.mainHand?.enchantmentId, level);
   defenses = addEnchantmentDefense(defenses, index, equipment.offHand?.enchantmentId, level);
   defenses = addEnchantmentDefense(defenses, index, equipment.implement?.enchantmentId, level);
+  for (const slotKey of MAGIC_ONLY_EQUIPMENT_SLOT_KEYS) {
+    defenses = addEnchantmentDefense(defenses, index, equipment[slotKey]?.enchantmentId, level);
+  }
 
   return {
     defenses,
@@ -242,6 +249,18 @@ function normalizeNeckSelection(raw: unknown): NeckSlotSelection {
   return out;
 }
 
+function normalizeMagicOnlySelection(raw: unknown): MagicOnlySlotSelection | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const v = raw as Record<string, unknown>;
+  const enchantmentId =
+    typeof v.enchantmentId === "string" && v.enchantmentId.trim() ? v.enchantmentId.trim() : undefined;
+  const enhancement = parseEnhancementLevel(v.enhancement) ?? 0;
+  if (!enchantmentId && enhancement === 0) return undefined;
+  const out: MagicOnlySlotSelection = { enhancement };
+  if (enchantmentId) out.enchantmentId = enchantmentId;
+  return out;
+}
+
 export function normalizeCharacterEquipment(raw: CharacterEquipment | undefined): CharacterEquipment {
   const armor = normalizeSlotSelection(raw?.armor);
   const shield = normalizeSlotSelection(raw?.shield);
@@ -255,6 +274,11 @@ export function normalizeCharacterEquipment(raw: CharacterEquipment | undefined)
   if (mainHand) out.mainHand = mainHand;
   if (offHand) out.offHand = offHand;
   if (implement) out.implement = implement;
+  for (const slotKey of MAGIC_ONLY_EQUIPMENT_SLOT_KEYS) {
+    if (slotKey === "neck") continue;
+    const slot = normalizeMagicOnlySelection(raw?.[slotKey]);
+    if (slot) out[slotKey] = slot;
+  }
   return out;
 }
 
