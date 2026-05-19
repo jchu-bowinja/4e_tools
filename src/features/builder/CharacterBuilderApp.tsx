@@ -1648,7 +1648,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       class: classReady && errorsByTab.class === 0 ? "complete" : "incomplete",
       abilities:
         errorsByTab.abilities === 0 &&
-        pointBuy.remaining >= 0 &&
+        pointBuy.remaining === 0 &&
         pointBuy.invalidScores.length === 0 &&
         !requiresRacialChoice
           ? "complete"
