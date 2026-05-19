@@ -251,7 +251,7 @@ function CharacterIdentitySection({
   return (
     <section className="character-sheet-identity">
       <dl className="character-sheet-identity__list">
-        <CharacterIdentityField label="Name" className="character-sheet-identity__field--name">
+        <CharacterIdentityField label="Name">
           {name || "—"}
         </CharacterIdentityField>
         <div className="character-sheet-identity__row character-sheet-identity__row--core">
