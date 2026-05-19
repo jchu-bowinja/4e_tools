@@ -14,6 +14,7 @@ export const defaultBuild: CharacterBuild = {
   },
   racialAbilityChoice: undefined,
   equipment: { neck: { enhancement: 0 } },
+  gold: 0,
   trainedSkillIds: [],
   featIds: [],
   powerIds: []

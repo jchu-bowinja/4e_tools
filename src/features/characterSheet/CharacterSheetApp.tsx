@@ -69,11 +69,14 @@ import {
   sheetWeaponProficiencyText,
   toBuildLikeState
 } from "./selectors";
-import { EquipmentTab } from "../builder/EquipmentTab";
+import { EquipmentTab, type EquipmentEditorSlot } from "../builder/EquipmentTab";
 import { CharacterInventoryList } from "./CharacterInventoryList";
+import { equipmentSlotGoldCost } from "../../rules/equipmentItemPrice";
 import {
   buildLikeStateFromSheet,
   characterSheetInventoryItems,
+  manualInventoryItemForSlot,
+  sheetCharacterEquipment,
   updateSheetEquipmentFromBuild
 } from "./sheetEquipment";
 import { loadCharacterSheetState, saveCharacterSheetState } from "./storage";
@@ -1173,6 +1176,34 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
 
   function updateSheet(mutator: (prev: CharacterSheetState) => CharacterSheetState): void {
     setSheet((prev) => mutator(prev));
+  }
+
+  function setGold(next: number): void {
+    updateSheet((prev) => ({ ...prev, gold: Math.max(0, Math.trunc(next)) }));
+  }
+
+  function addEquipmentSlotToInventory(slot: EquipmentEditorSlot): void {
+    const eq = sheetCharacterEquipment(sheet, index);
+    const item = manualInventoryItemForSlot(index, slot, eq);
+    if (!item) return;
+    updateSheet((prev) => ({ ...prev, inventory: [...prev.inventory, item] }));
+  }
+
+  function buyEquipmentSlot(slot: EquipmentEditorSlot): void {
+    const eq = sheetCharacterEquipment(sheet, index);
+    const cost = equipmentSlotGoldCost(index, slot, eq);
+    if (cost == null) return;
+    const item = manualInventoryItemForSlot(index, slot, eq);
+    if (!item) return;
+    updateSheet((prev) => {
+      const currentGold = prev.gold ?? 0;
+      if (currentGold < cost) return prev;
+      return {
+        ...prev,
+        gold: currentGold - cost,
+        inventory: [...prev.inventory, item]
+      };
+    });
   }
 
   function removeInventoryItem(itemId: string): void {
@@ -2866,6 +2897,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             index={index}
             build={sheetEquipmentBuild}
             magicCombat={magicCombat}
+            gold={sheet.gold ?? 0}
+            onGoldChange={setGold}
+            onAddToInventory={addEquipmentSlotToInventory}
+            onBuy={buyEquipmentSlot}
             onBuildChange={(next) =>
               updateSheet((prev) => updateSheetEquipmentFromBuild(prev, index, () => next))
             }

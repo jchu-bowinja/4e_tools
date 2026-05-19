@@ -291,6 +291,7 @@ export function sheetStateFromBuild(build: CharacterBuild, index: RulesIndex): C
       deathSaves: 0,
       conditions: []
     },
+    gold: normalized.gold ?? 0,
     inventory,
     equipment,
     powers: {

@@ -77,6 +77,8 @@ export interface CharacterSheetState {
   epicDestinyId?: string;
   /** Builder-aligned equipment (base, enchantment, plus per slot). Drives derived combat bonuses. */
   characterEquipment?: CharacterEquipment;
+  /** Gold pieces available for equipment purchases. */
+  gold?: number;
   abilityScores: AbilityScores;
   trainedSkillIds: string[];
   featIds?: string[];

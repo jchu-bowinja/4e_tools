@@ -23,6 +23,7 @@ export function createDefaultCharacterSheetState(): CharacterSheetState {
       deathSaves: 0,
       conditions: []
     },
+    gold: 0,
     inventory: [],
     equipment: {},
     powers: {

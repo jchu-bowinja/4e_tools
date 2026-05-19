@@ -70,6 +70,7 @@ export function normalizeState(input: unknown): CharacterSheetState {
     featIds: Array.isArray(v.featIds) ? v.featIds.filter((id): id is string => typeof id === "string") : [],
     trainedSkillIds: Array.isArray(v.trainedSkillIds) ? v.trainedSkillIds.filter((id): id is string => typeof id === "string") : [],
     level: clampInt(v.level, 1, 30, fallback.level),
+    gold: clampInt(v.gold, 0, 99_999_999, fallback.gold ?? 0),
     characterEquipment: characterEquipmentFromStored(v as Record<string, unknown>),
     themeId: typeof v.themeId === "string" && v.themeId.trim() ? v.themeId : undefined,
     paragonPathId: typeof v.paragonPathId === "string" && v.paragonPathId.trim() ? v.paragonPathId : undefined,

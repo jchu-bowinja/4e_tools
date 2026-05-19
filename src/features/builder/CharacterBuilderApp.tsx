@@ -83,11 +83,16 @@ import {
   collectFeatProficiencyDisplayRows,
   collectFeatProficiencyGrants
 } from "../../rules/featProficiencies";
-import { normalizeCharacterBuild, resolveEffectiveEquipmentIds } from "../../rules/equipment";
+import {
+  normalizeCharacterBuild,
+  normalizeCharacterEquipment,
+  resolveEffectiveEquipmentIds
+} from "../../rules/equipment";
 import { computeMagicItemCombatBonuses } from "../../rules/magicItemEquipment";
+import { equipmentSlotGoldCost } from "../../rules/equipmentItemPrice";
 import { summarizeImplementAttack, summarizeMainWeaponAttack } from "../../rules/weaponAttack";
 import { BuilderSidebarItemsPanel } from "./BuilderSidebarItemsPanel";
-import { EquipmentTab } from "./EquipmentTab";
+import { EquipmentTab, type EquipmentEditorSlot } from "./EquipmentTab";
 import { LiveSheetCollapsibleSection } from "./LiveSheetCollapsibleSection";
 import { GlossaryTooltipRichText, RulesRichText } from "./RulesRichText";
 import { NEUTRAL_PAGE_BG } from "../../ui/tokens";
@@ -4168,7 +4173,22 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         )}
 
         {activeTab === "equipment" && (
-          <EquipmentTab index={index} build={build} onBuildChange={updateBuild} magicCombat={magicCombat} />
+          <EquipmentTab
+            index={index}
+            build={build}
+            onBuildChange={updateBuild}
+            magicCombat={magicCombat}
+            gold={build.gold ?? 0}
+            onGoldChange={(nextGold) => updateBuild({ ...build, gold: Math.max(0, Math.trunc(nextGold)) })}
+            onBuy={(slot: EquipmentEditorSlot) => {
+              const equipment = normalizeCharacterEquipment(build.equipment);
+              const cost = equipmentSlotGoldCost(index, slot, equipment);
+              if (cost == null) return;
+              const currentGold = build.gold ?? 0;
+              if (currentGold < cost) return;
+              updateBuild({ ...build, gold: currentGold - cost });
+            }}
+          />
         )}
 
         {activeTab === "summary" && (

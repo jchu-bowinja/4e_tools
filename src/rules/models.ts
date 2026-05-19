@@ -439,6 +439,8 @@ export interface CharacterBuild {
   epicDestinyId?: string;
   /** Unified equipment per slot (base → enchantment → plus). */
   equipment?: CharacterEquipment;
+  /** Gold pieces available for equipment purchases. */
+  gold?: number;
   abilityScores: Record<Ability, number>;
   /** Point-buy / starting base only; level bumps live in `asiChoices` and automatic 11/21 bonuses. */
   asiChoices?: AsiChoices;

@@ -1,8 +1,16 @@
 import { useMemo, useState, type ChangeEvent, type CSSProperties, type ReactNode } from "react";
-import type { Armor, CharacterBuild, EnhancementLevel, Implement, MagicItem, RulesIndex, Weapon } from "../../rules/models";
+import type {
+  Armor,
+  CharacterBuild,
+  CharacterEquipment,
+  EnhancementLevel,
+  Implement,
+  MagicItem,
+  RulesIndex,
+  Weapon
+} from "../../rules/models";
 import type { EquipmentCombatBonuses } from "../../rules/equipment";
 import { normalizeCharacterEquipment } from "../../rules/equipment";
-import { equipmentEnchantmentEffects } from "../../rules/equipmentEnchantmentEffects";
 import {
   describeArmor,
   describeImplement,
@@ -19,7 +27,9 @@ import {
   magicItemFamilyDisplayName,
   type EnchantmentFamily
 } from "../../rules/enchantmentFamilies";
-import { adjustableNumberWidthCh } from "../../ui/AdjustableNumberInput";
+import { AdjustableNumberInput, adjustableNumberWidthCh } from "../../ui/AdjustableNumberInput";
+import { equipmentSlotGoldCost, type EquipmentPriceSlot } from "../../rules/equipmentItemPrice";
+import { EquipmentSlotActions } from "./EquipmentSlotActions";
 import { ensureSelectedEntityInFiltered, filterRulesEntitiesByQuery } from "./featPowerFilters";
 import {
   setImplementEnchantmentFamily,
@@ -74,6 +84,13 @@ interface EquipmentTabProps {
   hideTitle?: boolean;
   /** When set, only render the editor for this equipment slot. */
   activeSlotOnly?: EquipmentEditorSlotFilter;
+  /** Character gold pieces (builder or sheet). */
+  gold?: number;
+  onGoldChange?: (gold: number) => void;
+  /** Add current slot configuration to inventory without spending gold. */
+  onAddToInventory?: (slot: EquipmentEditorSlot) => void;
+  /** Purchase current slot configuration (deduct gold; sheet also adds to inventory). */
+  onBuy?: (slot: EquipmentEditorSlot) => void;
 }
 
 const selectStyle: CSSProperties = {
@@ -164,23 +181,6 @@ const slotTitleStyle: CSSProperties = {
   fontWeight: 700,
   color: "var(--text-primary)"
 };
-
-function slotLabelForEditor(slot: EquipmentEditorSlot): string {
-  switch (slot) {
-    case "armor":
-      return "Armor";
-    case "shield":
-      return "Shield";
-    case "mainHand":
-      return "Main hand";
-    case "offHand":
-      return "Off hand";
-    case "implement":
-      return "Implement";
-    case "neck":
-      return "Neck";
-  }
-}
 
 function filterEnchantmentFamilies(families: EnchantmentFamily[], query: string): EnchantmentFamily[] {
   const q = query.trim().toLowerCase();
@@ -326,6 +326,12 @@ interface StandardSlotSectionProps {
   onEnchantmentSearchChange: (value: string) => void;
   enhancement: number;
   onEnhancementChange: (value: EnhancementLevel) => void;
+  priceSlot: EquipmentPriceSlot;
+  equipment: CharacterEquipment;
+  gold: number;
+  showAddToInventory: boolean;
+  onAddToInventory?: () => void;
+  onBuy?: () => void;
 }
 
 function StandardSlotSection(props: StandardSlotSectionProps): JSX.Element {
@@ -348,8 +354,17 @@ function StandardSlotSection(props: StandardSlotSectionProps): JSX.Element {
     enchantmentSearch,
     onEnchantmentSearchChange,
     enhancement,
-    onEnhancementChange
+    onEnhancementChange,
+    priceSlot,
+    equipment,
+    gold,
+    showAddToInventory,
+    onAddToInventory,
+    onBuy
   } = props;
+
+  const price = equipmentSlotGoldCost(props.index, priceSlot, equipment);
+  const hasSelection = Boolean(baseValue || enchantmentId);
 
   const selectedFamily = enchantmentFamilies.find((f) => f.key === selectedFamilyKey);
   const baseItem = baseValue ? baseOptions.find((item) => item.id === baseValue) : undefined;
@@ -437,6 +452,14 @@ function StandardSlotSection(props: StandardSlotSectionProps): JSX.Element {
         enchantmentName={enchantmentItem ? magicItemFamilyDisplayName(enchantmentItem.name) : undefined}
         enchantmentDescription={enchantmentDescription}
       />
+      <EquipmentSlotActions
+        price={price}
+        gold={gold}
+        hasSelection={hasSelection}
+        showAddToInventory={showAddToInventory}
+        onAddToInventory={onAddToInventory}
+        onBuy={onBuy}
+      />
     </section>
   );
 }
@@ -447,7 +470,11 @@ export function EquipmentTab({
   onBuildChange,
   magicCombat,
   hideTitle,
-  activeSlotOnly: activeSlotOnlyProp
+  activeSlotOnly: activeSlotOnlyProp,
+  gold: goldProp,
+  onGoldChange,
+  onAddToInventory,
+  onBuy
 }: EquipmentTabProps): JSX.Element {
   const [pickedSlot, setPickedSlot] = useState<EquipmentEditorSlotFilter | "">("");
   const useParentSlotPicker = hideTitle === true;
@@ -456,11 +483,31 @@ export function EquipmentTab({
     : pickedSlot || undefined;
 
   const equipment = useMemo(() => normalizeCharacterEquipment(build.equipment), [build.equipment]);
+  const gold = goldProp ?? build.gold ?? 0;
+  const showInventoryActions = Boolean(onAddToInventory || onBuy);
+  const showAddToInventory = Boolean(onAddToInventory);
+
+  const slotActionProps = (slot: EquipmentEditorSlot) => {
+    if (!showInventoryActions) {
+      return {
+        priceSlot: slot,
+        equipment,
+        gold,
+        showAddToInventory: false,
+        onAddToInventory: undefined,
+        onBuy: undefined
+      };
+    }
+    return {
+      priceSlot: slot,
+      equipment,
+      gold,
+      showAddToInventory,
+      onAddToInventory: onAddToInventory ? () => onAddToInventory(slot) : undefined,
+      onBuy: onBuy ? () => onBuy(slot) : undefined
+    };
+  };
   const equipmentWarnings = useMemo(() => equipmentDuplicateEnchantmentWarnings(build, index), [build, index]);
-  const enchantmentEffects = useMemo(
-    () => equipmentEnchantmentEffects(equipment, index),
-    [equipment, index]
-  );
 
   const armorOptions = useMemo(
     () => index.armors.filter((a) => (a.armorType || "").toLowerCase() !== "shield"),
@@ -589,17 +636,6 @@ export function EquipmentTab({
     if (activeSlotFilter === "weapon") return slot === "mainHand" || slot === "offHand";
     return activeSlotFilter === slot;
   };
-  const filteredEnchantmentEffects = activeSlotFilter
-    ? activeSlotFilter === "weapon"
-      ? enchantmentEffects.filter(
-          (row) =>
-            row.slotLabel.toLowerCase() === "main hand" || row.slotLabel.toLowerCase() === "off hand"
-        )
-      : enchantmentEffects.filter(
-          (row) => row.slotLabel.toLowerCase() === slotLabelForEditor(activeSlotFilter).toLowerCase()
-        )
-    : enchantmentEffects;
-
   return (
     <>
     {!hideTitle && <h3 style={{ margin: "0 0 0.5rem 0", fontSize: "1.05rem", fontWeight: 700 }}>Equipment</h3>}
@@ -614,6 +650,31 @@ export function EquipmentTab({
         backgroundColor: "var(--surface-1)"
       }}
     >
+      {onGoldChange && (
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: "0.5rem",
+            padding: "0.45rem 0.55rem",
+            borderRadius: "6px",
+            border: "1px solid var(--panel-border)",
+            backgroundColor: "var(--surface-0)"
+          }}
+        >
+          <span style={{ fontSize: "0.88rem", fontWeight: 600 }}>Gold</span>
+          <AdjustableNumberInput
+            compact
+            min={0}
+            max={99_999_999}
+            value={gold}
+            onChange={onGoldChange}
+            ariaLabel="Gold pieces"
+          />
+          <span style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>gp</span>
+        </div>
+      )}
       {!useParentSlotPicker && (
         <select
           value={pickedSlot}
@@ -649,47 +710,6 @@ export function EquipmentTab({
           {magicCombat.implementAttack > 0 ? `; implement attack +${magicCombat.implementAttack}` : ""}
         </p>
       )}
-      {filteredEnchantmentEffects.length > 0 && (
-        <div
-          style={{
-            display: "grid",
-            gap: "0.45rem",
-            padding: "0.5rem 0.6rem",
-            borderRadius: "6px",
-            border: "1px solid var(--panel-border)",
-            backgroundColor: "var(--surface-0)"
-          }}
-        >
-          <p style={{ margin: 0, fontSize: "0.76rem", fontWeight: 700, color: "var(--text-secondary)" }}>
-            Enchantment effects
-          </p>
-          {filteredEnchantmentEffects.map((row) => (
-            <div key={row.slotLabel} style={{ fontSize: "0.78rem", lineHeight: 1.45, color: "var(--text-primary)" }}>
-              <span style={{ fontWeight: 600 }}>{row.slotLabel}</span>
-              <span style={{ color: "var(--text-muted)" }}> — {row.name}</span>
-              {row.property && (
-                <div style={{ marginTop: "0.15rem", color: "var(--text-secondary)" }}>
-                  <span style={{ fontWeight: 600 }}>Property: </span>
-                  {row.property}
-                </div>
-              )}
-              {row.power && (
-                <div style={{ marginTop: "0.15rem", color: "var(--text-secondary)" }}>
-                  <span style={{ fontWeight: 600 }}>Power: </span>
-                  {row.power}
-                </div>
-              )}
-              {row.critical && (
-                <div style={{ marginTop: "0.15rem", color: "var(--text-secondary)" }}>
-                  <span style={{ fontWeight: 600 }}>Critical: </span>
-                  {row.critical}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
       {showSlot("armor") && (
         <StandardSlotSection
           index={index}
@@ -715,6 +735,7 @@ export function EquipmentTab({
           onEnhancementChange={(n) =>
             patchStandard("armor", (b) => setStandardSlotEnhancement(b, index, "armor", n, magicArmorCatalog))
           }
+          {...slotActionProps("armor")}
         />
       )}
 
@@ -743,6 +764,7 @@ export function EquipmentTab({
           onEnhancementChange={(n) =>
             patchStandard("shield", (b) => setStandardSlotEnhancement(b, index, "shield", n, magicShieldCatalog))
           }
+          {...slotActionProps("shield")}
         />
       )}
 
@@ -776,6 +798,7 @@ export function EquipmentTab({
         onEnhancementChange={(n) =>
           patchStandard("mainHand", (b) => setStandardSlotEnhancement(b, index, "mainHand", n, magicMainWeaponCatalog))
         }
+        {...slotActionProps("mainHand")}
       />
       )}
 
@@ -809,6 +832,7 @@ export function EquipmentTab({
         onEnhancementChange={(n) =>
           patchStandard("offHand", (b) => setStandardSlotEnhancement(b, index, "offHand", n, magicOffHandCatalog))
         }
+        {...slotActionProps("offHand")}
       />
       )}
 
@@ -882,6 +906,16 @@ export function EquipmentTab({
             implementEnchantmentItem ? describeMagicItem(implementEnchantmentItem) : undefined
           }
         />
+        <EquipmentSlotActions
+          price={equipmentSlotGoldCost(index, "implement", equipment)}
+          gold={gold}
+          hasSelection={Boolean(
+            equipment.implement?.superiorImplementId || equipment.implement?.enchantmentId
+          )}
+          showAddToInventory={showAddToInventory}
+          onAddToInventory={slotActionProps("implement").onAddToInventory}
+          onBuy={slotActionProps("implement").onBuy}
+        />
       </section>
       )}
 
@@ -930,6 +964,14 @@ export function EquipmentTab({
           enchantmentDescription={
             neckEnchantmentItem ? describeMagicItem(neckEnchantmentItem) : undefined
           }
+        />
+        <EquipmentSlotActions
+          price={equipmentSlotGoldCost(index, "neck", equipment)}
+          gold={gold}
+          hasSelection={Boolean(equipment.neck?.enchantmentId)}
+          showAddToInventory={showAddToInventory}
+          onAddToInventory={slotActionProps("neck").onAddToInventory}
+          onBuy={slotActionProps("neck").onBuy}
         />
       </section>
       )}

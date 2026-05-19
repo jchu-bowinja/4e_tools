@@ -1,6 +1,7 @@
 import { normalizeCharacterBuild, normalizeCharacterEquipment } from "../../rules/equipment";
 import { magicItemFamilyDisplayName } from "../../rules/enchantmentFamilies";
 import { findMagicItem } from "../../rules/magicItemEquipment";
+import type { EquipmentPriceSlot } from "../../rules/equipmentItemPrice";
 import type {
   CharacterBuild,
   CharacterEquipment,
@@ -11,6 +12,13 @@ import type {
   RulesIndex
 } from "../../rules/models";
 import type { CharacterSheetState, EquipmentSlot, InventoryItem } from "./model";
+
+function newManualInventoryId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `manual-${crypto.randomUUID()}`;
+  }
+  return `manual-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
 
 export function formatSheetItemLabel(
   baseName: string | undefined,
@@ -96,6 +104,74 @@ function pushImplementSlotInventory(
   };
   inventory.push(item);
   equipment.implement = item.id;
+}
+
+/** Manual inventory row for the current slot configuration (not auto-equipped). */
+export function manualInventoryItemForSlot(
+  index: RulesIndex,
+  slot: EquipmentPriceSlot,
+  equipment: CharacterEquipment
+): InventoryItem | undefined {
+  if (slot === "neck") {
+    const neck = equipment.neck;
+    if (!neck?.enchantmentId) return undefined;
+    const enchantment = findMagicItem(index, neck.enchantmentId);
+    if (!enchantment) return undefined;
+    return {
+      id: newManualInventoryId(),
+      name: formatSheetItemLabel(undefined, enchantment, neck.enhancement),
+      kind: "gear",
+      quantity: 1,
+      sourceId: neck.enchantmentId,
+      slotHints: [],
+      notes: "Neck slot"
+    };
+  }
+
+  if (slot === "implement") {
+    const selection = equipment.implement;
+    if (!selection?.superiorImplementId && !selection?.enchantmentId) return undefined;
+    const base = selection.superiorImplementId
+      ? (index.implements ?? []).find((i) => i.id === selection.superiorImplementId)
+      : undefined;
+    const enchantment = selection.enchantmentId ? findMagicItem(index, selection.enchantmentId) : undefined;
+    const sourceId = selection.superiorImplementId ?? selection.enchantmentId;
+    if (!sourceId) return undefined;
+    return {
+      id: newManualInventoryId(),
+      name: formatSheetItemLabel(base?.name, enchantment, selection.enhancement),
+      kind: "implement",
+      quantity: 1,
+      sourceId: selection.superiorImplementId ?? enchantment?.id,
+      slotHints: ["implement", "mainHand", "offHand"],
+      notes: enchantment && base ? `Enchantment: ${magicItemFamilyDisplayName(enchantment.name)}` : undefined
+    };
+  }
+
+  const equipmentSlot = slot as EquipmentSlot;
+  const selection = equipment[equipmentSlot];
+  const kind = equipmentSlot === "mainHand" || equipmentSlot === "offHand" ? "weapon" : "armor";
+  if (!selection?.baseId && !selection?.enchantmentId) return undefined;
+  const baseArmor = kind === "armor" && selection.baseId ? index.armors.find((a) => a.id === selection.baseId) : undefined;
+  const baseWeapon =
+    kind === "weapon" && selection.baseId ? (index.weapons ?? []).find((w) => w.id === selection.baseId) : undefined;
+  const enchantment = selection.enchantmentId ? findMagicItem(index, selection.enchantmentId) : undefined;
+  const baseName = baseArmor?.name ?? baseWeapon?.name;
+  const sourceId = selection.baseId ?? selection.enchantmentId;
+  if (!sourceId) return undefined;
+  const slotHints: EquipmentSlot[] =
+    equipmentSlot === "mainHand" || equipmentSlot === "offHand"
+      ? ["mainHand", "offHand"]
+      : [equipmentSlot];
+  return {
+    id: newManualInventoryId(),
+    name: formatSheetItemLabel(baseName, enchantment, selection.enhancement),
+    kind,
+    quantity: 1,
+    sourceId: selection.baseId ?? enchantment?.id,
+    slotHints,
+    notes: enchantment && selection.baseId ? `Enchantment: ${magicItemFamilyDisplayName(enchantment.name)}` : undefined
+  };
 }
 
 function pushNeckInventory(inventory: InventoryItem[], neck: NeckSlotSelection | undefined, index: RulesIndex): void {
@@ -308,6 +384,7 @@ export function buildLikeStateFromSheet(state: CharacterSheetState, index: Rules
     trainedSkillIds: state.trainedSkillIds,
     featIds: state.featIds ?? [],
     powerIds: state.powers.selectedPowerIds,
-    equipment: characterEquipment
+    equipment: characterEquipment,
+    gold: state.gold
   };
 }
