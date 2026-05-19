@@ -66,6 +66,28 @@ describe("saved character storage overwrite behavior", () => {
     expect(all[0].build.level).toBe(2);
   });
 
+  it("overwrites existing entry by id when overwriteEntryId is set", () => {
+    const first = saveBuildToSavedCharacters({ ...baseBuild, name: "Test Hero" }, { overwriteExistingByName: false });
+    const second = saveBuildToSavedCharacters(
+      { ...baseBuild, name: "Renamed Hero", level: 4 },
+      { overwriteEntryId: first.entry.id }
+    );
+    expect(second.overwritten).toBe(true);
+    expect(second.entry.id).toBe(first.entry.id);
+    const all = loadSavedCharacters();
+    expect(all).toHaveLength(1);
+    expect(all[0].name).toBe("Renamed Hero");
+    expect(all[0].build.level).toBe(4);
+  });
+
+  it("refuses to create a duplicate when the name already exists", () => {
+    saveBuildToSavedCharacters({ ...baseBuild, name: "Test Hero" }, { overwriteExistingByName: false });
+    expect(() =>
+      saveBuildToSavedCharacters({ ...baseBuild, name: "Test Hero", level: 2 }, { overwriteExistingByName: false })
+    ).toThrow(/already exists/i);
+    expect(loadSavedCharacters()).toHaveLength(1);
+  });
+
   it("deletes a saved character by id", () => {
     const first = saveBuildToSavedCharacters({ ...baseBuild, name: "One" }, { overwriteExistingByName: false });
     saveBuildToSavedCharacters({ ...baseBuild, name: "Two" }, { overwriteExistingByName: false });

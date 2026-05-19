@@ -86,21 +86,34 @@ function normalizedName(name: string): string {
 
 export function saveBuildToSavedCharacters(
   build: CharacterBuild,
-  options?: { overwriteExistingByName?: boolean }
+  options?: { overwriteExistingByName?: boolean; overwriteEntryId?: string }
 ): SaveSavedCharacterResult {
   const entries = loadSavedCharacters();
   const name = (build.name || "Unnamed Character").trim() || "Unnamed Character";
   const overwriteExistingByName = options?.overwriteExistingByName ?? false;
-  const existingIndex = entries.findIndex((entry) => normalizedName(entry.name) === normalizedName(name));
+  const overwriteEntryId = options?.overwriteEntryId;
+
+  let existingIndex = -1;
+  if (overwriteEntryId) {
+    existingIndex = entries.findIndex((entry) => entry.id === overwriteEntryId);
+  } else if (overwriteExistingByName) {
+    existingIndex = entries.findIndex((entry) => normalizedName(entry.name) === normalizedName(name));
+  } else {
+    existingIndex = entries.findIndex((entry) => normalizedName(entry.name) === normalizedName(name));
+    if (existingIndex >= 0) {
+      throw new Error("A saved character with this name already exists.");
+    }
+  }
+
   const existing = existingIndex >= 0 ? entries[existingIndex] : null;
   const entry: SavedCharacterEntry = {
-    id: overwriteExistingByName && existing ? existing.id : createId(),
+    id: existing ? existing.id : createId(),
     name,
     updatedAt: new Date().toISOString(),
     build: normalizeCharacterBuild(build)
   };
   let overwritten = false;
-  if (overwriteExistingByName && existing && existingIndex >= 0) {
+  if (existing && existingIndex >= 0 && (overwriteEntryId || overwriteExistingByName)) {
     entries.splice(existingIndex, 1);
     overwritten = true;
   }

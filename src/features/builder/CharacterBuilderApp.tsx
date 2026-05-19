@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   Ability,
   AsiChoices,
@@ -12,7 +12,14 @@ import {
   RulesIndex
 } from "../../rules/models";
 import { defaultBuild } from "./defaultBuild";
-import { deleteSavedCharacterById, loadBuild, loadSavedCharacters, saveBuild, saveBuildToSavedCharacters } from "./storage";
+import {
+  deleteSavedCharacterById,
+  loadBuild,
+  loadSavedCharacters,
+  saveBuild,
+  saveBuildToSavedCharacters,
+  type SavedCharacterEntry
+} from "./storage";
 import { mergeHybridProficiencyLines } from "../../rules/hybridDerivedStats";
 import {
   buildHybridPowerSlotDefinitions,
@@ -554,8 +561,7 @@ type BuilderTab =
   | "theme"
   | "paragonPath"
   | "epicDestiny"
-  | "equipment"
-  | "summary";
+  | "equipment";
 
 function abilityModifier(score: number): number {
   return Math.floor((score - 10) / 2);
@@ -696,13 +702,46 @@ const ui = {
 };
 
 const pageTitleStyle: CSSProperties = {
-  margin: "0 0 0.65rem 0",
+  margin: 0,
   fontSize: "1.05rem",
   fontWeight: 700,
   letterSpacing: "0.04em",
   textTransform: "uppercase",
   color: "var(--text-primary)"
 };
+
+const pageHeaderRowStyle: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: "0.5rem 1rem",
+  minWidth: 0
+};
+
+const persistenceToolbarStyle: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "0.5rem",
+  alignItems: "center",
+  justifyContent: "flex-end",
+  flex: "1 1 12rem",
+  minWidth: 0
+};
+
+const savedCharacterPickerDialogStyle: CSSProperties = {
+  border: "1px solid var(--panel-border)",
+  borderRadius: "12px",
+  padding: "1.25rem",
+  backgroundColor: "var(--surface-0)",
+  color: "var(--text-primary)",
+  width: "min(100vw - 2rem, 24rem)",
+  maxHeight: "min(90vh, 420px)",
+  margin: "auto",
+  boxShadow: "var(--ui-panel-shadow, 0 18px 48px rgba(15, 23, 42, 0.25))"
+};
+
+type SavedCharacterPickerAction = "load" | "delete";
 
 const sectionTitleStyle: CSSProperties = {
   margin: "0 0 0.6rem 0",
@@ -731,7 +770,11 @@ function exportBuild(build: CharacterBuild): void {
   URL.revokeObjectURL(link.href);
 }
 
-function importBuildFromFile(file: File, onLoaded: (build: CharacterBuild) => void): void {
+function importBuildFromFile(
+  file: File,
+  index: RulesIndex,
+  onLoaded: (build: CharacterBuild) => void
+): void {
   const reader = new FileReader();
   reader.onload = () => {
     try {
@@ -743,6 +786,244 @@ function importBuildFromFile(file: File, onLoaded: (build: CharacterBuild) => vo
   reader.readAsText(file);
 }
 
+type BuilderPersistenceToolbarProps = {
+  index: RulesIndex;
+  commitNameDraft: () => CharacterBuild;
+  onBuildChange: (build: CharacterBuild) => void;
+  savedCharacters: ReturnType<typeof loadSavedCharacters>;
+  onSavedCharactersChange: () => void;
+  activeSavedCharacterId: string;
+  onActiveSavedCharacterIdChange: (id: string) => void;
+};
+
+function resolveSaveOverwriteTarget(
+  entries: ReturnType<typeof loadSavedCharacters>,
+  requestedName: string,
+  activeSavedCharacterId: string
+): SavedCharacterEntry | undefined {
+  const existingByName = entries.find(
+    (entry) => entry.name.trim().toLowerCase() === requestedName.toLowerCase()
+  );
+  const existingByActiveId = activeSavedCharacterId
+    ? entries.find((entry) => entry.id === activeSavedCharacterId)
+    : undefined;
+  return existingByName ?? existingByActiveId;
+}
+
+function builderHasUnsavedChanges(
+  build: CharacterBuild,
+  index: RulesIndex,
+  activeSavedCharacterId: string,
+  savedCharacters: SavedCharacterEntry[]
+): boolean {
+  const current = normalizeCharacterBuild(build, index);
+  if (activeSavedCharacterId) {
+    const saved = savedCharacters.find((entry) => entry.id === activeSavedCharacterId);
+    if (saved) {
+      return JSON.stringify(current) !== JSON.stringify(normalizeCharacterBuild(saved.build, index));
+    }
+  }
+  const baseline = normalizeCharacterBuild(defaultBuild, index);
+  return JSON.stringify(current) !== JSON.stringify(baseline);
+}
+
+function BuilderPersistenceToolbar({
+  index,
+  commitNameDraft,
+  onBuildChange,
+  savedCharacters,
+  onSavedCharactersChange,
+  activeSavedCharacterId,
+  onActiveSavedCharacterIdChange
+}: BuilderPersistenceToolbarProps): JSX.Element {
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const pickerDialogRef = useRef<HTMLDialogElement>(null);
+  const pickerTitleId = useId();
+  const [pickerAction, setPickerAction] = useState<SavedCharacterPickerAction | null>(null);
+  const [pickerSelectedId, setPickerSelectedId] = useState("");
+
+  useEffect(() => {
+    const el = pickerDialogRef.current;
+    if (!el) return;
+    function onClose(): void {
+      setPickerAction(null);
+      setPickerSelectedId("");
+    }
+    el.addEventListener("close", onClose);
+    return () => el.removeEventListener("close", onClose);
+  }, []);
+
+  function openPicker(action: SavedCharacterPickerAction): void {
+    if (savedCharacters.length === 0) {
+      alert(action === "load" ? "No saved characters to load." : "No saved characters to delete.");
+      return;
+    }
+    setPickerAction(action);
+    setPickerSelectedId(savedCharacters[0].id);
+    pickerDialogRef.current?.showModal();
+  }
+
+  function closePicker(): void {
+    pickerDialogRef.current?.close();
+  }
+
+  function confirmPicker(): void {
+    const selected = savedCharacters.find((entry) => entry.id === pickerSelectedId);
+    if (!selected) {
+      alert("Selected saved character could not be found.");
+      onSavedCharactersChange();
+      closePicker();
+      return;
+    }
+    if (pickerAction === "load") {
+      const shouldLoad = window.confirm(
+        `Load "${selected.name}" into the builder? This replaces your current in-progress character.`
+      );
+      if (!shouldLoad) return;
+      onBuildChange({ ...selected.build });
+      onActiveSavedCharacterIdChange(selected.id);
+      alert(`Loaded "${selected.name}".`);
+    } else if (pickerAction === "delete") {
+      const shouldDelete = window.confirm(`Delete saved character "${selected.name}"? This cannot be undone.`);
+      if (!shouldDelete) return;
+      const deleted = deleteSavedCharacterById(selected.id);
+      onSavedCharactersChange();
+      if (selected.id === activeSavedCharacterId) {
+        onActiveSavedCharacterIdChange("");
+      }
+      if (deleted) {
+        alert(`Deleted "${selected.name}".`);
+      } else {
+        alert("Saved character was not found.");
+      }
+    }
+    closePicker();
+  }
+
+  return (
+    <>
+    <div style={persistenceToolbarStyle} aria-label="Character file actions">
+      <button
+        type="button"
+        onClick={() => {
+          const buildToSave = commitNameDraft();
+          const requestedName = (buildToSave.name || "Unnamed Character").trim() || "Unnamed Character";
+          const entries = loadSavedCharacters();
+          const overwriteTarget = resolveSaveOverwriteTarget(entries, requestedName, activeSavedCharacterId);
+          if (overwriteTarget) {
+            const confirmed = window.confirm(
+              `A saved character named "${overwriteTarget.name}" already exists. Overwrite it?`
+            );
+            if (!confirmed) return;
+          }
+          const result = saveBuildToSavedCharacters(buildToSave, {
+            overwriteEntryId: overwriteTarget?.id
+          });
+          onSavedCharactersChange();
+          onActiveSavedCharacterIdChange(result.entry.id);
+          const actionLabel = result.overwritten ? "Overwrote" : "Saved";
+          alert(`${actionLabel} "${result.entry.name}" for Character Sheet.`);
+        }}
+      >
+        Save
+      </button>
+      <button type="button" onClick={() => openPicker("load")}>
+        Load
+      </button>
+      <button type="button" onClick={() => exportBuild(commitNameDraft())}>
+        Export
+      </button>
+      <button type="button" onClick={() => importInputRef.current?.click()}>
+        Import
+      </button>
+      <input
+        ref={importInputRef}
+        type="file"
+        accept="application/json"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            importBuildFromFile(file, index, (next) => {
+              onBuildChange(next);
+              onActiveSavedCharacterIdChange("");
+            });
+          }
+          e.target.value = "";
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => {
+          const current = commitNameDraft();
+          if (
+            builderHasUnsavedChanges(current, index, activeSavedCharacterId, savedCharacters) &&
+            !window.confirm("Reset the builder? Unsaved changes to this character will be lost.")
+          ) {
+            return;
+          }
+          onBuildChange(defaultBuild);
+          onActiveSavedCharacterIdChange("");
+        }}
+      >
+        Reset
+      </button>
+      <button type="button" onClick={() => openPicker("delete")}>
+        Delete
+      </button>
+    </div>
+    <dialog ref={pickerDialogRef} aria-labelledby={pickerTitleId} style={savedCharacterPickerDialogStyle}>
+      <h2 id={pickerTitleId} style={{ margin: "0 0 0.75rem", fontSize: "1rem", fontWeight: 600 }}>
+        {pickerAction === "delete" ? "Delete character" : "Load character"}
+      </h2>
+      <ul
+        style={{
+          listStyle: "none",
+          margin: 0,
+          padding: 0,
+          maxHeight: "16rem",
+          overflowY: "auto"
+        }}
+      >
+        {savedCharacters.map((entry) => (
+          <li key={entry.id} style={{ marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                cursor: "pointer"
+              }}
+            >
+              <input
+                type="radio"
+                name="saved-character-picker"
+                checked={pickerSelectedId === entry.id}
+                onChange={() => setPickerSelectedId(entry.id)}
+              />
+              <span>
+                {entry.name}{" "}
+                <span style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                  ({new Date(entry.updatedAt).toLocaleString()})
+                </span>
+              </span>
+            </label>
+          </li>
+        ))}
+      </ul>
+      <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem", justifyContent: "flex-end" }}>
+        <button type="button" onClick={closePicker}>
+          Cancel
+        </button>
+        <button type="button" onClick={confirmPicker}>
+          {pickerAction === "delete" ? "Delete" : "Load"}
+        </button>
+      </div>
+    </dialog>
+    </>
+  );
+}
+
 export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Element {
   const [build, setBuild] = useState<CharacterBuild>(() => {
     const loaded = loadBuild();
@@ -750,7 +1031,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   });
   const [nameDraft, setNameDraft] = useState(build.name);
   const [savedCharacters, setSavedCharacters] = useState(() => loadSavedCharacters());
-  const [selectedSavedCharacterId, setSelectedSavedCharacterId] = useState("");
+  const [activeSavedCharacterId, setActiveSavedCharacterId] = useState("");
   const prevAutoGrantedSkillIdsRef = useRef<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<BuilderTab>("race");
   const [featSearch, setFeatSearch] = useState("");
@@ -1403,7 +1684,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   }, [build.abilityScores, build.pointBuyBudget]);
 
   /** Which builder tab owns this validation message (for status dots and error buckets). */
-  function resolveValidationErrorTab(message: string): BuilderTab {
+  function resolveValidationErrorTab(message: string): BuilderTab | null {
     const m = message.toLowerCase();
     if (m.startsWith("theme:") || m.includes("selected theme is not")) {
       return "theme";
@@ -1435,12 +1716,13 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     if (m.includes("at-will") || m.includes("encounter") || m.includes("daily") || m.includes("power")) return "powers";
     if (m.includes("armor") || m.includes("shield") || m.includes("proficiency")) return "equipment";
     if (m.includes("main weapon") || m.includes("off-hand weapon") || m.includes("selected implement")) return "equipment";
-    return "summary";
+    return null;
   }
 
   /** Tab to open when jumping from an error (respects tier locks when those tabs are hidden). */
-  function navigateToTabForError(message: string): BuilderTab {
+  function navigateToTabForError(message: string): BuilderTab | null {
     const t = resolveValidationErrorTab(message);
+    if (!t) return null;
     if (t === "paragonPath" && build.level < 11) return "theme";
     if (t === "epicDestiny" && build.level < 21) return build.level >= 11 ? "paragonPath" : "theme";
     return t;
@@ -1449,7 +1731,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   const tabStatuses = useMemo(() => {
     const errorsByTab = legality.errors.reduce<Record<BuilderTab, number>>(
       (acc, e) => {
-        acc[resolveValidationErrorTab(e)] += 1;
+        const tab = resolveValidationErrorTab(e);
+        if (tab) acc[tab] += 1;
         return acc;
       },
       {
@@ -1462,8 +1745,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         theme: 0,
         paragonPath: 0,
         epicDestiny: 0,
-        equipment: 0,
-        summary: 0
+        equipment: 0
       }
     );
 
@@ -1486,8 +1768,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       theme: errorsByTab.theme === 0 ? "complete" : "incomplete",
       paragonPath: errorsByTab.paragonPath === 0 ? "complete" : "incomplete",
       epicDestiny: errorsByTab.epicDestiny === 0 ? "complete" : "incomplete",
-      equipment: errorsByTab.equipment === 0 ? "complete" : "incomplete",
-      summary: legality.errors.length === 0 ? "complete" : "incomplete"
+      equipment: errorsByTab.equipment === 0 ? "complete" : "incomplete"
     };
     return statuses;
   }, [
@@ -1653,7 +1934,18 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
 
   return (
     <div style={ui.page}>
-      <h1 style={pageTitleStyle}>D&amp;D 4e Character Builder</h1>
+      <div style={pageHeaderRowStyle}>
+        <h1 style={pageTitleStyle}>D&amp;D 4e Character Builder</h1>
+        <BuilderPersistenceToolbar
+          index={index}
+          commitNameDraft={commitNameDraft}
+          onBuildChange={updateBuild}
+          savedCharacters={savedCharacters}
+          onSavedCharactersChange={refreshSavedCharacters}
+          activeSavedCharacterId={activeSavedCharacterId}
+          onActiveSavedCharacterIdChange={setActiveSavedCharacterId}
+        />
+      </div>
       <div style={ui.chromeFields}>
           <label style={{ display: "block", fontSize: "0.9rem", color: "var(--text-secondary)" }}>
             Character Name
@@ -1716,8 +2008,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               ["theme", "Theme"],
               ...(build.level >= 11 ? ([["paragonPath", "Paragon path"]] as [BuilderTab, string][]) : []),
               ...(build.level >= 21 ? ([["epicDestiny", "Epic destiny"]] as [BuilderTab, string][]) : []),
-              ["equipment", "Equipment"],
-              ["summary", "Summary"]
+              ["equipment", "Equipment"]
             ].map(([id, label]) => (
               <button
                 key={id}
@@ -4153,105 +4444,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
           </div>
         )}
 
-        {activeTab === "summary" && (
-          <div style={{ marginTop: "1rem", display: "flex", gap: "0.5rem" }}>
-            <button onClick={() => exportBuild(commitNameDraft())}>Export Character JSON</button>
-            <button
-              onClick={() => {
-                const buildToSave = commitNameDraft();
-                const requestedName = (buildToSave.name || "Unnamed Character").trim() || "Unnamed Character";
-                const existing = loadSavedCharacters().find(
-                  (entry) => entry.name.trim().toLowerCase() === requestedName.toLowerCase()
-                );
-                const shouldOverwrite = existing
-                  ? window.confirm(`A saved character named "${requestedName}" already exists. Overwrite it?`)
-                  : false;
-                if (existing && !shouldOverwrite) {
-                  return;
-                }
-                const result = saveBuildToSavedCharacters(buildToSave, { overwriteExistingByName: shouldOverwrite });
-                refreshSavedCharacters();
-                const actionLabel = result.overwritten ? "Overwrote" : "Saved";
-                alert(`${actionLabel} "${result.entry.name}" for Character Sheet.`);
-              }}
-            >
-              Save for Character Sheet
-            </button>
-            <label style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
-              Load saved
-              <select
-                value={selectedSavedCharacterId}
-                onChange={(e) => setSelectedSavedCharacterId(e.target.value)}
-                style={{ minWidth: "18rem" }}
-              >
-                <option value="">Select character...</option>
-                {savedCharacters.map((entry) => (
-                  <option key={entry.id} value={entry.id}>
-                    {entry.name} ({new Date(entry.updatedAt).toLocaleString()})
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              onClick={() => {
-                if (!selectedSavedCharacterId) return;
-                const selected = savedCharacters.find((entry) => entry.id === selectedSavedCharacterId);
-                if (!selected) {
-                  alert("Selected saved character could not be found.");
-                  refreshSavedCharacters();
-                  setSelectedSavedCharacterId("");
-                  return;
-                }
-                const shouldLoad = window.confirm(
-                  `Load "${selected.name}" into the builder? This replaces your current in-progress character.`
-                );
-                if (!shouldLoad) return;
-                updateBuild({ ...selected.build });
-                setSelectedSavedCharacterId(selected.id);
-                alert(`Loaded "${selected.name}".`);
-              }}
-              disabled={!selectedSavedCharacterId}
-            >
-              Load Selected
-            </button>
-            <button
-              onClick={() => {
-                if (!selectedSavedCharacterId) return;
-                const selected = savedCharacters.find((entry) => entry.id === selectedSavedCharacterId);
-                if (!selected) {
-                  refreshSavedCharacters();
-                  setSelectedSavedCharacterId("");
-                  return;
-                }
-                const shouldDelete = window.confirm(`Delete saved character "${selected.name}"? This cannot be undone.`);
-                if (!shouldDelete) return;
-                const deleted = deleteSavedCharacterById(selected.id);
-                refreshSavedCharacters();
-                setSelectedSavedCharacterId("");
-                if (deleted) {
-                  alert(`Deleted "${selected.name}".`);
-                } else {
-                  alert("Saved character was not found.");
-                }
-              }}
-              disabled={!selectedSavedCharacterId}
-            >
-              Delete Selected
-            </button>
-            <button onClick={() => updateBuild(defaultBuild)}>Reset</button>
-            <label>
-              Import JSON
-              <input
-                type="file"
-                accept="application/json"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) importBuildFromFile(file, updateBuild);
-                }}
-              />
-            </label>
-          </div>
-        )}
         <JsonCollapsiblePanel
           title="JSON"
           jsonText={expandedBuildJson}
@@ -4297,7 +4489,10 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                       <li key={r}>
                         <button
                           type="button"
-                          onClick={() => setActiveTab(navigateToTabForError(r))}
+                          onClick={() => {
+                            const tab = navigateToTabForError(r);
+                            if (tab) setActiveTab(tab);
+                          }}
                           style={{
                             border: "none",
                             background: "transparent",
@@ -4318,7 +4513,10 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     <li key={e}>
                       <button
                         type="button"
-                        onClick={() => setActiveTab(navigateToTabForError(e))}
+                        onClick={() => {
+                          const tab = navigateToTabForError(e);
+                          if (tab) setActiveTab(tab);
+                        }}
                         style={{
                           border: "none",
                           background: "transparent",
