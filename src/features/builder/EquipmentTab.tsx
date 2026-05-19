@@ -47,6 +47,8 @@ import {
 import {
   magicArmorEnchantmentFamilies,
   magicArmorOptions,
+  magicShieldEnchantmentFamilies,
+  magicShieldOptions,
   magicEnchantmentFamiliesForSlot,
   magicImplementEnchantmentFamilies,
   magicImplementOptions,
@@ -694,7 +696,7 @@ export function EquipmentTab({
   const selectedWeapon = weaponsSorted.find((w) => w.id === equipment.mainHand?.baseId);
 
   const magicArmorCatalog = useMemo(() => magicArmorOptions(index, selectedArmor), [index, selectedArmor]);
-  const magicShieldCatalog = useMemo(() => magicArmorOptions(index, selectedShield), [index, selectedShield]);
+  const magicShieldCatalog = useMemo(() => magicShieldOptions(index, selectedShield), [index, selectedShield]);
   const magicWeaponCatalog = useMemo(
     () => magicWeaponOptions(index, selectedWeapon),
     [index, selectedWeapon]
@@ -720,7 +722,7 @@ export function EquipmentTab({
     [index, selectedArmor]
   );
   const magicShieldFamilies = useMemo(
-    () => magicArmorEnchantmentFamilies(index, selectedShield),
+    () => magicShieldEnchantmentFamilies(index, selectedShield),
     [index, selectedShield]
   );
   const magicWeaponFamilies = useMemo(

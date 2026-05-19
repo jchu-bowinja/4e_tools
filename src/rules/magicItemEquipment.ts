@@ -80,6 +80,29 @@ export function isArmorMagicItem(item: MagicItem): boolean {
     .toLowerCase() === "armor";
 }
 
+/** Compendium `_IsEnchant` (ETL `isEnchant` or legacy `raw.specific`). */
+export function magicItemIsEnchant(item: MagicItem): string {
+  const top = String(item.isEnchant ?? "").trim();
+  if (top) return top.toLowerCase();
+  const raw = item.raw as { specific?: Record<string, unknown> } | undefined;
+  const fromRaw = raw?.specific?.["_IsEnchant"];
+  if (fromRaw == null) return "";
+  if (Array.isArray(fromRaw)) {
+    const first = fromRaw.find((v) => String(v).trim());
+    return first ? String(first).trim().toLowerCase() : "";
+  }
+  return String(fromRaw).trim().toLowerCase();
+}
+
+/** Shield enchantments use `_IsEnchant: Shield` (Arms Slot Item), not `Magic Item Type: Armor`. */
+export function isShieldMagicItem(item: MagicItem): boolean {
+  if (magicItemIsEnchant(item) === "shield") return true;
+  if (!isArmorMagicItem(item)) return false;
+  const types = item.armorTypes;
+  if (!types?.length) return false;
+  return types.some((t) => /shield/i.test(t));
+}
+
 export function isWeaponMagicItem(item: MagicItem): boolean {
   return String(item.magicItemType || "")
     .trim()
@@ -141,6 +164,7 @@ function magicItemTypes(item: MagicItem): string[] {
 }
 
 export function isMagicItemForSlot(item: MagicItem, slot: MagicOnlyEquipmentSlotKey): boolean {
+  if (slot === "arms" && isShieldMagicItem(item)) return false;
   const types = magicItemTypes(item);
   const expected = MAGIC_ITEM_TYPE_BY_SLOT[slot];
   if (types.includes(expected)) return true;
@@ -173,9 +197,10 @@ export function isImplementMagicItem(item: MagicItem): boolean {
 
 export function armorMatchesMagicItem(armor: Armor | undefined, item: MagicItem): boolean {
   if (!armor) return true;
+  if (magicItemIsEnchant(item) === "shield") return true;
   const types = item.armorTypes;
   if (!types?.length) return true;
-  const hay = `${armor.armorCategory || ""} ${armor.name || ""}`.toLowerCase();
+  const hay = `${armor.armorType || ""} ${armor.armorCategory || ""} ${armor.name || ""}`.toLowerCase();
   return types.some((t) => hay.includes(t.toLowerCase()));
 }
 

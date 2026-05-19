@@ -5,12 +5,13 @@ import {
   computeMagicItemCombatBonuses,
   isArmorMagicItem,
   isMagicItemForSlot,
+  isShieldMagicItem,
   magicItemAttackBonus,
   stripLegacyMagicItemBonuses,
   weaponMatchesMagicItem
 } from "../../src/rules/magicItemEquipment";
-import type { CharacterBuild, MagicItem, RulesIndex, Weapon } from "../../src/rules/models";
-
+import type { Armor, CharacterBuild, MagicItem, RulesIndex, Weapon } from "../../src/rules/models";
+import { magicShieldOptions } from "../../src/features/builder/magicItemOptions";
 const blackIron: MagicItem = {
   id: "ID_FMP_MAGIC_ITEM_32",
   name: "Black Iron Armor +2",
@@ -39,6 +40,36 @@ const longswordPlus3: MagicItem = {
   raw: {}
 };
 
+const guardianShield: MagicItem = {
+  id: "ID_GUARDIAN_SHIELD",
+  name: "Guardian Shield (heroic tier)",
+  slug: "guardian-shield-heroic",
+  level: 10,
+  magicItemType: "Arms Slot Item",
+  isEnchant: "Shield",
+  raw: { specific: { _IsEnchant: "Shield" } }
+};
+
+const turathiShield: MagicItem = {
+  id: "ID_TURATHI",
+  name: "Shield of Turathi Defiance (paragon tier)",
+  slug: "shield-of-turathi-defiance",
+  level: 16,
+  magicItemType: "Armor",
+  armorTypes: ["Heavy Shields", "Light Shields"],
+  raw: {}
+};
+
+const lightShield: Armor = {
+  id: "a_light_shield",
+  name: "Light Shield",
+  slug: "light-shield",
+  armorType: "Shield",
+  armorCategory: "Light Shields",
+  armorBonus: 1,
+  raw: {}
+};
+
 const index: RulesIndex = {
   meta: { version: 1, counts: {} },
   races: [],
@@ -53,7 +84,8 @@ const index: RulesIndex = {
   themes: [],
   paragonPaths: [],
   epicDestinies: [],
-  magicItems: [blackIron, longswordPlus3]
+  magicItems: [blackIron, longswordPlus3, guardianShield, turathiShield],
+  armors: [lightShield]
 };
 
 describe("magicItemEquipment", () => {
@@ -93,6 +125,21 @@ describe("magicItemEquipment", () => {
     expect(weaponMatchesMagicItem(weapon, longswordPlus3)).toBe(true);
     expect(isArmorMagicItem(blackIron)).toBe(true);
     expect(magicItemAttackBonus(longswordPlus3)).toBe(3);
+  });
+
+  it("classifies shield enchants separately from body armor and arms slot", () => {
+    expect(isShieldMagicItem(guardianShield)).toBe(true);
+    expect(isShieldMagicItem(blackIron)).toBe(false);
+    expect(isShieldMagicItem(turathiShield)).toBe(true);
+    expect(isArmorMagicItem(guardianShield)).toBe(false);
+    expect(isMagicItemForSlot(guardianShield, "arms")).toBe(false);
+    expect(isMagicItemForSlot(guardianShield, "head")).toBe(false);
+
+    const shieldOptions = magicShieldOptions(index, lightShield);
+    expect(shieldOptions.map((m) => m.id)).toEqual(
+      expect.arrayContaining([guardianShield.id, turathiShield.id])
+    );
+    expect(shieldOptions.some((m) => m.id === blackIron.id)).toBe(false);
   });
 
   it("classifies magic-only equipment slots by type and item slot", () => {

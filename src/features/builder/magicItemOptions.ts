@@ -4,6 +4,7 @@ import {
   isArmorMagicItem,
   isImplementMagicItem,
   isMagicItemForSlot,
+  isShieldMagicItem,
   isWeaponMagicItem,
   weaponMatchesMagicItem
 } from "../../rules/magicItemEquipment";
@@ -15,7 +16,18 @@ function sortByName(items: MagicItem[]): MagicItem[] {
 
 export function magicArmorOptions(index: RulesIndex, selectedArmor: Armor | undefined): MagicItem[] {
   return sortByName(
-    (index.magicItems ?? []).filter(isArmorMagicItem).filter((item) => armorMatchesMagicItem(selectedArmor, item))
+    (index.magicItems ?? [])
+      .filter(isArmorMagicItem)
+      .filter((item) => !isShieldMagicItem(item))
+      .filter((item) => armorMatchesMagicItem(selectedArmor, item))
+  );
+}
+
+export function magicShieldOptions(index: RulesIndex, selectedShield: Armor | undefined): MagicItem[] {
+  return sortByName(
+    (index.magicItems ?? [])
+      .filter(isShieldMagicItem)
+      .filter((item) => armorMatchesMagicItem(selectedShield, item))
   );
 }
 
@@ -78,6 +90,13 @@ export function magicArmorEnchantmentFamilies(
   selectedArmor: Armor | undefined
 ): EnchantmentFamily[] {
   return groupMagicItemsIntoFamilies(magicArmorOptions(index, selectedArmor));
+}
+
+export function magicShieldEnchantmentFamilies(
+  index: RulesIndex,
+  selectedShield: Armor | undefined
+): EnchantmentFamily[] {
+  return groupMagicItemsIntoFamilies(magicShieldOptions(index, selectedShield));
 }
 
 export function magicEnchantmentFamiliesForSlot(

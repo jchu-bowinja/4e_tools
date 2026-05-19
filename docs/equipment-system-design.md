@@ -16,7 +16,7 @@ This document defines how the character builder and sheet should handle equippab
 | Slot key     | Mundane base (index)     | Magic filter                         | Notes |
 |-------------|---------------------------|--------------------------------------|-------|
 | `armor`     | `armors` (non-shield)     | `Magic Item Type: Armor`, armor types  | Body armor |
-| `shield`    | `armors` (shield)         | Armor + shield-compatible types      | Same 3-step flow as body armor |
+| `shield`    | `armors` (shield)         | `_IsEnchant: Shield` (CB arms-slot rows) + rare `Armor` rows with shield categories | Same 3-step flow as body armor |
 | `mainHand`  | `weapons`                 | `Magic Item Type: Weapon`, weapon types | |
 | `offHand`   | `weapons`                 | Same as main hand                    | |
 | `implement` | `implements` (Superior Implement) | Implement magic items (staff, orb, rod, …) | **Extra** superior-implement layer (see below) |
@@ -93,7 +93,7 @@ When the user selects an enchantment, set `enhancement` to that row’s compendi
 ### Compatibility filters (retained)
 
 - **Armor / weapon type matching**: Magic armor only if `armorTypes` matches selected mundane armor (when types are listed). Magic weapon only if `weaponTypes` matches selected weapon group/category.
-- **Shield**: Use the same armor-type magic filter as body armor, but only show magic items whose `armorTypes` (or equivalent) match the **selected shield** mundane entry.
+- **Shield**: Compendium shield property enchants use `_IsEnchant: Shield` with `Magic Item Type: Arms Slot Item` (not `Armor`). Filter by `isEnchant` / `isShieldMagicItem`, plus `armorTypes` matching for the few armor-type shield rows (e.g. Turathi).
 - **No character level filter** on magic options (explicit product decision; differs from CB loot tables but simplifies building test characters).
 
 ### Validation (proficiency, etc.)

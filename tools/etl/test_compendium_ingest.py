@@ -68,6 +68,21 @@ class TestCompendiumIngest(unittest.TestCase):
         self.assertEqual(len(out["statAdds"]), 2)
         self.assertEqual(out["magicItemType"], "Armor")
 
+    def test_magic_item_is_enchant_shield(self):
+        row = {
+            "internal_id": "ID_TEST_SHIELD_ENCHANT",
+            "name": "Guardian Shield (heroic tier)",
+            "specific": {
+                "Level": "10",
+                "Magic Item Type": "Arms Slot Item",
+                "_IsEnchant": "Shield",
+                "Item Slot": "Arms",
+            },
+        }
+        out = _magic_item_index_entry(row)
+        self.assertEqual(out["isEnchant"], "Shield")
+        self.assertEqual(out["magicItemType"], "Arms Slot Item")
+
 
 if __name__ == "__main__":
     unittest.main()
