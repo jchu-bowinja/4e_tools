@@ -1775,9 +1775,14 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       feats:
         errorsByTab.feats === 0 && build.featIds.length === expectedFeatCount ? "complete" : "incomplete",
       powers: classReady && errorsByTab.powers === 0 ? "complete" : "incomplete",
-      theme: errorsByTab.theme === 0 ? "complete" : "incomplete",
-      paragonPath: errorsByTab.paragonPath === 0 ? "complete" : "incomplete",
-      epicDestiny: errorsByTab.epicDestiny === 0 ? "complete" : "incomplete",
+      theme: !!build.themeId && errorsByTab.theme === 0 ? "complete" : "incomplete",
+      paragonPath:
+        errorsByTab.paragonPath === 0 &&
+        (build.level < 11 || !!build.paragonPathId || build.paragonMulticlassing)
+          ? "complete"
+          : "incomplete",
+      epicDestiny:
+        errorsByTab.epicDestiny === 0 && (build.level < 21 || !!build.epicDestinyId) ? "complete" : "incomplete",
       equipment: errorsByTab.equipment === 0 ? "complete" : "incomplete"
     };
     return statuses;
@@ -1799,6 +1804,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     build.level,
     build.themeId,
     build.paragonPathId,
+    build.paragonMulticlassing,
     build.epicDestinyId,
     expectedFeatCount
   ]);
