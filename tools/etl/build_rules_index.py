@@ -1108,6 +1108,141 @@ def extract_grants_from_rules(
     }
 
 
+def _parse_associated_power_names(spec: Any) -> List[str]:
+    """Comma-separated power names from feat specific['Associated Powers'] (augmentations, not grants)."""
+    if not isinstance(spec, dict):
+        return []
+    raw = str(spec.get("Associated Powers") or "").strip()
+    if not raw or raw.lower() == "null":
+        return []
+    return [part.strip() for part in raw.split(",") if part.strip()]
+
+
+def _build_power_name_to_id(powers_raw: List[Dict[str, Any]]) -> Dict[str, str]:
+    """First compendium row per display name (case-insensitive), matching builder name resolution."""
+    lookup: Dict[str, str] = {}
+    for power in powers_raw:
+        pid = power.get("internal_id")
+        pname = power.get("name")
+        if not isinstance(pid, str) or not isinstance(pname, str):
+            continue
+        key = pname.strip().lower()
+        if key and key not in lookup:
+            lookup[key] = pid
+    return lookup
+
+
+def _append_synthesized_power_modify_rules(
+    feat: Dict[str, Any], power_modifications: List[Dict[str, Any]]
+) -> None:
+    """Merge Associated Powers augmentations into feat.rules.modify (CB style feats)."""
+    if not power_modifications:
+        return
+    rules = feat.get("rules")
+    if not isinstance(rules, dict):
+        rules = {}
+        feat["rules"] = rules
+    modify = rules.get("modify")
+    if not isinstance(modify, list):
+        modify = []
+        rules["modify"] = modify
+    existing_names = {
+        str((m.get("attrs") or {}).get("name") or "").strip().lower()
+        for m in modify
+        if isinstance(m, dict) and str((m.get("attrs") or {}).get("type") or "").strip().lower() == "power"
+    }
+    for entry in power_modifications:
+        pname = str(entry.get("powerName") or "").strip()
+        if not pname or pname.lower() in existing_names:
+            continue
+        existing_names.add(pname.lower())
+        modify.append(
+            {
+                "attrs": {
+                    "name": pname,
+                    "type": "Power",
+                    "Field": str(entry.get("field") or feat.get("name") or "").strip(),
+                    "value": str(entry.get("value") or "").strip(),
+                }
+            }
+        )
+
+
+def extract_feat_power_modifications(
+    feat: Dict[str, Any],
+    power_name_to_id: Dict[str, str],
+) -> Dict[str, Any]:
+    """
+  Powers a feat augments (style / arena fighting), not grants.
+
+  Sources:
+  - rules.modify with type Power (e.g. Corellon's Wrath Style)
+  - specific['Associated Powers'] when no explicit modify row exists (e.g. Gulg Hunter Practice)
+    """
+    rules = feat.get("rules") if isinstance(feat.get("rules"), dict) else {}
+    spec = feat.get("specific") if isinstance(feat.get("specific"), dict) else {}
+    feat_name = str(feat.get("name") or "").strip()
+
+    entries: List[Dict[str, Any]] = []
+    seen_names: Set[str] = set()
+
+    for modify in rules.get("modify") or []:
+        if not isinstance(modify, dict):
+            continue
+        attrs = modify.get("attrs") or {}
+        if str(attrs.get("type") or "").strip().lower() != "power":
+            continue
+        pname = str(attrs.get("name") or "").strip()
+        if not pname:
+            continue
+        key = pname.lower()
+        if key in seen_names:
+            continue
+        seen_names.add(key)
+        field = str(attrs.get("Field") or attrs.get("field") or feat_name).strip()
+        value = str(attrs.get("value") or "").strip()
+        pid = power_name_to_id.get(key)
+        entries.append(
+            {
+                "powerName": pname,
+                "powerId": pid,
+                "field": field,
+                "value": value,
+            }
+        )
+
+    synthesized: List[Dict[str, Any]] = []
+    for pname in _parse_associated_power_names(spec):
+        key = pname.lower()
+        if key in seen_names:
+            continue
+        seen_names.add(key)
+        entry = {
+            "powerName": pname,
+            "powerId": power_name_to_id.get(key),
+            "field": feat_name,
+            "value": "",
+        }
+        entries.append(entry)
+        synthesized.append(entry)
+
+    if synthesized:
+        _append_synthesized_power_modify_rules(feat, synthesized)
+
+    power_ids: List[str] = []
+    seen_ids: Set[str] = set()
+    for entry in entries:
+        pid = entry.get("powerId")
+        if isinstance(pid, str) and pid and pid not in seen_ids:
+            seen_ids.add(pid)
+            power_ids.append(pid)
+
+    return {
+        "modifiedPowerIds": power_ids,
+        "powerModifications": entries,
+    }
+
+
 def extract_stat_adds_from_rules(rules: Any) -> List[Dict[str, Any]]:
     """rules.statadd from a compendium row (feat, theme, paragon path, epic destiny, etc.)."""
     if not isinstance(rules, dict):
@@ -1632,6 +1767,8 @@ def build_index(input_path: Path, output_dir: Path) -> None:
         if isinstance(sid, str) and isinstance(sname, str) and sname.strip():
             skill_name_to_id[sname.strip().lower()] = sid
 
+    power_name_to_id = _build_power_name_to_id(powers_raw)
+
     feats: List[Dict[str, Any]] = []
     for feat in feats_raw:
         parse = parse_prereqs(feat.get("prereqs"), known_races, known_classes)
@@ -1660,6 +1797,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
             class_feature_name_lookup,
             class_feature_id_by_name,
         )
+        feat_power_mods = extract_feat_power_modifications(feat, power_name_to_id)
         feats.append(
             {
                 "id": feat.get("internal_id"),
@@ -1676,6 +1814,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
                 "raw": feat,
                 **support_entity_stat_bonuses(feat),
                 **feat_grants,
+                **feat_power_mods,
             }
         )
 

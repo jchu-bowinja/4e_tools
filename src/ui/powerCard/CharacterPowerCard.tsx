@@ -1,4 +1,5 @@
 import type { CSSProperties, ComponentPropsWithoutRef, ElementType, ReactNode } from "react";
+import type { PowerFeatModifications } from "../../rules/featPowerModifications";
 import type { Power } from "../../rules/models";
 import { buildCharacterPowerCardViewModel } from "./characterPowerCardViewModel";
 import { powerCardUsageAccentBarColor, powerCardUsageAccentStyle } from "./powerCardAccent";
@@ -7,12 +8,14 @@ import type { CharacterPowerCardLabeledLine, CharacterPowerCardViewModel, PowerC
 export type CharacterPowerCardProps = {
   power?: Power;
   vm?: CharacterPowerCardViewModel;
+  featMods?: PowerFeatModifications;
   variant?: "builder" | "sheet";
   as?: ElementType;
   renderLineText?: (text: string, segmentKey: string, line: CharacterPowerCardLabeledLine) => ReactNode;
   renderKeyword?: (keyword: string, index: number) => ReactNode;
   renderUsageInHeader?: (usageLabel: string, usageBucket: PowerCardUsageBucket) => ReactNode;
   renderBody?: (body: string) => ReactNode;
+  renderAugmentationText?: (text: string, featId: string) => ReactNode;
   expended?: boolean;
   showExpendedBadge?: boolean;
   footer?: ReactNode;
@@ -51,12 +54,14 @@ function CharacterPowerCardLabeledBlock({
 export function CharacterPowerCard({
   power,
   vm: vmProp,
+  featMods,
   variant = "builder",
   as: Root = "article",
   renderLineText,
   renderKeyword,
   renderUsageInHeader,
   renderBody,
+  renderAugmentationText,
   expended = false,
   showExpendedBadge = false,
   footer,
@@ -67,7 +72,7 @@ export function CharacterPowerCard({
   style,
   ...rootProps
 }: CharacterPowerCardProps): JSX.Element {
-  const vm = vmProp ?? (power ? buildCharacterPowerCardViewModel(power) : null);
+  const vm = vmProp ?? (power ? buildCharacterPowerCardViewModel(power, featMods) : null);
   if (!vm) {
     throw new Error("CharacterPowerCard requires `power` or `vm`.");
   }
@@ -177,6 +182,36 @@ export function CharacterPowerCard({
         fontSize={bodyFontSize}
         color={bodyColor}
       />
+
+      {vm.augmentationLines.length > 0 ? (
+        <div style={{ marginTop: "0.4rem", display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+          {vm.augmentationLines.map((aug) => (
+            <div
+              key={`${vm.id}-aug-${aug.featId}`}
+              style={{
+                padding: "0.35rem 0.45rem",
+                borderRadius: "6px",
+                borderLeft: "3px solid var(--status-info)",
+                backgroundColor: "color-mix(in srgb, var(--status-info) 10%, var(--surface-1))"
+              }}
+            >
+              <div
+                style={{
+                  fontSize: keywordFontSize,
+                  fontWeight: 600,
+                  color: "var(--status-info)",
+                  marginBottom: "0.15rem"
+                }}
+              >
+                {aug.featName}
+              </div>
+              <div style={{ fontSize: bodyFontSize, color: bodyColor, lineHeight: 1.45 }}>
+                {renderAugmentationText ? renderAugmentationText(aug.text, aug.featId) : aug.text}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {vm.body ? (
         <div style={{ marginTop: "0.35rem", fontSize: bodyFontSize, color: bodyColor }}>

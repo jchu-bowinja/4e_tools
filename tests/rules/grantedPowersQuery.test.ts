@@ -8,11 +8,13 @@ import {
   ID_RACIAL_TRAIT_BONUS_AT_WILL,
   ID_RACIAL_TRAIT_HEROIC_EFFORT,
   ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION,
+  collectFeatModifiedPowersForBuild,
   parseFeatAssociatedPowerNames,
   raceGrantsBonusClassAtWillSlot,
   racePowerGroupsForRace,
   racialTraitGrantsBonusClassAtWillSlot,
   resolveFeatGrantedPowers,
+  resolveFeatModifiedPowers,
   resolvePowersByLooseNames
 } from "../../src/rules/grantedPowersQuery";
 import type { Feat, Race, RacialTrait, RulesIndex } from "../../src/rules/models";
@@ -282,7 +284,7 @@ describe("bonus class at-will from racial traits", () => {
 });
 
 describe("resolveFeatGrantedPowers", () => {
-  it("prefers ETL grantedPowerIds over Associated Powers names", () => {
+  it("uses only ETL grantedPowerIds (not Associated Powers)", () => {
     const feat = {
       id: "F1",
       name: "Armor of Bahamut",
@@ -295,6 +297,67 @@ describe("resolveFeatGrantedPowers", () => {
       powers: [{ id: "ID_FMP_POWER_2161", name: "Armor of Bahamut", slug: "aob", raw: {} }]
     } as unknown as RulesIndex;
     expect(resolveFeatGrantedPowers(index, feat).map((p) => p.id)).toEqual(["ID_FMP_POWER_2161"]);
+  });
+
+  it("returns empty when only Associated Powers text exists (augmentations are not grants)", () => {
+    const feat = {
+      id: "F2",
+      name: "Gulg Hunter Practice",
+      slug: "gulg-hunter-practice",
+      prereqTokens: [],
+      raw: { specific: { "Associated Powers": "Nimble Strike" } }
+    } as Feat;
+    const index = {
+      powers: [{ id: "P1", name: "Nimble Strike", slug: "nimble-strike", raw: {} }]
+    } as unknown as RulesIndex;
+    expect(resolveFeatGrantedPowers(index, feat)).toEqual([]);
+  });
+});
+
+describe("resolveFeatModifiedPowers", () => {
+  it("resolves modifiedPowerIds from ETL", () => {
+    const feat = {
+      id: "F1",
+      name: "Gulg Hunter Practice",
+      slug: "gulg",
+      prereqTokens: [],
+      modifiedPowerIds: ["P1", "P2"],
+      powerModifications: [
+        { powerName: "Nimble Strike", powerId: "P1", field: "Gulg Hunter Practice", value: "" },
+        { powerName: "Footwork Lure", powerId: "P2", field: "Gulg Hunter Practice", value: "" }
+      ],
+      raw: {}
+    } as Feat;
+    const index = {
+      powers: [
+        { id: "P1", name: "Nimble Strike", slug: "n", raw: {} },
+        { id: "P2", name: "Footwork Lure", slug: "f", raw: {} }
+      ]
+    } as unknown as RulesIndex;
+    expect(resolveFeatModifiedPowers(index, feat).map((p) => p.id)).toEqual(["P1", "P2"]);
+  });
+});
+
+describe("collectFeatModifiedPowersForBuild", () => {
+  it("only includes powers the character already has", () => {
+    const feat = {
+      id: "F1",
+      name: "Style",
+      slug: "style",
+      prereqTokens: [],
+      modifiedPowerIds: ["P1", "P2"],
+      raw: {}
+    } as Feat;
+    const index = {
+      feats: [feat],
+      powers: [
+        { id: "P1", name: "Nimble Strike", slug: "n", raw: {} },
+        { id: "P2", name: "Footwork Lure", slug: "f", raw: {} }
+      ]
+    } as unknown as RulesIndex;
+    const rows = collectFeatModifiedPowersForBuild(index, { featIds: ["F1"] }, new Set(["P1"]));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].powers.map((p) => p.id)).toEqual(["P1"]);
   });
 });
 

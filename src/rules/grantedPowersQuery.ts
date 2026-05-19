@@ -272,19 +272,64 @@ export function racePowerGroupsForRace(
   return out;
 }
 
-/** ETL `grantedPowerIds`, or empty when only Associated Powers text exists. */
+/** ETL `grantedPowerIds` only (explicit `rules.grant` type Power). */
 export function featGrantedPowerIdsFromEtl(feat: Feat): string[] {
   return feat.grantedPowerIds?.length ? [...feat.grantedPowerIds] : [];
 }
 
-/** Powers granted by a feat: prefer ETL ids, else Associated Powers name resolution. */
+/** ETL `modifiedPowerIds` (style / arena fighting augmentations, not grants). */
+export function featModifiedPowerIdsFromEtl(feat: Feat): string[] {
+  if (feat.modifiedPowerIds?.length) return [...feat.modifiedPowerIds];
+  return resolveFeatPowerModifications(feat)
+    .map((m) => m.powerId)
+    .filter((id): id is string => !!id);
+}
+
+/** Structured augmentations from ETL, with fallback to raw.rules.modify type Power. */
+export function resolveFeatPowerModifications(feat: Feat): Array<{
+  powerName: string;
+  powerId?: string | null;
+  field: string;
+  value: string;
+}> {
+  if (feat.powerModifications?.length) return feat.powerModifications;
+  const featName = feat.name;
+  const rules = feat.raw?.rules as { modify?: Array<{ attrs?: Record<string, string> }> } | undefined;
+  const out: Array<{ powerName: string; powerId?: string | null; field: string; value: string }> = [];
+  for (const row of rules?.modify ?? []) {
+    const attrs = row.attrs;
+    if (!attrs || String(attrs.type ?? "").toLowerCase() !== "power") continue;
+    const powerName = String(attrs.name ?? "").trim();
+    if (!powerName) continue;
+    out.push({
+      powerName,
+      powerId: null,
+      field: String(attrs.Field ?? attrs.field ?? featName).trim(),
+      value: String(attrs.value ?? "").trim()
+    });
+  }
+  return out;
+}
+
+/** Powers granted by a feat (`rules.grant` type Power only). */
 export function resolveFeatGrantedPowers(index: RulesIndex, feat: Feat): Power[] {
   const etlIds = featGrantedPowerIdsFromEtl(feat);
-  if (etlIds.length > 0) {
+  if (etlIds.length === 0) return [];
+  const byId = new Map(index.powers.map((p) => [p.id, p]));
+  return etlIds.map((id) => byId.get(id)).filter((p): p is Power => !!p);
+}
+
+/** Powers augmented by a feat (resolved to compendium rows when ETL supplied ids). */
+export function resolveFeatModifiedPowers(index: RulesIndex, feat: Feat): Power[] {
+  const ids = featModifiedPowerIdsFromEtl(feat);
+  if (ids.length > 0) {
     const byId = new Map(index.powers.map((p) => [p.id, p]));
-    return etlIds.map((id) => byId.get(id)).filter((p): p is Power => !!p);
+    return ids.map((id) => byId.get(id)).filter((p): p is Power => !!p);
   }
-  return resolvePowersByLooseNames(index, parseFeatAssociatedPowerNames(feat));
+  return resolvePowersByLooseNames(
+    index,
+    resolveFeatPowerModifications(feat).map((m) => m.powerName)
+  );
 }
 
 /** All powers granted by selected feats (deduped, stable order). */
@@ -298,6 +343,31 @@ export function collectFeatGrantedPowersForBuild(
     const feat = index.feats.find((f) => f.id === fid);
     if (!feat) continue;
     const powers = resolveFeatGrantedPowers(index, feat).filter((p) => {
+      if (seenPowerIds.has(p.id)) return false;
+      seenPowerIds.add(p.id);
+      return true;
+    });
+    if (powers.length > 0) rows.push({ feat, powers });
+  }
+  return rows;
+}
+
+/**
+ * Feat augmentations for powers the character already has (style / arena fighting).
+ * Does not add powers to the build — only surfaces existing picks the feat modifies.
+ */
+export function collectFeatModifiedPowersForBuild(
+  index: RulesIndex,
+  build: Pick<CharacterBuild, "featIds">,
+  characterPowerIds: ReadonlySet<string>
+): Array<{ feat: Feat; powers: Power[] }> {
+  const rows: Array<{ feat: Feat; powers: Power[] }> = [];
+  const seenPowerIds = new Set<string>();
+  for (const fid of build.featIds) {
+    const feat = index.feats.find((f) => f.id === fid);
+    if (!feat) continue;
+    const powers = resolveFeatModifiedPowers(index, feat).filter((p) => {
+      if (!characterPowerIds.has(p.id)) return false;
       if (seenPowerIds.has(p.id)) return false;
       seenPowerIds.add(p.id);
       return true;

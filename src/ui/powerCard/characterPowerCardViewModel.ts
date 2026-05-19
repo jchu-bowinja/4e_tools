@@ -1,4 +1,8 @@
 import { attackPowerBucketFromUsage } from "../../rules/classPowerSlots";
+import {
+  applyFeatModificationsToPowerCardVm,
+  type PowerFeatModifications
+} from "../../rules/featPowerModifications";
 import type { Power } from "../../rules/models";
 import { powerCardUsageBucketFromLabel } from "./powerCardAccent";
 import { splitPowerKeywords } from "./splitPowerKeywords";
@@ -10,7 +14,10 @@ function labeledLine(label: string, text: string, segmentKey: string): Character
   return { label, text: trimmed, segmentKey };
 }
 
-export function buildCharacterPowerCardViewModel(power: Power): CharacterPowerCardViewModel {
+export function buildCharacterPowerCardViewModel(
+  power: Power,
+  featMods?: PowerFeatModifications
+): CharacterPowerCardViewModel {
   const raw = (power.raw || {}) as Record<string, unknown>;
   const specific = (power.raw?.specific as Record<string, unknown> | undefined) || {};
   const usageLabel = String(specific["Power Usage"] || power.usage || "-");
@@ -34,7 +41,7 @@ export function buildCharacterPowerCardViewModel(power: Power): CharacterPowerCa
     labeledLine("Special", String(specific["Special"] || ""), `${power.id}-special`)
   ].filter((line): line is CharacterPowerCardLabeledLine => line != null);
 
-  return {
+  const base: CharacterPowerCardViewModel = {
     id: power.id,
     name: power.name,
     usageLabel,
@@ -45,7 +52,10 @@ export function buildCharacterPowerCardViewModel(power: Power): CharacterPowerCa
     keywords,
     preAttackLines,
     outcomeLines,
+    augmentationLines: [],
     body: typeof raw.body === "string" ? raw.body : "",
     flavor: typeof raw.flavor === "string" ? raw.flavor : ""
   };
+
+  return applyFeatModificationsToPowerCardVm(base, featMods, power.id);
 }

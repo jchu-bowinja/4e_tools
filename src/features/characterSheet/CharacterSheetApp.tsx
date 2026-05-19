@@ -24,6 +24,7 @@ import {
   collectFeatProficiencyDisplayRows,
   collectFeatProficiencyGrants
 } from "../../rules/featProficiencies";
+import { collectFeatModificationsByPowerId } from "../../rules/featPowerModifications";
 import { collectFeatGrantedPowersForBuild } from "../../rules/grantedPowersQuery";
 import { computeSkillSheetRows } from "../../rules/skillCalculator";
 import {
@@ -1004,6 +1005,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   );
   const featGrantedPowerRows = useMemo(
     () => collectFeatGrantedPowersForBuild(index, { featIds: sheet.featIds ?? [] }),
+    [index, sheet.featIds]
+  );
+  const featModsByPowerId = useMemo(
+    () => collectFeatModificationsByPowerId(index, sheet.featIds ?? []),
     [index, sheet.featIds]
   );
   const featProficiencyGrants = useMemo(
@@ -2530,6 +2535,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                       <CharacterPowerCard
                         key={power.id}
                         power={power}
+                        featMods={featModsByPowerId.get(power.id)}
                         variant="sheet"
                         showInsetShadow
                         expended={expended}
@@ -2593,6 +2599,13 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                           <RulesRichText
                             text={body}
                             paragraphStyle={{ fontSize: "0.8rem", color: "var(--text-primary)", margin: "0 0 0.35rem 0" }}
+                            listItemStyle={{ fontSize: "0.8rem", color: "var(--text-primary)" }}
+                          />
+                        )}
+                        renderAugmentationText={(text) => (
+                          <RulesRichText
+                            text={text}
+                            paragraphStyle={{ fontSize: "0.8rem", color: "var(--text-primary)", margin: 0 }}
                             listItemStyle={{ fontSize: "0.8rem", color: "var(--text-primary)" }}
                           />
                         )}

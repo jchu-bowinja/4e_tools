@@ -51,9 +51,12 @@ import {
   ID_RACIAL_TRAIT_HEROIC_EFFORT,
   ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION,
   collectFeatGrantedPowersForBuild,
+  collectFeatModifiedPowersForBuild,
   racePowerGroupsForRace,
   racePowerSelectSelectionKey
 } from "../../rules/grantedPowersQuery";
+import { collectFeatModificationsByPowerId } from "../../rules/featPowerModifications";
+import { collectCharacterPowerIdsForSelections } from "../../rules/powerSelections";
 import { hybridBaseClassNames } from "../../rules/prereqEvaluator";
 import { buildPrereqCharacterContext } from "../../rules/prereqContext";
 import { evaluateSupportOptionLegality } from "../../rules/supportOptionLegality";
@@ -273,8 +276,10 @@ function renderPowerCard(
       leave: () => void;
     };
     renderRuleText?: (raw: string, keyPrefix: string) => JSX.Element;
+    featModsByPowerId?: ReturnType<typeof collectFeatModificationsByPowerId>;
   }
 ): JSX.Element {
+  const featMods = options?.featModsByPowerId?.get(power.id);
   const usageBucketForGlossary = powerCardUsageBucketFromLabel(
     String((power.raw?.specific as Record<string, unknown> | undefined)?.["Power Usage"] || power.usage || "-")
   );
@@ -283,6 +288,7 @@ function renderPowerCard(
     <CharacterPowerCard
       key={options?.key || power.id}
       power={power}
+      featMods={featMods}
       variant="builder"
       renderUsageInHeader={(usageLabel) =>
         usageBucketForGlossary && options?.glossaryHover ? (
@@ -339,6 +345,13 @@ function renderPowerCard(
           text={body}
           paragraphStyle={{ fontSize: "0.8rem", color: "var(--text-muted)" }}
           listItemStyle={{ fontSize: "0.8rem", color: "var(--text-muted)" }}
+        />
+      )}
+      renderAugmentationText={(text) => (
+        <RulesRichText
+          text={text}
+          paragraphStyle={{ fontSize: "0.78rem", color: "var(--text-muted)", margin: 0 }}
+          listItemStyle={{ fontSize: "0.78rem", color: "var(--text-muted)" }}
         />
       )}
     />
@@ -1535,9 +1548,21 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     }
     return autoGrantedClassPowers(index, build.classId);
   }, [index, build.classId, isHybridBuild, hybridBaseClassAId, hybridBaseClassBId]);
-  const featAssociatedPowers = useMemo(
+  const characterPowerIds = useMemo(
+    () => collectCharacterPowerIdsForSelections(index, build),
+    [index, build]
+  );
+  const featGrantedPowers = useMemo(
     () => collectFeatGrantedPowersForBuild(index, build),
     [index, build.featIds]
+  );
+  const featModsByPowerId = useMemo(
+    () => collectFeatModificationsByPowerId(index, build.featIds),
+    [index, build.featIds]
+  );
+  const featModifiedPowers = useMemo(
+    () => collectFeatModifiedPowersForBuild(index, build, characterPowerIds),
+    [index, build.featIds, characterPowerIds]
   );
   const selectedClassSkillNamesLower = new Set((legality.classSkillRules?.classSkillNames || []).map((s) => s.toLowerCase()));
   const skillsSortedAll = useMemo(
@@ -1724,7 +1749,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     if (m.includes("feat")) return "feats";
     if (m.includes("utility power")) return "powers";
     if (m.includes("at-will") || m.includes("encounter") || m.includes("daily") || m.includes("power")) return "powers";
-    if (m.includes("armor") || m.includes("shield") || m.includes("proficiency")) return "equipment";
     if (m.includes("main weapon") || m.includes("off-hand weapon") || m.includes("selected implement")) return "equipment";
     return null;
   }
@@ -1851,7 +1875,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
           onKeywordMouseEnter: (event, keyword) => glossaryTooltipUi.startHover(event, `powerKeyword:${keyword}`),
           onKeywordMouseLeave: glossaryTooltipUi.leaveHover,
           glossaryHover: { start: glossaryTooltipUi.startHover, leave: glossaryTooltipUi.leaveHover },
-          renderRuleText: renderPowerGlossaryRuleText
+          renderRuleText: renderPowerGlossaryRuleText,
+          featModsByPowerId
         })}
         <PowerConstructionSelects power={p} build={build} onChange={updateBuild} />
       </div>
@@ -2331,7 +2356,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                                         onKeywordMouseEnter: (event, keyword) => glossaryTooltipUi.startHover(event, `powerKeyword:${keyword}`),
                                         onKeywordMouseLeave: glossaryTooltipUi.leaveHover,
                                         glossaryHover: { start: glossaryTooltipUi.startHover, leave: glossaryTooltipUi.leaveHover },
-                                        renderRuleText: renderPowerGlossaryRuleText
+                                        renderRuleText: renderPowerGlossaryRuleText,
+                                        featModsByPowerId
                                       })
                                     ) : (
                                       <p style={{ margin: 0, fontSize: "0.82rem", color: "var(--status-warning)" }}>
@@ -2350,7 +2376,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                                     onKeywordMouseEnter: (event, keyword) => glossaryTooltipUi.startHover(event, `powerKeyword:${keyword}`),
                                     onKeywordMouseLeave: glossaryTooltipUi.leaveHover,
                                     glossaryHover: { start: glossaryTooltipUi.startHover, leave: glossaryTooltipUi.leaveHover },
-                                    renderRuleText: renderPowerGlossaryRuleText
+                                    renderRuleText: renderPowerGlossaryRuleText,
+                                    featModsByPowerId
                                   })
                                 )
                               )}
@@ -3680,7 +3707,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             )}
             {(racePowerGroups.some((g) => g.powerIds.length > 0 || g.dilettantePick) ||
               classAutoGrantedPowers.length > 0 ||
-              featAssociatedPowers.length > 0 ||
+              featGrantedPowers.length > 0 ||
+              featModifiedPowers.length > 0 ||
               themeGrantedPowers.length > 0 ||
               paragonPathGrantedPowers.length > 0 ||
               epicDestinyGrantedPowers.length > 0) && (
@@ -3824,16 +3852,35 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     </div>
                   </div>
                 )}
-                {featAssociatedPowers.length > 0 && (
+                {featGrantedPowers.length > 0 && (
                   <div>
-                    <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "0.25rem" }}>Feats you selected</div>
+                    <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "0.25rem" }}>Powers granted by feats</div>
                     <ul style={{ margin: 0, paddingLeft: "1.1rem", fontSize: "0.82rem", color: "var(--text-primary)" }}>
-                      {featAssociatedPowers.map(({ feat, powers }) => (
+                      {featGrantedPowers.map(({ feat, powers }) => (
                         <li key={feat.id} style={{ marginBottom: "0.45rem" }}>
                           <span style={{ fontWeight: 600 }}>{feat.name}</span>
                           <div style={{ marginTop: "0.2rem" }}>
                             {powers.map((p) => renderPowerCardWithSelections(p, `${feat.id}-${p.id}`))}
                           </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {featModifiedPowers.length > 0 && (
+                  <div style={{ marginBottom: "0.65rem" }}>
+                    <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "0.25rem" }}>
+                      Feat augmentations on your powers
+                    </div>
+                    <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                      Augmentation rules appear on the matching power cards above and in your class power slots.
+                    </p>
+                    <ul style={{ margin: 0, paddingLeft: "1.1rem", fontSize: "0.82rem", color: "var(--text-secondary)" }}>
+                      {featModifiedPowers.map(({ feat, powers }) => (
+                        <li key={feat.id} style={{ marginBottom: "0.25rem" }}>
+                          <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{feat.name}</span>
+                          {": "}
+                          {powers.map((p) => p.name).join(", ")}
                         </li>
                       ))}
                     </ul>

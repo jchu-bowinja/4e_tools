@@ -124,6 +124,14 @@ export interface ProficiencyGrant {
   label?: string | null;
 }
 
+/** ETL: a class power augmented by a style / arena fighting feat (not granted). */
+export interface FeatPowerModification {
+  powerName: string;
+  powerId?: string | null;
+  field: string;
+  value: string;
+}
+
 export interface Feat extends RulesEntity {
   tier?: string | null;
   category?: string | null;
@@ -138,6 +146,10 @@ export interface Feat extends RulesEntity {
   nadBonusesFromSpecific?: NadBonusesFromSpecific;
   /** ETL: `rules.grant` entries with type Power. */
   grantedPowerIds?: string[];
+  /** ETL: powers augmented via rules.modify / Associated Powers (not granted). */
+  modifiedPowerIds?: string[];
+  /** ETL: structured power augmentations (Corellon's Wrath Style, Gulg Hunter Practice, etc.). */
+  powerModifications?: FeatPowerModification[];
   /** ETL: `rules.grant` entries with type Class Feature. */
   grantedClassFeatureIds?: string[];
   /** ETL: `rules.grant` entries with type Racial Trait. */

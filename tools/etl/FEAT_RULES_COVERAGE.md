@@ -11,6 +11,7 @@ For feats (and the same helpers for themes, paragon paths, epic destinies):
 | `raw.rules.statadd` | `statAdds` | `passiveDefenseBonusesFromStatAdds` (+ other future always-on stats) |
 | `raw.specific["Bonus to Defense"]` | `nadBonusesFromSpecific` | NAD bumps alongside `statAdds` |
 | `rules.grant` type Power / Class Feature / Racial Trait | `grantedPowerIds`, `grantedClassFeatureIds`, `grantedRacialTraitIds` | Feat powers, class features on sheet/builder |
+| `rules.modify` type Power + `specific['Associated Powers']` | `modifiedPowerIds`, `powerModifications` | Style / arena fighting augmentations (not grants) |
 | `rules.grant` type Proficiency | `proficiencyGrants` | Weapon/armor/shield/implement validation and attack previews |
 | `rules.grant` type Multiclass | `hasMulticlassGrant` | Multiclass feat detection in builder summary |
 | `rules.grant` type CountsAsClass | `countsAsClassNames`, `countsAsClassIds` | Class prereqs (e.g. paragon feats for trained class) |

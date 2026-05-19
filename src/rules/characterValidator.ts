@@ -16,15 +16,8 @@ import {
   racePowerGroupsForRace,
   racePowerSelectSelectionKey
 } from "./grantedPowersQuery";
-import {
-  collectFeatProficiencyGrants,
-  legacyFeatNamesSet,
-  validateArmorProficiencyForSelection,
-  validateShieldProficiencyForSelection
-} from "./featProficiencies";
 import { resolveEffectiveEquipmentIds } from "./equipment";
-import { isProficientWithImplement, isProficientWithWeapon } from "./weaponAttack";
-import { mergeHybridProficiencyLines, parseHybridDefenseBonuses } from "./hybridDerivedStats";
+import { parseHybridDefenseBonuses } from "./hybridDerivedStats";
 import { parseClassDefenseBonusesFromClassDef } from "./parseClassDefenseBonuses";
 import { collectCharacterPowerIdsForSelections } from "./powerSelections";
 import { hybridCombinedClassSkillNames, expectedHybridTrainedSkillCount } from "./hybridSkills";
@@ -241,7 +234,6 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
 
   if (!isHybrid && cls) {
     const specific = (cls.raw.specific as Record<string, unknown> | undefined) || {};
-    const armorProficiencies = String(specific["Armor Proficiencies"] || "").toLowerCase();
     classDefenseBonuses = parseClassDefenseBonusesFromClassDef(cls);
 
     classSkillRules = parseClassSkillRules(cls);
@@ -315,52 +307,17 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
     }
 
     const equipmentIds = resolveEffectiveEquipmentIds(build, index);
-    const selectedArmor = index.armors.find((a) => a.id === equipmentIds.armorId);
-    const selectedShield = index.armors.find((a) => a.id === equipmentIds.shieldId);
-    const featProficiencyGrants = collectFeatProficiencyGrants(index, build.featIds);
-    const legacyFeatNames = legacyFeatNamesSet(index, build);
-
-    errors.push(
-      ...validateArmorProficiencyForSelection(selectedArmor, armorProficiencies, featProficiencyGrants, legacyFeatNames)
-    );
-    errors.push(
-      ...validateShieldProficiencyForSelection(selectedShield, armorProficiencies, featProficiencyGrants, legacyFeatNames)
-    );
-
     const weaponsIndex = index.weapons ?? [];
     const implementsIndex = index.implements ?? [];
-    const weaponProfText = String(specific["Weapon Proficiencies"] || "");
-    const implementSupportText = [specific["Implements"], specific["Implement"]].filter((x) => typeof x === "string").join("; ");
 
-    if (equipmentIds.mainWeaponId) {
-      const mw = weaponsIndex.find((w) => w.id === equipmentIds.mainWeaponId);
-      if (!mw) {
-        errors.push("Selected main weapon is not in the rules index.");
-      } else if (!isProficientWithWeapon(mw, weaponProfText, featProficiencyGrants)) {
-        warnings.push(
-          `Main weapon "${mw.name}" — your class weapon proficiencies may not include this category (nonproficient weapon attacks take −2).`
-        );
-      }
+    if (equipmentIds.mainWeaponId && !weaponsIndex.some((w) => w.id === equipmentIds.mainWeaponId)) {
+      errors.push("Selected main weapon is not in the rules index.");
     }
-    if (equipmentIds.offHandWeaponId) {
-      const ow = weaponsIndex.find((w) => w.id === equipmentIds.offHandWeaponId);
-      if (!ow) {
-        errors.push("Selected off-hand weapon is not in the rules index.");
-      } else if (!isProficientWithWeapon(ow, weaponProfText, featProficiencyGrants)) {
-        warnings.push(
-          `Off-hand weapon "${ow.name}" — your class weapon proficiencies may not include this category (nonproficient weapon attacks take −2).`
-        );
-      }
+    if (equipmentIds.offHandWeaponId && !weaponsIndex.some((w) => w.id === equipmentIds.offHandWeaponId)) {
+      errors.push("Selected off-hand weapon is not in the rules index.");
     }
-    if (equipmentIds.implementId) {
-      const imp = implementsIndex.find((x) => x.id === equipmentIds.implementId);
-      if (!imp) {
-        errors.push("Selected implement is not in the rules index.");
-      } else if (!isProficientWithImplement(imp, implementSupportText, featProficiencyGrants)) {
-        warnings.push(
-          `Implement "${imp.name}" — your class may not match this implement group (nonproficient implement attacks take −2).`
-        );
-      }
+    if (equipmentIds.implementId && !implementsIndex.some((x) => x.id === equipmentIds.implementId)) {
+      errors.push("Selected implement is not in the rules index.");
     }
 
     const attackPowers = getClassPowersForLevelRange(index, build.classId, build.level, "attack");
@@ -538,66 +495,18 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
       errors.push(`Trained skills must come from hybrid class skills list: ${offListHyNames.join(", ")}.`);
     }
 
-    const mergedProf = mergeHybridProficiencyLines(hybridA, hybridB);
-    const armorProficienciesHy = mergedProf.armorLine.toLowerCase();
-    const featProficiencyGrantsHy = collectFeatProficiencyGrants(index, build.featIds);
-    const legacyFeatNamesHy = legacyFeatNamesSet(index, build);
-
     const equipmentIdsHy = resolveEffectiveEquipmentIds(build, index);
-    const selectedArmorHy = index.armors.find((a) => a.id === equipmentIdsHy.armorId);
-    const selectedShieldHy = index.armors.find((a) => a.id === equipmentIdsHy.shieldId);
+    const weaponsIndexHy = index.weapons ?? [];
+    const implementsIndexHy = index.implements ?? [];
 
-    errors.push(
-      ...validateArmorProficiencyForSelection(
-        selectedArmorHy,
-        armorProficienciesHy,
-        featProficiencyGrantsHy,
-        legacyFeatNamesHy
-      )
-    );
-    errors.push(
-      ...validateShieldProficiencyForSelection(
-        selectedShieldHy,
-        armorProficienciesHy,
-        featProficiencyGrantsHy,
-        legacyFeatNamesHy
-      )
-    );
-
-    const weaponsIndex = index.weapons ?? [];
-    const implementsIndex = index.implements ?? [];
-    const weaponProfTextHy = mergedProf.weaponLine;
-    const implementSupportTextHy = mergedProf.implementLine;
-
-    if (equipmentIdsHy.mainWeaponId) {
-      const mw = weaponsIndex.find((w) => w.id === equipmentIdsHy.mainWeaponId);
-      if (!mw) {
-        errors.push("Selected main weapon is not in the rules index.");
-      } else if (!isProficientWithWeapon(mw, weaponProfTextHy, featProficiencyGrantsHy)) {
-        warnings.push(
-          `Main weapon "${mw.name}" — your hybrid weapon proficiencies may not include this category (nonproficient weapon attacks take −2).`
-        );
-      }
+    if (equipmentIdsHy.mainWeaponId && !weaponsIndexHy.some((w) => w.id === equipmentIdsHy.mainWeaponId)) {
+      errors.push("Selected main weapon is not in the rules index.");
     }
-    if (equipmentIdsHy.offHandWeaponId) {
-      const ow = weaponsIndex.find((w) => w.id === equipmentIdsHy.offHandWeaponId);
-      if (!ow) {
-        errors.push("Selected off-hand weapon is not in the rules index.");
-      } else if (!isProficientWithWeapon(ow, weaponProfTextHy, featProficiencyGrantsHy)) {
-        warnings.push(
-          `Off-hand weapon "${ow.name}" — your hybrid weapon proficiencies may not include this category (nonproficient weapon attacks take −2).`
-        );
-      }
+    if (equipmentIdsHy.offHandWeaponId && !weaponsIndexHy.some((w) => w.id === equipmentIdsHy.offHandWeaponId)) {
+      errors.push("Selected off-hand weapon is not in the rules index.");
     }
-    if (equipmentIdsHy.implementId) {
-      const imp = implementsIndex.find((x) => x.id === equipmentIdsHy.implementId);
-      if (!imp) {
-        errors.push("Selected implement is not in the rules index.");
-      } else if (!isProficientWithImplement(imp, implementSupportTextHy, featProficiencyGrantsHy)) {
-        warnings.push(
-          `Implement "${imp.name}" — your hybrid classes may not match this implement group (nonproficient implement attacks take −2).`
-        );
-      }
+    if (equipmentIdsHy.implementId && !implementsIndexHy.some((x) => x.id === equipmentIdsHy.implementId)) {
+      errors.push("Selected implement is not in the rules index.");
     }
 
     const baseAid = hybridA.baseClassId!;
