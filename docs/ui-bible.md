@@ -132,6 +132,7 @@ State visuals should be consistent across buttons, fields, toggles, and list row
 - Builder sidebar: `ui.sidebarPanel` supplies the section border; `LiveSheetCollapsibleSection` body is layout-only (no second border). Stack sections with flex `gap` on the panel, not an extra inner grid wrapper.
 - Character sheet overview: one `panelStyle` tab shell; character identity uses `OverviewReadonlyField` inside a single `section` (not nested bordered boxes per field); overview rows are direct grid children (no `character-sheet-overview-rows` wrapper); collapsible body spacing via `.character-sheet-overview-collapsible > :not(summary)` in CSS.
 - Power display: character builder and character sheet use **`CharacterPowerCard`** (`src/ui/powerCard/`) with `buildCharacterPowerCardViewModel`; pass `renderLineText`, `renderKeyword`, and `renderBody` for glossary/rich text. Monster editor keeps its own card body but shares shell/accent helpers (`monsterPowerCardShellStyle`, action bucket accents) from the same module.
+- Character sheet HP / conditions: overview center column uses one grid per row (vitals row 1: four columns; row 2: death saves + healing surges). Healing surges cell is a single bordered grid (label + flex row for input, button column, hint); do not nest a second grid around the label. Spend Surge / Second Wind stack in a flex column on that row. Conditions panel applies `gap` on the outer bordered grid only—toolbar rows are direct children, not wrapped in an extra pass-through grid.
 
 #### Collapsible disclosure (expand / collapse)
 

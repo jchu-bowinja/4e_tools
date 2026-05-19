@@ -1692,25 +1692,25 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               ...hpPanelShrinkableBoxStyle,
               display: "grid",
               gap: "0.2rem",
-              alignContent: "start"
+              alignContent: "start",
+              minWidth: 0
             }}
           >
-            <div style={{ display: "grid", gap: "0.2rem", minWidth: 0 }}>
-              <HealingSurgesFieldLabel
-                onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "surges")}
-                onMouseLeave={glossaryTooltipUi.leaveHover}
-                onFocus={(event) => glossaryTooltipUi.startHover(event, "surges")}
-                onBlur={glossaryTooltipUi.leaveHover}
-              />
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.35rem",
-                  flexWrap: "wrap",
-                  minWidth: 0
-                }}
-              >
+            <HealingSurgesFieldLabel
+              onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "surges")}
+              onMouseLeave={glossaryTooltipUi.leaveHover}
+              onFocus={(event) => glossaryTooltipUi.startHover(event, "surges")}
+              onBlur={glossaryTooltipUi.leaveHover}
+            />
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.35rem",
+                flexWrap: "wrap",
+                minWidth: 0
+              }}
+            >
                 <AdjustableNumberInput
                   compact
                   min={0}
@@ -1729,14 +1729,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   ariaLabel="Healing surges remaining"
                   style={{ flexShrink: 0 }}
                 />
-                <div
-                  style={{
-                    display: "grid",
-                    gap: "0.2rem",
-                    flexShrink: 0,
-                    alignContent: "start"
-                  }}
-                >
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem", flexShrink: 0 }}>
                   <button
                     type="button"
                     onClick={() => spendHealingSurge()}
@@ -1776,7 +1769,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   onBlur={glossaryTooltipUi.leaveHover}
                 />
               </div>
-            </div>
           </div>
         </div>
       </>
@@ -1872,21 +1864,20 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700 }}>
           Conditions
         </div>
-        <div style={{ display: "grid", gap: "0.25rem" }}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns:
-                selectedConditionOption && selectedConditionOption !== "__custom__"
-                  ? selectedDurationPreset === "rounds"
-                    ? "1fr auto 3.2rem auto"
-                    : "1fr auto auto"
-                  : "1fr",
-              gap: "0.2rem",
-              alignItems: "center"
-            }}
-          >
-            <select
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              selectedConditionOption && selectedConditionOption !== "__custom__"
+                ? selectedDurationPreset === "rounds"
+                  ? "1fr auto 3.2rem auto"
+                  : "1fr auto auto"
+                : "1fr",
+            gap: "0.2rem",
+            alignItems: "center"
+          }}
+        >
+          <select
               value={selectedConditionOption}
               onChange={(e) => setSelectedConditionOption(e.target.value)}
               style={{ fontSize: "0.78rem", borderRadius: "0.25rem", border: "1px solid var(--panel-border)", padding: "0.15rem 0.2rem" }}
@@ -1915,8 +1906,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 </button>
               </>
             )}
-          </div>
-          {selectedConditionOption === "__custom__" && (
+        </div>
+        {selectedConditionOption === "__custom__" && (
             <div
               style={{
                 display: "grid",
@@ -1945,8 +1936,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 Add
               </button>
             </div>
-          )}
-        </div>
+        )}
         {(isBloodied || isDying || isDead) && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem" }}>
             {isBloodied && (
@@ -2003,7 +1993,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                     onMouseLeave={glossaryTooltipUi.leaveHover}
                     onBlur={glossaryTooltipUi.leaveHover}
                     tabIndex={0}
-                    style={{ display: "grid", gap: "0.05rem", minWidth: 0 }}
+                    style={{ display: "flex", flexDirection: "column", gap: "0.05rem", minWidth: 0 }}
                   >
                     <span>{conditionDisplayLabel(condition.name)}</span>
                     {durationPhrase ? (
