@@ -2051,6 +2051,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     return (
       <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.4rem", backgroundColor: "var(--surface-0)" }}>
         <StatScoreTable
+          className="stat-score-table--compact"
           columns={DEFENSE_SCORE_COLUMNS}
           bonusHeader={null}
           statHeader="DEFENSE"

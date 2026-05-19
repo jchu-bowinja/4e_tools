@@ -107,18 +107,75 @@ Use the shared **`CollapsibleDisclosure`** and **`CollapsibleDisclosureArrow`** 
 - Keep sorting/filtering interaction patterns uniform when used.
 - Empty, loading, and error states should use shared phrasing and layout conventions.
 
-#### Score breakdown tables (skills, defenses, speed, initiative)
+#### Character sheet score breakdown tables
 
-Character-sheet style breakdown tables show a **total** in the leading column, a **row label** (skill name, defense name, etc.), then **component columns** for the math.
+The character sheet uses shared breakdown tables for **skills**, **defenses**, **speed / initiative**, and **ability scores**. Each row answers: “What is the total?” and “What is it called?” before showing how the total is built.
 
-- **Prioritize the total and the row label.** Those two columns are the anchors users scan first. They must stay readable when the panel is narrow or when many component columns are present.
-- **Align breakdown columns on the longest label.** Every row in a table must share the **same** label-column track, with a **minimum** width equal to the longest row label (and the stat-column header when shown, e.g. `DEFENSE`). Short labels such as `AC` or `Speed` must not use a narrower track than `Fortitude` or `Initiative`; otherwise component values appear jagged row to row when the panel is narrow or resized. Do not give each row its own `max-content` or `1fr` label track.
-- **Narrow panels:** clip or hide content on the **right** (component columns), not by overlapping labels onto the math. Do not add a horizontal scrollbar on the whole table.
-- **Skills** (`SkillModifierTable`): bonus and skill name stay in the left columns; `--skill-name-block-width` is the max measured name width; modifier columns share one grid and fall off the right edge when space is tight.
-- **Defenses** (`StatScoreTable` with `prioritizeStatLabel`): green total and row label stay visible; `--stat-label-min-width` is the measured longest label in that table; the label track is `minmax(that minimum, max-content)`; component columns live in a flexible third track and **right-align** as a group when the panel is wide; component columns clip on the right when narrow.
-- **Speed + initiative** (`stat-score-table--compact` + `prioritizeStatLabel`): same label minimum and shared `subgrid` alignment; the label track is `minmax(that minimum, 1fr)` so the Speed/Initiative column **fills** the space up to the Race column (no empty gap); component columns clip on the right when narrow.
-- **Component columns** are secondary; do not sacrifice total or label legibility to keep every header on one line.
-- Reuse `StatScoreTable` / `SkillModifierTable` and shared score cell styling (`scoreTableCells`) rather than one-off breakdown layouts.
+**Canonical layout (left → right)**
+
+| Column | Role | User priority |
+| --- | --- | --- |
+| 1 — Bonus / total | Final modifier or defense value | **Primary** — always visible |
+| 2 — Name / label | Skill name, defense name, ability code, etc. | **Primary** — always visible |
+| 3+ — Components | Ability mod, ½ level, armor, trained bonus, etc. | **Secondary** — may clip when space is tight |
+
+**Resize contract (non-negotiable)**
+
+The **bonus value** and **row name** are the two anchors users scan first. They must remain legible at any viewport width or panel squeeze. When horizontal space runs out:
+
+1. **Keep** the bonus column and name column at usable widths.
+2. **Clip** component columns on the **right** (`overflow: hidden` on the table; no whole-table horizontal scrollbar).
+3. **Do not** overlap names onto component values, shrink the bonus column below its content, or ellipsis-truncate primary columns to “make room” for math columns.
+4. **Do not** give each row its own label width — one shared label track per table, sized to the **longest** label in that table (and the stat-column header when shown, e.g. `DEFENSE`).
+
+**Shared visual language**
+
+- **Totals** use emphasized score cells (`ScoreModCell` with `emphasize`) — bold, tabular figures, `var(--status-success)` for modifiers and defenses.
+- **Component values** use the standard score cell style; em dash (`—`) for empty optional slots.
+- **Row striping** alternates `var(--table-stripe-even)` / `var(--table-stripe-odd)` on bonus, label, and component cells.
+- **Headers** are small caps, muted (`var(--text-muted)`), often stacked on two lines (e.g. `Base +` / `½ Lvl`, `Trnd` / `(+5)`).
+- **Spacing tokens** (shared with skills): `--skill-bonus-name-gap` (gap between bonus and name), `--skill-col-gap` (column gap), `font-variant-numeric: tabular-nums` on the table.
+- **Label backgrounds** on prioritized stat tables use an opaque stripe (`--stat-row-bg`) so clipped component columns do not show through under the name when rows overlap in z-order.
+
+**Implementation map**
+
+| Character sheet section | Component | Required props / classes |
+| --- | --- | --- |
+| Skills | `SkillModifierTable` | Measures `--skill-name-block-width`; bonus + name columns fixed priority; five component columns with fixed track widths |
+| Defenses | `StatScoreTable` | `prioritizeStatLabel`, `className="stat-score-table--compact"`, `statHeader="DEFENSE"` |
+| Speed + initiative | `StatScoreTable` | `prioritizeStatLabel`, `stat-score-table--compact`, `statHeader={null}` |
+| Ability scores | `StatScoreTable` | Single component column (`Score`); short fixed labels — compact prioritize mode optional |
+
+Styles live in `src/styles.css` (`.skill-modifier-table`, `.stat-score-table`). Cell primitives live in `src/ui/scoreTableCells.tsx`.
+
+**Skills (`SkillModifierTable`)**
+
+- Grid: bonus column (`minmax(2.35rem, max-content)`), name column (`minmax(var(--skill-name-block-width), 1fr)`), then five fixed-width component columns.
+- On mount and resize, measure every `.skill-modifier-table__name-text` (and header) and set `--skill-name-block-width` to the widest natural width so `Acrobatics` and `Diplomacy` share one name track.
+- Name cell may include trailing metadata (trained `(T)`, ability code right-aligned) inside the measured block; glossary hover attaches to the name affordance, not the bonus cell.
+- Table `overflow: hidden` — modifier columns fall off the right edge when narrow.
+
+**Defenses, speed, initiative (`StatScoreTable` + `prioritizeStatLabel` + `stat-score-table--compact`)**
+
+- Pass `prioritizeStatLabel` on any character-sheet breakdown where component columns can crowd the label.
+- Use `stat-score-table--compact` so all component tracks sit in one grid row (not a nested breakdown subgrid) and the label column is `minmax(var(--stat-label-min-width), 1fr)`.
+- `StatScoreTable` measures `.stat-score-table__stat-label-text` and `.stat-score-table__stat-hdr`, then sets `--stat-label-min-width` to the longest label (including `DEFENSE` when `statHeader` is set). Short labels (`AC`, `Will`, `Speed`) use the same column width as `Fortitude` / `Initiative`.
+- Bonus column `z-index: 3`, label `z-index: 2`, components `z-index: 0` — totals and names paint above clipped math.
+- Signed totals (initiative) use `signedTotal` / `formatScoreTotalDisplay` (`+N` / `N`).
+
+**Ability scores**
+
+- Same `StatScoreTable` / `ScoreModCell` family for consistency; only one breakdown column and three-letter labels, so full prioritize/compact stack is usually unnecessary.
+- Glossary tooltips on ability codes follow the label-only tooltip rule (not on the numeric score cell).
+
+**Adding a new breakdown table**
+
+- Extend `StatScoreTable` or `SkillModifierTable` — do not hand-roll grids on the character sheet.
+- If the table has multiple component columns and a variable-width name, enable `prioritizeStatLabel` (and `stat-score-table--compact` for stat-style tables).
+- Measure the longest label in that table instance; never hard-code per-row label widths.
+- Verify by narrowing the overview column: bonus and name stay readable; right-side columns clip cleanly with no text collision.
+
+See also **Layout and Responsiveness** (content priority when stacking) and the UI review checklist items for score tables.
 
 ### Overlays (Tooltips, Popovers, Modals)
 
@@ -144,6 +201,7 @@ Character-sheet style breakdown tables show a **total** in the leading column, a
 - Align on common breakpoints and avoid feature-specific breakpoint values unless required.
 - Keep responsive behavior predictable: stack, collapse, or scroll based on content priority.
 - Preserve critical actions and key metadata visibility across viewport sizes.
+- **Character sheet overview columns** use `minWidth: 0` and `overflow: hidden` on side columns so grids can shrink; score breakdown tables inside those columns must still honor the [score table resize contract](#character-sheet-score-breakdown-tables) (bonus + name stay visible; math columns clip on the right).
 
 For all major screens, define behavior for:
 
@@ -203,6 +261,9 @@ Use this checklist before merging UI/style/look-and-feel work:
 - [ ] Obvious one-off styles were avoided or justified with a clear reason.
 - [ ] Glossary or rules hover tooltips are not attached to raw value inputs; they use labels or explicit help text instead.
 - [ ] Expand/collapse sections use `CollapsibleDisclosure` (or `CollapsibleDisclosureArrow` for non-details toggles), not ad-hoc arrows or placeholders.
+- [ ] Character sheet score tables use `SkillModifierTable` / `StatScoreTable` with shared `scoreTableCells` styling — not one-off layouts.
+- [ ] Breakdown tables with variable-width names use measured label width (`--skill-name-block-width` or `--stat-label-min-width`) and a single shared name column per table.
+- [ ] Resizing or narrowing the panel keeps the **bonus/total** and **row name** readable; only right-hand component columns clip (no table-level horizontal scroll, no label-on-math overlap).
 
 ## Update Process
 
