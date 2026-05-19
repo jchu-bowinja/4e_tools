@@ -114,6 +114,7 @@ import { BuilderSidebarItemsPanel } from "./BuilderSidebarItemsPanel";
 import { EquipmentTab, type EquipmentEditorSlot } from "./EquipmentTab";
 import { LiveSheetCollapsibleSection } from "./LiveSheetCollapsibleSection";
 import { GlossaryTooltipRichText, RulesRichText } from "./RulesRichText";
+import { CharacterPowerCard, powerCardUsageBucketFromLabel } from "../../ui/powerCard";
 import { NEUTRAL_PAGE_BG } from "../../ui/tokens";
 import { STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE } from "../../ui/glossaryTooltip";
 import { useGlossaryTooltip } from "../../ui/useGlossaryTooltip";
@@ -146,51 +147,6 @@ const ROLE_LABELS_EXCLUDED_FROM_CLASS_SELECT = new Set(["defender", "leader", "s
 function isExcludedFromClassSelect(name: string): boolean {
   if (CLASS_NAMES_EXCLUDED_FROM_SELECT.has(name)) return true;
   return ROLE_LABELS_EXCLUDED_FROM_CLASS_SELECT.has(name.trim().toLowerCase());
-}
-
-function powerCardUsageAccent(usageRaw: string): { borderLeft: string; backgroundColor: string; border: string } {
-  const u = usageRaw.toLowerCase();
-  if (u.includes("at-will") || u.includes("at will")) {
-    return {
-      borderLeft: "6px solid var(--power-accent-atwill-bar)",
-      backgroundColor: "var(--power-accent-atwill-bg)",
-      border: "1px solid var(--power-accent-atwill-border)"
-    };
-  }
-  if (u.includes("encounter")) {
-    return {
-      borderLeft: "6px solid var(--power-accent-encounter-bar)",
-      backgroundColor: "var(--power-accent-encounter-bg)",
-      border: "1px solid var(--power-accent-encounter-border)"
-    };
-  }
-  if (u.includes("daily")) {
-    return {
-      borderLeft: "6px solid var(--power-accent-daily-bar)",
-      backgroundColor: "var(--power-accent-daily-bg)",
-      border: "1px solid var(--power-accent-daily-border)"
-    };
-  }
-  return {
-    borderLeft: "6px solid var(--panel-border)",
-    backgroundColor: "var(--surface-0)",
-    border: "1px solid var(--panel-border)"
-  };
-}
-
-function splitPowerKeywords(rawKeywords: string): string[] {
-  return rawKeywords
-    .split(/[;,]/)
-    .map((part) => part.trim())
-    .filter((part) => part.length > 0);
-}
-
-function inferPowerUsageBucket(usageRaw: string): "atWill" | "encounter" | "daily" | null {
-  const u = usageRaw.toLowerCase();
-  if (u.includes("at-will") || u.includes("at will")) return "atWill";
-  if (u.includes("encounter")) return "encounter";
-  if (u.includes("daily")) return "daily";
-  return null;
 }
 
 type BuilderAbilityCode = "STR" | "CON" | "DEX" | "INT" | "WIS" | "CHA";
@@ -303,168 +259,73 @@ function renderPowerCard(
     renderRuleText?: (raw: string, keyPrefix: string) => JSX.Element;
   }
 ): JSX.Element {
-  const raw = (power.raw || {}) as Record<string, unknown>;
-  const specific = (power.raw?.specific as Record<string, unknown> | undefined) || {};
-  const flavor = typeof raw.flavor === "string" ? raw.flavor : "";
-  const body = typeof raw.body === "string" ? raw.body : "";
-  const usage = String(specific["Power Usage"] || power.usage || "-");
-  const usageBucket = inferPowerUsageBucket(usage);
-  const accent = powerCardUsageAccent(usage);
-  const powerType = String(specific["Power Type"] || "-");
-  const level = power.level ?? null;
-  const display = String(specific["Display"] || power.display || "").trim();
-  const keywords = String(specific["Keywords"] || power.keywords || "").trim();
-  const keywordTokens = splitPowerKeywords(keywords);
-  const actionType = String(specific["Action Type"] || "").trim();
-  const attackType = String(specific["Attack Type"] || "").trim();
-  const target = String(specific["Target"] || "").trim();
-  const trigger = String(specific["Trigger"] || "").trim();
-  const requirement = String(specific["Requirement"] || "").trim();
-  const hit = String(specific["Hit"] || "").trim();
-  const miss = String(specific["Miss"] || "").trim();
-  const effect = String(specific["Effect"] || "").trim();
-  const special = String(specific["Special"] || "").trim();
+  const usageBucketForGlossary = powerCardUsageBucketFromLabel(
+    String((power.raw?.specific as Record<string, unknown> | undefined)?.["Power Usage"] || power.usage || "-")
+  );
 
   return (
-    <article
+    <CharacterPowerCard
       key={options?.key || power.id}
-      style={{
-        border: accent.border,
-        borderLeft: accent.borderLeft,
-        backgroundColor: accent.backgroundColor,
-        borderRadius: "8px",
-        padding: "0.55rem 0.65rem",
-        marginTop: "0.45rem"
+      power={power}
+      variant="builder"
+      renderUsageInHeader={(usageLabel) =>
+        usageBucketForGlossary && options?.glossaryHover ? (
+          <span
+            onMouseEnter={(event) => options.glossaryHover!.start(event, `powerUsage:${usageBucketForGlossary}`)}
+            onMouseLeave={options.glossaryHover.leave}
+            onFocus={(event) => options.glossaryHover!.start(event, `powerUsage:${usageBucketForGlossary}`)}
+            onBlur={options.glossaryHover.leave}
+            tabIndex={0}
+            style={{
+              cursor: "help",
+              textDecoration: "underline dotted",
+              textUnderlineOffset: "2px",
+              color: "var(--text-muted)"
+            }}
+          >
+            {usageLabel}
+          </span>
+        ) : (
+          usageLabel
+        )
+      }
+      renderKeyword={(keyword) => {
+        const tooltip = options?.keywordTooltip?.(keyword) ?? null;
+        const hasHoverHandlers = Boolean(options?.onKeywordMouseEnter && options?.onKeywordMouseLeave);
+        const isParalysisKeyword = keyword.trim().toLowerCase() === "paralysis";
+        if (isParalysisKeyword) {
+          return <span style={{ color: "var(--text-primary)" }}>{keyword}</span>;
+        }
+        return (
+          <span
+            title={hasHoverHandlers ? undefined : tooltip ?? undefined}
+            onMouseEnter={hasHoverHandlers ? (event) => options?.onKeywordMouseEnter?.(event, keyword) : undefined}
+            onMouseLeave={hasHoverHandlers ? options?.onKeywordMouseLeave : undefined}
+            onFocus={hasHoverHandlers ? (event) => options?.onKeywordMouseEnter?.(event, keyword) : undefined}
+            onBlur={hasHoverHandlers ? options?.onKeywordMouseLeave : undefined}
+            tabIndex={hasHoverHandlers ? 0 : undefined}
+            style={{
+              color: "var(--text-primary)",
+              cursor: hasHoverHandlers || Boolean(tooltip) ? "help" : "default",
+              textDecoration: hasHoverHandlers || Boolean(tooltip) ? "underline dotted" : "none",
+              textUnderlineOffset: "2px"
+            }}
+          >
+            {keyword}
+          </span>
+        );
       }}
-    >
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "baseline" }}>
-        <div style={{ fontWeight: 700, color: "var(--text-primary)" }}>{power.name}</div>
-        <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
-          {usageBucket && options?.glossaryHover ? (
-            <span
-              onMouseEnter={(event) => options.glossaryHover!.start(event, `powerUsage:${usageBucket}`)}
-              onMouseLeave={options.glossaryHover.leave}
-              onFocus={(event) => options.glossaryHover!.start(event, `powerUsage:${usageBucket}`)}
-              onBlur={options.glossaryHover.leave}
-              tabIndex={0}
-              style={{
-                cursor: "help",
-                textDecoration: "underline dotted",
-                textUnderlineOffset: "2px",
-                color: "var(--text-muted)"
-              }}
-            >
-              {usage}
-            </span>
-          ) : (
-            usage
-          )}{" "}
-          {powerType !== "-" ? `• ${powerType}` : ""}
-          {level != null && level > 0 ? ` • Lv ${level}` : ""}
-        </div>
-      </div>
-      {display && <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "0.2rem" }}>{display}</div>}
-      {keywordTokens.length > 0 && (
-        <div style={{ fontSize: "0.77rem", color: "var(--text-muted)", marginTop: "0.2rem" }}>
-          <strong>Keywords:</strong>{" "}
-          {keywordTokens.map((keyword, idx) => {
-            const tooltip = options?.keywordTooltip?.(keyword) ?? null;
-            const hasHoverHandlers = Boolean(options?.onKeywordMouseEnter && options?.onKeywordMouseLeave);
-            const isParalysisKeyword = keyword.trim().toLowerCase() === "paralysis";
-            return (
-              <span key={`${power.id}-kw-${keyword}`}>
-                {isParalysisKeyword ? (
-                  <span style={{ color: "var(--text-primary)" }}>{keyword}</span>
-                ) : (
-                  <span
-                    title={hasHoverHandlers ? undefined : tooltip ?? undefined}
-                    onMouseEnter={hasHoverHandlers ? (event) => options?.onKeywordMouseEnter?.(event, keyword) : undefined}
-                    onMouseLeave={hasHoverHandlers ? options?.onKeywordMouseLeave : undefined}
-                    onFocus={hasHoverHandlers ? (event) => options?.onKeywordMouseEnter?.(event, keyword) : undefined}
-                    onBlur={hasHoverHandlers ? options?.onKeywordMouseLeave : undefined}
-                    tabIndex={hasHoverHandlers ? 0 : undefined}
-                    style={{
-                      color: "var(--text-primary)",
-                      cursor: hasHoverHandlers || Boolean(tooltip) ? "help" : "default",
-                      textDecoration: hasHoverHandlers || Boolean(tooltip) ? "underline dotted" : "none",
-                      textUnderlineOffset: "2px"
-                    }}
-                  >
-                    {keyword}
-                  </span>
-                )}
-                {idx < keywordTokens.length - 1 ? <span> </span> : null}
-              </span>
-            );
-          })}
-        </div>
+      renderLineText={(text, segmentKey) =>
+        options?.renderRuleText ? options.renderRuleText(text, segmentKey) : text
+      }
+      renderBody={(body) => (
+        <RulesRichText
+          text={body}
+          paragraphStyle={{ fontSize: "0.8rem", color: "var(--text-muted)" }}
+          listItemStyle={{ fontSize: "0.8rem", color: "var(--text-muted)" }}
+        />
       )}
-      {(actionType || attackType || target || trigger || requirement) && (
-        <div style={{ marginTop: "0.3rem", fontSize: "0.78rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
-          {actionType && (
-            <div>
-              <strong>Action:</strong>{" "}
-              {options?.renderRuleText ? options.renderRuleText(actionType, `${power.id}-action`) : actionType}
-            </div>
-          )}
-          {attackType && (
-            <div>
-              <strong>Range/Area:</strong>{" "}
-              {options?.renderRuleText ? options.renderRuleText(attackType, `${power.id}-attack-type`) : attackType}
-            </div>
-          )}
-          {target && (
-            <div>
-              <strong>Target:</strong> {options?.renderRuleText ? options.renderRuleText(target, `${power.id}-target`) : target}
-            </div>
-          )}
-          {trigger && (
-            <div>
-              <strong>Trigger:</strong>{" "}
-              {options?.renderRuleText ? options.renderRuleText(trigger, `${power.id}-trigger`) : trigger}
-            </div>
-          )}
-          {requirement && (
-            <div>
-              <strong>Requirement:</strong>{" "}
-              {options?.renderRuleText ? options.renderRuleText(requirement, `${power.id}-requirement`) : requirement}
-            </div>
-          )}
-        </div>
-      )}
-      {(hit || miss || effect || special) && (
-        <div style={{ marginTop: "0.3rem", fontSize: "0.78rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
-          {hit && (
-            <div>
-              <strong>Hit:</strong> {options?.renderRuleText ? options.renderRuleText(hit, `${power.id}-hit`) : hit}
-            </div>
-          )}
-          {miss && (
-            <div>
-              <strong>Miss:</strong> {options?.renderRuleText ? options.renderRuleText(miss, `${power.id}-miss`) : miss}
-            </div>
-          )}
-          {effect && (
-            <div>
-              <strong>Effect:</strong>{" "}
-              {options?.renderRuleText ? options.renderRuleText(effect, `${power.id}-effect`) : effect}
-            </div>
-          )}
-          {special && (
-            <div>
-              <strong>Special:</strong>{" "}
-              {options?.renderRuleText ? options.renderRuleText(special, `${power.id}-special`) : special}
-            </div>
-          )}
-        </div>
-      )}
-      {flavor && <p style={{ margin: "0.35rem 0 0 0", fontStyle: "italic", fontSize: "0.8rem", color: "var(--text-muted)" }}>{flavor}</p>}
-      {body && (
-        <div style={{ marginTop: "0.35rem", fontSize: "0.8rem", color: "var(--text-muted)" }}>
-          <RulesRichText text={body} paragraphStyle={{ fontSize: "0.8rem", color: "var(--text-muted)" }} listItemStyle={{ fontSize: "0.8rem", color: "var(--text-muted)" }} />
-        </div>
-      )}
-    </article>
+    />
   );
 }
 

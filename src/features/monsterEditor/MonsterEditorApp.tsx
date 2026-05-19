@@ -17,6 +17,7 @@ import { useGlossaryTooltip } from "../../ui/useGlossaryTooltip";
 import { resolveMonsterGlossaryHoverSections, resolveMonsterStyleTooltip } from "./monsterTooltipResolve";
 import { GlossaryTooltipRichText } from "../builder/RulesRichText";
 import { CollapsibleDisclosure, CollapsibleDisclosureArrow } from "../../ui/CollapsibleDisclosure";
+import { monsterPowerCardShellStyle, type MonsterPowerActionBucket } from "../../ui/powerCard";
 import { findCaseInsensitiveMatches, scrollTextareaToMatch } from "../../ui/jsonSearch";
 import {
   loadMonsterEntry,
@@ -781,91 +782,6 @@ const statValueStrong: CSSProperties = { color: "var(--text-primary)", fontSize:
 const statEmptyPlaceholder: CSSProperties = { fontWeight: 700, fontSize: "0.8rem", color: "var(--text-primary)" };
 
 const outcomeEntryTitleStyle: CSSProperties = { fontSize: "0.78rem", fontWeight: 700, color: "var(--text-primary)" };
-
-type MonsterPowerActionBucket = "standard" | "move" | "minor" | "free" | "triggered" | "other";
-
-function usageAccentColor(bucket: MonsterPowerActionBucket): string {
-  if (bucket === "standard") return "var(--power-accent-atwill-bar)";
-  if (bucket === "move") return "var(--power-accent-move-bar)";
-  if (bucket === "minor") return "var(--power-accent-encounter-bar)";
-  if (bucket === "free") return "var(--power-accent-free-bar)";
-  if (bucket === "triggered") return "var(--power-accent-daily-bar)";
-  return "var(--text-secondary)";
-}
-
-function usageAccentCardStyle(bucket: MonsterPowerActionBucket): {
-  border: string;
-  borderLeft: string;
-  backgroundColor: string;
-} {
-  if (bucket === "standard") {
-    return {
-      border: "1px solid var(--power-accent-atwill-border)",
-      borderLeft: "6px solid var(--power-accent-atwill-bar)",
-      backgroundColor: "var(--power-accent-atwill-bg)"
-    };
-  }
-  if (bucket === "move") {
-    return {
-      border: "1px solid var(--power-accent-move-border)",
-      borderLeft: "6px solid var(--power-accent-move-bar)",
-      backgroundColor: "var(--power-accent-move-bg)"
-    };
-  }
-  if (bucket === "minor") {
-    return {
-      border: "1px solid var(--power-accent-encounter-border)",
-      borderLeft: "6px solid var(--power-accent-encounter-bar)",
-      backgroundColor: "var(--power-accent-encounter-bg)"
-    };
-  }
-  if (bucket === "free") {
-    return {
-      border: "1px solid var(--power-accent-free-border)",
-      borderLeft: "6px solid var(--power-accent-free-bar)",
-      backgroundColor: "var(--power-accent-free-bg)"
-    };
-  }
-  if (bucket === "triggered") {
-    return {
-      border: "1px solid var(--power-accent-daily-border)",
-      borderLeft: "6px solid var(--power-accent-daily-bar)",
-      backgroundColor: "var(--power-accent-daily-bg)"
-    };
-  }
-  return {
-    border: "1px solid var(--panel-border)",
-    borderLeft: "6px solid var(--text-secondary)",
-    backgroundColor: "var(--surface-1)"
-  };
-}
-
-/**
- * Rounded, beveled shell for each monster power (character builder power cards: 8px radius, left accent
- * follows the curve; list spacing uses ~0.45rem gaps).
- */
-function monsterPowerCardShellStyle(bucket: MonsterPowerActionBucket): CSSProperties {
-  const accent = usageAccentCardStyle(bucket);
-  const bar = usageAccentColor(bucket);
-  return {
-    border: accent.border,
-    borderLeft: accent.borderLeft,
-    borderRadius: "8px",
-    padding: 0,
-    backgroundColor: accent.backgroundColor,
-    boxShadow: [
-      `inset 0 0 0 1px color-mix(in srgb, ${bar} 40%, transparent)`,
-      "inset 0 1px 0 color-mix(in srgb, var(--text-primary) 10%, transparent)",
-      "inset 0 -1px 0 color-mix(in srgb, var(--text-primary) 7%, transparent)",
-      "0 2px 6px color-mix(in srgb, var(--text-primary) 7%, transparent)"
-    ].join(", "),
-    height: "100%",
-    boxSizing: "border-box",
-    display: "flex",
-    flexDirection: "column",
-    overflow: "hidden"
-  };
-}
 
 /** Title / usage block at top of a power card (shell supplies action-type background). */
 function monsterPowerCardTitleBlockStyle(): CSSProperties {

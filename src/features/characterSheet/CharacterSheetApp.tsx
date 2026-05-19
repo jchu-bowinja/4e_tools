@@ -46,6 +46,7 @@ import { SkillModifierNameContent } from "../../ui/scoreBreakdownSkillName";
 import { ScoreBreakdownTable, type ScoreBreakdownRowDef } from "../../ui/ScoreBreakdownTable";
 import { loadBuild, loadSavedCharacters, type SavedCharacterEntry } from "../builder/storage";
 import { GlossaryTooltipRichText, RulesRichText } from "../builder/RulesRichText";
+import { CharacterPowerCard, powerCardUsageAccentBarColor } from "../../ui/powerCard";
 import { areActiveConditionsDuplicate, createActiveCondition } from "./activeConditions";
 import {
   buildDurationFromPreset,
@@ -581,45 +582,6 @@ function HealingSurgesFieldLabel({
   );
 }
 
-function usageAccentColor(bucket: "atWill" | "encounter" | "daily" | "utility"): string {
-  if (bucket === "atWill") return "var(--power-accent-atwill-bar)";
-  if (bucket === "encounter") return "var(--power-accent-encounter-bar)";
-  if (bucket === "daily") return "var(--power-accent-daily-bar)";
-  return "var(--text-secondary)";
-}
-
-function usageAccentCardStyle(bucket: "atWill" | "encounter" | "daily" | "utility"): {
-  border: string;
-  borderLeft: string;
-  backgroundColor: string;
-} {
-  if (bucket === "atWill") {
-    return {
-      border: "1px solid var(--power-accent-atwill-border)",
-      borderLeft: "6px solid var(--power-accent-atwill-bar)",
-      backgroundColor: "var(--power-accent-atwill-bg)"
-    };
-  }
-  if (bucket === "encounter") {
-    return {
-      border: "1px solid var(--power-accent-encounter-border)",
-      borderLeft: "6px solid var(--power-accent-encounter-bar)",
-      backgroundColor: "var(--power-accent-encounter-bg)"
-    };
-  }
-  if (bucket === "daily") {
-    return {
-      border: "1px solid var(--power-accent-daily-border)",
-      borderLeft: "6px solid var(--power-accent-daily-bar)",
-      backgroundColor: "var(--power-accent-daily-bg)"
-    };
-  }
-  return {
-    border: "1px solid var(--panel-border)",
-    borderLeft: "6px solid var(--text-secondary)",
-    backgroundColor: "var(--surface-1)"
-  };
-}
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -708,12 +670,6 @@ function conditionDisplayLabel(name: string): string {
 }
 
 
-function splitPowerKeywords(rawKeywords: string): string[] {
-  return rawKeywords
-    .split(/[;,]/)
-    .map((part) => part.trim())
-    .filter((part) => part.length > 0);
-}
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -2601,7 +2557,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                     style={{
                       fontWeight: 700,
                       marginBottom: "0.35rem",
-                      borderLeft: `5px solid ${usageAccentColor(section.usageBucket)}`,
+                      borderLeft: `5px solid ${powerCardUsageAccentBarColor(section.usageBucket)}`,
                       paddingLeft: "0.45rem",
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
@@ -2634,42 +2590,19 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   <div style={{ display: "grid", gap: "0.4rem", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", alignItems: "stretch" }}>
                     {orderedSectionPowers.map((power) => {
                     const usageBucket = powerUsageBucket(power);
-                    const accent = usageAccentCardStyle(usageBucket);
                     const expended = usedSet.has(power.id);
                     const canExpend = usageBucket === "encounter" || usageBucket === "daily";
-                    const raw = (power.raw || {}) as Record<string, unknown>;
-                    const specific = (raw.specific as Record<string, unknown> | undefined) || {};
-                    const display = String(specific["Display"] || power.display || "").trim();
-                    const keywords = String(specific["Keywords"] || power.keywords || "").trim();
-                    const keywordTokens = splitPowerKeywords(keywords);
-                    const actionType = String(specific["Action Type"] || "").trim();
-                    const attackType = String(specific["Attack Type"] || "").trim();
-                    const target = String(specific["Target"] || "").trim();
-                    const trigger = String(specific["Trigger"] || "").trim();
-                    const requirement = String(specific["Requirement"] || "").trim();
-                    const hit = String(specific["Hit"] || "").trim();
-                    const miss = String(specific["Miss"] || "").trim();
-                    const effect = String(specific["Effect"] || "").trim();
-                    const special = String(specific["Special"] || "").trim();
-                    const flavor = typeof raw.flavor === "string" ? raw.flavor : "";
-                    const body = typeof raw.body === "string" ? raw.body : "";
                       return (
-                      <div
+                      <CharacterPowerCard
                         key={power.id}
-                        style={{
-                          border: accent.border,
-                          borderLeft: accent.borderLeft,
-                          borderRadius: "8px",
-                          padding: "0.55rem 0.65rem",
-                          backgroundColor: accent.backgroundColor,
-                          boxShadow: `inset 0 0 0 1px ${usageAccentColor(usageBucket)}33`,
+                        power={power}
+                        variant="sheet"
+                        showInsetShadow
+                        expended={expended}
+                        showExpendedBadge
+                        shellStyle={{
                           opacity: expended ? 0.58 : 1,
                           filter: expended ? "grayscale(0.55) saturate(0.65) brightness(0.88) contrast(0.82)" : "none",
-                          height: "100%",
-                          boxSizing: "border-box",
-                          display: "flex",
-                          flexDirection: "column",
-                          overflow: "hidden",
                           cursor: "grab"
                         }}
                         draggable
@@ -2682,141 +2615,61 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                           reorderPowerCardsByDrag(section.powers, draggingPowerId, power.id);
                           setDraggingPowerId(null);
                         }}
-                      >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem" }}>
-                          <strong style={{ textDecoration: expended ? "line-through" : "none" }}>{power.name}</strong>
-                          <span style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>
-                            Lv {power.level ?? 0} ? {power.usage || "-"}
-                          </span>
-                        </div>
-                        {expended ? (
-                          <div
-                            style={{
-                              marginTop: "0.28rem",
-                              alignSelf: "flex-start",
-                              padding: "0.12rem 0.45rem",
-                              borderRadius: "999px",
-                              backgroundColor: "var(--status-danger)",
-                              color: "#ffffff",
-                              fontSize: "0.72rem",
-                              fontWeight: 700,
-                              letterSpacing: "0.04em",
-                              textTransform: "uppercase"
-                            }}
-                          >
-                            Used
-                          </div>
-                        ) : null}
-                        {display ? <div style={{ fontSize: "0.82rem", color: "var(--text-secondary)", marginTop: "0.2rem" }}>{display}</div> : null}
-                        {keywordTokens.length > 0 ? (
-                          <div style={{ fontSize: "0.82rem", color: "var(--text-secondary)", marginTop: "0.2rem" }}>
-                            <strong>Keywords:</strong>{" "}
-                            {keywordTokens.map((keyword, idx) => (
-                              <span key={`${power.id}-keyword-${keyword}`}>
-                                {(() => {
-                                  const isParalysisKeyword = keyword.trim().toLowerCase() === "paralysis";
-                                  if (isParalysisKeyword) {
-                                    return (
-                                      <span
-                                        style={{
-                                          color: "var(--text-primary)"
-                                        }}
-                                      >
-                                        {keyword}
-                                      </span>
-                                    );
-                                  }
-                                  return (
-                                    <span
-                                      onMouseEnter={(event) => glossaryTooltipUi.startHover(event, `powerKeyword:${keyword}`)}
-                                      onFocus={(event) => glossaryTooltipUi.startHover(event, `powerKeyword:${keyword}`)}
-                                      onMouseLeave={glossaryTooltipUi.leaveHover}
-                                      onBlur={glossaryTooltipUi.leaveHover}
-                                      tabIndex={0}
-                                      style={{
-                                        color: "var(--text-primary)",
-                                        cursor: "help",
-                                        textDecoration: "underline dotted",
-                                        textUnderlineOffset: "2px"
-                                      }}
-                                    >
-                                      {keyword}
-                                    </span>
-                                  );
-                                })()}
-                                {idx < keywordTokens.length - 1 ? <span> </span> : null}
+                        renderKeyword={(keyword) => {
+                          const isParalysisKeyword = keyword.trim().toLowerCase() === "paralysis";
+                          if (isParalysisKeyword) {
+                            return <span style={{ color: "var(--text-primary)" }}>{keyword}</span>;
+                          }
+                          return (
+                            <span
+                              onMouseEnter={(event) => glossaryTooltipUi.startHover(event, `powerKeyword:${keyword}`)}
+                              onFocus={(event) => glossaryTooltipUi.startHover(event, `powerKeyword:${keyword}`)}
+                              onMouseLeave={glossaryTooltipUi.leaveHover}
+                              onBlur={glossaryTooltipUi.leaveHover}
+                              tabIndex={0}
+                              style={{
+                                color: "var(--text-primary)",
+                                cursor: "help",
+                                textDecoration: "underline dotted",
+                                textUnderlineOffset: "2px"
+                              }}
+                            >
+                              {keyword}
+                            </span>
+                          );
+                        }}
+                        renderLineText={(text, segmentKey, line) => {
+                          if (line.label === "Action" && hasGlossaryHoverForTerm(text)) {
+                            return (
+                              <span
+                                onMouseEnter={(event) => glossaryTooltipUi.startHover(event, `powerKeyword:${text}`)}
+                                onFocus={(event) => glossaryTooltipUi.startHover(event, `powerKeyword:${text}`)}
+                                onMouseLeave={glossaryTooltipUi.leaveHover}
+                                onBlur={glossaryTooltipUi.leaveHover}
+                                tabIndex={0}
+                                style={{ cursor: "help", textDecoration: "underline dotted", textUnderlineOffset: "2px" }}
+                              >
+                                {text}
                               </span>
-                            ))}
-                          </div>
-                        ) : null}
-                        {(actionType || attackType || target || trigger || requirement) && (
-                          <div style={{ marginTop: "0.3rem", fontSize: "0.8rem", color: "var(--text-primary)", lineHeight: 1.45 }}>
-                            {actionType ? (
-                              <div>
-                                <strong>Action:</strong>{" "}
-                                {hasGlossaryHoverForTerm(actionType) ? (
-                                  <span
-                                    onMouseEnter={(event) => glossaryTooltipUi.startHover(event, `powerKeyword:${actionType}`)}
-                                    onFocus={(event) => glossaryTooltipUi.startHover(event, `powerKeyword:${actionType}`)}
-                                    onMouseLeave={glossaryTooltipUi.leaveHover}
-                                    onBlur={glossaryTooltipUi.leaveHover}
-                                    tabIndex={0}
-                                    style={{ cursor: "help", textDecoration: "underline dotted", textUnderlineOffset: "2px" }}
-                                  >
-                                    {actionType}
-                                  </span>
-                                ) : (
-                                  renderPowerTextWithGlossaryHovers(actionType, `${power.id}-action`)
-                                )}
-                              </div>
-                            ) : null}
-                            {attackType ? <div><strong>Range/Area:</strong> {renderPowerTextWithGlossaryHovers(attackType, `${power.id}-attack-type`)}</div> : null}
-                            {target ? <div><strong>Target:</strong> {renderPowerTextWithGlossaryHovers(target, `${power.id}-target`)}</div> : null}
-                            {trigger ? <div><strong>Trigger:</strong> {renderPowerTextWithGlossaryHovers(trigger, `${power.id}-trigger`)}</div> : null}
-                            {requirement ? <div><strong>Requirement:</strong> {renderPowerTextWithGlossaryHovers(requirement, `${power.id}-requirement`)}</div> : null}
-                          </div>
+                            );
+                          }
+                          return renderPowerTextWithGlossaryHovers(text, segmentKey);
+                        }}
+                        renderBody={(body) => (
+                          <RulesRichText
+                            text={body}
+                            paragraphStyle={{ fontSize: "0.8rem", color: "var(--text-primary)", margin: "0 0 0.35rem 0" }}
+                            listItemStyle={{ fontSize: "0.8rem", color: "var(--text-primary)" }}
+                          />
                         )}
-                        {(hit || miss || effect || special) && (
-                          <div style={{ marginTop: "0.3rem", fontSize: "0.8rem", color: "var(--text-primary)", lineHeight: 1.45 }}>
-                            {hit ? <div><strong>Hit:</strong> {renderPowerTextWithGlossaryHovers(hit, `${power.id}-hit`)}</div> : null}
-                            {miss ? <div><strong>Miss:</strong> {renderPowerTextWithGlossaryHovers(miss, `${power.id}-miss`)}</div> : null}
-                            {effect ? <div><strong>Effect:</strong> {renderPowerTextWithGlossaryHovers(effect, `${power.id}-effect`)}</div> : null}
-                            {special ? <div><strong>Special:</strong> {renderPowerTextWithGlossaryHovers(special, `${power.id}-special`)}</div> : null}
-                          </div>
-                        )}
-                        {body ? (
-                          <div style={{ marginTop: "0.35rem", fontSize: "0.8rem", color: "var(--text-primary)" }}>
-                            <RulesRichText
-                              text={body}
-                              paragraphStyle={{ fontSize: "0.8rem", color: "var(--text-primary)", margin: "0 0 0.35rem 0" }}
-                              listItemStyle={{ fontSize: "0.8rem", color: "var(--text-primary)" }}
-                            />
-                          </div>
-                        ) : null}
-                        <div
-                          style={{
-                            marginTop: "auto",
-                            paddingTop: "0.35rem",
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "flex-end",
-                            gap: "0.5rem"
-                          }}
-                        >
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            {flavor ? (
-                              <p style={{ margin: 0, fontStyle: "italic", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
-                                {flavor}
-                              </p>
-                            ) : null}
-                          </div>
-                          {canExpend ? (
+                        footer={
+                          canExpend ? (
                             <button type="button" onClick={() => togglePowerExpended(power.id)}>
                               {expended ? "Mark Ready" : "Mark Used"}
                             </button>
-                          ) : null}
-                        </div>
-                      </div>
+                          ) : null
+                        }
+                      />
                       );
                     })}
                   </div>
