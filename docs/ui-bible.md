@@ -30,6 +30,7 @@ If a local exception is needed, document the reason in the feature area and keep
 - Accessibility by default: keyboard, focus visibility, and readable contrast are baseline requirements.
 - Reuse before creating: if a pattern already exists, extend it instead of creating a new style family.
 - Stable mental model: avoid changing terminology, icon intent, or control placement without clear user value.
+- **Shallow structure:** prefer fewer layout containers unless a wrapper has a clear job (grid area, collapsible body, stripe row, scroll region). Extra nesting makes responsive layout and refactors harder without improving UX.
 
 ## Visual Language
 
@@ -91,6 +92,46 @@ State visuals should be consistent across buttons, fields, toggles, and list row
 - Use shared card/panel primitives for repeated content containers.
 - Keep heading structure and internal spacing predictable.
 - Avoid creating feature-specific panel variants unless the data shape truly demands it.
+
+#### Layout containers and DOM depth
+
+**Default:** one visual “panel” (border, radius, padding, surface) per logical section — not nested panels that repeat the same chrome.
+
+**When a wrapper is justified**
+
+| Purpose | OK to add a container |
+| --- | --- |
+| CSS grid / flex layout (columns, rows, `minmax(0, 1fr)`) | Yes — prefer the shallowest element that owns the grid |
+| Collapsible body (`details` content, `CollapsibleDisclosure` body) | Yes — one body wrapper for padding/gap |
+| Row stripe, drag handle, or card shell | Yes — on the row or card root |
+| Scroll clipping (`overflow: auto/hidden`) | Yes — on the scrollport only |
+| Glossary / focus target | Yes — on the label affordance, not around whole sections |
+
+**Avoid**
+
+- **Pass-through wrappers** — a `motion.div` with a single child and no layout styles (move `minWidth: 0`, `gap`, etc. to the child or parent grid).
+- **Duplicate panel tokens** — stacking `panelStyle`, `overviewCollapsiblePanelStyle`, nested bordered shells on the same section, or sidebar panel + collapsible body border for the same visual box.
+- **Grid as vertical gap** — `display: grid` with a single column (`minmax(0, 1fr)`) only to space children; use `display: flex; flex-direction: column; gap` on the parent, or `gap` on an existing grid.
+- **Fake inputs** — bordered inner `motion.div` around static readonly text; use one field surface (label + value in one cell or a shared readonly field component).
+- **Redundant section titles** — a wrapper `motion.div` whose only job is to hold a heading; use `h2`/`h3` with margin on the section root.
+
+**Prefer**
+
+- **Semantic elements** where they match structure: `section`, `article` (power cards), `ul`/`li` (inventory), `dl`/`dt`/`dd` (definition lists) instead of anonymous `div` chains.
+- **Shared layout primitives** when the same nesting appears twice (e.g. one `PowerCard`, one overview field grid) rather than copying deep trees in sheet, builder, and monster editor.
+- **CSS on the existing surface** — padding and gap via class or token on the panel you already have, not an extra inner `div`.
+
+**Practical depth guideline**
+
+- Aim for **≤ 4 layout wrappers** from a page section root to a leaf control (label + input, table row, or button). Deeper trees are a smell unless required by tables, collapsibles, or drag-and-drop.
+- Before adding a `motion.div`, ask: can this style live on the parent grid, a shared component, or a class?
+
+**Cross-feature patterns to consolidate (when touching those areas)**
+
+- Builder: `ui.mainColumn` is the sole main-tab panel shell; use `blockInset` for subsections inside a tab (do not nest a second bordered `blockContent` wrapper).
+- Builder sidebar: `sidebarPanel` + `LiveSheetCollapsibleSection` body border — one border per section.
+- Character sheet overview: tab `panelStyle` + per-block bordered boxes + `OverviewCollapsibleSection` panel — flatten where possible.
+- Power display: sheet, builder, and monster editor share similar deep card trees — extract shared card markup when changing any of them.
 
 #### Collapsible disclosure (expand / collapse)
 
@@ -264,6 +305,7 @@ Use this checklist before merging UI/style/look-and-feel work:
 - [ ] Character sheet score tables use `SkillModifierTable` / `StatScoreTable` with shared `scoreTableCells` styling — not one-off layouts.
 - [ ] Breakdown tables with variable-width names use measured label width (`--skill-name-block-width` or `--stat-label-min-width`) and a single shared name column per table.
 - [ ] Resizing or narrowing the panel keeps the **bonus/total** and **row name** readable; only right-hand component columns clip (no table-level horizontal scroll, no label-on-math overlap).
+- [ ] New UI does not stack duplicate panel borders or pass-through wrappers; layout depth stays shallow unless collapsible, grid, or scroll requires otherwise.
 
 ## Update Process
 

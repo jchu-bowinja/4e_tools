@@ -793,12 +793,6 @@ const ui = {
     padding: "0.55rem 0.65rem",
     marginBottom: "1rem"
   },
-  blockContent: {
-    backgroundColor: "var(--surface-1)",
-    border: "1px solid var(--panel-border)",
-    borderRadius: "var(--ui-section-radius, 10px)",
-    padding: "1rem 1.1rem"
-  },
   blockInset: {
     backgroundColor: "var(--surface-2)",
     border: "1px solid var(--panel-border)",
@@ -1939,7 +1933,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             width: useSingleColumnLayout ? undefined : 0
           }}
         >
-        <div style={ui.blockContent}>
         {activeTab === "race" && (
           <>
             <h3 style={sectionTitleStyle}>Race</h3>
@@ -4385,7 +4378,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             </label>
           </div>
         )}
-        </div>
         <div style={{ ...ui.blockInset, marginTop: "0.75rem", backgroundColor: "var(--surface-0)" }}>
           <details>
             <summary style={jsonSummaryStyle}>
