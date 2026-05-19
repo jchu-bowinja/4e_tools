@@ -1640,22 +1640,12 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               gap: "0.22rem"
             }}
           >
-            <label style={{ display: "grid", gap: "0.12rem", margin: 0 }}>
-              <span {...glossaryTooltipUi.hoverA11y("shortRest")} style={{ fontSize: "0.68rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                Short rest
-              </span>
-              <button type="button" onClick={applyShortRest} style={restButtonStyle}>
-                Take
-              </button>
-            </label>
-            <label style={{ display: "grid", gap: "0.12rem", margin: 0 }}>
-              <span {...glossaryTooltipUi.hoverA11y("extendedRest")} style={{ fontSize: "0.68rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                Long rest
-              </span>
-              <button type="button" onClick={applyLongRest} style={restButtonStyle}>
-                Take
-              </button>
-            </label>
+            <button type="button" onClick={applyShortRest} style={restButtonStyle} {...glossaryTooltipUi.hoverA11y("shortRest")}>
+              Short rest
+            </button>
+            <button type="button" onClick={applyLongRest} style={restButtonStyle} {...glossaryTooltipUi.hoverA11y("extendedRest")}>
+              Long rest
+            </button>
           </div>
         </div>
         <div
@@ -1763,24 +1753,19 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   >
                     Spend Surge
                   </button>
-                  <label style={{ display: "grid", gap: "0.08rem", margin: 0 }}>
-                    <span {...glossaryTooltipUi.hoverA11y("secondWind")} style={{ fontSize: "0.65rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em" }}>
-                      Second Wind
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => useSecondWind()}
-                      disabled={!canUseSecondWind(sheet.resources)}
-                      aria-label="Use second wind"
-                      style={{
-                        ...hpPanelHealButtonStyle,
-                        cursor: canUseSecondWind(sheet.resources) ? "pointer" : "not-allowed",
-                        opacity: canUseSecondWind(sheet.resources) ? 1 : 0.55
-                      }}
-                    >
-                      Use
-                    </button>
-                  </label>
+                  <button
+                    type="button"
+                    onClick={() => useSecondWind()}
+                    disabled={!canUseSecondWind(sheet.resources)}
+                    {...glossaryTooltipUi.hoverA11y("secondWind")}
+                    style={{
+                      ...hpPanelHealButtonStyle,
+                      cursor: canUseSecondWind(sheet.resources) ? "pointer" : "not-allowed",
+                      opacity: canUseSecondWind(sheet.resources) ? 1 : 0.55
+                    }}
+                  >
+                    Second Wind
+                  </button>
                 </div>
                 <HealingSurgeValueHint
                   surgeValue={derived.surgeValue}
