@@ -1,4 +1,5 @@
-import type { ChangeEvent, CSSProperties } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties, type KeyboardEvent } from "react";
+import { parseAdjustableNumberBlur } from "./adjustableNumberBlur";
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -51,6 +52,11 @@ type AdjustableNumberInputOptionalProps = AdjustableNumberInputBaseProps & {
 
 export type AdjustableNumberInputProps = AdjustableNumberInputRequiredProps | AdjustableNumberInputOptionalProps;
 
+function widthFromDraft(draftText: string, fallback: number): number {
+  const parsed = Number(draftText);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 export function AdjustableNumberInput(props: AdjustableNumberInputProps): JSX.Element {
   const {
     min = 0,
@@ -70,6 +76,16 @@ export function AdjustableNumberInput(props: AdjustableNumberInputProps): JSX.El
   const isEmpty = optional && props.value === undefined;
   const clamped = isEmpty ? min : clamp(props.value ?? min, min, max);
 
+  const [isFocused, setIsFocused] = useState(false);
+  const [draftText, setDraftText] = useState(() => (isEmpty ? "" : String(clamped)));
+  const skipCommitOnBlurRef = useRef(false);
+
+  useEffect(() => {
+    if (!isFocused) {
+      setDraftText(isEmpty ? "" : String(clamped));
+    }
+  }, [clamped, isEmpty, isFocused]);
+
   const emitChange = (next: number | undefined): void => {
     if (optional) {
       (props as AdjustableNumberInputOptionalProps).onChange(next);
@@ -78,17 +94,65 @@ export function AdjustableNumberInput(props: AdjustableNumberInputProps): JSX.El
     }
   };
 
-  const handleInputChange = (event: ChangeEvent<HTMLInputElement>): void => {
-    const raw = event.target.value;
-    if (raw === "") {
-      emitChange(optional ? undefined : min);
+  const commitDraft = (): void => {
+    const result = parseAdjustableNumberBlur(draftText, { min, max, optional });
+    if (result.kind === "revert") return;
+    const next = result.value;
+    if (optional) {
+      if (next === props.value) return;
+      emitChange(next);
       return;
     }
-    const parsed = Number(raw);
-    emitChange(clamp(Number.isFinite(parsed) ? parsed : min, min, max));
+    if (next !== undefined && next !== (props as AdjustableNumberInputRequiredProps).value) {
+      emitChange(next);
+    }
+  };
+
+  const cancelDraft = (): void => {
+    setDraftText(isEmpty ? "" : String(clamped));
+  };
+
+  const handleInputChange = (event: ChangeEvent<HTMLInputElement>): void => {
+    setDraftText(event.target.value);
+  };
+
+  const handleFocus = (): void => {
+    setDraftText(isEmpty ? "" : String(clamped));
+    setIsFocused(true);
+  };
+
+  const handleBlur = (): void => {
+    setIsFocused(false);
+    if (!skipCommitOnBlurRef.current) {
+      commitDraft();
+    } else {
+      skipCommitOnBlurRef.current = false;
+    }
+    cancelDraft();
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {
+    if (event.key === "Enter") {
+      event.currentTarget.blur();
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      skipCommitOnBlurRef.current = true;
+      setIsFocused(false);
+      cancelDraft();
+      event.currentTarget.blur();
+    }
+  };
+
+  const clearFocus = (): void => {
+    if (!isFocused) return;
+    setIsFocused(false);
+    cancelDraft();
   };
 
   const stepUp = (): void => {
+    clearFocus();
     if (isEmpty) {
       emitChange(clamp(Math.max(min, 0), min, max));
       return;
@@ -97,6 +161,7 @@ export function AdjustableNumberInput(props: AdjustableNumberInputProps): JSX.El
   };
 
   const stepDown = (): void => {
+    clearFocus();
     if (optional && (isEmpty || clamped <= min)) {
       emitChange(undefined);
       return;
@@ -114,23 +179,27 @@ export function AdjustableNumberInput(props: AdjustableNumberInputProps): JSX.El
     .filter(Boolean)
     .join(" ");
 
-  const widthValues = isEmpty ? [max] : [clamped, max];
+  const displayText = isFocused ? draftText : isEmpty ? "" : String(clamped);
+  const widthValue = isFocused ? widthFromDraft(draftText, clamped) : clamped;
+  const widthValues = isEmpty ? [max] : [widthValue, max];
 
   const inputWidthStyle = fill
     ? inputStyle
     : {
-        width: adjustableNumberWidthCh(...(hasCompanionMax ? [clamped] : widthValues)),
+        width: adjustableNumberWidthCh(...(hasCompanionMax ? [widthValue] : widthValues)),
         ...inputStyle
       };
 
   const valueInput = (
     <input
       id={id}
-      type="number"
-      min={min}
-      max={max}
-      value={isEmpty ? "" : clamped}
+      type="text"
+      inputMode="numeric"
+      value={displayText}
       onChange={handleInputChange}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      onKeyDown={handleKeyDown}
       aria-label={
         hasCompanionMax && !isEmpty ? `${ariaLabel}, ${clamped} of ${companionMax}` : ariaLabel
       }

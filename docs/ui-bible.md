@@ -86,6 +86,7 @@ State visuals should be consistent across buttons, fields, toggles, and list row
 - Keep label placement and helper/error text behavior consistent.
 - Required/optional semantics should be presented uniformly.
 - Validation messaging should be specific and adjacent to the affected field.
+- **Bounded numeric fields** (`AdjustableNumberInput`): allow free typing while focused; validate on blur (or Enter). If the value is out of range or not a number, revert to the last committed value instead of clamping on every keystroke.
 
 ### Cards, Panels, and Sections
 
