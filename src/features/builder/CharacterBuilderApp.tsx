@@ -1941,7 +1941,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         >
         <div style={ui.blockContent}>
         {activeTab === "race" && (
-          <div>
+          <>
             <h3 style={sectionTitleStyle}>Race</h3>
             <select
               value={build.raceId || ""}
@@ -2264,7 +2264,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 )}
               </div>
             )}
-          </div>
+          </>
         )}
 
         {activeTab === "class" && (
