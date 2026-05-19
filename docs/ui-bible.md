@@ -130,7 +130,7 @@ State visuals should be consistent across buttons, fields, toggles, and list row
 
 - Builder: `ui.mainColumn` is the sole main-tab panel shell; use `blockInset` for subsections inside a tab (do not nest a second bordered `blockContent` wrapper).
 - Builder sidebar: `sidebarPanel` + `LiveSheetCollapsibleSection` body border — one border per section.
-- Character sheet overview: tab `panelStyle` + per-block bordered boxes + `OverviewCollapsibleSection` panel — flatten where possible.
+- Character sheet overview: one `panelStyle` tab shell; character identity uses `OverviewReadonlyField` inside a single `section` (not nested bordered boxes per field); overview rows are direct grid children (no `character-sheet-overview-rows` wrapper); collapsible body spacing via `.character-sheet-overview-collapsible > :not(summary)` in CSS.
 - Power display: sheet, builder, and monster editor share similar deep card trees — extract shared card markup when changing any of them.
 
 #### Collapsible disclosure (expand / collapse)

@@ -160,9 +160,53 @@ const overviewCollapsibleSummaryStyle: CSSProperties = {
   color: "var(--text-primary)"
 };
 
-const overviewCollapsibleBodyStyle: CSSProperties = {
-  marginTop: "0.25rem"
+const characterOverviewPanelStyle: CSSProperties = {
+  border: "1px solid var(--panel-border)",
+  borderRadius: "0.4rem",
+  padding: "0.55rem",
+  backgroundColor: "var(--surface-0)",
+  display: "grid",
+  gap: "0.35rem",
+  boxShadow: "inset 0 0 0 1px var(--surface-2)",
+  minWidth: 0
 };
+
+const characterOverviewFieldsGridStyle: CSSProperties = {
+  display: "grid",
+  gap: "0.35rem",
+  gridTemplateColumns: "repeat(12, minmax(0, 1fr))"
+};
+
+type OverviewReadonlyFieldProps = {
+  label: ReactNode;
+  gridColumn: string;
+  children: ReactNode;
+  valueStyle?: CSSProperties;
+  onValueMouseEnter?: (event: ReactMouseEvent<HTMLDivElement>) => void;
+  onValueMouseLeave?: () => void;
+};
+
+function OverviewReadonlyField({
+  label,
+  gridColumn,
+  children,
+  valueStyle,
+  onValueMouseEnter,
+  onValueMouseLeave
+}: OverviewReadonlyFieldProps): JSX.Element {
+  return (
+    <div style={{ ...labelStyle, gridColumn, gap: "0.12rem" }}>
+      {label}
+      <div
+        onMouseEnter={onValueMouseEnter}
+        onMouseLeave={onValueMouseLeave}
+        style={{ ...characterOverviewFieldValueStyle, ...valueStyle }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
 
 type OverviewCollapsibleSectionProps = {
   title: string;
@@ -187,12 +231,12 @@ function traitsEmptyMessage(selectionName: string | undefined, fallback: string)
 }
 
 function TraitRowsList({ rows, emptyMessage }: { rows: TraitDisplayRow[]; emptyMessage: string }): JSX.Element {
+  if (rows.length === 0) {
+    return <div style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>{emptyMessage}</div>;
+  }
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: "0.18rem" }}>
-      {rows.length === 0 ? (
-        <div style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>{emptyMessage}</div>
-      ) : (
-        rows.map((trait, idx) => (
+    <div style={{ display: "flex", flexDirection: "column", gap: "0.18rem" }}>
+      {rows.map((trait, idx) => (
           <div
             key={trait.id}
             style={{
@@ -220,8 +264,7 @@ function TraitRowsList({ rows, emptyMessage }: { rows: TraitDisplayRow[]; emptyM
               </div>
             )}
           </div>
-        ))
-      )}
+        ))}
     </div>
   );
 }
@@ -243,7 +286,6 @@ function OverviewCollapsibleSection({
       open={defaultOpen}
       style={{ ...overviewCollapsiblePanelStyle, ...shellStyle }}
       summaryStyle={overviewCollapsibleSummaryStyle}
-      bodyStyle={overviewCollapsibleBodyStyle}
       summary={title}
       summaryTabIndex={titleTabIndex}
       onSummaryMouseEnter={onTitleMouseEnter}
@@ -2251,82 +2293,87 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               Refresh Saved List
             </button>
           </div>
-          <div className="character-sheet-overview-rows" style={{ gridColumn: "1 / -1", minWidth: 0, width: "100%" }}>
-            <div className="character-sheet-overview-row" style={overviewThreeColumnGridStyle}>
+          <div className="character-sheet-overview-row" style={{ ...overviewThreeColumnGridStyle, gridColumn: "1 / -1" }}>
             <div style={overviewSideColumnStyle}>
-              <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.4rem", padding: "0.55rem", backgroundColor: "var(--surface-0)", display: "grid", gap: "0.35rem", boxShadow: "inset 0 0 0 1px var(--surface-2)" }}>
-                <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700 }}>
+              <section style={characterOverviewPanelStyle}>
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: "0.72rem",
+                    color: "var(--text-muted)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    fontWeight: 700
+                  }}
+                >
                   Character
-                </div>
-                <div style={{ display: "grid", gap: "0.35rem", gridTemplateColumns: "repeat(12, minmax(0, 1fr))" }}>
-                  <div style={{ ...labelStyle, gridColumn: "span 8", gap: "0.12rem" }}>
-                    Name
-                    <div style={{ border: "1px solid var(--panel-border)", backgroundColor: "var(--surface-0)", borderRadius: "0.32rem", padding: "0.24rem 0.45rem", lineHeight: 1.2, fontWeight: 700, color: "var(--text-primary)" }}>
-                      {sheet.name || "-"}
-                    </div>
-                  </div>
-                  <div style={{ ...labelStyle, gridColumn: "span 4", gap: "0.12rem" }}>
-                    Race
-                    <div
-                      onMouseEnter={startRaceHoverInfoTimer}
-                      onMouseLeave={stopRaceHoverInfoTimerAndHide}
-                      style={{ border: "1px solid var(--panel-border)", backgroundColor: "var(--surface-0)", borderRadius: "0.32rem", padding: "0.24rem 0.45rem", lineHeight: 1.2 }}
-                    >
-                      {derived.race?.name || "-"}
-                    </div>
-                  </div>
-                  <div style={{ ...labelStyle, gridColumn: "span 9", gap: "0.12rem" }}>
-                    Class
-                    <div
-                      onMouseEnter={startClassHoverInfoTimer}
-                      onMouseLeave={stopClassHoverInfoTimerAndHide}
-                      style={{ border: "1px solid var(--panel-border)", backgroundColor: "var(--surface-0)", borderRadius: "0.32rem", padding: "0.24rem 0.45rem", lineHeight: 1.2 }}
-                    >
-                      {derived.cls?.name || "-"}
-                    </div>
-                  </div>
-                  <div style={{ ...labelStyle, gridColumn: "span 3", gap: "0.12rem" }}>
-                    <span
-                      tabIndex={0}
-                      onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "level")}
-                      onMouseLeave={glossaryTooltipUi.leaveHover}
-                      onFocus={(event) => glossaryTooltipUi.startHover(event, "level")}
-                      onBlur={glossaryTooltipUi.leaveHover}
-                    >
-                      Level
-                    </span>
-                    <div
-                      style={{ border: "1px solid var(--panel-border)", backgroundColor: "var(--surface-0)", borderRadius: "0.32rem", padding: "0.24rem 0.45rem", lineHeight: 1.2, textAlign: "left", fontWeight: 800, color: "var(--text-primary)" }}
-                    >
-                      {sheet.level}
-                    </div>
-                  </div>
+                </h3>
+                <div style={characterOverviewFieldsGridStyle}>
+                  <OverviewReadonlyField label="Name" gridColumn="span 8" valueStyle={{ fontWeight: 700, color: "var(--text-primary)" }}>
+                    {sheet.name || "-"}
+                  </OverviewReadonlyField>
+                  <OverviewReadonlyField
+                    label="Race"
+                    gridColumn="span 4"
+                    onValueMouseEnter={startRaceHoverInfoTimer}
+                    onValueMouseLeave={stopRaceHoverInfoTimerAndHide}
+                  >
+                    {derived.race?.name || "-"}
+                  </OverviewReadonlyField>
+                  <OverviewReadonlyField
+                    label="Class"
+                    gridColumn="span 9"
+                    onValueMouseEnter={startClassHoverInfoTimer}
+                    onValueMouseLeave={stopClassHoverInfoTimerAndHide}
+                  >
+                    {derived.cls?.name || "-"}
+                  </OverviewReadonlyField>
+                  <OverviewReadonlyField
+                    label={
+                      <span
+                        tabIndex={0}
+                        onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "level")}
+                        onMouseLeave={glossaryTooltipUi.leaveHover}
+                        onFocus={(event) => glossaryTooltipUi.startHover(event, "level")}
+                        onBlur={glossaryTooltipUi.leaveHover}
+                      >
+                        Level
+                      </span>
+                    }
+                    gridColumn="span 3"
+                    valueStyle={{ fontWeight: 800, color: "var(--text-primary)" }}
+                  >
+                    {sheet.level}
+                  </OverviewReadonlyField>
                   {sheet.themeId && (
-                    <div style={{ ...labelStyle, gridColumn: "span 12", gap: "0.12rem" }}>
-                      Theme
-                      <div style={{ ...characterOverviewFieldValueStyle, fontWeight: 600, color: "var(--text-primary)" }}>
-                        {selectedTheme?.name ?? sheet.themeId}
-                      </div>
-                    </div>
+                    <OverviewReadonlyField
+                      label="Theme"
+                      gridColumn="span 12"
+                      valueStyle={{ fontWeight: 600, color: "var(--text-primary)" }}
+                    >
+                      {selectedTheme?.name ?? sheet.themeId}
+                    </OverviewReadonlyField>
                   )}
                   {sheet.paragonPathId && (
-                    <div style={{ ...labelStyle, gridColumn: "span 12", gap: "0.12rem" }}>
-                      Paragon path
-                      <div style={{ ...characterOverviewFieldValueStyle, fontWeight: 600, color: "var(--text-primary)" }}>
-                        {selectedParagonPath?.name ?? sheet.paragonPathId}
-                      </div>
-                    </div>
+                    <OverviewReadonlyField
+                      label="Paragon path"
+                      gridColumn="span 12"
+                      valueStyle={{ fontWeight: 600, color: "var(--text-primary)" }}
+                    >
+                      {selectedParagonPath?.name ?? sheet.paragonPathId}
+                    </OverviewReadonlyField>
                   )}
                   {sheet.epicDestinyId && (
-                    <div style={{ ...labelStyle, gridColumn: "span 12", gap: "0.12rem" }}>
-                      Epic destiny
-                      <div style={{ ...characterOverviewFieldValueStyle, fontWeight: 600, color: "var(--text-primary)" }}>
-                        {selectedEpicDestiny?.name ?? sheet.epicDestinyId}
-                      </div>
-                    </div>
+                    <OverviewReadonlyField
+                      label="Epic destiny"
+                      gridColumn="span 12"
+                      valueStyle={{ fontWeight: 600, color: "var(--text-primary)" }}
+                    >
+                      {selectedEpicDestiny?.name ?? sheet.epicDestinyId}
+                    </OverviewReadonlyField>
                   )}
                 </div>
-              </div>
+              </section>
               <OverviewCollapsibleSection
                 title="Ability Scores"
                 titleTabIndex={0}
@@ -2375,45 +2422,14 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             </div>
             <div style={overviewCenterColumnStyle}>
               <OverviewCollapsibleSection title={racialTraitsSectionTitle}>
-                <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: "0.18rem" }}>
-                  {!derived.race ? (
-                    <div style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>No race selected.</div>
-                  ) : racialTraitRows.length === 0 ? (
-                    <div style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
-                      {traitsEmptyMessage(derived.race?.name, "No racial traits listed.")}
-                    </div>
-                  ) : (
-                    racialTraitRows.map(({ trait }, idx) => (
-                      <div
-                        key={trait.id}
-                        style={{
-                          fontSize: "0.8rem",
-                          lineHeight: 1.2,
-                          padding: "0.24rem 0.35rem",
-                          borderRadius: "0.25rem",
-                          backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)",
-                          color: "var(--text-primary)"
-                        }}
-                      >
-                        <div style={{ fontWeight: 700 }}>{trait.name}</div>
-                        {typeof trait.shortDescription === "string" && trait.shortDescription.trim() && (
-                          <div
-                            style={{
-                              marginTop: "0.14rem",
-                              color: "var(--text-secondary)",
-                              fontSize: "0.76rem",
-                              textTransform: "none",
-                              letterSpacing: "normal",
-                              fontWeight: 500
-                            }}
-                          >
-                            {trait.shortDescription}
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  )}
-                </div>
+                <TraitRowsList
+                  rows={racialTraitRows.map(({ trait }) => trait)}
+                  emptyMessage={
+                    !derived.race
+                      ? "No race selected."
+                      : traitsEmptyMessage(derived.race?.name, "No racial traits listed.")
+                  }
+                />
               </OverviewCollapsibleSection>
               {showClassTraits && (
                 <OverviewCollapsibleSection title={classTraitsSectionTitle}>
@@ -2455,41 +2471,14 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 </OverviewCollapsibleSection>
               )}
               <OverviewCollapsibleSection title="Feats">
-                <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: "0.18rem" }}>
-                  {selectedFeatRows.length === 0 ? (
-                    <div style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>No feats selected.</div>
-                  ) : (
-                    selectedFeatRows.map((feat, idx) => (
-                      <div
-                        key={feat.id}
-                        style={{
-                          fontSize: "0.8rem",
-                          lineHeight: 1.2,
-                          padding: "0.24rem 0.35rem",
-                          borderRadius: "0.25rem",
-                          backgroundColor: idx % 2 === 0 ? "var(--table-stripe-even)" : "var(--table-stripe-odd)",
-                          color: "var(--text-primary)"
-                        }}
-                      >
-                        <div style={{ fontWeight: 700 }}>{feat.name}</div>
-                        {typeof feat.shortDescription === "string" && feat.shortDescription.trim() && (
-                          <div
-                            style={{
-                              marginTop: "0.14rem",
-                              color: "var(--text-secondary)",
-                              fontSize: "0.76rem",
-                              textTransform: "none",
-                              letterSpacing: "normal",
-                              fontWeight: 500
-                            }}
-                          >
-                            {feat.shortDescription}
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  )}
-                </div>
+                <TraitRowsList
+                  rows={selectedFeatRows.map((feat) => ({
+                    id: feat.id,
+                    name: feat.name,
+                    shortDescription: feat.shortDescription
+                  }))}
+                  emptyMessage="No feats selected."
+                />
               </OverviewCollapsibleSection>
               {featGrantedTraitRows.length > 0 && (
                 <OverviewCollapsibleSection title="Granted by feats">
@@ -2498,7 +2487,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               )}
               {featGrantedPowerRows.length > 0 && (
                 <OverviewCollapsibleSection title="Feat powers">
-                  <div style={{ display: "grid", gap: "0.35rem" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
                     {featGrantedPowerRows.map(({ feat, powers }) => (
                       <div key={feat.id} style={{ fontSize: "0.8rem" }}>
                         <div style={{ fontWeight: 700, marginBottom: "0.12rem" }}>{feat.name}</div>
@@ -2533,13 +2522,14 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               )}
             </div>
             </div>
-            <div className="character-sheet-overview-row character-sheet-overview-row--page-break" style={overviewThreeColumnGridStyle}>
+            <div
+              className="character-sheet-overview-row character-sheet-overview-row--page-break"
+              style={{ ...overviewThreeColumnGridStyle, gridColumn: "1 / -1" }}
+            >
             <div style={overviewSideColumnStyle}>
-              <div style={{ display: "grid", gap: "0.45rem", alignContent: "start" }}>
                 {renderDefensesPanel()}
                 {renderSpeedInitiativePanel()}
                 {renderAttackPreviewPanel()}
-              </div>
             </div>
             <div style={overviewCenterColumnStyle}>
               {renderHitPointsPanel()}
@@ -2548,7 +2538,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               {renderConditionsPanel()}
             </div>
             </div>
-          </div>
           <div style={{ ...panelStyle, gridColumn: "1 / -1", display: "flex", flexWrap: "wrap", gap: "0.4rem", alignItems: "center" }}>
             <span style={{ fontSize: "0.78rem", fontWeight: 700, letterSpacing: "0.03em", textTransform: "uppercase", color: "var(--text-secondary)" }}>
               Group powers by

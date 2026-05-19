@@ -474,15 +474,12 @@ textarea:hover {
 }
 
 /* Character sheet overview: two 3-column rows; row 2 starts a new page when printing */
-.character-sheet-overview-rows {
-  display: grid;
-  gap: 0.5rem;
-  min-width: 0;
-  width: 100%;
-}
-
 .character-sheet-overview-row {
   min-width: 0;
+}
+
+.character-sheet-overview-collapsible > :not(summary) {
+  margin-top: 0.25rem;
 }
 
 .character-sheet-overview-row--page-break {
