@@ -526,27 +526,36 @@ export function canSelectInventoryItemForEquipSlot(
   return { allowed: true };
 }
 
-/** Inventory rows eligible for a gear-slot dropdown (includes currently equipped). */
+function slotHasConfiguredEquipment(
+  slot: EquippedSlotKey,
+  characterEquipment: CharacterEquipment,
+  index: RulesIndex
+): boolean {
+  const normalized = normalizeCharacterEquipment(characterEquipment);
+  if (configInventoryItemForSlot(index, slot, normalized)) return true;
+  if (slot === "offHand" && configInventoryItemForSlot(index, "shield", normalized)) return true;
+  return false;
+}
+
+/** Inventory rows eligible for a gear-slot dropdown (inventory only; not equipment-tab config). */
 export function equipSlotDropdownChoices(
   inventory: InventoryItem[],
   equippedSlots: Partial<Record<EquippedSlotKey, string>>,
   slot: EquippedSlotKey,
   index: RulesIndex,
-  characterEquipment?: CharacterEquipment
+  _characterEquipment?: CharacterEquipment
 ): EquipSlotDropdownChoice[] {
-  const merged = inventoryForEquipUi(inventory, characterEquipment, index);
-  const currentId = selectedEquipSlotItemId(slot, inventory, equippedSlots, characterEquipment, index);
+  const currentId = selectedEquipSlotItemId(slot, inventory, equippedSlots);
   const choices: EquipSlotDropdownChoice[] = [];
-  for (const item of merged) {
+  for (const item of inventory) {
     if (!itemFitsEquipSlot(item, slot, index)) continue;
-    const check = canSelectInventoryItemForEquipSlot(item, slot, merged, equippedSlots, index);
+    const check = canSelectInventoryItemForEquipSlot(item, slot, inventory, equippedSlots, index);
     if (!check.allowed && item.id !== currentId) continue;
-    const fromConfig = isConfigEquipInventoryId(item.id);
     choices.push({
       itemId: item.id,
-      label: fromConfig ? `${item.name} (configured)` : item.name,
+      label: item.name,
       disabled: item.id !== currentId && !check.allowed,
-      hint: fromConfig ? "Add to inventory when equipped" : check.hint
+      hint: check.hint
     });
   }
   return choices.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
@@ -560,10 +569,13 @@ export function equipSlotShouldDisplay(
   index: RulesIndex,
   characterEquipment?: CharacterEquipment
 ): boolean {
-  if (selectedEquipSlotItemId(slot, inventory, equippedSlots, characterEquipment, index)) {
+  if (selectedEquipSlotItemId(slot, inventory, equippedSlots)) {
     return true;
   }
-  return equipSlotDropdownChoices(inventory, equippedSlots, slot, index, characterEquipment).length > 0;
+  if (characterEquipment && slotHasConfiguredEquipment(slot, characterEquipment, index)) {
+    return true;
+  }
+  return equipSlotDropdownChoices(inventory, equippedSlots, slot, index).length > 0;
 }
 
 export function equippedSlotWieldHint(
@@ -574,10 +586,9 @@ export function equippedSlotWieldHint(
   characterEquipment?: CharacterEquipment
 ): string | undefined {
   if (slot !== "mainHand" && slot !== "offHand") return undefined;
-  const itemId = selectedEquipSlotItemId(slot, inventory, equippedSlots, characterEquipment, index);
+  const itemId = selectedEquipSlotItemId(slot, inventory, equippedSlots);
   if (!itemId) return undefined;
-  const merged = inventoryForEquipUi(inventory, characterEquipment, index);
-  const item = merged.find((entry) => entry.id === itemId);
+  const item = inventory.find((entry) => entry.id === itemId);
   if (!item) return undefined;
   const weapon = resolveWeaponFromInventoryItem(item, index);
   if (!weapon) return undefined;

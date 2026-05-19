@@ -2941,10 +2941,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               index={index}
               onEquipItem={equipInventoryItem}
               onUnequipItem={unequipInventoryItem}
-              onEquipFromConfig={(slot) => {
-                const priceSlot: EquipmentPriceSlot = slot === "mainHand" ? "weapon" : (slot as EquipmentPriceSlot);
-                updateSheet((prev) => addAcquiredEquipmentToSheet(prev, index, priceSlot));
-              }}
             />
           </div>
           <div style={panelStyle}>

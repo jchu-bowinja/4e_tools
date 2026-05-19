@@ -18,6 +18,7 @@ import {
   describeWeapon
 } from "../../rules/equipmentDescriptions";
 import { findMagicItem } from "../../rules/magicItemEquipment";
+import { ArmorCategoryBasePicker } from "./ArmorCategoryBasePicker";
 import { EquipmentSelectionDetails } from "./EquipmentSelectionDetails";
 import {
   enchantmentFamilyKeyFromId,
@@ -476,6 +477,8 @@ interface StandardSlotSectionProps {
   showAddToInventory: boolean;
   onAddToInventory?: () => void;
   onBuy?: () => void;
+  /** Two-step type → material picker for armor (default true when baseKind is armor). */
+  armorCategoryPicker?: boolean;
 }
 
 function StandardSlotSection(props: StandardSlotSectionProps): JSX.Element {
@@ -504,7 +507,8 @@ function StandardSlotSection(props: StandardSlotSectionProps): JSX.Element {
     gold,
     showAddToInventory,
     onAddToInventory,
-    onBuy
+    onBuy,
+    armorCategoryPicker = baseKind === "armor"
   } = props;
 
   const price = equipmentSlotGoldCost(props.index, priceSlot, equipment);
@@ -535,33 +539,46 @@ function StandardSlotSection(props: StandardSlotSectionProps): JSX.Element {
     [enchantmentFamilies, enchantmentSearch, selectedFamilyKey]
   );
 
+  const enchantmentStepLabel = armorCategoryPicker ? "3. Enchantment" : "2. Enchantment";
+
   return (
     <div style={slotSectionStyle}>
       <h4 style={slotTitleStyle}>{title}</h4>
-      <label style={fieldLabelStyle}>
-        1. {baseLabel}
-        <EquipmentPickerRow
-          filterValue={baseSearch}
-          onFilterChange={onBaseSearchChange}
-          filterPlaceholder={basePlaceholder}
-          filterAriaLabel={`Filter ${baseLabel.toLowerCase()}`}
-        >
-          <select
-            value={baseValue || ""}
-            onChange={(e) => onBaseChange(e.target.value || undefined)}
-            style={selectInlineStyle}
+      {armorCategoryPicker ? (
+        <ArmorCategoryBasePicker
+          armors={baseOptions as Armor[]}
+          value={baseValue}
+          onChange={onBaseChange}
+          typeLabel={`1. ${baseLabel} type`}
+          materialLabel={`2. ${baseLabel}`}
+          formatMaterialOption={(a) => formatBaseOption(a)}
+        />
+      ) : (
+        <label style={fieldLabelStyle}>
+          1. {baseLabel}
+          <EquipmentPickerRow
+            filterValue={baseSearch}
+            onFilterChange={onBaseSearchChange}
+            filterPlaceholder={basePlaceholder}
+            filterAriaLabel={`Filter ${baseLabel.toLowerCase()}`}
           >
-            <option value="">None</option>
-            {filteredBase.map((item) => (
-              <option key={item.id} value={item.id}>
-                {formatBaseOption(item)}
-              </option>
-            ))}
-          </select>
-        </EquipmentPickerRow>
-      </label>
+            <select
+              value={baseValue || ""}
+              onChange={(e) => onBaseChange(e.target.value || undefined)}
+              style={selectInlineStyle}
+            >
+              <option value="">None</option>
+              {filteredBase.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {formatBaseOption(item)}
+                </option>
+              ))}
+            </select>
+          </EquipmentPickerRow>
+        </label>
+      )}
       <label style={fieldLabelStyle}>
-        2. Enchantment
+        {enchantmentStepLabel}
         <EquipmentPickerRow
           filterValue={enchantmentSearch}
           onFilterChange={onEnchantmentSearchChange}
@@ -712,7 +729,6 @@ export function EquipmentTab({
   );
   const magicImplementFamilies = useMemo(() => magicImplementEnchantmentFamilies(index), [index]);
 
-  const [armorBaseSearch, setArmorBaseSearch] = useState("");
   const [shieldBaseSearch, setShieldBaseSearch] = useState("");
   const [weaponBaseSearch, setWeaponBaseSearch] = useState("");
   const [implementBaseSearch, setImplementBaseSearch] = useState("");
@@ -838,9 +854,10 @@ export function EquipmentTab({
           baseValue={equipment.armor?.baseId}
           enchantmentId={equipment.armor?.enchantmentId}
           onBaseChange={(id) => patchStandard("armor", (b) => setStandardSlotBase(b, "armor", id))}
-          baseSearch={armorBaseSearch}
-          onBaseSearchChange={setArmorBaseSearch}
-          basePlaceholder="Name, category…"
+          baseSearch=""
+          onBaseSearchChange={() => {}}
+          basePlaceholder="Name…"
+          armorCategoryPicker
           formatBaseOption={(a) => `${(a as Armor).name} (+${(a as Armor).armorBonus || 0} AC)`}
           enchantmentFamilies={magicArmorFamilies}
           selectedFamilyKey={enchantmentFamilyKeyFromId(index, equipment.armor?.enchantmentId)}
@@ -869,7 +886,8 @@ export function EquipmentTab({
           onBaseChange={(id) => patchStandard("shield", (b) => setStandardSlotBase(b, "shield", id))}
           baseSearch={shieldBaseSearch}
           onBaseSearchChange={setShieldBaseSearch}
-          basePlaceholder="Name"
+          basePlaceholder="Name…"
+          armorCategoryPicker={false}
           formatBaseOption={(a) => `${(a as Armor).name} (+${(a as Armor).armorBonus || 0} AC)`}
           enchantmentFamilies={magicShieldFamilies}
           selectedFamilyKey={enchantmentFamilyKeyFromId(index, equipment.shield?.enchantmentId)}

@@ -4257,11 +4257,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 index={index}
                 onEquipItem={(itemId, slot) => updateBuild(equipInventoryItemOnBuild(build, itemId, slot, index))}
                 onUnequipItem={(itemId, slot) => updateBuild(unequipInventoryItemOnBuild(build, itemId, slot, index))}
-                onEquipFromConfig={(slot) => {
-                  const priceSlot: EquipmentPriceSlot =
-                    slot === "mainHand" ? "weapon" : (slot as EquipmentPriceSlot);
-                  updateBuild(addAcquiredEquipmentToBuild(build, index, priceSlot));
-                }}
               />
             </div>
             <div style={ui.equipmentSubPanel}>
@@ -4826,11 +4821,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               index={index}
               onEquipItem={(itemId, slot) => updateBuild(equipInventoryItemOnBuild(build, itemId, slot, index))}
               onUnequipItem={(itemId, slot) => updateBuild(unequipInventoryItemOnBuild(build, itemId, slot))}
-              onEquipFromConfig={(slot) => {
-                const priceSlot: EquipmentPriceSlot =
-                  slot === "mainHand" ? "weapon" : (slot as EquipmentPriceSlot);
-                updateBuild(addAcquiredEquipmentToBuild(build, index, priceSlot));
-              }}
             />
           </LiveSheetCollapsibleSection>
 

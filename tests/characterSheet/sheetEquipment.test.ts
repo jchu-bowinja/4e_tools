@@ -464,7 +464,7 @@ describe("equipSlotShouldDisplay", () => {
 });
 
 describe("equipSlotDropdownChoices", () => {
-  it("includes configured equipment-tab items not yet in inventory", () => {
+  it("does not include configured equipment-tab items until they are in inventory", () => {
     const build: CharacterBuild = {
       name: "Hero",
       level: 1,
@@ -474,30 +474,13 @@ describe("equipSlotDropdownChoices", () => {
       powerIds: [],
       equipment: {
         armor: { baseId: plate.id, enhancement: 0 },
-        neck: { enhancement: 0 }
-      }
-    };
-    const choices = equipSlotDropdownChoices([], {}, "armor", index, build.equipment);
-    expect(choices).toHaveLength(1);
-    expect(choices[0]?.label).toContain("Plate Armor");
-    expect(choices[0]?.label).toContain("(configured)");
-  });
-
-  it("includes magic-only configured slots in equipped dropdown choices", () => {
-    const build: CharacterBuild = {
-      name: "Hero",
-      level: 1,
-      abilityScores: { STR: 10, CON: 10, DEX: 10, INT: 10, WIS: 10, CHA: 10 },
-      trainedSkillIds: [],
-      featIds: [],
-      powerIds: [],
-      equipment: {
         neck: { enchantmentId: cloak.id, enhancement: 1 }
       }
     };
-    const choices = equipSlotDropdownChoices([], {}, "neck", index, build.equipment);
-    expect(choices).toHaveLength(1);
-    expect(choices[0]?.label).toContain("Cloak");
+    expect(equipSlotDropdownChoices([], {}, "armor", index, build.equipment)).toHaveLength(0);
+    expect(equipSlotDropdownChoices([], {}, "neck", index, build.equipment)).toHaveLength(0);
+    expect(equipSlotShouldDisplay([], {}, "armor", index, build.equipment)).toBe(true);
+    expect(equipSlotShouldDisplay([], {}, "neck", index, build.equipment)).toBe(true);
   });
 
   it("lists inventory items that fit each gear slot", () => {

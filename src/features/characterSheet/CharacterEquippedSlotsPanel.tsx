@@ -6,13 +6,9 @@ import { normalizeEquippedSlots } from "../../rules/weaponWielding";
 import {
   EQUIPPED_SLOT_LABELS,
   EQUIPPED_SLOT_ORDER,
-  configInventoryItemForSlot,
   equipSlotDropdownChoices,
-  equipSlotFromConfigInventoryId,
   equipSlotShouldDisplay,
   equippedSlotWieldHint,
-  inventoryForEquipUi,
-  isConfigEquipInventoryId,
   selectedEquipSlotItemId,
   type EquipSlotDropdownChoice
 } from "./sheetEquipment";
@@ -22,10 +18,6 @@ const gridStyle: CSSProperties = {
   gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
   gap: "0.55rem 0.75rem",
   alignItems: "start"
-};
-
-const fullWidthStyle: CSSProperties = {
-  gridColumn: "1 / -1"
 };
 
 const rowStyle: CSSProperties = {
@@ -72,8 +64,6 @@ export interface CharacterEquippedSlotsPanelProps {
   characterEquipment?: CharacterEquipment;
   onEquipItem?: (itemId: string, slot: EquippedSlotKey) => void;
   onUnequipItem?: (itemId: string, slot: EquippedSlotKey) => void;
-  /** Acquire configured slot gear to inventory and equip (when selecting a config-only row). */
-  onEquipFromConfig?: (slot: EquippedSlotKey) => void;
 }
 
 export function CharacterEquippedSlotsPanel({
@@ -82,17 +72,11 @@ export function CharacterEquippedSlotsPanel({
   index,
   characterEquipment,
   onEquipItem,
-  onUnequipItem,
-  onEquipFromConfig
+  onUnequipItem
 }: CharacterEquippedSlotsPanelProps): JSX.Element {
   const normalizedEquipment = useMemo(
     () => (characterEquipment ? normalizeCharacterEquipment(characterEquipment) : undefined),
     [characterEquipment]
-  );
-
-  const mergedInventory = useMemo(
-    () => inventoryForEquipUi(inventory, normalizedEquipment, index),
-    [inventory, normalizedEquipment, index]
   );
 
   const visibleSlots = useMemo(
@@ -106,18 +90,13 @@ export function CharacterEquippedSlotsPanel({
   const choicesBySlot = useMemo(() => {
     const map = new Map<EquippedSlotKey, EquipSlotDropdownChoice[]>();
     for (const slot of visibleSlots) {
-      map.set(slot, equipSlotDropdownChoices(inventory, equippedSlots, slot, index, normalizedEquipment));
+      map.set(slot, equipSlotDropdownChoices(inventory, equippedSlots, slot, index));
     }
     return map;
-  }, [inventory, equippedSlots, index, normalizedEquipment, visibleSlots]);
+  }, [inventory, equippedSlots, index, visibleSlots]);
 
-  const canChange = Boolean(onEquipItem || onUnequipItem || onEquipFromConfig);
+  const canChange = Boolean(onEquipItem || onUnequipItem);
   const hasAnyEquipped = Object.values(equippedSlots).some(Boolean);
-  const hasConfig = Boolean(
-    normalizedEquipment &&
-      visibleSlots.some((slot) => configInventoryItemForSlot(index, slot, normalizedEquipment))
-  );
-  const hasInventoryOptions = mergedInventory.some((item) => !isConfigEquipInventoryId(item.id));
 
   if (!canChange && !hasAnyEquipped && visibleSlots.length === 0) {
     return (
@@ -129,30 +108,18 @@ export function CharacterEquippedSlotsPanel({
 
   return (
     <div style={gridStyle}>
-      {hasConfig && !hasInventoryOptions && (
-        <p style={{ ...emptyStyle, ...fullWidthStyle }}>
-          Items marked “(configured)” come from the Equipment tab. Choosing one adds it to inventory and equips it.
-        </p>
-      )}
       {visibleSlots.map((slot) => (
         <EquippedSlotRow
           key={slot}
           slot={slot}
           inventory={inventory}
           equippedSlots={equippedSlots}
-          normalizedEquipment={normalizedEquipment}
           index={index}
           choices={choicesBySlot.get(slot) ?? []}
           wieldHint={equippedSlotWieldHint(inventory, equippedSlots, slot, index, normalizedEquipment)}
           canChange={canChange}
           onChange={(nextItemId) => {
-            const currentId = selectedEquipSlotItemId(
-              slot,
-              inventory,
-              equippedSlots,
-              normalizedEquipment,
-              index
-            );
+            const currentId = selectedEquipSlotItemId(slot, inventory, equippedSlots);
             if (currentId === nextItemId) return;
 
             if (!nextItemId) {
@@ -160,12 +127,6 @@ export function CharacterEquippedSlotsPanel({
               if (equippedId && onUnequipItem) {
                 onUnequipItem(equippedId, slot);
               }
-              return;
-            }
-
-            if (isConfigEquipInventoryId(nextItemId)) {
-              const configSlot = equipSlotFromConfigInventoryId(nextItemId);
-              if (configSlot) onEquipFromConfig?.(configSlot);
               return;
             }
 
@@ -181,7 +142,6 @@ function EquippedSlotRow({
   slot,
   inventory,
   equippedSlots,
-  normalizedEquipment,
   index,
   choices,
   wieldHint,
@@ -191,16 +151,14 @@ function EquippedSlotRow({
   slot: EquippedSlotKey;
   inventory: InventoryItem[];
   equippedSlots: Partial<Record<EquippedSlotKey, string>>;
-  normalizedEquipment?: CharacterEquipment;
   index: RulesIndex;
   choices: EquipSlotDropdownChoice[];
   wieldHint?: string;
   canChange: boolean;
   onChange: (itemId: string) => void;
 }): JSX.Element {
-  const selectedId = selectedEquipSlotItemId(slot, inventory, equippedSlots, normalizedEquipment, index);
-  const merged = inventoryForEquipUi(inventory, normalizedEquipment, index);
-  const selectedItem = selectedId ? merged.find((entry) => entry.id === selectedId) : undefined;
+  const selectedId = selectedEquipSlotItemId(slot, inventory, equippedSlots);
+  const selectedItem = selectedId ? inventory.find((entry) => entry.id === selectedId) : undefined;
   const selectedInChoices = selectedId ? choices.some((choice) => choice.itemId === selectedId) : true;
 
   return (
