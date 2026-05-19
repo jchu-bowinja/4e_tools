@@ -499,6 +499,22 @@ textarea:hover {
   list-style: none;
 }
 
+.feat-facet-multiselect {
+  position: relative;
+}
+
+.feat-facet-multiselect[open] {
+  z-index: 30;
+}
+
+.feat-facet-multiselect > summary::-webkit-details-marker {
+  display: none;
+}
+
+.feat-facet-multiselect > summary::marker {
+  content: "";
+}
+
 .template-json-collapsible > .template-json-collapsible-summary::-webkit-details-marker {
   display: none;
 }

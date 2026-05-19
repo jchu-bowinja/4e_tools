@@ -133,14 +133,21 @@ import { JsonCollapsiblePanel } from "../../ui/JsonCollapsiblePanel";
 import { resolveUiGlossaryHoverPlainText, termHasPowerKeywordTooltipBody } from "../../data/glossaryHoverResolve";
 import {
   ensureSelectedEntityInFiltered,
+  EMPTY_FEAT_SOURCE_FILTER,
   ensureSelectedFeatsInList,
+  FEAT_TIER_OPTIONS,
   filterFeatOptions,
-  FeatSortMode,
+  getFeatDisplayTags,
   getFeatFacetCategory,
   filterPowersByQuery,
   filterRulesEntitiesByQuery,
-  sortFeatOptions
+  sortFeatOptions,
+  type FeatSourceFilter,
+  type FeatTier
 } from "./featPowerFilters";
+import { FeatFacetMultiSelect } from "./FeatFacetMultiSelect";
+import { FeatSourceFilterDropdown } from "./FeatSourceFilterDropdown";
+import { FeatTagPill } from "./FeatTagPill";
 
 interface Props {
   index: RulesIndex;
@@ -1035,11 +1042,11 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   const prevAutoGrantedSkillIdsRef = useRef<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<BuilderTab>("race");
   const [featSearch, setFeatSearch] = useState("");
+  const [featFilterAllText, setFeatFilterAllText] = useState(false);
   const [showInvalidFeats, setShowInvalidFeats] = useState(false);
-  const [featTierFilter, setFeatTierFilter] = useState<"all" | "HEROIC" | "PARAGON" | "EPIC">("all");
-  const [featCategoryFilter, setFeatCategoryFilter] = useState<string>("all");
-  const [featSourceFilter, setFeatSourceFilter] = useState<string>("all");
-  const [featSortMode, setFeatSortMode] = useState<FeatSortMode>("tier-alpha");
+  const [featTierFilter, setFeatTierFilter] = useState<FeatTier[]>([]);
+  const [featCategoryFilter, setFeatCategoryFilter] = useState<string[]>([]);
+  const [featSourceFilter, setFeatSourceFilter] = useState<FeatSourceFilter>(EMPTY_FEAT_SOURCE_FILTER);
   const [powerSearch, setPowerSearch] = useState("");
   const [themeSearch, setThemeSearch] = useState("");
   const [paragonSearch, setParagonSearch] = useState("");
@@ -1409,13 +1416,16 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   const filteredFeatRows = useMemo(() => {
     const filtered = filterFeatOptions(displayedFeatOptions, {
       query: featSearch,
-      tier: featTierFilter,
-      category: featCategoryFilter,
+      filterAllText: featFilterAllText,
+      tiers: featTierFilter,
+      categories: featCategoryFilter,
       source: featSourceFilter
     });
-    const sorted = sortFeatOptions(filtered, featSortMode);
+    const sorted = sortFeatOptions(filtered, "tier-alpha");
+    // Text filter is inclusive-only; do not prepend selected feats that fail the query.
+    if (featSearch.trim()) return sorted;
     return ensureSelectedFeatsInList(sorted, build.featIds, featOptions);
-  }, [displayedFeatOptions, featSearch, featTierFilter, featCategoryFilter, featSourceFilter, featSortMode, build.featIds, featOptions]);
+  }, [displayedFeatOptions, featSearch, featFilterAllText, featTierFilter, featCategoryFilter, featSourceFilter, build.featIds, featOptions]);
   const featCategoryOptions = useMemo(() => {
     const values = new Set<string>();
     // Keep category filter usable even if metadata is stale/cached in a running session.
@@ -3296,127 +3306,94 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
 
         {activeTab === "feats" && (
           <div>
-            <h3 style={sectionTitleStyle}>Feat Selection</h3>
-            <p style={{ margin: "0.25rem 0 0.5rem 0", fontSize: "0.85rem", color: "var(--text-muted)" }}>
-              <strong>
-                {build.featIds.length} / {expectedFeatCount}
-              </strong>{" "}
-              feat slot{expectedFeatCount === 1 ? "" : "s"} at level {build.level}
-              {isHumanRace(selectedRace?.name) ? " (includes human bonus feat)." : "."}{" "}
-              {showInvalidFeats ? (
-                <>Showing all {featOptions.length} feat{featOptions.length === 1 ? "" : "s"} ({allLegalFeats.length} legal).</>
-              ) : (
-                <>{allLegalFeats.length} legal feat{allLegalFeats.length === 1 ? "" : "s"} for this build.</>
-              )}{" "}
-              Search by name, source, tier, category, tags, prerequisites, or rules text. Click a row to add or remove a feat.
-            </p>
-            <label style={{ display: "flex", alignItems: "center", gap: "0.45rem", fontSize: "0.88rem", marginBottom: "0.5rem", cursor: "pointer", userSelect: "none" }}>
-              <input
-                type="checkbox"
-                checked={showInvalidFeats}
-                onChange={(e) => setShowInvalidFeats(e.target.checked)}
-              />
-              Show invalid feats (not eligible; cannot be selected)
-            </label>
-            <label style={{ display: "block", fontSize: "0.88rem", marginBottom: "0.45rem" }}>
-              Search feats
-              <input
-                type="search"
-                value={featSearch}
-                onChange={(e) => setFeatSearch(e.target.value)}
-                placeholder="Filter by name, source, category, tags, prereqs…"
-                style={{
-                  width: "100%",
-                  maxWidth: "28rem",
-                  marginTop: "0.2rem",
-                  padding: "0.4rem 0.5rem",
-                  border: "1px solid var(--panel-border)",
-                  borderRadius: "6px",
-                  boxSizing: "border-box"
-                }}
-              />
-            </label>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.55rem" }}>
-              <label style={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}>
-                Tier
-                <select
-                  value={featTierFilter}
-                  onChange={(e) => setFeatTierFilter(e.target.value as "all" | "HEROIC" | "PARAGON" | "EPIC")}
-                  style={{ display: "block", marginTop: "0.2rem", minWidth: "8.5rem", padding: "0.35rem", border: "1px solid var(--panel-border)", borderRadius: "6px" }}
-                >
-                  <option value="all">All tiers</option>
-                  <option value="HEROIC">Heroic</option>
-                  <option value="PARAGON">Paragon</option>
-                  <option value="EPIC">Epic</option>
-                </select>
+            <h3 style={sectionTitleStyle}>Feats</h3>
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                gap: "0.65rem 1.1rem",
+                marginBottom: "0.5rem"
+              }}
+            >
+              <label style={{ display: "flex", alignItems: "center", gap: "0.45rem", fontSize: "0.88rem", cursor: "pointer", userSelect: "none" }}>
+                <input
+                  type="checkbox"
+                  checked={showInvalidFeats}
+                  onChange={(e) => setShowInvalidFeats(e.target.checked)}
+                />
+                Show invalid feats
               </label>
-              <label style={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}>
-                Category
-                <select
-                  value={featCategoryFilter}
-                  onChange={(e) => setFeatCategoryFilter(e.target.value)}
-                  style={{ display: "block", marginTop: "0.2rem", minWidth: "10rem", padding: "0.35rem", border: "1px solid var(--panel-border)", borderRadius: "6px" }}
-                >
-                  <option value="all">All categories</option>
-                  {featCategoryOptions.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label style={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}>
-                Source
-                <select
-                  value={featSourceFilter}
-                  onChange={(e) => setFeatSourceFilter(e.target.value)}
-                  style={{ display: "block", marginTop: "0.2rem", minWidth: "11rem", padding: "0.35rem", border: "1px solid var(--panel-border)", borderRadius: "6px" }}
-                >
-                  <option value="all">All sources</option>
-                  {featSourceOptions.map((src) => (
-                    <option key={src} value={src}>
-                      {src}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label style={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}>
-                Sort
-                <select
-                  value={featSortMode}
-                  onChange={(e) => setFeatSortMode(e.target.value as FeatSortMode)}
-                  style={{ display: "block", marginTop: "0.2rem", minWidth: "11rem", padding: "0.35rem", border: "1px solid var(--panel-border)", borderRadius: "6px" }}
-                >
-                  <option value="tier-alpha">Tier, then name</option>
-                  <option value="alpha">Name (A-Z)</option>
-                  <option value="source-alpha">Source, then name</option>
-                </select>
+              <label style={{ display: "flex", alignItems: "center", gap: "0.45rem", fontSize: "0.88rem", cursor: "pointer", userSelect: "none" }}>
+                <input
+                  type="checkbox"
+                  checked={featFilterAllText}
+                  onChange={(e) => setFeatFilterAllText(e.target.checked)}
+                />
+                Filter all text
               </label>
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center", marginBottom: "0.45rem" }}>
-              <button type="button" onClick={() => updateBuild({ ...build, featIds: [] })} style={{ padding: "0.35rem 0.65rem", borderRadius: "6px", border: "1px solid var(--panel-border)", background: "var(--surface-0)", cursor: "pointer" }}>
-                Clear all feats
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setFeatSearch("");
-                  setFeatTierFilter("all");
-                  setFeatCategoryFilter("all");
-                  setFeatSourceFilter("all");
-                  setFeatSortMode("tier-alpha");
-                }}
-                style={{ padding: "0.35rem 0.65rem", borderRadius: "6px", border: "1px solid var(--panel-border)", background: "var(--surface-0)", cursor: "pointer" }}
-              >
-                Reset feat filters
-              </button>
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "flex-end",
+                gap: "0.5rem 0.75rem",
+                marginBottom: "0.55rem"
+              }}
+            >
+              <label style={{ fontSize: "0.82rem", color: "var(--text-secondary)", flex: "1 1 14rem", minWidth: "14rem", maxWidth: "28rem" }}>
+                Filter
+                <input
+                  type="text"
+                  value={featSearch}
+                  onChange={(e) => setFeatSearch(e.target.value)}
+                  placeholder="Feat name…"
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    marginTop: "0.2rem",
+                    padding: "0.4rem 0.5rem",
+                    border: "1px solid var(--panel-border)",
+                    borderRadius: "6px",
+                    boxSizing: "border-box"
+                  }}
+                />
+              </label>
+              <FeatFacetMultiSelect
+                label="Tier"
+                options={FEAT_TIER_OPTIONS}
+                selected={featTierFilter}
+                onChange={setFeatTierFilter}
+                allLabel="All tiers"
+                summaryPrefix="Tier"
+                minWidth="8.5rem"
+                detailsName="feat-facet-filters"
+              />
+              <FeatFacetMultiSelect
+                label="Category"
+                options={featCategoryOptions.map((cat) => ({ value: cat, label: cat }))}
+                selected={featCategoryFilter}
+                onChange={setFeatCategoryFilter}
+                allLabel="All categories"
+                summaryPrefix="Category"
+                minWidth="10rem"
+                detailsName="feat-facet-filters"
+              />
+              <FeatSourceFilterDropdown
+                sources={featSourceOptions}
+                value={featSourceFilter}
+                onChange={setFeatSourceFilter}
+                minWidth="10rem"
+                detailsName="feat-facet-filters"
+              />
             </div>
             <div style={{ ...ui.blockSubsection, maxHeight: "280px", overflow: "auto", backgroundColor: "var(--surface-1)", padding: "0.35rem" }}>
               {filteredFeatRows.length === 0 ? (
                 <p style={{ margin: "0.5rem", color: "var(--text-muted)", fontSize: "0.9rem" }}>
                   {allLegalFeats.length === 0 && !showInvalidFeats
                     ? "No feats are legal for this build yet. Check prerequisites (ability scores, race, class, skills), or turn on “Show invalid feats” to browse others."
-                    : "No feats match this search. Clear the filter or try different keywords."}
+                    : "No feats match this filter. Clear the filter or try different text."}
                 </p>
               ) : (
                 <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
@@ -3424,8 +3401,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     const selected = build.featIds.includes(opt.item.id);
                     const invalid = !opt.legal;
                     const atCap = !selected && build.featIds.length >= expectedFeatCount;
-                    const featCategory = getFeatFacetCategory(opt.item);
-                    const featTier = String(opt.item.tier || "").trim();
+                    const featDisplayTags = getFeatDisplayTags(opt.item);
                     const featRaw = opt.item.raw as Record<string, unknown>;
                     const featSpecific = (featRaw.specific as Record<string, unknown> | undefined) || {};
                     const shortDescription =
@@ -3457,25 +3433,44 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                             opacity: invalid ? 0.92 : 1
                           }}
                         >
-                          <span style={{ fontWeight: selected ? 600 : 500 }}>
-                            {opt.item.name}
-                            {invalid && (
-                              <span style={{ marginLeft: "0.35rem", fontSize: "0.72rem", fontWeight: 600, color: "var(--status-warning)" }}>Invalid</span>
-                            )}
-                          </span>
-                          <span style={{ display: "block", marginTop: "0.2rem" }}>
-                            {featTier && (
-                              <span style={{ display: "inline-block", marginRight: "0.3rem", padding: "0.08rem 0.35rem", borderRadius: "999px", fontSize: "0.7rem", background: "var(--surface-2)", color: "var(--text-secondary)", fontWeight: 600 }}>
-                                {featTier}
+                          <span
+                            style={{
+                              display: "flex",
+                              alignItems: "baseline",
+                              justifyContent: "space-between",
+                              gap: "0.5rem",
+                              width: "100%"
+                            }}
+                          >
+                            <span style={{ fontWeight: selected ? 600 : 500, minWidth: 0 }}>
+                              {opt.item.name}
+                              {invalid && (
+                                <span style={{ marginLeft: "0.35rem", fontSize: "0.72rem", fontWeight: 600, color: "var(--status-warning)" }}>Invalid</span>
+                              )}
+                            </span>
+                            {(featDisplayTags.length > 0 || opt.item.source) && (
+                              <span
+                                style={{
+                                  display: "inline-flex",
+                                  flexWrap: "wrap",
+                                  justifyContent: "flex-start",
+                                  alignItems: "baseline",
+                                  gap: "0.25rem 0.5rem",
+                                  flexShrink: 0,
+                                  marginLeft: "auto"
+                                }}
+                              >
+                                {featDisplayTags.map((tag) => (
+                                  <FeatTagPill key={tag} tag={tag} />
+                                ))}
+                                {opt.item.source ? (
+                                  <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 400, whiteSpace: "nowrap" }}>
+                                    {opt.item.source}
+                                  </span>
+                                ) : null}
                               </span>
                             )}
-                            <span style={{ display: "inline-block", marginRight: "0.3rem", padding: "0.08rem 0.35rem", borderRadius: "999px", fontSize: "0.7rem", background: "var(--surface-2)", color: "var(--status-info)", fontWeight: 600 }}>
-                              {featCategory}
-                            </span>
                           </span>
-                          {opt.item.source && (
-                            <span style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 400 }}>{opt.item.source}</span>
-                          )}
                           {shortDescription && (
                             <span style={{ display: "block", marginTop: "0.16rem", fontSize: "0.76rem", color: "var(--text-secondary)", fontWeight: 400, lineHeight: 1.35 }}>
                               {shortDescription}
@@ -3494,7 +3489,31 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               )}
             </div>
             <div style={{ ...ui.blockSubsection, marginTop: "0.75rem", backgroundColor: "var(--surface-1)" }}>
-              <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--text-secondary)", marginBottom: "0.3rem" }}>Selected Feats</div>
+              <div
+                style={{
+                  margin: 0,
+                  marginBottom: "0.3rem",
+                  fontSize: "0.82rem",
+                  fontWeight: 700,
+                  color: "var(--text-secondary)"
+                }}
+              >
+                <strong
+                  style={{
+                    color:
+                      build.featIds.length === expectedFeatCount
+                        ? "var(--status-success)"
+                        : "var(--status-danger)"
+                  }}
+                >
+                  {build.featIds.length}
+                </strong>
+                <strong style={{ color: "var(--text-muted)" }}> / {expectedFeatCount}</strong>{" "}
+                Selected Feats
+                {isHumanRace(selectedRace?.name) ? (
+                  <span style={{ fontWeight: 400, color: "var(--text-muted)" }}> (includes human bonus feat).</span>
+                ) : null}
+              </div>
               {selectedFeats.length === 0 ? (
                 <p style={{ margin: 0, fontSize: "0.84rem", color: "var(--text-muted)" }}>No feats selected yet.</p>
               ) : (
@@ -3508,55 +3527,100 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                       "";
                     const bodyText = typeof raw.body === "string" ? raw.body.trim() : "";
                     const summary = shortDesc || (bodyText ? bodyText.slice(0, 180) + (bodyText.length > 180 ? "..." : "") : "");
-                    const tier = String(f.tier || "").trim();
+                    const featDisplayTags = getFeatDisplayTags(f);
+                    const removeFeatButtonStyle = {
+                      fontSize: "0.72rem",
+                      lineHeight: 1.1,
+                      padding: "0.16rem 0.4rem",
+                      borderRadius: "999px",
+                      border: "1px solid #f3c6c6",
+                      backgroundColor: "var(--surface-0)",
+                      color: "var(--status-danger)",
+                      cursor: "pointer",
+                      fontWeight: 700,
+                      flexShrink: 0
+                    } as const;
+                    const removeFeatButton = (
+                      <button
+                        type="button"
+                        onClick={() => updateBuild({ ...build, featIds: build.featIds.filter((id) => id !== f.id) })}
+                        style={removeFeatButtonStyle}
+                        aria-label={`Remove feat ${f.name}`}
+                        title="Remove feat"
+                      >
+                        Remove
+                      </button>
+                    );
                     return (
                       <article
                         key={f.id}
                         style={{
+                          display: "flex",
+                          flexDirection: "column",
                           border: "1px solid var(--panel-border)",
                           borderRadius: "8px",
                           backgroundColor: "var(--surface-0)",
                           padding: "0.45rem 0.55rem"
                         }}
                       >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.4rem" }}>
-                          <div style={{ fontWeight: 700, fontSize: "0.84rem", color: "var(--text-primary)" }}>{f.name}</div>
-                          <button
-                            type="button"
-                            onClick={() => updateBuild({ ...build, featIds: build.featIds.filter((id) => id !== f.id) })}
-                            style={{
-                              fontSize: "0.72rem",
-                              lineHeight: 1.1,
-                              padding: "0.16rem 0.4rem",
-                              borderRadius: "999px",
-                              border: "1px solid #f3c6c6",
-                              backgroundColor: "var(--surface-0)",
-                              color: "var(--status-danger)",
-                              cursor: "pointer",
-                              fontWeight: 700
-                            }}
-                            aria-label={`Remove feat ${f.name}`}
-                            title="Remove feat"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                        <div style={{ marginTop: "0.18rem", display: "flex", flexWrap: "wrap", gap: "0.3rem 0.45rem", alignItems: "center" }}>
-                          {f.source ? (
-                            <span style={{ fontSize: "0.74rem", color: "var(--text-secondary)", backgroundColor: "var(--surface-1)", border: "1px solid var(--panel-border)", borderRadius: "999px", padding: "0.06rem 0.38rem" }}>
-                              {f.source}
-                            </span>
-                          ) : null}
-                          {tier ? (
-                            <span style={{ fontSize: "0.72rem", color: "var(--status-info)", backgroundColor: "var(--surface-2)", border: "1px solid var(--panel-border)", borderRadius: "999px", padding: "0.06rem 0.38rem", fontWeight: 600 }}>
-                              {tier}
-                            </span>
-                          ) : null}
-                        </div>
-                        {summary && (
-                          <div style={{ marginTop: "0.28rem", color: "var(--text-secondary)", fontSize: "0.79rem", lineHeight: 1.4 }}>
-                            {summary}
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "baseline",
+                            justifyContent: "space-between",
+                            gap: "0.5rem",
+                            width: "100%"
+                          }}
+                        >
+                          <div style={{ fontWeight: 700, fontSize: "0.84rem", color: "var(--text-primary)", minWidth: 0 }}>
+                            {f.name}
                           </div>
+                          {(featDisplayTags.length > 0 || f.source) && (
+                            <span
+                              style={{
+                                display: "inline-flex",
+                                flexWrap: "wrap",
+                                justifyContent: "flex-start",
+                                alignItems: "baseline",
+                                gap: "0.25rem 0.5rem",
+                                flexShrink: 0,
+                                marginLeft: "auto"
+                              }}
+                            >
+                              {featDisplayTags.map((tag) => (
+                                <FeatTagPill key={tag} tag={tag} />
+                              ))}
+                              {f.source ? (
+                                <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", whiteSpace: "nowrap" }}>{f.source}</span>
+                              ) : null}
+                            </span>
+                          )}
+                        </div>
+                        {summary ? (
+                          <div
+                            style={{
+                              display: "flex",
+                              flexWrap: "wrap",
+                              alignItems: "flex-start",
+                              gap: "0.5rem",
+                              marginTop: "0.28rem"
+                            }}
+                          >
+                            <div
+                              style={{
+                                flex: "1 1 0",
+                                minWidth: 0,
+                                color: "var(--text-secondary)",
+                                fontSize: "0.79rem",
+                                lineHeight: 1.4
+                              }}
+                            >
+                              {summary}
+                            </div>
+                            <span style={{ marginLeft: "auto" }}>{removeFeatButton}</span>
+                          </div>
+                        ) : (
+                          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.35rem" }}>{removeFeatButton}</div>
                         )}
                       </article>
                     );
