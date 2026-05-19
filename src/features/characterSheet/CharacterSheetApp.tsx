@@ -165,46 +165,130 @@ const overviewCollapsibleSummaryStyle: CSSProperties = {
   color: "var(--text-primary)"
 };
 
-const characterOverviewPanelStyle: CSSProperties = {
-  display: "grid",
-  gap: "0.35rem",
-  minWidth: 0
-};
-
-const characterOverviewFieldsGridStyle: CSSProperties = {
-  display: "grid",
-  gap: "0.35rem",
-  gridTemplateColumns: "repeat(12, minmax(0, 1fr))"
-};
-
-type OverviewReadonlyFieldProps = {
+type CharacterIdentityFieldProps = {
   label: ReactNode;
-  gridColumn: string;
   children: ReactNode;
-  valueStyle?: CSSProperties;
-  onValueMouseEnter?: (event: ReactMouseEvent<HTMLDivElement>) => void;
-  onValueMouseLeave?: () => void;
+  className?: string;
+  onLabelMouseEnter?: (event: ReactMouseEvent<HTMLElement>) => void;
+  onLabelMouseLeave?: () => void;
+  onLabelFocus?: (event: ReactFocusEvent<HTMLElement>) => void;
+  onLabelBlur?: () => void;
+  labelTabIndex?: number;
 };
 
-function OverviewReadonlyField({
+function CharacterIdentityField({
   label,
-  gridColumn,
   children,
-  valueStyle,
-  onValueMouseEnter,
-  onValueMouseLeave
-}: OverviewReadonlyFieldProps): JSX.Element {
+  className,
+  onLabelMouseEnter,
+  onLabelMouseLeave,
+  onLabelFocus,
+  onLabelBlur,
+  labelTabIndex
+}: CharacterIdentityFieldProps): JSX.Element {
+  const hasLabelAffordance = Boolean(onLabelMouseEnter || onLabelFocus);
+  const fieldClass = className ? `character-sheet-identity__field ${className}` : "character-sheet-identity__field";
   return (
-    <div style={{ ...labelStyle, gridColumn, gap: "0.12rem" }}>
-      {label}
-      <div
-        onMouseEnter={onValueMouseEnter}
-        onMouseLeave={onValueMouseLeave}
-        style={{ ...characterOverviewFieldValueStyle, ...valueStyle }}
-      >
-        {children}
-      </div>
+    <div className={fieldClass}>
+      <dt>
+        {hasLabelAffordance ? (
+          <span
+            className="character-sheet-identity__label-affordance"
+            tabIndex={labelTabIndex ?? 0}
+            onMouseEnter={onLabelMouseEnter}
+            onMouseLeave={onLabelMouseLeave}
+            onFocus={onLabelFocus}
+            onBlur={onLabelBlur}
+          >
+            {label}
+          </span>
+        ) : (
+          label
+        )}
+      </dt>
+      <dd>{children}</dd>
     </div>
+  );
+}
+
+type CharacterIdentitySectionProps = {
+  name: string;
+  raceName: string;
+  classDisplay: string;
+  level: number;
+  themeName?: string;
+  paragonPathName?: string;
+  epicDestinyName?: string;
+  onRaceLabelMouseEnter?: (event: ReactMouseEvent<HTMLElement>) => void;
+  onRaceLabelMouseLeave?: () => void;
+  onClassLabelMouseEnter?: (event: React.MouseEvent<HTMLElement>) => void;
+  onClassLabelMouseLeave?: () => void;
+  onLevelLabelMouseEnter?: (event: React.MouseEvent<HTMLElement>) => void;
+  onLevelLabelMouseLeave?: () => void;
+  onLevelLabelFocus?: (event: React.FocusEvent<HTMLElement>) => void;
+  onLevelLabelBlur?: () => void;
+};
+
+function CharacterIdentitySection({
+  name,
+  raceName,
+  classDisplay,
+  level,
+  themeName,
+  paragonPathName,
+  epicDestinyName,
+  onRaceLabelMouseEnter,
+  onRaceLabelMouseLeave,
+  onClassLabelMouseEnter,
+  onClassLabelMouseLeave,
+  onLevelLabelMouseEnter,
+  onLevelLabelMouseLeave,
+  onLevelLabelFocus,
+  onLevelLabelBlur
+}: CharacterIdentitySectionProps): JSX.Element {
+  const showAdvancement = Boolean(themeName || paragonPathName || epicDestinyName);
+
+  return (
+    <section className="character-sheet-identity">
+      <dl className="character-sheet-identity__list">
+        <CharacterIdentityField label="Name" className="character-sheet-identity__field--name">
+          {name || "—"}
+        </CharacterIdentityField>
+        <div className="character-sheet-identity__row character-sheet-identity__row--core">
+          <CharacterIdentityField
+            label="Race"
+            onLabelMouseEnter={onRaceLabelMouseEnter}
+            onLabelMouseLeave={onRaceLabelMouseLeave}
+          >
+            {raceName || "—"}
+          </CharacterIdentityField>
+          <CharacterIdentityField
+            label="Class"
+            onLabelMouseEnter={onClassLabelMouseEnter}
+            onLabelMouseLeave={onClassLabelMouseLeave}
+          >
+            {classDisplay || "—"}
+          </CharacterIdentityField>
+          <CharacterIdentityField
+            label="Level"
+            className="character-sheet-identity__field--level"
+            onLabelMouseEnter={onLevelLabelMouseEnter}
+            onLabelMouseLeave={onLevelLabelMouseLeave}
+            onLabelFocus={onLevelLabelFocus}
+            onLabelBlur={onLevelLabelBlur}
+          >
+            {level}
+          </CharacterIdentityField>
+        </div>
+        {showAdvancement && (
+          <div className="character-sheet-identity__advancement">
+            {themeName && <CharacterIdentityField label="Theme">{themeName}</CharacterIdentityField>}
+            {paragonPathName && <CharacterIdentityField label="Paragon path">{paragonPathName}</CharacterIdentityField>}
+            {epicDestinyName && <CharacterIdentityField label="Epic destiny">{epicDestinyName}</CharacterIdentityField>}
+          </div>
+        )}
+      </dl>
+    </section>
   );
 }
 
@@ -315,11 +399,6 @@ const labelStyle: CSSProperties = {
   fontWeight: 600,
   textTransform: "uppercase",
   letterSpacing: "0.04em"
-};
-
-const characterOverviewFieldValueStyle: CSSProperties = {
-  lineHeight: 1.25,
-  color: "var(--text-primary)"
 };
 
 /** HP panel resource labels (Hit Points, Temp HP, Healing Surges, etc.). */
@@ -2074,7 +2153,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     );
   }
 
-  function startRaceHoverInfoTimer(event: ReactMouseEvent<HTMLDivElement>): void {
+  function startRaceHoverInfoTimer(event: ReactMouseEvent<HTMLElement>): void {
     if (!derived.race) return;
     const rect = event.currentTarget.getBoundingClientRect();
     setRaceHoverPanelPos(positionFixedTooltip(rect, { panelWidth: 360, maxHeightVh: 52 }));
@@ -2096,7 +2175,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     setRaceHoverPanelPos(null);
   }
 
-  function startClassHoverInfoTimer(event: ReactMouseEvent<HTMLDivElement>): void {
+  function startClassHoverInfoTimer(event: ReactMouseEvent<HTMLElement>): void {
     if (!derived.cls) return;
     const rect = event.currentTarget.getBoundingClientRect();
     setClassHoverPanelPos(positionFixedTooltip(rect, { panelWidth: 380, maxHeightVh: 52 }));
@@ -2184,85 +2263,31 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           </div>
           <div className="character-sheet-overview-row" style={{ ...overviewThreeColumnGridStyle, gridColumn: "1 / -1" }}>
             <div style={overviewSideColumnStyle}>
-              <section style={characterOverviewPanelStyle}>
-                <h3
-                  style={{
-                    margin: 0,
-                    fontSize: "0.72rem",
-                    color: "var(--text-muted)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.06em",
-                    fontWeight: 700
-                  }}
-                >
-                  Character
-                </h3>
-                <div style={characterOverviewFieldsGridStyle}>
-                  <OverviewReadonlyField label="Name" gridColumn="span 8" valueStyle={{ fontWeight: 700, color: "var(--text-primary)" }}>
-                    {sheet.name || "-"}
-                  </OverviewReadonlyField>
-                  <OverviewReadonlyField
-                    label="Race"
-                    gridColumn="span 4"
-                    onValueMouseEnter={startRaceHoverInfoTimer}
-                    onValueMouseLeave={stopRaceHoverInfoTimerAndHide}
-                  >
-                    {derived.race?.name || "-"}
-                  </OverviewReadonlyField>
-                  <OverviewReadonlyField
-                    label="Class"
-                    gridColumn="span 9"
-                    onValueMouseEnter={startClassHoverInfoTimer}
-                    onValueMouseLeave={stopClassHoverInfoTimerAndHide}
-                  >
-                    {derived.cls?.name || "-"}
-                  </OverviewReadonlyField>
-                  <OverviewReadonlyField
-                    label={
-                      <span
-                        tabIndex={0}
-                        onMouseEnter={(event) => glossaryTooltipUi.startHover(event, "level")}
-                        onMouseLeave={glossaryTooltipUi.leaveHover}
-                        onFocus={(event) => glossaryTooltipUi.startHover(event, "level")}
-                        onBlur={glossaryTooltipUi.leaveHover}
-                      >
-                        Level
-                      </span>
-                    }
-                    gridColumn="span 3"
-                    valueStyle={{ fontWeight: 800, color: "var(--text-primary)" }}
-                  >
-                    {sheet.level}
-                  </OverviewReadonlyField>
-                  {sheet.themeId && (
-                    <OverviewReadonlyField
-                      label="Theme"
-                      gridColumn="span 12"
-                      valueStyle={{ fontWeight: 600, color: "var(--text-primary)" }}
-                    >
-                      {selectedTheme?.name ?? sheet.themeId}
-                    </OverviewReadonlyField>
-                  )}
-                  {sheet.paragonPathId && (
-                    <OverviewReadonlyField
-                      label="Paragon path"
-                      gridColumn="span 12"
-                      valueStyle={{ fontWeight: 600, color: "var(--text-primary)" }}
-                    >
-                      {selectedParagonPath?.name ?? sheet.paragonPathId}
-                    </OverviewReadonlyField>
-                  )}
-                  {sheet.epicDestinyId && (
-                    <OverviewReadonlyField
-                      label="Epic destiny"
-                      gridColumn="span 12"
-                      valueStyle={{ fontWeight: 600, color: "var(--text-primary)" }}
-                    >
-                      {selectedEpicDestiny?.name ?? sheet.epicDestinyId}
-                    </OverviewReadonlyField>
-                  )}
-                </div>
-              </section>
+              <CharacterIdentitySection
+                name={sheet.name}
+                raceName={derived.race?.name ?? ""}
+                classDisplay={
+                  sheet.characterStyle === "hybrid" && hybridClassA && hybridClassB
+                    ? `${hybridClassA.name} / ${hybridClassB.name}`
+                    : derived.cls?.name ?? ""
+                }
+                level={sheet.level}
+                themeName={sheet.themeId ? (selectedTheme?.name ?? sheet.themeId) : undefined}
+                paragonPathName={sheet.paragonPathId ? (selectedParagonPath?.name ?? sheet.paragonPathId) : undefined}
+                epicDestinyName={sheet.epicDestinyId ? (selectedEpicDestiny?.name ?? sheet.epicDestinyId) : undefined}
+                onRaceLabelMouseEnter={derived.race ? startRaceHoverInfoTimer : undefined}
+                onRaceLabelMouseLeave={derived.race ? stopRaceHoverInfoTimerAndHide : undefined}
+                onClassLabelMouseEnter={
+                  derived.cls || (hybridClassA && hybridClassB) ? startClassHoverInfoTimer : undefined
+                }
+                onClassLabelMouseLeave={
+                  derived.cls || (hybridClassA && hybridClassB) ? stopClassHoverInfoTimerAndHide : undefined
+                }
+                onLevelLabelMouseEnter={(event) => glossaryTooltipUi.startHover(event, "level")}
+                onLevelLabelMouseLeave={glossaryTooltipUi.leaveHover}
+                onLevelLabelFocus={(event) => glossaryTooltipUi.startHover(event, "level")}
+                onLevelLabelBlur={glossaryTooltipUi.leaveHover}
+              />
               <OverviewCollapsibleSection
                 title="Ability Scores"
                 titleTabIndex={0}

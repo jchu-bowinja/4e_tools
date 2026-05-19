@@ -530,6 +530,93 @@ textarea:hover {
   margin-top: 0.25rem;
 }
 
+/* Character identity block (overview left column) */
+.character-sheet-identity {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.character-sheet-identity__list {
+  margin: 0;
+  display: grid;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.character-sheet-identity__row {
+  display: grid;
+  gap: 0.5rem 0.75rem;
+  min-width: 0;
+}
+
+.character-sheet-identity__row--core {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr) auto;
+  align-items: end;
+}
+
+.character-sheet-identity__field {
+  margin: 0;
+  min-width: 0;
+  display: grid;
+  gap: 0.1rem;
+}
+
+.character-sheet-identity__field dt {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.character-sheet-identity__field dd {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.35;
+  color: var(--text-primary);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.character-sheet-identity__field--name dd {
+  font-size: 1.08rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.25;
+}
+
+.character-sheet-identity__field--level {
+  text-align: right;
+}
+
+.character-sheet-identity__field--level dd {
+  font-size: 1.15rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.character-sheet-identity__label-affordance {
+  cursor: help;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+
+.character-sheet-identity__advancement {
+  margin: 0;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--panel-border);
+  display: grid;
+  gap: 0.35rem;
+}
+
+.character-sheet-identity__advancement .character-sheet-identity__field dd {
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
 .live-sheet-collapsible > :not(summary) {
   margin-top: 0.35rem;
 }
