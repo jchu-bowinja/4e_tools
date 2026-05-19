@@ -35,8 +35,15 @@ import {
   motionUnifiedRowValues
 } from "../../rules/statScoreBreakdown";
 import { CollapsibleDisclosure } from "../../ui/CollapsibleDisclosure";
-import { SkillModifierNameContent, SkillModifierTable } from "../../ui/SkillModifierTable";
-import { StatScoreTable, type StatScoreRowDef } from "../../ui/StatScoreTable";
+import { SKILL_BREAKDOWN_COLUMNS } from "../../ui/scoreBreakdownColumns";
+import {
+  formatSkillBreakdownComponent,
+  formatSkillBreakdownTotal,
+  skillRowMap,
+  skillRowsToBreakdown
+} from "../../ui/scoreBreakdownSkill";
+import { SkillModifierNameContent } from "../../ui/scoreBreakdownSkillName";
+import { ScoreBreakdownTable, type ScoreBreakdownRowDef } from "../../ui/ScoreBreakdownTable";
 import { loadBuild, loadSavedCharacters, type SavedCharacterEntry } from "../builder/storage";
 import { GlossaryTooltipRichText, RulesRichText } from "../builder/RulesRichText";
 import { areActiveConditionsDuplicate, createActiveCondition } from "./activeConditions";
@@ -1820,7 +1827,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     );
   }
 
-  function renderGlossaryStatLabel(row: StatScoreRowDef, stripe: string): ReactNode {
+  function renderGlossaryStatLabel(row: ScoreBreakdownRowDef, stripe: string): ReactNode {
     const glossaryKey = row.glossaryKey ?? row.rowKey;
     return (
       <span
@@ -1837,7 +1844,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     );
   }
 
-  function renderAbilityScoreLabel(row: StatScoreRowDef, stripe: string): ReactNode {
+  function renderAbilityScoreLabel(row: ScoreBreakdownRowDef, stripe: string): ReactNode {
     const glossaryKey = row.glossaryKey ?? `ability:${row.rowKey}`;
     return (
       <span
@@ -1869,12 +1876,13 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         className="character-sheet-motion-panel"
         style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.3rem 0.35rem", backgroundColor: "var(--surface-0)" }}
       >
-        <StatScoreTable
-          className="stat-score-table--compact"
+        <ScoreBreakdownTable
+          variant="stat"
+          compact
           columns={MOTION_SCORE_COLUMNS}
           bonusHeader={null}
-          statHeader={null}
-          prioritizeStatLabel
+          labelHeader={null}
+          prioritizeLabel
           rows={[
             {
               rowKey: "speed",
@@ -2092,12 +2100,13 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     const acComponents = buildAcScoreComponents(bd, { magicItemBonus: magicAcBonus, secondWindBonus });
     return (
       <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", padding: "0.4rem", backgroundColor: "var(--surface-0)" }}>
-        <StatScoreTable
-          className="stat-score-table--compact"
+        <ScoreBreakdownTable
+          variant="stat"
+          compact
           columns={DEFENSE_SCORE_COLUMNS}
           bonusHeader={null}
-          statHeader="DEFENSE"
-          prioritizeStatLabel
+          labelHeader="DEFENSE"
+          prioritizeLabel
           rows={[
             {
               rowKey: "ac",
@@ -2382,9 +2391,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 onTitleFocus={(event) => glossaryTooltipUi.startHover(event, "abilityScores")}
                 onTitleBlur={glossaryTooltipUi.leaveHover}
               >
-                <StatScoreTable
+                <ScoreBreakdownTable
+                  variant="stat"
                   columns={ABILITY_SCORE_COLUMNS}
-                  statHeader={null}
+                  labelHeader={null}
                   rows={(["STR", "CON", "DEX", "INT", "WIS", "CHA"] as const).map((ab) => ({
                     rowKey: ab,
                     label: ab,
@@ -2397,26 +2407,35 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 />
               </OverviewCollapsibleSection>
               <OverviewCollapsibleSection title="Skills">
-                <SkillModifierTable
-                  rows={skillRows}
+                <ScoreBreakdownTable
+                  variant="skill"
+                  columns={SKILL_BREAKDOWN_COLUMNS}
+                  rows={skillRowsToBreakdown(skillRows)}
                   fontSize="0.76rem"
-                  renderSkillName={(row, stripe) => (
-                    <SkillModifierNameContent
-                      row={row}
-                      onMouseEnter={(event) => glossaryTooltipUi.startHover(event, `skill:${row.skillId}`)}
-                      onMouseLeave={glossaryTooltipUi.leaveHover}
-                      onFocus={(event) => glossaryTooltipUi.startHover(event, `skill:${row.skillId}`)}
-                      onBlur={glossaryTooltipUi.leaveHover}
-                      tabIndex={0}
-                      style={{
-                        fontWeight: 600,
-                        color: "var(--text-primary)",
-                        padding: "0.12rem 0.2rem",
-                        borderRadius: "0.2rem",
-                        backgroundColor: stripe
-                      }}
-                    />
-                  )}
+                  formatTotalValue={(row) => formatSkillBreakdownTotal(skillRowMap(skillRows).get(row.rowKey)!)}
+                  formatComponentValue={(row, columnKey) =>
+                    formatSkillBreakdownComponent(skillRowMap(skillRows).get(row.rowKey)!, columnKey)
+                  }
+                  renderLabel={(row, stripe) => {
+                    const skill = skillRowMap(skillRows).get(row.rowKey)!;
+                    return (
+                      <SkillModifierNameContent
+                        row={skill}
+                        onMouseEnter={(event) => glossaryTooltipUi.startHover(event, `skill:${skill.skillId}`)}
+                        onMouseLeave={glossaryTooltipUi.leaveHover}
+                        onFocus={(event) => glossaryTooltipUi.startHover(event, `skill:${skill.skillId}`)}
+                        onBlur={glossaryTooltipUi.leaveHover}
+                        tabIndex={0}
+                        style={{
+                          fontWeight: 600,
+                          color: "var(--text-primary)",
+                          padding: "0.12rem 0.2rem",
+                          borderRadius: "0.2rem",
+                          backgroundColor: stripe
+                        }}
+                      />
+                    );
+                  }}
                 />
               </OverviewCollapsibleSection>
             </div>

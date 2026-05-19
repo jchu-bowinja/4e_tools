@@ -57,8 +57,16 @@ import { getClassBuildOptions } from "../../rules/classBuildOptions";
 import { autoGrantedTrainedSkillIds } from "../../rules/grantedSkillsQuery";
 import { computeSkillSheetRows } from "../../rules/skillCalculator";
 import { DEFENSE_SCORE_COLUMNS, MOTION_INITIATIVE_COLUMNS } from "../../rules/statScoreBreakdown";
-import { SkillModifierNameContent, SkillModifierTable } from "../../ui/SkillModifierTable";
-import { StatScoreTable } from "../../ui/StatScoreTable";
+import { SKILL_BREAKDOWN_COLUMNS } from "../../ui/scoreBreakdownColumns";
+import {
+  formatSkillBreakdownComponent,
+  formatSkillBreakdownTotal,
+  skillRowMap,
+  skillRowsToBreakdown
+} from "../../ui/scoreBreakdownSkill";
+import { SkillModifierNameContent } from "../../ui/scoreBreakdownSkillName";
+import { ScoreBreakdownTable } from "../../ui/ScoreBreakdownTable";
+import { TableScrollport } from "../../ui/TableScrollport";
 import {
   collectCountsAsClassNames,
   collectCountsAsFeatureNames,
@@ -2949,7 +2957,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   >
                     {title}
                   </h4>
-                  <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: "0.86rem" }}>
+                  <TableScrollport>
+                  <table style={{ borderCollapse: "separate", borderSpacing: 0, fontSize: "0.86rem" }}>
                     <thead>
                       <tr style={{ textAlign: "left", color: "var(--text-muted)", borderBottom: "1px solid var(--panel-border)" }}>
                         <th style={{ padding: "0.3rem 0.25rem 0.35rem 0", fontWeight: 700 }}>Ability</th>
@@ -3020,6 +3029,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                       })}
                     </tbody>
                   </table>
+                  </TableScrollport>
                 </div>
               ))}
             </div>
@@ -3066,13 +3076,20 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               </p>
             )}
             <div style={{ ...ui.blockInset, backgroundColor: "var(--surface-1)" }}>
-              <SkillModifierTable
-                rows={skillSheetRows}
+              <ScoreBreakdownTable
+                variant="skill"
+                columns={SKILL_BREAKDOWN_COLUMNS}
+                rows={skillRowsToBreakdown(skillSheetRows)}
                 rowStripe={false}
                 fontSize="0.76rem"
-                renderSkillName={(row, stripe) => {
-                  const skill = skillsSortedAll.find((s) => s.id === row.skillId);
-                  if (!skill) return row.name;
+                formatTotalValue={(row) => formatSkillBreakdownTotal(skillRowMap(skillSheetRows).get(row.rowKey)!)}
+                formatComponentValue={(row, columnKey) =>
+                  formatSkillBreakdownComponent(skillRowMap(skillSheetRows).get(row.rowKey)!, columnKey)
+                }
+                renderLabel={(row, stripe) => {
+                  const skillRow = skillRowMap(skillSheetRows).get(row.rowKey)!;
+                  const skill = skillsSortedAll.find((s) => s.id === skillRow.skillId);
+                  if (!skill) return skillRow.name;
                   const checked = build.trainedSkillIds.includes(skill.id);
                   const trainable = !!(selectedClass && selectedClassSkillNamesLower.has(skill.name.toLowerCase()));
                   const autoGranted = autoGrantedSkillIdSet.has(skill.id);
@@ -3081,7 +3098,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   const canInteract = (trainable || checked) && !autoGranted && !disableBecauseMaxed;
                   return (
                     <label
-                      className="skill-modifier-table__name-label"
+                      className="score-breakdown-table__label-affordance"
                       style={{
                         cursor: canInteract ? "pointer" : "default",
                         fontWeight: trainable || checked ? 600 : 400,
@@ -3105,7 +3122,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                         }}
                       />
                       <SkillModifierNameContent
-                        row={row}
+                        row={skillRow}
                         {...glossaryTooltipUi.hoverA11y(`skill:${skill.id}`)}
                         trailing={
                           <>
@@ -4685,12 +4702,13 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   alignItems: "start"
                 }}
               >
-                <StatScoreTable
+                <ScoreBreakdownTable
+                  variant="stat"
                   fontSize="0.82rem"
                   columns={DEFENSE_SCORE_COLUMNS}
                   bonusHeader={null}
-                  statHeader={null}
-                  prioritizeStatLabel
+                  labelHeader={null}
+                  prioritizeLabel
                   showComponents={false}
                   rows={[
                     {
@@ -4728,12 +4746,13 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     </strong>
                   )}
                 />
-                <StatScoreTable
+                <ScoreBreakdownTable
+                  variant="stat"
                   fontSize="0.82rem"
                   columns={MOTION_INITIATIVE_COLUMNS}
                   bonusHeader={null}
-                  statHeader={null}
-                  prioritizeStatLabel
+                  labelHeader={null}
+                  prioritizeLabel
                   showComponents={false}
                   rows={[
                     {
@@ -4837,13 +4856,19 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.76rem", color: "var(--text-muted)" }}>
               Includes untrained skills; trained rows add +5 and ignore armor check penalty.
             </p>
-            <SkillModifierTable
-              rows={skillSheetRows}
+            <ScoreBreakdownTable
+              variant="skill"
+              columns={SKILL_BREAKDOWN_COLUMNS}
+              rows={skillRowsToBreakdown(skillSheetRows)}
               fontSize="0.75rem"
-              renderSkillName={(row, stripe) => (
+              formatTotalValue={(row) => formatSkillBreakdownTotal(skillRowMap(skillSheetRows).get(row.rowKey)!)}
+              formatComponentValue={(row, columnKey) =>
+                formatSkillBreakdownComponent(skillRowMap(skillSheetRows).get(row.rowKey)!, columnKey)
+              }
+              renderLabel={(row, stripe) => (
                 <SkillModifierNameContent
-                  row={row}
-                  {...glossaryTooltipUi.hoverA11y(`skill:${row.skillId}`)}
+                  row={skillRowMap(skillSheetRows).get(row.rowKey)!}
+                  {...glossaryTooltipUi.hoverA11y(`skill:${row.rowKey}`)}
                   style={{
                     color: "var(--text-secondary)",
                     padding: "0.12rem 0.2rem",

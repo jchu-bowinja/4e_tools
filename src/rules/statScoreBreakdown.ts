@@ -1,7 +1,9 @@
 import type { AcBreakdown } from "./defenseCalculator";
-import type { StatScoreColumnDef } from "../ui/StatScoreTable";
+import type { ScoreBreakdownColumnDef } from "../ui/ScoreBreakdownTable";
 
-export type { StatScoreColumnDef };
+export type StatScoreColumnDef = ScoreBreakdownColumnDef;
+export type StatScoreRowDef = import("../ui/ScoreBreakdownTable").ScoreBreakdownRowDef;
+export type { ScoreBreakdownColumnDef, ScoreBreakdownRowDef } from "../ui/ScoreBreakdownTable";
 
 export interface ScoreComponent {
   key: string;

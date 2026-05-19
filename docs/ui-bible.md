@@ -148,6 +148,53 @@ Use the shared **`CollapsibleDisclosure`** and **`CollapsibleDisclosureArrow`** 
 - Keep sorting/filtering interaction patterns uniform when used.
 - Empty, loading, and error states should use shared phrasing and layout conventions.
 
+#### Table sizing and horizontal scroll (all tables)
+
+Every data table — native `<table>`, `ScoreBreakdownTable`, or future grid-based tables — must follow the same **fill + scroll** contract:
+
+| Axis | Rule |
+| --- | --- |
+| **Width** | Table scrollport uses `width: 100%` and `max-width: 100%` of its panel. Flexible name/label tracks use `minmax(measured-min, 1fr)` so extra horizontal space goes into the label column, not empty margin. |
+| **Height** | Table scrollport uses **natural row height** from shared padding tokens (do not squash rows). The scrollport spans the **full width** of its slot; vertically it grows with row count. When a parent layout assigns a fixed-height region (e.g. a tall sidebar list), the scrollport may use `height: 100%` and `overflow-y: auto` — pair vertical scroll with horizontal scroll only when both axes can overflow. |
+| **Horizontal overflow** | When content is wider than the panel, show a **horizontal scrollbar** on the table scrollport (`overflow-x: auto`). Never clip or crush component/value columns to fit. |
+| **Minimum content width** | Inner grid (`score-breakdown-table__sync-grid` or per-row grids) uses `min-width: max-content` so the scrollport can scroll. Component tracks use `minmax(W, W)` so fixed columns do not collapse. |
+| **Shared name/label column** | One label track per table, never per-row widths — see [shared label column](#shared-label-column-all-breakdown-tables). |
+
+**Implementation**
+
+| Table kind | Scrollport | Notes |
+| --- | --- | --- |
+| Native `<table>` | `TableScrollport` (or `.table-h-scroll`) | Inner table: `width: 100%`, `min-width: max-content` |
+| Skills | `ScoreBreakdownTable` (`variant="skill"`) | `useMeasuredLabelWidth` → `--score-breakdown-label-width` |
+| Stat breakdowns | `ScoreBreakdownTable` (`variant="stat"`, `compact` when needed) | `useMeasuredLabelWidth` → `--score-breakdown-label-width`; inner `__sync-grid` when `compact` + `prioritizeLabel`; see [score breakdown tables](#character-sheet-score-breakdown-tables) |
+
+Shared primitives: `TableScrollport`, `useMeasuredLabelWidth`, `tableLayout.ts`, **`ScoreBreakdownTable`** (skills + stat breakdowns). Skill row helpers: `scoreBreakdownSkill.ts`, `scoreBreakdownSkillName.tsx`.
+
+**Parent layout:** Panels that host tables must pass width constraints down (`min-width: 0` on grid/flex children). Side columns may use `overflow: hidden` on the column shell; the **table** inside still owns `overflow-x: auto` on its scrollport.
+
+**Do not**
+
+- Set `min-width: max-content` on the **scrollport** root (parent clips instead of scrolling) — only the inner sync grid or rows use `min-width: max-content`.
+- Size label/name columns per row independently (breaks alignment for short values like `AC` vs `Fortitude`).
+- Use `overflow: hidden` on the table scrollport to hide overflowing columns.
+- Hand-roll per-page table layout when `ScoreBreakdownTable` or `.table-h-scroll` applies.
+
+#### Shared label column (all breakdown tables)
+
+Every breakdown table with variable-width row names (skills, defenses, speed, initiative) must use **one shared label track per table instance**, sized to the **longest** label text (and column header when shown, e.g. `DEFENSE` or `Acrobatics`).
+
+| Table | Mechanism |
+| --- | --- |
+| Skills | `useMeasuredLabelWidth` on `ScoreBreakdownTable` (`variant="skill"`); sets `--score-breakdown-label-width`; every row uses `minmax(var(--score-breakdown-label-width), 1fr)` for the label column. |
+| Defenses, speed, initiative | `useMeasuredLabelWidth` when `prioritizeLabel`; sets `--score-breakdown-label-width`; `compact` tables use an inner `.score-breakdown-table__sync-grid` with **subgrid** so all rows share one label column track. |
+
+**Rules**
+
+1. Measure on mount and on resize; seed with a synchronous estimate so the first paint is close (no flash of narrow `AC` beside wide `Fortitude`).
+2. Short labels must not define a narrower column — the track minimum is always the longest measured label in **that table**.
+3. Extra horizontal space may grow the label column (`1fr` max on `minmax(--*-min-width, 1fr)`); it must not shrink below the measured minimum.
+4. Do not remove `--score-breakdown-label-width` during measurement passes (distorts the measure).
+
 #### Character sheet score breakdown tables
 
 The character sheet uses shared breakdown tables for **skills**, **defenses**, **speed / initiative**, and **ability scores**. Each row answers: “What is the total?” and “What is it called?” before showing how the total is built.
@@ -158,14 +205,14 @@ The character sheet uses shared breakdown tables for **skills**, **defenses**, *
 | --- | --- | --- |
 | 1 — Bonus / total | Final modifier or defense value | **Primary** — always visible |
 | 2 — Name / label | Skill name, defense name, ability code, etc. | **Primary** — always visible |
-| 3+ — Components | Ability mod, ½ level, armor, trained bonus, etc. | **Secondary** — may clip when space is tight |
+| 3+ — Components | Ability mod, ½ level, armor, trained bonus, etc. | **Secondary** — reachable via horizontal scroll when space is tight |
 
 **Resize contract (non-negotiable)**
 
-The **bonus value** and **row name** are the two anchors users scan first. They must remain legible at any viewport width or panel squeeze. When horizontal space runs out:
+Follows the global [table sizing and horizontal scroll](#table-sizing-and-horizontal-scroll-all-tables) rules. Additionally, the **bonus value** and **row name** are the two anchors users scan first:
 
-1. **Keep** the bonus column and name column at usable widths.
-2. **Clip** component columns on the **right** (`overflow: hidden` on the table; no whole-table horizontal scrollbar).
+1. **Keep** the bonus column and name column at usable widths (measured label track; no per-row label widths). The name/label column grows with `1fr` when extra horizontal space is available.
+2. **Fill** the panel width when content is narrower than the container; **scroll** horizontally when content is wider, so component columns stay readable instead of clipping.
 3. **Do not** overlap names onto component values, shrink the bonus column below its content, or ellipsis-truncate primary columns to “make room” for math columns.
 4. **Do not** give each row its own label width — one shared label track per table, sized to the **longest** label in that table (and the stat-column header when shown, e.g. `DEFENSE`).
 
@@ -175,46 +222,52 @@ The **bonus value** and **row name** are the two anchors users scan first. They 
 - **Component values** use the standard score cell style; em dash (`—`) for empty optional slots.
 - **Row striping** alternates `var(--table-stripe-even)` / `var(--table-stripe-odd)` on bonus, label, and component cells.
 - **Headers** are small caps, muted (`var(--text-muted)`), often stacked on two lines (e.g. `Base +` / `½ Lvl`, `Trnd` / `(+5)`).
-- **Spacing tokens** (shared with skills): `--skill-bonus-name-gap` (gap between bonus and name), `--skill-col-gap` (column gap), `font-variant-numeric: tabular-nums` on the table.
-- **Label backgrounds** on prioritized stat tables use an opaque stripe (`--stat-row-bg`) so clipped component columns do not show through under the name when rows overlap in z-order.
+- **Spacing tokens**: `--score-breakdown-bonus-label-gap`, `--score-breakdown-col-gap`, `font-variant-numeric: tabular-nums` on the table.
+- **Label backgrounds** on prioritized stat tables use an opaque stripe (`--score-breakdown-row-bg`) so component columns do not show through under the name during horizontal scroll.
 
 **Implementation map**
 
 | Character sheet section | Component | Required props / classes |
 | --- | --- | --- |
-| Skills | `SkillModifierTable` | Measures `--skill-name-block-width`; bonus + name columns fixed priority; five component columns with fixed track widths |
-| Defenses | `StatScoreTable` | `prioritizeStatLabel`, `className="stat-score-table--compact"`, `statHeader="DEFENSE"` |
-| Speed + initiative | `StatScoreTable` | `prioritizeStatLabel`, `stat-score-table--compact`, `statHeader={null}` |
-| Ability scores | `StatScoreTable` | Single component column (`Score`); short fixed labels — compact prioritize mode optional |
+| Skills | `ScoreBreakdownTable` (`variant="skill"`) | Measures `--score-breakdown-label-width`; bonus + label columns fixed priority; five component columns with fixed track widths |
+| Defenses | `ScoreBreakdownTable` (`variant="stat"`) | `prioritizeLabel`, `compact`, `labelHeader="DEFENSE"` |
+| Speed + initiative | `ScoreBreakdownTable` (`variant="stat"`) | `prioritizeLabel`, `compact`, `labelHeader={null}` |
+| Ability scores | `ScoreBreakdownTable` (`variant="stat"`) | Single component column (`Score`); short fixed labels — compact prioritize mode optional |
 
-Styles live in `src/styles.css` (`.skill-modifier-table`, `.stat-score-table`). Cell primitives live in `src/ui/scoreTableCells.tsx`.
+Styles live in `src/styles.css` (`.table-scrollport`, `.score-breakdown-table`, modifiers `--stat` / `--skill`). Cell primitives: `src/ui/scoreTableCells.tsx`. Table stack: `ScoreBreakdownTable` → `TableScrollport` + `useMeasuredLabelWidth`.
 
-**Skills (`SkillModifierTable`)**
+**Skills (`variant="skill"`)**
 
-- Grid: bonus column (`minmax(2.35rem, max-content)`), name column (`minmax(var(--skill-name-block-width), 1fr)`), then five fixed-width component columns.
-- On mount and resize, measure every `.skill-modifier-table__name-text` (and header) and set `--skill-name-block-width` to the widest natural width so `Acrobatics` and `Diplomacy` share one name track.
+- Grid: bonus column (`minmax(2.35rem, max-content)`), label column (`minmax(var(--score-breakdown-label-width), 1fr)`), then five fixed-width component columns (`minmax(W, W)` per track).
+- On mount and resize, measure every `.score-breakdown-table__label-text` (and header) and set `--score-breakdown-label-width` to the widest natural width so `Acrobatics` and `Diplomacy` share one label track.
 - Name cell may include trailing metadata (trained `(T)`, ability code right-aligned) inside the measured block; glossary hover attaches to the name affordance, not the bonus cell.
-- Table `overflow: hidden` — modifier columns fall off the right edge when narrow.
+- Root: `width: 100%`, `max-width: 100%`, `overflow-x: auto`. Rows: `width: 100%`, `min-width: max-content`.
 
-**Defenses, speed, initiative (`StatScoreTable` + `prioritizeStatLabel` + `stat-score-table--compact`)**
+**Defenses, speed, initiative (`variant="stat"` + `prioritizeLabel` + `compact`)**
 
-- Pass `prioritizeStatLabel` on any character-sheet breakdown where component columns can crowd the label.
-- Use `stat-score-table--compact` so all component tracks sit in one grid row (not a nested breakdown subgrid) and the label column is `minmax(var(--stat-label-min-width), 1fr)`.
-- `StatScoreTable` measures `.stat-score-table__stat-label-text` and `.stat-score-table__stat-hdr`, then sets `--stat-label-min-width` to the longest label (including `DEFENSE` when `statHeader` is set). Short labels (`AC`, `Will`, `Speed`) use the same column width as `Fortitude` / `Initiative`.
-- Bonus column `z-index: 3`, label `z-index: 2`, components `z-index: 0` — totals and names paint above clipped math.
+- Pass `prioritizeLabel` on any character-sheet breakdown where component columns can crowd the label.
+- Pass `compact` so all component tracks sit in one grid row; `ScoreBreakdownTable` wraps header + rows in `.score-breakdown-table__sync-grid` (subgrid) so label and component columns stay aligned across rows.
+- Label column track: `minmax(var(--score-breakdown-label-width), 1fr)` on the sync grid. `--score-breakdown-label-width` comes from DOM measure + estimate (includes `DEFENSE` header when `labelHeader` is set). Short labels (`AC`, `Will`, `Speed`) share the same column width as `Fortitude` / `Initiative`.
+- **Scrollport** (outer `.score-breakdown-table--prioritize-label`): `min-width: 0`, `width: 100%`, `overflow-x: auto`. **Inner grid** (`.score-breakdown-table__sync-grid`): `min-width: max-content`, `width: 100%`. Component columns emitted as `minmax(W, W)`.
+- Bonus column `z-index: 3`, label `z-index: 2`, components `z-index: 0` — totals and names stay visually anchored during horizontal scroll.
 - Signed totals (initiative) use `signedTotal` / `formatScoreTotalDisplay` (`+N` / `N`).
 
 **Ability scores**
 
-- Same `StatScoreTable` / `ScoreModCell` family for consistency; only one breakdown column and three-letter labels, so full prioritize/compact stack is usually unnecessary.
+- Same `ScoreBreakdownTable` / `ScoreModCell` family for consistency; only one breakdown column and three-letter labels, so full prioritize/compact stack is usually unnecessary.
+- Uses the same `width: 100%` / `overflow-x: auto` scrollport as other stat tables; label column `minmax(0, 1fr)` absorbs extra width.
 - Glossary tooltips on ability codes follow the label-only tooltip rule (not on the numeric score cell).
+
+**Builder ability table**
+
+- Physical / mental ability `<table>` elements in `CharacterBuilderApp` are wrapped in `.table-h-scroll` (same native-table contract as above).
 
 **Adding a new breakdown table**
 
-- Extend `StatScoreTable` or `SkillModifierTable` — do not hand-roll grids on the character sheet.
-- If the table has multiple component columns and a variable-width name, enable `prioritizeStatLabel` (and `stat-score-table--compact` for stat-style tables).
+- Use `ScoreBreakdownTable` with `variant="skill"` or `variant="stat"` — do not hand-roll grids on the character sheet.
+- If the table has multiple component columns and a variable-width name, enable `prioritizeLabel` (and `compact` for stat-style tables).
 - Measure the longest label in that table instance; never hard-code per-row label widths.
-- Verify by narrowing the overview column: bonus and name stay readable; right-side columns clip cleanly with no text collision.
+- Verify: (1) wide panel — table spans full panel width, label column grows; (2) narrow panel — horizontal scrollbar appears before columns overlap or truncate; (3) row height stays readable (no vertical crush).
 
 See also **Layout and Responsiveness** (content priority when stacking) and the UI review checklist items for score tables.
 
@@ -242,7 +295,7 @@ See also **Layout and Responsiveness** (content priority when stacking) and the 
 - Align on common breakpoints and avoid feature-specific breakpoint values unless required.
 - Keep responsive behavior predictable: stack, collapse, or scroll based on content priority.
 - Preserve critical actions and key metadata visibility across viewport sizes.
-- **Character sheet overview columns** use `minWidth: 0` and `overflow: hidden` on side columns so grids can shrink; score breakdown tables inside those columns must still honor the [score table resize contract](#character-sheet-score-breakdown-tables) (bonus + name stay visible; math columns clip on the right).
+- **Character sheet overview columns** use `minWidth: 0` and `overflow: hidden` on side columns so grids can shrink; tables inside those columns must still honor [table sizing and horizontal scroll](#table-sizing-and-horizontal-scroll-all-tables) (full width of slot, horizontal scroll when squeezed).
 
 For all major screens, define behavior for:
 
@@ -302,9 +355,14 @@ Use this checklist before merging UI/style/look-and-feel work:
 - [ ] Obvious one-off styles were avoided or justified with a clear reason.
 - [ ] Glossary or rules hover tooltips are not attached to raw value inputs; they use labels or explicit help text instead.
 - [ ] Expand/collapse sections use `CollapsibleDisclosure` (or `CollapsibleDisclosureArrow` for non-details toggles), not ad-hoc arrows or placeholders.
-- [ ] Character sheet score tables use `SkillModifierTable` / `StatScoreTable` with shared `scoreTableCells` styling — not one-off layouts.
-- [ ] Breakdown tables with variable-width names use measured label width (`--skill-name-block-width` or `--stat-label-min-width`) and a single shared name column per table.
-- [ ] Resizing or narrowing the panel keeps the **bonus/total** and **row name** readable; only right-hand component columns clip (no table-level horizontal scroll, no label-on-math overlap).
+- [ ] Data tables use the shared fill + scroll contract (`TableScrollport` / `ScoreBreakdownTable`, or thin wrappers) — not one-off layouts without horizontal scroll.
+- [ ] Table scrollports use `width: 100%` of their panel; flexible label/name columns grow with `1fr` when space allows.
+- [ ] Narrow panels show horizontal scroll on the table scrollport before columns crush or overlap (no `overflow: hidden` on table roots).
+- [ ] Character sheet score tables use shared `scoreTableCells` styling; variable-width names use measured label width (`--skill-name-block-width` or `--stat-label-min-width`).
+- [ ] Score breakdown tables keep **bonus/total** and **row name** readable; short labels use the same name column width as the longest label in that table.
+- [ ] Prioritize/compact stat tables use `.score-breakdown-table__sync-grid` (subgrid), not independent per-row column sizing.
+- [ ] Table scrollport uses `min-width: 0`; inner grid/rows use `min-width: max-content`.
+- [ ] Row height uses shared padding tokens — rows are not vertically crushed to fake fit.
 - [ ] New UI does not stack duplicate panel borders or pass-through wrappers; layout depth stays shallow unless collapsible, grid, or scroll requires otherwise.
 
 ## Update Process

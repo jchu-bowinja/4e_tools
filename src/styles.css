@@ -1570,69 +1570,84 @@ button.encounter-roster-stat-cards-expand-btn[aria-pressed="true"] .template-jso
   }
 }
 
-/* Stat score tables (speed, initiative, defenses) share spacing tokens with skills. */
-.stat-score-table {
-  --stat-bonus-col: minmax(2.35rem, max-content);
-  --stat-label-col: minmax(0, 1fr);
-  --skill-bonus-name-gap: 0.4rem;
-  --skill-col-gap: 0.2rem;
+/* Shared horizontal scrollport for data tables (see TableScrollport). */
+.table-scrollport,
+.table-h-scroll {
   min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  overflow-x: auto;
+}
+
+.table-scrollport > table,
+.table-h-scroll > table {
+  width: 100%;
+  min-width: max-content;
+}
+
+/* Score breakdown tables — stat variant (defenses, speed, initiative, abilities). */
+.score-breakdown-table--stat {
+  --score-breakdown-bonus-col: minmax(2.35rem, max-content);
+  --score-breakdown-label-col: minmax(0, 1fr);
+  --score-breakdown-bonus-label-gap: 0.4rem;
+  --score-breakdown-col-gap: 0.2rem;
+  max-width: 100%;
   width: 100%;
   font-variant-numeric: tabular-nums;
-  overflow: visible;
 }
 
-.stat-score-table .stat-score-table__header,
-.stat-score-table .stat-score-table__row {
+.score-breakdown-table--stat .score-breakdown-table__header,
+.score-breakdown-table--stat .score-breakdown-table__row {
   display: grid;
-  grid-template-columns: var(--stat-bonus-col) var(--stat-label-col) var(--stat-score-comp-cols);
-  column-gap: var(--skill-col-gap);
+  grid-template-columns: var(--score-breakdown-bonus-col) var(--score-breakdown-label-col) var(--score-breakdown-comp-cols);
+  column-gap: var(--score-breakdown-col-gap);
   align-items: center;
-  overflow: visible;
+  width: 100%;
+  min-width: max-content;
 }
 
-.stat-score-table--no-components .stat-score-table__header,
-.stat-score-table--no-components .stat-score-table__row {
-  grid-template-columns: var(--stat-bonus-col) var(--stat-label-col);
+.score-breakdown-table--stat.score-breakdown-table--no-components .score-breakdown-table__header,
+.score-breakdown-table--stat.score-breakdown-table--no-components .score-breakdown-table__row {
+  grid-template-columns: var(--score-breakdown-bonus-col) var(--score-breakdown-label-col);
 }
 
-.stat-score-table .stat-score-table__header {
+.score-breakdown-table--stat .score-breakdown-table__header {
   margin-bottom: 0.08rem;
 }
 
-.stat-score-table .stat-score-table__row + .stat-score-table__row {
+.score-breakdown-table--stat .score-breakdown-table__row + .score-breakdown-table__row {
   margin-top: 0.04rem;
 }
 
-.stat-score-table .stat-score-table__bonus {
+.score-breakdown-table--stat .score-breakdown-table__bonus {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 0.1rem var(--skill-bonus-name-gap) 0.1rem 0.05rem;
+  padding: 0.1rem var(--score-breakdown-bonus-label-gap) 0.1rem 0.05rem;
   min-width: 0;
 }
 
-.stat-score-table .stat-score-table__bonus-hdr {
-  padding-right: var(--skill-bonus-name-gap);
+.score-breakdown-table--stat .score-breakdown-table__bonus-hdr {
+  padding-right: var(--score-breakdown-bonus-label-gap);
 }
 
-.stat-score-table .stat-score-table__stat {
+.score-breakdown-table--stat .score-breakdown-table__label {
   min-width: 0;
   padding-left: 0.1rem;
 }
 
-.stat-score-table .stat-score-table__breakdown,
-.stat-score-table .stat-score-table__breakdown-hdr {
+.score-breakdown-table--stat .score-breakdown-table__breakdown,
+.score-breakdown-table--stat .score-breakdown-table__breakdown-hdr {
   display: contents;
 }
 
-.stat-score-table .stat-score-table__comp {
+.score-breakdown-table--stat .score-breakdown-table__comp {
   display: flex;
   justify-content: center;
   padding: 0.1rem 0;
 }
 
-.stat-score-table__hdr {
+.score-breakdown-table__hdr {
   font-size: 0.58rem;
   font-weight: 700;
   line-height: 1.1;
@@ -1646,221 +1661,245 @@ button.encounter-roster-stat-cards-expand-btn[aria-pressed="true"] .template-jso
   overflow: hidden;
 }
 
-.stat-score-table__hdr--stack span {
+.score-breakdown-table__hdr--stack span {
   display: block;
 }
 
-.stat-score-table__hdr--stack span + span {
+.score-breakdown-table__hdr--stack span + span {
   margin-top: 0.04rem;
 }
 
-.stat-score-table__stat-hdr {
+.score-breakdown-table__label-hdr {
   text-align: left;
   padding-left: 0.1rem;
 }
 
 /* Speed + initiative panel: one shared header, slightly denser than defenses. */
-.stat-score-table--compact .stat-score-table__header {
+.score-breakdown-table--stat.score-breakdown-table--compact .score-breakdown-table__header {
   margin-bottom: 0.06rem;
 }
 
-.stat-score-table--compact .stat-score-table__row + .stat-score-table__row {
+.score-breakdown-table--stat.score-breakdown-table--compact .score-breakdown-table__row + .score-breakdown-table__row {
   margin-top: 0.04rem;
 }
 
-.stat-score-table--compact .stat-score-table__hdr {
+.score-breakdown-table--stat.score-breakdown-table--compact .score-breakdown-table__hdr {
   padding: 0.08rem 0.1rem;
   font-size: 0.56rem;
   line-height: 1.05;
 }
 
-.stat-score-table--compact .stat-score-table__hdr--stack span + span {
+.score-breakdown-table--stat.score-breakdown-table--compact .score-breakdown-table__hdr--stack span + span {
   margin-top: 0.03rem;
 }
 
-.stat-score-table--compact .stat-score-table__bonus,
-.stat-score-table--compact .stat-score-table__comp {
+.score-breakdown-table--stat.score-breakdown-table--compact .score-breakdown-table__bonus,
+.score-breakdown-table--stat.score-breakdown-table--compact .score-breakdown-table__comp {
   padding-top: 0.07rem;
   padding-bottom: 0.07rem;
 }
 
-.stat-score-table--compact .stat-score-table__stat > span:not(.stat-score-table__stat-label) {
+.score-breakdown-table--stat.score-breakdown-table--compact .score-breakdown-table__label > span:not(.score-breakdown-table__label-wrap) {
   padding: 0.1rem 0.18rem !important;
 }
 
-.stat-score-table--compact .stat-score-table__bonus span,
-.stat-score-table--compact .stat-score-table__comp span {
+.score-breakdown-table--stat.score-breakdown-table--compact .score-breakdown-table__bonus span,
+.score-breakdown-table--stat.score-breakdown-table--compact .score-breakdown-table__comp span {
   padding: 0.06rem 0.15rem !important;
   font-size: 0.72rem !important;
   line-height: 1.15 !important;
 }
 
-/* Defenses, speed, initiative: anchor total + label; clip component columns on the right. */
-.stat-score-table--prioritize-stat {
+/* Defenses, speed, initiative: anchor total + label; scroll when component columns do not fit. */
+.score-breakdown-table--stat.score-breakdown-table--prioritize-label {
   /* Label track min = longest label in this table; may grow with content but not shrink per row. */
-  --stat-label-col: minmax(var(--stat-label-min-width, max-content), max-content);
-  display: grid;
-  grid-template-columns: var(--stat-bonus-col) var(--stat-label-col) minmax(0, 1fr);
-  grid-auto-rows: min-content;
-  column-gap: var(--skill-col-gap);
-  align-items: start;
+  --score-breakdown-label-col: minmax(var(--score-breakdown-label-width, max-content), 1fr);
+  /* Scrollport fits the panel; inner rows/grids supply min-width: max-content (same as skill breakdown tables). */
   container-type: inline-size;
-  container-name: stat-score-table;
-  overflow: hidden;
+  container-name: score-breakdown-table;
 }
 
-.stat-score-table--prioritize-stat .stat-score-table__breakdown,
-.stat-score-table--prioritize-stat .stat-score-table__breakdown-hdr {
+/* Non-compact prioritize: one parent grid + subgrid rows (e.g. breakdown subgrid on defenses without --compact). */
+.score-breakdown-table--stat.score-breakdown-table--prioritize-label:not(.score-breakdown-table--stat.score-breakdown-table--compact) {
   display: grid;
-  grid-template-columns: var(--stat-score-comp-cols);
+  grid-template-columns: var(--score-breakdown-bonus-col) var(--score-breakdown-label-col) minmax(0, 1fr);
+  grid-auto-rows: min-content;
+  column-gap: var(--score-breakdown-col-gap);
+  align-items: start;
+}
+
+.score-breakdown-table--stat.score-breakdown-table--prioritize-label .score-breakdown-table__breakdown,
+.score-breakdown-table--stat.score-breakdown-table--prioritize-label .score-breakdown-table__breakdown-hdr {
+  display: grid;
+  grid-template-columns: var(--score-breakdown-comp-cols);
   justify-content: end;
   justify-self: stretch;
   min-width: 0;
-  column-gap: var(--skill-col-gap);
+  column-gap: var(--score-breakdown-col-gap);
 }
 
-.stat-score-table--prioritize-stat.stat-score-table--no-components {
-  grid-template-columns: var(--stat-bonus-col) var(--stat-label-col);
+.score-breakdown-table--stat.score-breakdown-table--prioritize-label.score-breakdown-table--stat.score-breakdown-table--no-components {
+  grid-template-columns: var(--score-breakdown-bonus-col) var(--score-breakdown-label-col);
 }
 
-.stat-score-table--prioritize-stat .stat-score-table__header,
-.stat-score-table--prioritize-stat .stat-score-table__row {
+.score-breakdown-table--stat.score-breakdown-table--prioritize-label:not(.score-breakdown-table--stat.score-breakdown-table--compact) .score-breakdown-table__header,
+.score-breakdown-table--stat.score-breakdown-table--prioritize-label:not(.score-breakdown-table--stat.score-breakdown-table--compact) .score-breakdown-table__row {
   display: grid;
   grid-template-columns: subgrid;
   grid-column: 1 / -1;
   align-items: center;
-  overflow: hidden;
+  width: 100%;
+  min-width: max-content;
 }
 
 @supports not (grid-template-columns: subgrid) {
-  .stat-score-table--prioritize-stat .stat-score-table__header,
-  .stat-score-table--prioritize-stat .stat-score-table__row {
-    grid-template-columns: var(--stat-bonus-col) var(--stat-label-col) minmax(0, 1fr);
+  .score-breakdown-table--stat.score-breakdown-table--prioritize-label:not(.score-breakdown-table--stat.score-breakdown-table--compact) .score-breakdown-table__header,
+  .score-breakdown-table--stat.score-breakdown-table--prioritize-label:not(.score-breakdown-table--stat.score-breakdown-table--compact) .score-breakdown-table__row {
+    grid-template-columns: var(--score-breakdown-bonus-col) var(--score-breakdown-label-col) minmax(0, 1fr);
   }
 
-  .stat-score-table--prioritize-stat.stat-score-table--no-components .stat-score-table__header,
-  .stat-score-table--prioritize-stat.stat-score-table--no-components .stat-score-table__row {
-    grid-template-columns: var(--stat-bonus-col) var(--stat-label-col);
+  .score-breakdown-table--stat.score-breakdown-table--prioritize-label:not(.score-breakdown-table--stat.score-breakdown-table--compact).score-breakdown-table--stat.score-breakdown-table--no-components .score-breakdown-table__header,
+  .score-breakdown-table--stat.score-breakdown-table--prioritize-label:not(.score-breakdown-table--stat.score-breakdown-table--compact).score-breakdown-table--stat.score-breakdown-table--no-components .score-breakdown-table__row {
+    grid-template-columns: var(--score-breakdown-bonus-col) var(--score-breakdown-label-col);
   }
 }
 
-.stat-score-table--prioritize-stat .stat-score-table__bonus,
-.stat-score-table--prioritize-stat .stat-score-table__stat,
-.stat-score-table--prioritize-stat .stat-score-table__comp {
+.score-breakdown-table--stat.score-breakdown-table--prioritize-label .score-breakdown-table__bonus,
+.score-breakdown-table--stat.score-breakdown-table--prioritize-label .score-breakdown-table__label,
+.score-breakdown-table--stat.score-breakdown-table--prioritize-label .score-breakdown-table__comp {
   align-self: center;
 }
 
-.stat-score-table--prioritize-stat .stat-score-table__bonus {
+.score-breakdown-table--stat.score-breakdown-table--prioritize-label .score-breakdown-table__bonus {
   position: relative;
   z-index: 3;
   overflow: visible;
 }
 
-.stat-score-table--prioritize-stat .stat-score-table__stat {
+.score-breakdown-table--stat.score-breakdown-table--prioritize-label .score-breakdown-table__label {
   position: relative;
   z-index: 2;
   overflow: visible;
 }
 
-.stat-score-table--prioritize-stat .stat-score-table__stat-label {
+.score-breakdown-table--stat.score-breakdown-table--prioritize-label .score-breakdown-table__label-wrap {
   display: block;
   width: 100%;
   min-width: 0;
 }
 
-.stat-score-table--prioritize-stat .stat-score-table__stat {
-  min-width: 0;
-}
-
-.stat-score-table--prioritize-stat .stat-score-table__stat-label-text {
+.score-breakdown-table--stat.score-breakdown-table--prioritize-label .score-breakdown-table__label-text {
   display: block;
   box-sizing: border-box;
   width: 100%;
-  min-width: var(--stat-label-min-width, max-content);
+  min-width: var(--score-breakdown-label-width, max-content);
   max-width: 100%;
   line-height: 1.15;
   vertical-align: middle;
   overflow: visible;
   text-overflow: clip;
   white-space: nowrap;
-  background-color: var(--stat-row-bg, var(--surface-0));
+  background-color: var(--score-breakdown-row-bg, var(--surface-0));
   padding: 0.1rem 0.28rem 0.1rem 0.18rem;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
 
 /* Defenses: pill-width label stripe; column gap shows before Base + ½ Lvl (not full-cell fill). */
-.stat-score-table--prioritize-stat:not(.stat-score-table--compact) .stat-score-table__stat-label {
+.score-breakdown-table--stat.score-breakdown-table--prioritize-label:not(.score-breakdown-table--stat.score-breakdown-table--compact) .score-breakdown-table__label-wrap {
   width: max-content;
   max-width: 100%;
 }
 
-.stat-score-table--prioritize-stat:not(.stat-score-table--compact) .stat-score-table__stat-label-text {
+.score-breakdown-table--stat.score-breakdown-table--prioritize-label:not(.score-breakdown-table--stat.score-breakdown-table--compact) .score-breakdown-table__label-text {
   width: max-content;
-  min-width: var(--stat-label-min-width, max-content);
+  min-width: var(--score-breakdown-label-width, max-content);
 }
 
 /* Keep the label header cell in the grid when empty (speed/initiative) so columns line up. */
-.stat-score-table--prioritize-stat .stat-score-table__stat-hdr:empty {
+.score-breakdown-table--stat.score-breakdown-table--prioritize-label .score-breakdown-table__label-hdr:empty {
   visibility: hidden;
 }
 
-.stat-score-table--prioritize-stat .stat-score-table__stat-hdr {
+.score-breakdown-table--stat.score-breakdown-table--prioritize-label .score-breakdown-table__label-hdr {
   display: block;
   box-sizing: border-box;
   width: max-content;
-  min-width: var(--stat-label-min-width, max-content);
+  min-width: var(--score-breakdown-label-width, max-content);
   max-width: 100%;
   line-height: 1.15;
   background-color: var(--surface-0);
   padding: 0.1rem 0.28rem 0.1rem 0.18rem;
 }
 
-/* Speed + initiative: label column grows until the Race column; component cols stay aligned. */
-.stat-score-table--compact.stat-score-table--prioritize-stat {
-  --stat-label-col: minmax(var(--stat-label-min-width, max-content), 1fr);
-  grid-template-columns: var(--stat-bonus-col) var(--stat-label-col) var(--stat-score-comp-cols);
+/* Speed + initiative (+ compact defenses): scrollport on root, shared column tracks on inner sync grid. */
+.score-breakdown-table--stat.score-breakdown-table--compact.score-breakdown-table--stat.score-breakdown-table--prioritize-label .score-breakdown-table__sync-grid {
+  display: grid;
+  grid-template-columns: var(--score-breakdown-bonus-col) var(--score-breakdown-label-col) var(--score-breakdown-comp-cols);
+  column-gap: var(--score-breakdown-col-gap);
+  align-items: start;
+  width: 100%;
+  min-width: max-content;
 }
 
-.stat-score-table--compact.stat-score-table--prioritize-stat .stat-score-table__breakdown,
-.stat-score-table--compact.stat-score-table--prioritize-stat .stat-score-table__breakdown-hdr {
+.score-breakdown-table--stat.score-breakdown-table--compact.score-breakdown-table--stat.score-breakdown-table--prioritize-label .score-breakdown-table__sync-grid .score-breakdown-table__header,
+.score-breakdown-table--stat.score-breakdown-table--compact.score-breakdown-table--stat.score-breakdown-table--prioritize-label .score-breakdown-table__sync-grid .score-breakdown-table__row {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+  align-items: center;
+}
+
+.score-breakdown-table--stat.score-breakdown-table--compact.score-breakdown-table--stat.score-breakdown-table--prioritize-label .score-breakdown-table__breakdown,
+.score-breakdown-table--stat.score-breakdown-table--compact.score-breakdown-table--stat.score-breakdown-table--prioritize-label .score-breakdown-table__breakdown-hdr {
   display: contents;
 }
 
 @supports not (grid-template-columns: subgrid) {
-  .stat-score-table--compact.stat-score-table--prioritize-stat .stat-score-table__header,
-  .stat-score-table--compact.stat-score-table--prioritize-stat .stat-score-table__row {
-    grid-template-columns: var(--stat-bonus-col) var(--stat-label-col) var(--stat-score-comp-cols);
+  .score-breakdown-table--stat.score-breakdown-table--compact.score-breakdown-table--stat.score-breakdown-table--prioritize-label .score-breakdown-table__sync-grid .score-breakdown-table__header,
+  .score-breakdown-table--stat.score-breakdown-table--compact.score-breakdown-table--stat.score-breakdown-table--prioritize-label .score-breakdown-table__sync-grid .score-breakdown-table__row {
+    grid-template-columns: var(--score-breakdown-bonus-col) var(--score-breakdown-label-col) var(--score-breakdown-comp-cols);
+    column-gap: var(--score-breakdown-col-gap);
   }
 }
 
-.stat-score-table--compact.stat-score-table--prioritize-stat .stat-score-table__stat-hdr {
+.character-sheet-motion-panel {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.score-breakdown-table--stat.score-breakdown-table--compact.score-breakdown-table--stat.score-breakdown-table--prioritize-label .score-breakdown-table__label-hdr {
   width: 100%;
 }
 
 /* Motion (speed + initiative): match defenses row density; fill label column to Race. */
-.stat-score-table--compact.stat-score-table--prioritize-stat .stat-score-table__stat-label {
+.score-breakdown-table--stat.score-breakdown-table--compact.score-breakdown-table--stat.score-breakdown-table--prioritize-label .score-breakdown-table__label-wrap {
   width: 100%;
 }
 
-.stat-score-table--compact.stat-score-table--prioritize-stat .stat-score-table__stat-label-text,
-.stat-score-table--compact.stat-score-table--prioritize-stat .stat-score-table__stat-hdr {
+.score-breakdown-table--stat.score-breakdown-table--compact.score-breakdown-table--stat.score-breakdown-table--prioritize-label .score-breakdown-table__label-text,
+.score-breakdown-table--stat.score-breakdown-table--compact.score-breakdown-table--stat.score-breakdown-table--prioritize-label .score-breakdown-table__label-hdr {
   padding: 0.07rem 0.22rem 0.07rem 0.15rem;
 }
 
-.stat-score-table--compact.stat-score-table--prioritize-stat .stat-score-table__stat-label-text {
+.score-breakdown-table--stat.score-breakdown-table--compact.score-breakdown-table--stat.score-breakdown-table--prioritize-label .score-breakdown-table__label-text {
   width: 100%;
 }
 
-.stat-score-table--prioritize-stat .stat-score-table__comp {
+.score-breakdown-table--stat.score-breakdown-table--compact.score-breakdown-table--stat.score-breakdown-table--prioritize-label .score-breakdown-table__label,
+.score-breakdown-table--stat.score-breakdown-table--compact.score-breakdown-table--stat.score-breakdown-table--prioritize-label .score-breakdown-table__comp {
+  min-width: min-content;
+}
+
+.score-breakdown-table--stat.score-breakdown-table--prioritize-label .score-breakdown-table__comp {
   position: relative;
   z-index: 0;
 }
 
-/* Skill modifier table: clip component columns on the right when the panel is narrow. */
-.skill-modifier-table {
-  --skill-bonus-col: minmax(2.35rem, max-content);
-  --skill-name-col: minmax(var(--skill-name-block-width, max-content), 1fr);
+/* Score breakdown tables — skill variant. */
+.score-breakdown-table--skill.score-breakdown-table--prioritize-label {
+  --score-breakdown-bonus-col: minmax(2.35rem, max-content);
+  --score-breakdown-label-col: minmax(var(--score-breakdown-label-width, max-content), 1fr);
   --skill-comp-col: 1.85rem;
   --skill-comp-col-trained: 2.15rem;
   --skill-comp-col-armor: 3.15rem;
@@ -1868,63 +1907,61 @@ button.encounter-roster-stat-cards-expand-btn[aria-pressed="true"] .template-jso
   --skill-comp-cols:
     var(--skill-comp-col) var(--skill-comp-col) var(--skill-comp-col-trained) var(--skill-comp-col-armor)
     var(--skill-comp-col-misc);
-  --skill-bonus-name-gap: 0.4rem;
-  --skill-col-gap: 0.2rem;
+  --score-breakdown-bonus-label-gap: 0.4rem;
+  --score-breakdown-col-gap: 0.2rem;
   display: flex;
   flex-direction: column;
-  min-width: 0;
-  width: 100%;
   font-variant-numeric: tabular-nums;
-  overflow: hidden;
 }
 
-.skill-modifier-table__header,
-.skill-modifier-table__row {
+.score-breakdown-table--skill .score-breakdown-table__header,
+.score-breakdown-table--skill .score-breakdown-table__row {
   display: grid;
   grid-template-columns:
-    var(--skill-bonus-col)
-    var(--skill-name-col)
+    var(--score-breakdown-bonus-col)
+    var(--score-breakdown-label-col)
     var(--skill-comp-col)
     var(--skill-comp-col)
     var(--skill-comp-col-trained)
     var(--skill-comp-col-armor)
     var(--skill-comp-col-misc);
-  column-gap: var(--skill-col-gap);
+  column-gap: var(--score-breakdown-col-gap);
   align-items: center;
+  width: 100%;
+  min-width: max-content;
 }
 
-.skill-modifier-table__header {
+.score-breakdown-table--skill .score-breakdown-table__header {
   margin-bottom: 0.08rem;
 }
 
-.skill-modifier-table__row + .skill-modifier-table__row {
+.score-breakdown-table--skill .score-breakdown-table__row + .score-breakdown-table__row {
   margin-top: 0.04rem;
 }
 
-.skill-modifier-table__bonus-hdr {
-  padding-right: var(--skill-bonus-name-gap);
+.score-breakdown-table--skill .score-breakdown-table__bonus-hdr {
+  padding-right: var(--score-breakdown-bonus-label-gap);
 }
 
-.skill-modifier-table__name-hdr {
+.score-breakdown-table--skill .score-breakdown-table__label-hdr {
   text-align: left;
   padding-left: 0.1rem;
 }
 
-.skill-modifier-table__bonus {
+.score-breakdown-table--skill .score-breakdown-table__bonus {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 0.1rem var(--skill-bonus-name-gap) 0.1rem 0.05rem;
+  padding: 0.1rem var(--score-breakdown-bonus-label-gap) 0.1rem 0.05rem;
   min-width: 0;
 }
 
-.skill-modifier-table__name {
+.score-breakdown-table--skill .score-breakdown-table__label {
   min-width: 0;
   padding-left: 0.1rem;
-  overflow: hidden;
 }
 
-.skill-modifier-table__name-text {
+.score-breakdown-table--skill .score-breakdown-table__label-text {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -1934,17 +1971,17 @@ button.encounter-roster-stat-cards-expand-btn[aria-pressed="true"] .template-jso
   white-space: nowrap;
 }
 
-.skill-modifier-table__name-leading {
+.score-breakdown-table--skill .score-breakdown-table__label-leading {
   min-width: 0;
   flex: 1 1 auto;
 }
 
-.skill-modifier-table__name-trained {
+.score-breakdown-table--skill .score-breakdown-table__label-trained {
   color: var(--status-success);
   font-weight: 700;
 }
 
-.skill-modifier-table__name-abil {
+.score-breakdown-table--skill .score-breakdown-table__label-abil {
   flex: 0 0 auto;
   font-weight: 700;
   font-size: 0.68rem;
@@ -1952,33 +1989,32 @@ button.encounter-roster-stat-cards-expand-btn[aria-pressed="true"] .template-jso
   text-align: right;
 }
 
-.skill-modifier-table__name-label {
+.score-breakdown-table--skill .score-breakdown-table__label-affordance {
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  overflow: hidden;
   min-width: 0;
   width: 100%;
   box-sizing: border-box;
 }
 
-.skill-modifier-table__name-label .skill-modifier-table__name-text {
+.score-breakdown-table--skill .score-breakdown-table__label-affordance .score-breakdown-table__label-text {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.skill-modifier-table__breakdown,
-.skill-modifier-table__breakdown-hdr {
+.score-breakdown-table--skill .score-breakdown-table__breakdown,
+.score-breakdown-table--skill .score-breakdown-table__breakdown-hdr {
   display: contents;
 }
 
-.skill-modifier-table__comp {
+.score-breakdown-table--skill .score-breakdown-table__comp {
   display: flex;
   justify-content: center;
   padding: 0.1rem 0;
 }
 
-.skill-modifier-table__hdr {
+.score-breakdown-table--skill .score-breakdown-table__hdr {
   font-size: 0.58rem;
   font-weight: 700;
   line-height: 1.1;
@@ -1992,11 +2028,11 @@ button.encounter-roster-stat-cards-expand-btn[aria-pressed="true"] .template-jso
   overflow: hidden;
 }
 
-.skill-modifier-table__hdr--stack span {
+.score-breakdown-table--skill .score-breakdown-table__hdr--stack span {
   display: block;
 }
 
-.skill-modifier-table__hdr--stack span + span {
+.score-breakdown-table--skill .score-breakdown-table__hdr--stack span + span {
   margin-top: 0.04rem;
 }
 
