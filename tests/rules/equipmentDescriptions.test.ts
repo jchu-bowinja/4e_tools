@@ -47,6 +47,23 @@ describe("equipmentDescriptions", () => {
     expect(desc.power).toContain("Daily");
   });
 
+  it("joins array property lines from compendium data", () => {
+    const item = {
+      id: "m2",
+      name: "Boots of Striding and Springing +4",
+      slug: "boots-striding-4",
+      property: [
+        "Gain a +1 item bonus to speed when wearing light or no armor.",
+        "Gain a +5 item bonus to Athletics checks made to jump."
+      ],
+      raw: {}
+    } as MagicItem;
+    const desc = describeMagicItem(item);
+    expect(desc.property).toContain("speed");
+    expect(desc.property).toContain("Athletics");
+    expect(desc.property).toContain("\n");
+  });
+
   it("describes weapon from stats when body is missing", () => {
     const weapon: Weapon = {
       id: "w1",

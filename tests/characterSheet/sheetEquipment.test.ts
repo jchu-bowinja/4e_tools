@@ -439,12 +439,13 @@ describe("equipSlotShouldDisplay", () => {
     expect(equipSlotShouldDisplay([], {}, "neck", index)).toBe(false);
   });
 
-  it("shows slots with configured equipment-tab items", () => {
+  it("hides slots that are only configured on the equipment tab", () => {
     const equipment = {
       armor: { baseId: plate.id, enhancement: 0 },
-      neck: { enhancement: 0 }
+      neck: { enchantmentId: cloak.id, enhancement: 1 }
     };
-    expect(equipSlotShouldDisplay([], {}, "armor", index, equipment)).toBe(true);
+    expect(equipSlotShouldDisplay([], {}, "armor", index, equipment)).toBe(false);
+    expect(equipSlotShouldDisplay([], {}, "neck", index, equipment)).toBe(false);
     expect(equipSlotShouldDisplay([], {}, "implement", index, equipment)).toBe(false);
   });
 
@@ -479,8 +480,8 @@ describe("equipSlotDropdownChoices", () => {
     };
     expect(equipSlotDropdownChoices([], {}, "armor", index, build.equipment)).toHaveLength(0);
     expect(equipSlotDropdownChoices([], {}, "neck", index, build.equipment)).toHaveLength(0);
-    expect(equipSlotShouldDisplay([], {}, "armor", index, build.equipment)).toBe(true);
-    expect(equipSlotShouldDisplay([], {}, "neck", index, build.equipment)).toBe(true);
+    expect(equipSlotShouldDisplay([], {}, "armor", index, build.equipment)).toBe(false);
+    expect(equipSlotShouldDisplay([], {}, "neck", index, build.equipment)).toBe(false);
   });
 
   it("lists inventory items that fit each gear slot", () => {

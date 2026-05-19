@@ -56,19 +56,36 @@ export interface MagicItemDescription {
   requirement?: string;
 }
 
+/** Normalize compendium text fields that may be strings or string arrays. */
+function magicItemTextField(value: unknown): string | undefined {
+  if (value == null) return undefined;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed || undefined;
+  }
+  if (Array.isArray(value)) {
+    const lines = value
+      .map((entry) => (typeof entry === "string" ? entry.trim() : String(entry).trim()))
+      .filter(Boolean);
+    return lines.length > 0 ? lines.join("\n") : undefined;
+  }
+  const trimmed = String(value).trim();
+  return trimmed || undefined;
+}
+
 export function describeMagicItem(item: MagicItem): MagicItemDescription {
   const out: MagicItemDescription = {};
-  const flavor = item.flavor?.trim();
+  const flavor = magicItemTextField(item.flavor);
   if (flavor) out.flavor = flavor;
-  const property = item.property?.trim();
+  const property = magicItemTextField(item.property);
   if (property) out.property = property;
-  const power = item.power?.trim();
+  const power = magicItemTextField(item.power);
   if (power) out.power = power;
-  const critical = item.critical?.trim();
+  const critical = magicItemTextField(item.critical);
   if (critical) out.critical = critical;
-  const enhancement = item.enhancement?.trim();
+  const enhancement = magicItemTextField(item.enhancement);
   if (enhancement) out.enhancement = enhancement;
-  const requirement = item.requirement?.trim();
+  const requirement = magicItemTextField(item.requirement);
   if (requirement) out.requirement = requirement;
   return out;
 }

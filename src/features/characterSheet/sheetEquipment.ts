@@ -526,17 +526,6 @@ export function canSelectInventoryItemForEquipSlot(
   return { allowed: true };
 }
 
-function slotHasConfiguredEquipment(
-  slot: EquippedSlotKey,
-  characterEquipment: CharacterEquipment,
-  index: RulesIndex
-): boolean {
-  const normalized = normalizeCharacterEquipment(characterEquipment);
-  if (configInventoryItemForSlot(index, slot, normalized)) return true;
-  if (slot === "offHand" && configInventoryItemForSlot(index, "shield", normalized)) return true;
-  return false;
-}
-
 /** Inventory rows eligible for a gear-slot dropdown (inventory only; not equipment-tab config). */
 export function equipSlotDropdownChoices(
   inventory: InventoryItem[],
@@ -561,18 +550,15 @@ export function equipSlotDropdownChoices(
   return choices.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
 }
 
-/** True when the slot is filled or the character has inventory/config items that fit it. */
+/** True when the slot is filled or inventory has items that fit it. */
 export function equipSlotShouldDisplay(
   inventory: InventoryItem[],
   equippedSlots: Partial<Record<EquippedSlotKey, string>>,
   slot: EquippedSlotKey,
   index: RulesIndex,
-  characterEquipment?: CharacterEquipment
+  _characterEquipment?: CharacterEquipment
 ): boolean {
   if (selectedEquipSlotItemId(slot, inventory, equippedSlots)) {
-    return true;
-  }
-  if (characterEquipment && slotHasConfiguredEquipment(slot, characterEquipment, index)) {
     return true;
   }
   return equipSlotDropdownChoices(inventory, equippedSlots, slot, index).length > 0;
