@@ -2181,7 +2181,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             >
               Load Into Sheet
             </button>
-          </motion.div>
+          </div>
           <div className="character-sheet-overview-row" style={{ ...overviewThreeColumnGridStyle, gridColumn: "1 / -1" }}>
             <div style={overviewSideColumnStyle}>
               <section style={characterOverviewPanelStyle}>
