@@ -811,6 +811,8 @@ function importBuildFromFile(
 
 type BuilderPersistenceToolbarProps = {
   index: RulesIndex;
+  build: CharacterBuild;
+  nameDraft: string;
   commitNameDraft: () => CharacterBuild;
   onBuildChange: (build: CharacterBuild) => void;
   savedCharacters: ReturnType<typeof loadSavedCharacters>;
@@ -818,6 +820,10 @@ type BuilderPersistenceToolbarProps = {
   activeSavedCharacterId: string;
   onActiveSavedCharacterIdChange: (id: string) => void;
 };
+
+function effectiveBuilderBuild(build: CharacterBuild, nameDraft: string): CharacterBuild {
+  return nameDraft === build.name ? build : { ...build, name: nameDraft };
+}
 
 function resolveSaveOverwriteTarget(
   entries: ReturnType<typeof loadSavedCharacters>,
@@ -852,6 +858,8 @@ function builderHasUnsavedChanges(
 
 function BuilderPersistenceToolbar({
   index,
+  build,
+  nameDraft,
   commitNameDraft,
   onBuildChange,
   savedCharacters,
@@ -864,6 +872,12 @@ function BuilderPersistenceToolbar({
   const pickerTitleId = useId();
   const [pickerAction, setPickerAction] = useState<SavedCharacterPickerAction | null>(null);
   const [pickerSelectedId, setPickerSelectedId] = useState("");
+
+  const effectiveBuild = useMemo(() => effectiveBuilderBuild(build, nameDraft), [build, nameDraft]);
+  const hasUnsavedChanges = useMemo(
+    () => builderHasUnsavedChanges(effectiveBuild, index, activeSavedCharacterId, savedCharacters),
+    [effectiveBuild, index, activeSavedCharacterId, savedCharacters]
+  );
 
   useEffect(() => {
     const el = pickerDialogRef.current;
@@ -928,6 +942,9 @@ function BuilderPersistenceToolbar({
     <div style={persistenceToolbarStyle} aria-label="Character file actions">
       <button
         type="button"
+        className={hasUnsavedChanges ? "builder-persistence-save--unsaved" : undefined}
+        title={hasUnsavedChanges ? "Unsaved changes — save to Character Sheet" : undefined}
+        aria-label={hasUnsavedChanges ? "Save character (unsaved changes)" : "Save character"}
         onClick={() => {
           const buildToSave = commitNameDraft();
           const requestedName = (buildToSave.name || "Unnamed Character").trim() || "Unnamed Character";
@@ -948,7 +965,7 @@ function BuilderPersistenceToolbar({
           alert(`${actionLabel} "${result.entry.name}" for Character Sheet.`);
         }}
       >
-        Save
+        Save{hasUnsavedChanges ? " *" : ""}
       </button>
       <button type="button" onClick={() => openPicker("load")}>
         Load
@@ -978,9 +995,8 @@ function BuilderPersistenceToolbar({
       <button
         type="button"
         onClick={() => {
-          const current = commitNameDraft();
           if (
-            builderHasUnsavedChanges(current, index, activeSavedCharacterId, savedCharacters) &&
+            hasUnsavedChanges &&
             !window.confirm("Reset the builder? Unsaved changes to this character will be lost.")
           ) {
             return;
@@ -2066,6 +2082,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         <h1 style={pageTitleStyle}>D&amp;D 4e Character Builder</h1>
         <BuilderPersistenceToolbar
           index={index}
+          build={build}
+          nameDraft={nameDraft}
           commitNameDraft={commitNameDraft}
           onBuildChange={updateBuild}
           savedCharacters={savedCharacters}

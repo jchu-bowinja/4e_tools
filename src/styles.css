@@ -2405,3 +2405,18 @@ button.builder-tab-carousel__tab--active:focus-visible {
     scroll-behavior: auto !important;
   }
 }
+
+button.builder-persistence-save--unsaved {
+  border-color: var(--status-warning);
+  background: color-mix(in srgb, var(--status-warning) 14%, var(--button-background));
+  font-weight: 600;
+}
+
+button.builder-persistence-save--unsaved:hover:not(:disabled) {
+  border-color: var(--status-warning);
+  background: color-mix(in srgb, var(--status-warning) 22%, var(--button-background));
+}
+
+button.builder-persistence-save--unsaved:active:not(:disabled) {
+  background: color-mix(in srgb, var(--status-warning) 28%, var(--button-background));
+}
