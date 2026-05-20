@@ -79,7 +79,8 @@ Add `generated/feat_heavy_rules.json` to `.gitignore` if you do not want it comm
 
 ## Runtime follow-ups (multiclass pass 2)
 
-- **Paragon multiclassing** — `paragonMulticlassing` + `paragonMulticlassPowers` wired to builder UI, power card index, character sheet combat powers, and at-will swap into class slots. Psionic paragon MC variants (power point changes) still deferred.
+- **Paragon multiclassing** — `paragonMulticlassing` + `paragonMulticlassPowers` wired to builder UI, power card index, character sheet combat powers, and at-will swap into class slots.
+- **Psionic power point adjustments** — `powerPointSwapChange` on PHB3 Dabbler / Conventionalist offers; `summarizePsionicPowerPointAdjustments` in builder + character sheet. Paragon +2 PP when MC into psionic at 11 (non-hybrid). Base class PP pool still manual.
 - **Internal grants** — `KI_FOCUS_USER`, `PSIONIC_SECOND_CLASS`, bloodline heritage limits in `internalGrantValidation.ts`.
 - **Compendium tags** — `MULTICLASS` / `Unlimited Multiclass` prereq tags on entry feats evaluated in `prereqEvaluator`.
 

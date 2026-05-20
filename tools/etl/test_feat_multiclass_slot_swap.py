@@ -69,6 +69,7 @@ class TestFeatMulticlassSlotSwap(unittest.TestCase):
         self.assertTrue(offer["requireAugmentableReplacement"])
         self.assertTrue(offer["replacementUsedAsEncounter"])
         self.assertNotIn("requireAugmentableSlot", offer)
+        self.assertEqual(offer["powerPointSwapChange"], "gain")
 
     def test_psionic_conventionalist_at_will_to_encounter(self):
         feat = {
@@ -83,6 +84,7 @@ class TestFeatMulticlassSlotSwap(unittest.TestCase):
         self.assertEqual(offer["replacementUsageBucket"], "encounter")
         self.assertTrue(offer["requireAugmentableSlot"])
         self.assertNotIn("requireAugmentableReplacement", offer)
+        self.assertEqual(offer["powerPointSwapChange"], "lose")
 
 
 if __name__ == "__main__":

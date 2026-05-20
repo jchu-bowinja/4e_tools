@@ -1373,11 +1373,13 @@ _PSIONIC_MULTICLASS_SWAP_BY_FEAT: Dict[str, Dict[str, Any]] = {
         "replacementUsageBucket": "atWill",
         "requireAugmentableReplacement": True,
         "replacementUsedAsEncounter": True,
+        "powerPointSwapChange": "gain",
     },
     "psionic conventionalist": {
         "usageBucket": "atWill",
         "replacementUsageBucket": "encounter",
         "requireAugmentableSlot": True,
+        "powerPointSwapChange": "lose",
     },
 }
 
@@ -1474,6 +1476,8 @@ def extract_feat_multiclass_slot_swap_offers(feat: Dict[str, Any]) -> Dict[str, 
         offer["requireAugmentableReplacement"] = True
     if replacement_used_as_encounter:
         offer["replacementUsedAsEncounter"] = True
+    if psionic_spec and psionic_spec.get("powerPointSwapChange"):
+        offer["powerPointSwapChange"] = psionic_spec["powerPointSwapChange"]
 
     return {"multiclassSlotSwapOffers": [offer]}
 

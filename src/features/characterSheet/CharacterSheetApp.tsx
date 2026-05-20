@@ -27,6 +27,7 @@ import {
 import { collectFeatModificationsByPowerId } from "../../rules/featPowerModifications";
 import { collectFeatGrantedPowersForBuild } from "../../rules/grantedPowersQuery";
 import { multiclassEntryClassId } from "../../rules/paragonMulticlassing";
+import { summarizePsionicPowerPointAdjustments } from "../../rules/psionicPowerPoints";
 import { computeSkillSheetRows } from "../../rules/skillCalculator";
 import {
   ABILITY_SCORE_COLUMNS,
@@ -1024,6 +1025,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   const featModsByPowerId = useMemo(
     () => collectFeatModificationsByPowerId(index, sheet.featIds ?? []),
     [index, sheet.featIds]
+  );
+  const psionicPowerPointSummary = useMemo(
+    () => summarizePsionicPowerPointAdjustments(index, toBuildLikeState(sheet, index)),
+    [index, sheet]
   );
   const featProficiencyGrants = useMemo(
     () => collectFeatProficiencyGrants(index, sheet.featIds ?? []),
@@ -2420,6 +2425,25 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   emptyMessage="No feats selected."
                 />
               </OverviewCollapsibleSection>
+              {psionicPowerPointSummary.lines.length > 0 && (
+                <OverviewCollapsibleSection title="Power point adjustments" defaultOpen>
+                  <ul style={{ margin: 0, paddingLeft: "1.1rem", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
+                    {psionicPowerPointSummary.lines.map((line) => (
+                      <li key={line.label} style={{ marginBottom: "0.2rem" }}>
+                        <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{line.label}</span>
+                        {": "}
+                        {line.delta > 0 ? "+" : ""}
+                        {line.delta}
+                        {line.detail ? ` (${line.detail})` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                  <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                    Net {psionicPowerPointSummary.total > 0 ? "+" : ""}
+                    {psionicPowerPointSummary.total} to your class power point pool (add to base from class).
+                  </p>
+                </OverviewCollapsibleSection>
+              )}
               {featGrantedTraitRows.length > 0 && (
                 <OverviewCollapsibleSection title="Granted by feats">
                   <TraitRowsList rows={featGrantedTraitRows} emptyMessage="No feat-granted features." />

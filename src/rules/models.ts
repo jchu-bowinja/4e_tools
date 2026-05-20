@@ -155,6 +155,8 @@ export interface FeatMulticlassSlotSwapOffer {
   requireAugmentableReplacement?: boolean;
   /** Swapped-in power is used once per encounter (paired rules.modify in compendium). */
   replacementUsedAsEncounter?: boolean;
+  /** PHB3: gain or lose power points when the swap is active (Dabbler / Conventionalist). */
+  powerPointSwapChange?: "gain" | "lose";
 }
 
 /** Active power-replace (named or multiclass slot swap). */

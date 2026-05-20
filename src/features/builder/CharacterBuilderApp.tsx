@@ -125,6 +125,10 @@ import {
 } from "../../rules/featGrantFlags";
 import { pruneStalePowerSelections } from "../../rules/powerSelections";
 import {
+  powerPointsForPrintedLevel,
+  summarizePsionicPowerPointAdjustments
+} from "../../rules/psionicPowerPoints";
+import {
   collectFeatProficiencyDisplayRows,
   collectFeatProficiencyGrants
 } from "../../rules/featProficiencies";
@@ -1618,6 +1622,10 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   const paragonAtWillSlots = useMemo(
     () => (build.paragonMulticlassing ? paragonAtWillSlotDefs(index, build) : []),
     [index, build.paragonMulticlassing, build.level, build.characterStyle, build.raceSelections]
+  );
+  const psionicPowerPointSummary = useMemo(
+    () => summarizePsionicPowerPointAdjustments(index, build),
+    [index, build]
   );
   const themeGrantedPowers = useMemo(() => {
     if (!build.themeId) return [];
@@ -4033,6 +4041,36 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                         );
                       })}
                     </ul>
+                    {psionicPowerPointSummary.lines.length > 0 && (
+                      <div
+                        style={{
+                          marginTop: "0.45rem",
+                          padding: "0.4rem 0.5rem",
+                          borderRadius: "6px",
+                          border: "1px solid color-mix(in srgb, var(--status-info) 30%, var(--panel-border))",
+                          backgroundColor: "color-mix(in srgb, var(--status-info) 6%, var(--surface-1))"
+                        }}
+                      >
+                        <div style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "0.25rem" }}>
+                          Power point adjustments
+                        </div>
+                        <ul style={{ margin: 0, paddingLeft: "1.1rem", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                          {psionicPowerPointSummary.lines.map((line) => (
+                            <li key={line.label} style={{ marginBottom: "0.15rem" }}>
+                              <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{line.label}</span>
+                              {": "}
+                              {line.delta > 0 ? "+" : ""}
+                              {line.delta}
+                              {line.detail ? ` (${line.detail})` : ""}
+                            </li>
+                          ))}
+                        </ul>
+                        <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.76rem", color: "var(--text-muted)" }}>
+                          Net {psionicPowerPointSummary.total > 0 ? "+" : ""}
+                          {psionicPowerPointSummary.total} to your class power point pool (add to your base from class).
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
                 {featModifiedPowers.length > 0 && (
@@ -4304,6 +4342,19 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                                     {row.offer.replacementUsedAsEncounter
                                       ? " Swapped power is usable once per encounter."
                                       : ""}
+                                    {row.offer.powerPointSwapChange && active
+                                      ? (() => {
+                                          const state = build.featPowerReplacements?.[row.feat.id];
+                                          const level =
+                                            row.offer.powerPointSwapChange === "gain"
+                                              ? (index.powers.find((p) => p.id === state?.replacementPowerId)?.level ?? 1)
+                                              : (index.powers.find((p) => p.id === state?.originalPowerId)?.level ?? 1);
+                                          const pts = powerPointsForPrintedLevel(level);
+                                          return row.offer.powerPointSwapChange === "gain"
+                                            ? ` Gain ${pts} power points.`
+                                            : ` Lose ${pts} power points.`;
+                                        })()
+                                      : ""}
                                   </p>
                                 </>
                               )}
@@ -4498,6 +4549,9 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   </label>
                   <p style={{ margin: "0.35rem 0 0 1.55rem", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
                     Requires Novice, Acolyte, and Adept Power. Replaces paragon path benefits with powers from your multiclass class.
+                    {psionicPowerPointSummary.lines.some((l) => l.label === "Paragon multiclassing") ? (
+                      <> At 11th level you gain +2 power points when multiclassing into a psionic class.</>
+                    ) : null}
                   </p>
                   {build.paragonMulticlassing && paragonMcClassId && (
                     <div style={{ marginTop: "0.5rem", marginLeft: "1.55rem", display: "grid", gap: "0.4rem" }}>
