@@ -36,6 +36,10 @@ type AdjustableNumberInputBaseProps = {
   fill?: boolean;
   /** Show read-only maximum beside the value as `current / max` (steppers edit current only). */
   companionMax?: number;
+  /** Show read-only leading value as `leading / value` (steppers edit value only; e.g. point-buy spent / budget). */
+  fractionLeading?: number;
+  /** Optional style for the read-only leading fraction value (e.g. match/mismatch color). */
+  fractionLeadingStyle?: CSSProperties;
 };
 
 type AdjustableNumberInputRequiredProps = AdjustableNumberInputBaseProps & {
@@ -69,10 +73,13 @@ export function AdjustableNumberInput(props: AdjustableNumberInputProps): JSX.El
     compact = false,
     fill = false,
     companionMax,
+    fractionLeading,
+    fractionLeadingStyle,
     optional = false
   } = props;
 
-  const hasCompanionMax = companionMax !== undefined;
+  const hasFractionLeading = fractionLeading !== undefined;
+  const hasCompanionMax = !hasFractionLeading && companionMax !== undefined;
   const isEmpty = optional && props.value === undefined;
   const clamped = isEmpty ? min : clamp(props.value ?? min, min, max);
 
@@ -174,6 +181,7 @@ export function AdjustableNumberInput(props: AdjustableNumberInputProps): JSX.El
     compact ? "adjustable-number--compact" : "",
     fill ? "adjustable-number--fill" : "",
     hasCompanionMax ? "adjustable-number--with-companion-max" : "",
+    hasFractionLeading ? "adjustable-number--with-fraction-leading" : "",
     className
   ]
     .filter(Boolean)
@@ -186,7 +194,9 @@ export function AdjustableNumberInput(props: AdjustableNumberInputProps): JSX.El
   const inputWidthStyle = fill
     ? inputStyle
     : {
-        width: adjustableNumberWidthCh(...(hasCompanionMax ? [widthValue] : widthValues)),
+        width: adjustableNumberWidthCh(
+          ...(hasCompanionMax || hasFractionLeading ? [widthValue] : widthValues)
+        ),
         ...inputStyle
       };
 
@@ -201,7 +211,11 @@ export function AdjustableNumberInput(props: AdjustableNumberInputProps): JSX.El
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}
       aria-label={
-        hasCompanionMax && !isEmpty ? `${ariaLabel}, ${clamped} of ${companionMax}` : ariaLabel
+        hasCompanionMax && !isEmpty
+          ? `${ariaLabel}, ${clamped} of ${companionMax}`
+          : hasFractionLeading
+            ? `${ariaLabel}, ${fractionLeading} of ${clamped} spent`
+            : ariaLabel
       }
       className="adjustable-number__input"
       style={inputWidthStyle}
@@ -210,7 +224,24 @@ export function AdjustableNumberInput(props: AdjustableNumberInputProps): JSX.El
 
   return (
     <div className={rootClass} style={style}>
-      {hasCompanionMax ? (
+      {hasFractionLeading ? (
+        <div
+          className="adjustable-number__value-pane"
+          style={{ minWidth: companionMaxPaneWidthCh(fractionLeading, clamped) }}
+        >
+          <span
+            className="adjustable-number__fraction-leading"
+            aria-hidden
+            style={{ width: adjustableNumberWidthCh(fractionLeading), ...fractionLeadingStyle }}
+          >
+            {fractionLeading}
+          </span>
+          <span className="adjustable-number__fraction-sep" aria-hidden>
+            /
+          </span>
+          {valueInput}
+        </div>
+      ) : hasCompanionMax ? (
         <div
           className="adjustable-number__value-pane"
           style={{ minWidth: companionMaxPaneWidthCh(clamped, companionMax) }}

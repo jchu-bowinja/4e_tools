@@ -86,6 +86,8 @@ export type ScoreBreakdownTableProps = {
   className?: string;
   formatTotalValue?: (row: ScoreBreakdownRowDef) => string;
   formatComponentValue?: (row: ScoreBreakdownRowDef, columnKey: string) => string;
+  /** When defined, replaces the default `ScoreModCell` for that column (return `undefined` to use default). */
+  renderComponentCell?: (row: ScoreBreakdownRowDef, columnKey: string, stripe: string) => ReactNode | undefined;
   /** Passed to `estimateLabelWidthFromStrings` for first-paint label width. */
   labelEstimatePadding?: string;
 };
@@ -105,6 +107,7 @@ export function ScoreBreakdownTable({
   className,
   formatTotalValue,
   formatComponentValue,
+  renderComponentCell,
   labelEstimatePadding = variant === "skill" ? "0.12rem 0.2rem" : "0.12rem 0.3rem 0.12rem 0.2rem"
 }: ScoreBreakdownTableProps) {
   const measureSelectors = `.${P}__label-text, .${P}__label-affordance, .${P}__label-hdr, .${P}__label-wrap`;
@@ -216,17 +219,24 @@ export function ScoreBreakdownTable({
             </span>
             {showComponents ? (
               <div className={`${P}__breakdown`}>
-                {columns.map((col) => (
-                  <span key={col.key} className={`${P}__comp`} style={stripeStyle(stripe)}>
-                    <ScoreModCell
-                      value={
-                        formatComponentValue
-                          ? formatComponentValue(row, col.key)
-                          : formatScoreComponentDisplay(row.values[col.key])
-                      }
-                    />
-                  </span>
-                ))}
+                {columns.map((col) => {
+                  const customCell = renderComponentCell?.(row, col.key, stripe);
+                  return (
+                    <span key={col.key} className={`${P}__comp`} style={stripeStyle(stripe)}>
+                      {customCell !== undefined ? (
+                        customCell
+                      ) : (
+                        <ScoreModCell
+                          value={
+                            formatComponentValue
+                              ? formatComponentValue(row, col.key)
+                              : formatScoreComponentDisplay(row.values[col.key])
+                          }
+                        />
+                      )}
+                    </span>
+                  );
+                })}
               </div>
             ) : null}
           </div>

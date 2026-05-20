@@ -59,6 +59,37 @@ If a local exception is needed, document the reason in the feature area and keep
 - Reserve attention-drawing colors for important states (error, warning, success, active).
 - Ensure text/background combinations meet readable contrast expectations.
 
+#### Theme contrast (light and dark)
+
+The app supports **light** and **dark** themes via `:root[data-theme="dark"]` on `body` (see `src/styles.css`). Any UI change that sets or changes **text color**, **background**, **borders**, or **state highlights** must be checked in **both** themes before merge.
+
+**Token rules**
+
+- Prefer theme-aware CSS variables (`--text-primary`, `--surface-0` / `--surface-1` / `--surface-2`, `--panel-border`, `--panel-border-strong`, `--status-success`, `--status-danger`, `--status-warning`) — not raw hex or colors that only look correct on one background.
+- If a token is defined on `:root` using `color-mix` or other derived values, ensure the **same token is redefined** (or correctly inherited) under `:root[data-theme="dark"] body` when dark theme overrides base surfaces. A common bug: dark mode updates `--surface-*` and `--button-background` on `body`, but `--control-hover-bg` still resolves from light-theme mixes — producing pale highlights and unreadable text on dark panels.
+- Status colors used on numbers or labels (for example point-buy spent turning green/red) must stay legible on the **actual surface behind them** in each theme, not only on the default page background.
+
+**What to verify (both themes)**
+
+| Check | Light | Dark |
+| --- | --- | --- |
+| Body text on section/panel backgrounds | Readable at a glance | Readable at a glance |
+| Muted/secondary text on inset surfaces | Not washed out | Not lost on brown/dark panels |
+| Hover/focus/active backgrounds behind text | Sufficient contrast for foreground | Same — no “light mode gray” on dark chrome |
+| Semantic success/error/warning accents | Clear, not neon-on-neon | Clear, not low-contrast mud |
+| Borders and inset shadows | Visible separation | Visible separation |
+
+**Workflow**
+
+1. Implement using semantic tokens only.
+2. Toggle theme in the running app (or use devtools on `data-theme`) and exercise **default**, **hover**, **focus-visible**, and any **custom state** (for example stepper focus on `AdjustableNumberInput` with `fractionLeading`).
+3. If contrast fails in one theme, fix the token or state rule for that theme — do not ship theme-specific hacks in feature code unless the bible documents a narrow exception.
+
+**Example (builder point buy `X / Y` control)**
+
+- Spent **X**: `fractionLeadingStyle` may set green (`--status-success`) or red (`crimson` / error) when spent ≠ budget; confirm both on `--surface-1` panel backgrounds.
+- Budget **Y**: stepper `:focus-within` highlight uses `--surface-2` + `--panel-border-strong` + `--text-primary` — not `--control-hover-bg` alone, which was unreadable in dark mode until dark-theme token definitions were added.
+
 ### Interactive States
 
 Every interactive component should support and visually distinguish:
@@ -87,6 +118,7 @@ State visuals should be consistent across buttons, fields, toggles, and list row
 - Required/optional semantics should be presented uniformly.
 - Validation messaging should be specific and adjacent to the affected field.
 - **Bounded numeric fields** (`AdjustableNumberInput`): allow free typing while focused; validate on blur (or Enter). If the value is out of range or not a number, revert to the last committed value instead of clamping on every keystroke.
+- **`fractionLeading` / `companionMax`**: HP-style `current / max` uses `value` + `companionMax` (steppers edit current). Point buy uses `fractionLeading` + `value` as `spent / budget` (steppers edit budget). Match typography between both sides of the slash; use `fractionLeadingStyle` for semantic spent color. Stepper focus may emphasize **Y** via CSS (`:has(.adjustable-number__stepper:focus-within)`) — verify highlight contrast in [both themes](#theme-contrast-light-and-dark).
 
 ### Cards, Panels, and Sections
 
@@ -264,7 +296,8 @@ Styles live in `src/styles.css` (`.table-scrollport`, `.score-breakdown-table`, 
 
 **Builder ability table**
 
-- Physical / mental ability `<table>` elements in `CharacterBuilderApp` are wrapped in `.table-h-scroll` (same native-table contract as above).
+- Ability Scores tab uses `ScoreBreakdownTable` (`variant="stat"`, `BUILDER_ABILITY_SCORE_COLUMNS`) — same bonus / label / component layout as the character sheet, with extra columns for base (editable), level, and racial deltas. Use `renderComponentCell` for inputs and styled deltas; `prioritizeLabel` + `compact` for horizontal scroll when component columns are wider than the panel.
+- **Point buy** (middle column): label `Point buy` + `AdjustableNumberInput` with `fractionLeading={spent}`, `value={budget}`, compact steppers on **Y** only. See [theme contrast](#theme-contrast-light-and-dark) for spent/budget colors and stepper-focus highlight.
 
 **Adding a new breakdown table**
 
@@ -355,6 +388,8 @@ Use this checklist before merging UI/style/look-and-feel work:
 - [ ] Layout works across intended viewport sizes without hiding critical actions.
 - [ ] Loading, empty, and error states are handled and visually consistent.
 - [ ] Accessibility basics are met (keyboard navigation, focus visibility, readable contrast).
+- [ ] **Light and dark theme:** text, backgrounds, borders, and state highlights (hover, focus, success/error) were checked in both themes; no light-only tokens on dark surfaces.
+- [ ] Derived tokens (`--control-hover-bg`, mixes) work in dark mode if used for backgrounds behind text.
 - [ ] Any local subapplication variation is documented and intentionally scoped.
 - [ ] Obvious one-off styles were avoided or justified with a clear reason.
 - [ ] Glossary or rules hover tooltips are not attached to raw value inputs; they use labels or explicit help text instead.

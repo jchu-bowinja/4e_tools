@@ -51,6 +51,14 @@ export function motionUnifiedRowValues(
 
 export const ABILITY_SCORE_COLUMNS: StatScoreColumnDef[] = [{ key: "score", header: "Score", width: "2.35rem" }];
 
+/** Builder ability tab: base editing plus level/racial deltas before final score. */
+export const BUILDER_ABILITY_SCORE_COLUMNS: StatScoreColumnDef[] = [
+  { key: "base", header: "Base", width: "3.25rem" },
+  { key: "level", header: "Level", width: "2.55rem" },
+  { key: "racial", header: "Racial", width: "2.75rem" },
+  { key: "score", header: "Score", width: "2.35rem" }
+];
+
 export const DEFENSE_SCORE_COLUMNS: StatScoreColumnDef[] = [
   { key: "baseHalfLevel", header: ["Base +", "½ Lvl"], width: "2.75rem" },
   { key: "ability", header: "Abil" },

@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   Ability,
   AsiChoices,
@@ -66,7 +66,11 @@ import { parseRacialTraitIdsFromRace, resolveRacialTraitsForRace } from "../../r
 import { getClassBuildOptions } from "../../rules/classBuildOptions";
 import { autoGrantedTrainedSkillIds } from "../../rules/grantedSkillsQuery";
 import { computeSkillSheetRows } from "../../rules/skillCalculator";
-import { DEFENSE_SCORE_COLUMNS, MOTION_INITIATIVE_COLUMNS } from "../../rules/statScoreBreakdown";
+import {
+  BUILDER_ABILITY_SCORE_COLUMNS,
+  DEFENSE_SCORE_COLUMNS,
+  MOTION_INITIATIVE_COLUMNS
+} from "../../rules/statScoreBreakdown";
 import { SKILL_BREAKDOWN_COLUMNS } from "../../ui/scoreBreakdownColumns";
 import {
   formatSkillBreakdownComponent,
@@ -75,8 +79,8 @@ import {
   skillRowsToBreakdown
 } from "../../ui/scoreBreakdownSkill";
 import { SkillModifierNameContent } from "../../ui/scoreBreakdownSkillName";
-import { ScoreBreakdownTable } from "../../ui/ScoreBreakdownTable";
-import { TableScrollport } from "../../ui/TableScrollport";
+import { ScoreBreakdownTable, type ScoreBreakdownRowDef } from "../../ui/ScoreBreakdownTable";
+import { scoreComponentCellStyle } from "../../ui/scoreTableCells";
 import {
   collectCountsAsClassNames,
   collectCountsAsFeatureNames,
@@ -570,8 +574,6 @@ function HybridClassDetailPanel(props: {
 }
 
 const abilities: Array<keyof CharacterBuild["abilityScores"]> = ["STR", "CON", "DEX", "INT", "WIS", "CHA"];
-const PHYSICAL_ABILITIES: Ability[] = ["STR", "CON", "DEX"];
-const MENTAL_ABILITIES: Ability[] = ["INT", "WIS", "CHA"];
 type BuilderTab =
   | "race"
   | "class"
@@ -1132,6 +1134,78 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     () => applyRacialBonuses(scoresAfterLevel, raceAbilityBonusInfo, build.racialAbilityChoice),
     [scoresAfterLevel, build.racialAbilityChoice, raceAbilityBonusInfo]
   );
+  const builderAbilityScoreRows = useMemo(
+    (): ScoreBreakdownRowDef[] =>
+      abilities.map((ability) => {
+        const base = build.abilityScores[ability];
+        const postLevel = scoresAfterLevel[ability];
+        const final = effectiveAbilityScores[ability];
+        return {
+          rowKey: ability,
+          label: ability,
+          glossaryKey: `ability:${ability}`,
+          total: abilityModifier(final),
+          signedTotal: true,
+          values: {
+            base,
+            level: postLevel - base,
+            racial: final - postLevel,
+            score: final
+          }
+        };
+      }),
+    [build.abilityScores, scoresAfterLevel, effectiveAbilityScores]
+  );
+  const renderBuilderAbilityLabel = useCallback(
+    (row: ScoreBreakdownRowDef, stripe: string) => (
+      <span
+        {...glossaryTooltipUi.hoverA11y(row.glossaryKey ?? `ability:${row.rowKey}`)}
+        style={{
+          fontWeight: 700,
+          letterSpacing: "0.04em",
+          color: "var(--text-primary)",
+          padding: "0.12rem 0.2rem",
+          ...(stripe !== "transparent" ? { backgroundColor: stripe, borderRadius: "0.2rem" } : {})
+        }}
+      >
+        {row.label}
+      </span>
+    ),
+    [glossaryTooltipUi]
+  );
+  const renderBuilderAbilityComponent = useCallback(
+    (row: ScoreBreakdownRowDef, columnKey: string) => {
+      const ability = row.rowKey as Ability;
+      if (columnKey === "base") {
+        return (
+          <AdjustableNumberInput
+            compact
+            min={8}
+            max={18}
+            value={build.abilityScores[ability]}
+            onChange={(next) =>
+              updateBuild({
+                ...build,
+                abilityScores: { ...build.abilityScores, [ability]: next }
+              })
+            }
+            ariaLabel={`${getAbilityLabel(ability)} base score`}
+            style={{ maxWidth: "100%" }}
+          />
+        );
+      }
+      if (columnKey === "level" || columnKey === "racial") {
+        const delta = Number(row.values[columnKey] ?? 0);
+        return (
+          <span style={{ ...scoreComponentCellStyle, color: delta === 0 ? "var(--text-muted)" : undefined }}>
+            {delta > 0 ? `+${delta}` : String(delta)}
+          </span>
+        );
+      }
+      return undefined;
+    },
+    [build]
+  );
   const effectiveBuild = useMemo(() => ({ ...build, abilityScores: effectiveAbilityScores }), [build, effectiveAbilityScores]);
   const legality = useMemo(() => validateCharacterBuild(index, build), [index, build]);
   const derived = useMemo(
@@ -1570,14 +1644,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     () => [...index.skills].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })),
     [index.skills]
   );
-  const abilityLoreByCode = useMemo(() => {
-    const m = new Map<Ability, string>();
-    for (const entry of index.abilityScores) {
-      if (entry.abilityCode && entry.body) m.set(entry.abilityCode, entry.body);
-    }
-    return m;
-  }, [index.abilityScores]);
-
   const raceNameById = useMemo(() => new Map(index.races.map((r) => [r.id, r.name])), [index.races]);
   const classNameById = useMemo(() => new Map(index.classes.map((c) => [c.id, c.name])), [index.classes]);
   const classesForSelect = useMemo(
@@ -2502,7 +2568,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   style={{
                     display: "grid",
                     gap: "0.85rem",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
                     alignItems: "start"
                   }}
                 >
@@ -2913,21 +2979,70 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
           <div>
             <h3 style={sectionTitleStyle}>Ability Scores</h3>
             <p style={{ margin: "0.25rem 0 0.75rem 0", color: "var(--text-muted)", fontSize: "0.9rem", lineHeight: 1.45 }}>
-              Set <strong>base</strong> scores (8–18) using point buy. Modifiers below use your <strong>final</strong> score after level-based increases, then racial bonuses—those are what checks and attacks use.
+              Set <strong>base</strong> scores (8–18) using point buy. Modifiers in the table use your <strong>final</strong> score after level-based increases, then racial bonuses—those are what checks and attacks use.
             </p>
 
-            {build.level >= 11 && (
-              <p style={{ ...ui.blockSubsection, marginBottom: "0.75rem", backgroundColor: "var(--surface-2)", fontSize: "0.88rem", color: "var(--text-primary)" }}>
-                <strong>PHB tier bumps:</strong> At 11th level and 21st level, each ability score gains +1 automatically (included below). At 4, 8, 14, 18, 24, and 28, assign two different +1s in{" "}
-                <strong>Level-up ability increases</strong>.
-              </p>
-            )}
+            <div
+              style={{
+                display: "grid",
+                gap: "0.85rem",
+                gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                alignItems: "start",
+                marginBottom: "0.85rem"
+              }}
+            >
+              <div
+                style={{
+                  ...ui.blockSubsection,
+                  minWidth: 0,
+                  backgroundColor: "var(--surface-1)",
+                  borderColor: "var(--panel-border)"
+                }}
+              >
+                <ScoreBreakdownTable
+                  variant="stat"
+                  columns={BUILDER_ABILITY_SCORE_COLUMNS}
+                  labelHeader={null}
+                  prioritizeLabel
+                  compact
+                  rows={builderAbilityScoreRows}
+                  renderLabel={renderBuilderAbilityLabel}
+                  renderComponentCell={renderBuilderAbilityComponent}
+                  formatComponentValue={(row, columnKey) =>
+                    columnKey === "score" ? String(row.values.score ?? "") : ""
+                  }
+                />
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem", minWidth: 0 }}>
+                <section style={{ ...ui.blockSubsection, backgroundColor: "var(--surface-1)", borderColor: "var(--panel-border)" }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.5rem" }}>
+                    <span style={{ fontWeight: 600, fontSize: "0.88rem" }}>Point buy</span>
+                    <AdjustableNumberInput
+                      compact
+                      min={0}
+                      max={60}
+                      fractionLeading={pointBuy.total}
+                      fractionLeadingStyle={{
+                        color:
+                          pointBuy.total === pointBuy.budget ? "var(--status-success)" : "crimson"
+                      }}
+                      value={pointBuy.budget}
+                      onChange={(next) => updateBuild({ ...build, pointBuyBudget: next })}
+                      ariaLabel="Point buy"
+                    />
+                  </div>
+                  {pointBuy.invalidScores.length > 0 && (
+                    <p style={{ color: "crimson", margin: "0.5rem 0 0 0", fontSize: "0.82rem", lineHeight: 1.35 }}>
+                      Each score must be 8–18: {pointBuy.invalidScores.join(", ")}
+                    </p>
+                  )}
+                </section>
 
             {(raceAbilityBonusInfo.fixed.length > 0 || raceAbilityBonusInfo.chooseOne.length > 0) && (
               <div
                 style={{
                   ...ui.blockSubsection,
-                  marginBottom: "0.75rem",
                   backgroundColor: "var(--surface-1)",
                   fontSize: "0.88rem"
                 }}
@@ -2958,264 +3073,93 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 )}
               </div>
             )}
+              </div>
 
-            {requiredAsiMilestonesUpTo(build.level).length > 0 && (
-              <section style={{ ...ui.blockSubsection, marginBottom: "0.85rem", backgroundColor: "var(--surface-1)" }}>
-                <h4 style={subsectionTitleStyle}>Level-up ability increases</h4>
-                <p style={{ margin: "0 0 0.75rem 0", fontSize: "0.85rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
-                  At each listed level, pick two <strong>different</strong> abilities for +1 each (Player&apos;s Handbook). These stack with automatic +1 to all abilities at levels 11 and 21.
-                </p>
-                {requiredAsiMilestonesUpTo(build.level).map((m) => {
-                  const pick = build.asiChoices?.[String(m)];
-                  const otherAbilities = (a: Ability) => abilities.filter((x) => x !== a);
-                  return (
-                    <div key={m} style={{ marginBottom: "0.85rem" }}>
-                      <div style={{ fontWeight: 600, marginBottom: "0.35rem", fontSize: "0.88rem" }}>Level {m}</div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "flex-end" }}>
-                        <label style={{ fontSize: "0.82rem" }}>
-                          First +1
-                          <select
-                            value={pick?.first || ""}
-                            onChange={(e) => {
-                              const first = e.target.value as Ability;
-                              const second =
-                                pick?.second && pick.second !== first ? pick.second : otherAbilities(first)[0];
-                              updateBuild({
-                                ...build,
-                                asiChoices: { ...(build.asiChoices || {}), [String(m)]: { first, second } }
-                              });
-                            }}
-                            style={{ display: "block", marginTop: "0.2rem", padding: "0.3rem 0.4rem", borderRadius: "6px", border: "1px solid var(--panel-border)" }}
-                          >
-                            <option value="">—</option>
-                            {abilities.map((a) => (
-                              <option key={`${m}-a-${a}`} value={a}>
-                                {getAbilityLabel(a)}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label style={{ fontSize: "0.82rem" }}>
-                          Second +1
-                          <select
-                            value={pick?.second || ""}
-                            onChange={(e) => {
-                              const second = e.target.value as Ability;
-                              const first =
-                                pick?.first && pick.first !== second ? pick.first : otherAbilities(second)[0];
-                              updateBuild({
-                                ...build,
-                                asiChoices: { ...(build.asiChoices || {}), [String(m)]: { first, second } }
-                              });
-                            }}
-                            style={{ display: "block", marginTop: "0.2rem", padding: "0.3rem 0.4rem", borderRadius: "6px", border: "1px solid var(--panel-border)" }}
-                          >
-                            <option value="">—</option>
-                            {abilities.map((a) => (
-                              <option key={`${m}-b-${a}`} value={a}>
-                                {getAbilityLabel(a)}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem", minWidth: 0 }}>
+                {requiredAsiMilestonesUpTo(build.level).length > 0 && (
+                  <section style={{ ...ui.blockSubsection, backgroundColor: "var(--surface-1)" }}>
+                    <h4 style={subsectionTitleStyle}>Level-up ability increases</h4>
+                    {requiredAsiMilestonesUpTo(build.level).map((m) => {
+                      const pick = build.asiChoices?.[String(m)];
+                      const otherAbilities = (a: Ability) => abilities.filter((x) => x !== a);
+                      return (
+                        <div
+                          key={m}
+                          style={{
+                            display: "flex",
+                            flexWrap: "wrap",
+                            gap: "0.5rem",
+                            alignItems: "center",
+                            marginBottom: "0.85rem"
+                          }}
+                        >
+                          <span style={{ fontWeight: 600, fontSize: "0.88rem", flexShrink: 0 }}>Level {m}</span>
+                            <select
+                              aria-label={`Level ${m} first ability increase`}
+                              value={pick?.first || ""}
+                              onChange={(e) => {
+                                const first = e.target.value as Ability;
+                                const second =
+                                  pick?.second && pick.second !== first ? pick.second : otherAbilities(first)[0];
+                                updateBuild({
+                                  ...build,
+                                  asiChoices: { ...(build.asiChoices || {}), [String(m)]: { first, second } }
+                                });
+                              }}
+                              style={{ fontSize: "0.82rem", padding: "0.3rem 0.4rem", borderRadius: "6px", border: "1px solid var(--panel-border)" }}
+                            >
+                              <option value="">—</option>
+                              {abilities.map((a) => (
+                                <option key={`${m}-a-${a}`} value={a}>
+                                  {getAbilityLabel(a)}
+                                </option>
+                              ))}
+                            </select>
+                            <select
+                              aria-label={`Level ${m} second ability increase`}
+                              value={pick?.second || ""}
+                              onChange={(e) => {
+                                const second = e.target.value as Ability;
+                                const first =
+                                  pick?.first && pick.first !== second ? pick.first : otherAbilities(second)[0];
+                                updateBuild({
+                                  ...build,
+                                  asiChoices: { ...(build.asiChoices || {}), [String(m)]: { first, second } }
+                                });
+                              }}
+                              style={{ fontSize: "0.82rem", padding: "0.3rem 0.4rem", borderRadius: "6px", border: "1px solid var(--panel-border)" }}
+                            >
+                              <option value="">—</option>
+                              {abilities.map((a) => (
+                                <option key={`${m}-b-${a}`} value={a}>
+                                  {getAbilityLabel(a)}
+                                </option>
+                              ))}
+                            </select>
+                        </div>
+                      );
+                    })}
+                  </section>
+                )}
+
+                {(build.level >= 11 || build.level >= 21) && (
+                  <section style={{ ...ui.blockSubsection, backgroundColor: "var(--surface-1)" }}>
+                    {build.level >= 11 && (
+                      <div style={{ marginBottom: build.level >= 21 ? "0.55rem" : 0 }}>
+                        <div style={{ fontWeight: 700, marginBottom: "0.2rem", fontSize: "0.88rem" }}>Paragon Tier</div>
+                        <p style={{ margin: 0, fontSize: "0.84rem", color: "var(--text-secondary)" }}>All ability scores increase by +1 automatically.</p>
                       </div>
-                    </div>
-                  );
-                })}
-              </section>
-            )}
-
-            {(build.level >= 11 || build.level >= 21) && (
-              <section style={{ ...ui.blockSubsection, marginBottom: "0.85rem", backgroundColor: "var(--surface-1)" }}>
-                {build.level >= 11 && (
-                  <div style={{ marginBottom: build.level >= 21 ? "0.55rem" : 0 }}>
-                    <div style={{ fontWeight: 700, marginBottom: "0.2rem", fontSize: "0.88rem" }}>Paragon Tier</div>
-                    <p style={{ margin: 0, fontSize: "0.84rem", color: "var(--text-secondary)" }}>All ability scores increase by +1 automatically.</p>
-                  </div>
+                    )}
+                    {build.level >= 21 && (
+                      <div>
+                        <div style={{ fontWeight: 700, marginBottom: "0.2rem", fontSize: "0.88rem" }}>Epic Tier</div>
+                        <p style={{ margin: 0, fontSize: "0.84rem", color: "var(--text-secondary)" }}>All ability scores increase by +1 automatically.</p>
+                      </div>
+                    )}
+                  </section>
                 )}
-                {build.level >= 21 && (
-                  <div>
-                    <div style={{ fontWeight: 700, marginBottom: "0.2rem", fontSize: "0.88rem" }}>Epic Tier</div>
-                    <p style={{ margin: 0, fontSize: "0.84rem", color: "var(--text-secondary)" }}>All ability scores increase by +1 automatically.</p>
-                  </div>
-                )}
-              </section>
-            )}
-
-            <section style={{ ...ui.blockSubsection, marginBottom: "0.85rem", backgroundColor: "var(--surface-1)", borderColor: "var(--panel-border)" }}>
-              <div style={{ marginBottom: "0.55rem", fontSize: "0.82rem", fontWeight: 700, color: "var(--text-secondary)", letterSpacing: "0.01em" }}>
-                Point-Buy Budget
               </div>
-              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "stretch", gap: "0.75rem 1rem" }}>
-                <label style={{ display: "flex", flexDirection: "column", gap: "0.3rem", width: "fit-content" }}>
-                  <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.03em" }}>Budget</span>
-                  <AdjustableNumberInput
-                    min={0}
-                    max={60}
-                    value={build.pointBuyBudget ?? DEFAULT_POINT_BUY_BUDGET}
-                    onChange={(next) => updateBuild({ ...build, pointBuyBudget: next })}
-                    ariaLabel="Point-buy budget"
-                  />
-                </label>
-                <div style={{ flex: "1 1 14rem", display: "grid", gap: "0.35rem" }}>
-                  <p style={{ margin: 0, fontSize: "0.9rem", display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                    <strong style={{ color: "var(--text-secondary)" }}>Points spent:</strong>
-                    <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>{pointBuy.total}</span>
-                    <span style={{ color: "var(--text-muted)" }}>/</span>
-                    <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>{pointBuy.budget}</span>
-                  </p>
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: "0.9rem",
-                      color: pointBuy.remaining < 0 ? "crimson" : pointBuy.remaining === 0 ? "var(--status-success)" : "var(--text-primary)",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.35rem"
-                    }}
-                  >
-                    <strong style={{ color: "var(--text-secondary)" }}>Remaining:</strong>
-                    <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>{pointBuy.remaining}</span>
-                  </p>
-                  {pointBuy.invalidScores.length > 0 && (
-                    <p style={{ color: "crimson", margin: "0.15rem 0 0 0", fontSize: "0.82rem", lineHeight: 1.35 }}>
-                      Each score must be 8–18: {pointBuy.invalidScores.join(", ")}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </section>
-
-            <div
-              style={{
-                ...ui.blockSubsection,
-                marginTop: "0.35rem",
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-                gap: "1rem",
-                alignItems: "start",
-                backgroundColor: "var(--surface-1)",
-                borderColor: "var(--panel-border)"
-              }}
-            >
-              {(
-                [
-                  { title: "Physical", list: PHYSICAL_ABILITIES },
-                  { title: "Mental", list: MENTAL_ABILITIES }
-                ] as const
-              ).map(({ title, list }) => (
-                <div key={title} style={{ backgroundColor: "var(--surface-0)", border: "1px solid var(--panel-border)", borderRadius: "8px", padding: "0.5rem 0.65rem" }}>
-                  <h4
-                    style={{
-                      margin: "0 0 0.45rem 0",
-                      fontSize: "0.85rem",
-                      color: "var(--text-secondary)",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.04em",
-                      borderBottom: "1px solid var(--panel-border)",
-                      paddingBottom: "0.3rem"
-                    }}
-                  >
-                    {title}
-                  </h4>
-                  <TableScrollport>
-                  <table style={{ borderCollapse: "separate", borderSpacing: 0, fontSize: "0.86rem" }}>
-                    <thead>
-                      <tr style={{ textAlign: "left", color: "var(--text-muted)", borderBottom: "1px solid var(--panel-border)" }}>
-                        <th style={{ padding: "0.3rem 0.25rem 0.35rem 0", fontWeight: 700 }}>Ability</th>
-                        <th style={{ padding: "0.3rem 0.25rem 0.35rem 0.25rem", fontWeight: 700, width: "4rem", textAlign: "center" }}>Base</th>
-                        <th style={{ padding: "0.3rem 0", fontWeight: 700, width: "3.25rem", textAlign: "right" }}>Level</th>
-                        <th style={{ padding: "0.3rem 0", fontWeight: 700, width: "3.25rem", textAlign: "right" }}>Racial</th>
-                        <th style={{ padding: "0.3rem 0", fontWeight: 700, width: "3.5rem", textAlign: "right" }}>Final</th>
-                        <th style={{ padding: "0.3rem 0", fontWeight: 700, width: "3.25rem", textAlign: "right" }}>Mod</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {list.map((ability) => {
-                        const base = build.abilityScores[ability];
-                        const postLevel = scoresAfterLevel[ability];
-                        const final = effectiveAbilityScores[ability];
-                        const mod = abilityModifier(final);
-                        const levelDelta = postLevel - base;
-                        const racialDelta = final - postLevel;
-                        return (
-                          <tr key={ability}>
-                            <td style={{ padding: "0.45rem 0.25rem 0.45rem 0", verticalAlign: "middle" }}>
-                              <span {...glossaryTooltipUi.hoverA11y(`ability:${ability}`)}>
-                                <span style={{ fontWeight: 600 }}>{ability}</span>
-                              </span>
-                            </td>
-                            <td style={{ padding: "0.35rem 0.25rem", verticalAlign: "middle", textAlign: "center", width: "3.75rem" }}>
-                              <AdjustableNumberInput
-                                compact
-                                min={8}
-                                max={18}
-                                value={base}
-                                onChange={(next) =>
-                                  updateBuild({
-                                    ...build,
-                                    abilityScores: { ...build.abilityScores, [ability]: next }
-                                  })
-                                }
-                                ariaLabel={`${getAbilityLabel(ability)} base score`}
-                                style={{ maxWidth: "100%" }}
-                              />
-                            </td>
-                            <td style={{ padding: "0.35rem 0", verticalAlign: "middle", fontSize: "0.82rem", textAlign: "right" }}>
-                              <span style={levelDelta === 0 ? { color: "var(--text-muted)" } : undefined}>
-                                {levelDelta > 0 ? `+${levelDelta}` : levelDelta}
-                              </span>
-                            </td>
-                            <td style={{ padding: "0.35rem 0", verticalAlign: "middle", fontSize: "0.82rem", textAlign: "right" }}>
-                              <span style={racialDelta === 0 ? { color: "var(--text-muted)" } : undefined}>
-                                {racialDelta > 0 ? `+${racialDelta}` : racialDelta}
-                              </span>
-                            </td>
-                            <td style={{ padding: "0.35rem 0", verticalAlign: "middle", fontSize: "0.82rem", textAlign: "right" }}>
-                              <span
-                                title={`Final: ${final} (${formatAbilityMod(mod)} modifier)${
-                                  levelDelta !== 0 ? `; level adjustment ${levelDelta > 0 ? "+" : ""}${levelDelta}` : ""
-                                }${
-                                  racialDelta !== 0 ? `; racial adjustment ${racialDelta > 0 ? "+" : ""}${racialDelta}` : ""
-                                }`}
-                              >
-                                {final}
-                              </span>
-                            </td>
-                            <td style={{ padding: "0.35rem 0", verticalAlign: "middle", fontWeight: 700, textAlign: "right" }}>
-                              {formatAbilityMod(mod)}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                  </TableScrollport>
-                </div>
-              ))}
             </div>
-
-            <CollapsibleDisclosure
-              style={{ ...ui.blockSubsection, marginTop: "1rem" }}
-              summary="What do these abilities mean?"
-              summaryStyle={disclosureSummaryStyle}
-              bodyStyle={{ marginTop: "0.65rem", display: "flex", flexDirection: "column", gap: "0.65rem" }}
-            >
-                {abilities.map((ability) => {
-                  const lore = abilityLoreByCode.get(ability);
-                  if (!lore) return null;
-                  return (
-                    <div key={ability}>
-                      <p style={{ margin: 0, fontWeight: 600, fontSize: "0.88rem" }}>
-                        {ability}
-                      </p>
-                      <div style={{ margin: "0.25rem 0 0 0", fontSize: "0.82rem", color: "var(--text-secondary)" }}>
-                        <RulesRichText text={lore} paragraphStyle={{ fontSize: "0.82rem", color: "var(--text-secondary)" }} listItemStyle={{ fontSize: "0.82rem", color: "var(--text-secondary)" }} />
-                      </div>
-                    </div>
-                  );
-                })}
-            </CollapsibleDisclosure>
           </div>
         )}
 

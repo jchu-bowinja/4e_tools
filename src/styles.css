@@ -349,7 +349,8 @@ textarea:hover {
   min-width: 2.5ch;
 }
 
-.adjustable-number--with-companion-max {
+.adjustable-number--with-companion-max,
+.adjustable-number--with-fraction-leading {
   width: fit-content;
   max-width: 100%;
 }
@@ -362,7 +363,8 @@ textarea:hover {
   font-variant-numeric: tabular-nums;
 }
 
-.adjustable-number--with-companion-max .adjustable-number__value-pane {
+.adjustable-number--with-companion-max .adjustable-number__value-pane,
+.adjustable-number--with-fraction-leading .adjustable-number__value-pane {
   justify-content: center;
   padding-inline: 0.2rem;
   box-sizing: border-box;
@@ -372,6 +374,35 @@ textarea:hover {
   flex: 0 0 auto;
   text-align: center;
   padding-inline: 0.08rem;
+}
+
+.adjustable-number--with-fraction-leading .adjustable-number__input {
+  flex: 0 0 auto;
+  text-align: center;
+  padding: 0.04rem 0.2rem;
+  font-weight: 700;
+  line-height: 1.05;
+  color: var(--text-primary);
+  border-radius: 0.2rem;
+  transition:
+    font-weight 0.12s ease,
+    background-color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+/* Point-buy spent / budget: emphasize budget (Y) when +/- steppers are focused. */
+.adjustable-number--with-fraction-leading:has(.adjustable-number__stepper:focus-within)
+  .adjustable-number__input {
+  font-weight: 900;
+  background-color: var(--surface-2);
+  color: var(--text-primary);
+  box-shadow: inset 0 0 0 1px var(--panel-border-strong);
+}
+
+.adjustable-number--with-fraction-leading:has(.adjustable-number__stepper:focus-within)
+  .adjustable-number__fraction-leading {
+  opacity: 0.5;
+  font-weight: 500;
 }
 
 .adjustable-number__fraction-sep,
@@ -390,7 +421,25 @@ textarea:hover {
   padding-inline: 0;
 }
 
-.adjustable-number--with-companion-max .adjustable-number__stepper {
+.adjustable-number__fraction-leading {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  line-height: 1.05;
+  text-align: center;
+  padding: 0.04rem 0.2rem;
+  transition: opacity 0.12s ease, font-weight 0.12s ease;
+}
+
+.adjustable-number--compact .adjustable-number__fraction-leading,
+.adjustable-number--compact.adjustable-number--with-fraction-leading .adjustable-number__input {
+  font-size: 0.74rem;
+}
+
+.adjustable-number--with-companion-max .adjustable-number__stepper,
+.adjustable-number--with-fraction-leading .adjustable-number__stepper {
   flex: 0 0 auto;
 }
 
@@ -440,6 +489,8 @@ textarea:hover {
   --inset-section-bg: #1b140d;
   --inset-section-border: #8d6f47;
   --inset-section-highlight: rgba(255, 255, 255, 0.18);
+  --control-hover-bg: color-mix(in srgb, var(--button-background) 86%, var(--surface-2) 14%);
+  --control-active-bg: color-mix(in srgb, var(--button-background) 78%, var(--surface-2) 22%);
   --ui-panel-radius: 0.45rem;
   --ui-section-radius: 0.5rem;
   --ui-panel-shadow: 0 1px 2px rgba(18, 12, 6, 0.32);
