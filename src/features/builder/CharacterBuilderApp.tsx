@@ -57,6 +57,20 @@ import {
   racePowerSelectSelectionKey
 } from "../../rules/grantedPowersQuery";
 import { collectFeatModificationsByPowerId } from "../../rules/featPowerModifications";
+import {
+  collectMulticlassSlotSwapRows,
+  multiclassPowersForSlotSwap,
+  toggleMulticlassSlotSwap,
+  updateMulticlassSlotSwapReplacement,
+  pruneMulticlassSlotSwaps
+} from "../../rules/featMulticlassSlotSwap";
+import {
+  collectFeatPowerReplaceRows,
+  disableFeatPowerReplace,
+  enableFeatPowerReplace,
+  isSlotUsedByAnotherFeatSwap,
+  pruneFeatPowerReplacements
+} from "../../rules/featPowerReplace";
 import { collectCharacterPowerIdsForSelections } from "../../rules/powerSelections";
 import { hybridBaseClassNames } from "../../rules/prereqEvaluator";
 import { buildPrereqCharacterContext } from "../../rules/prereqContext";
@@ -97,7 +111,9 @@ import {
   filterParagonMulticlassEncounterOptions,
   multiclassEntryClassId,
   paragonMulticlassAttackPowers,
-  paragonMulticlassUtilityPowers
+  paragonMulticlassUtilityPowers,
+  pruneParagonMulticlassing,
+  resolveParagonMulticlassPowers
 } from "../../rules/paragonMulticlassing";
 import {
   characterHasKiFocusUser,
@@ -1587,6 +1603,10 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
     });
   }, [index, build.epicDestinyId, build.level]);
+  const paragonMcGrantedPowers = useMemo(
+    () => (build.paragonMulticlassing ? resolveParagonMulticlassPowers(index, build) : []),
+    [index, build.paragonMulticlassing, build.paragonMulticlassPowers, build.level]
+  );
   const themeGrantedPowers = useMemo(() => {
     if (!build.themeId) return [];
     const atk = getPowersForOwnerId(index, build.themeId, build.level, "attack");
@@ -1603,12 +1623,25 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
 
   function reconcilePowerSlotsForBuild(nextBase: CharacterBuild, lv: number): { classPowerSlots?: Record<string, string>; powerIds: string[] } {
     const bonus = bonusClassAtWillSlotFromRaceBuild(index, nextBase);
-    if (nextBase.characterStyle === "hybrid") {
-      const ha = index.hybridClasses?.find((h) => h.id === nextBase.hybridClassIdA);
-      const hb = index.hybridClasses?.find((h) => h.id === nextBase.hybridClassIdB);
-      return reconcileHybridClassPowerSlotsForBuild(nextBase, lv, bonus, index, ha?.baseClassId ?? undefined, hb?.baseClassId ?? undefined);
+    const defs =
+      nextBase.characterStyle === "hybrid"
+        ? buildHybridPowerSlotDefinitions(lv, bonus)
+        : buildClassPowerSlotDefinitions(lv, bonus);
+    let pruned = pruneFeatPowerReplacements(nextBase, index, defs);
+    pruned = pruneMulticlassSlotSwaps(pruned, index, defs);
+    if (pruned.characterStyle === "hybrid") {
+      const ha = index.hybridClasses?.find((h) => h.id === pruned.hybridClassIdA);
+      const hb = index.hybridClasses?.find((h) => h.id === pruned.hybridClassIdB);
+      return reconcileHybridClassPowerSlotsForBuild(
+        pruned,
+        lv,
+        bonus,
+        index,
+        ha?.baseClassId ?? undefined,
+        hb?.baseClassId ?? undefined
+      );
     }
-    return reconcileClassPowerSlotsForBuild(nextBase, lv, bonus, index);
+    return reconcileClassPowerSlotsForBuild(pruned, lv, bonus, index);
   }
 
   const humanPowerExtraTraitIds = useMemo(() => {
@@ -1657,6 +1690,36 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     () => collectFeatModifiedPowersForBuild(index, build, characterPowerIds),
     [index, build.featIds, characterPowerIds]
   );
+  const featPowerReplaceRows = useMemo(
+    () => collectFeatPowerReplaceRows(index, build, powerSlotDefs),
+    [index, build.featIds, build.featPowerReplacements, powerSlotDefs]
+  );
+  const multiclassSlotSwapRows = useMemo(
+    () => collectMulticlassSlotSwapRows(index, build, powerSlotDefs),
+    [index, build.featIds, build.level, build.featPowerReplacements, powerSlotDefs]
+  );
+  const multiclassSwapRowsBySlotKey = useMemo(() => {
+    const map = new Map<string, typeof multiclassSlotSwapRows>();
+    for (const row of multiclassSlotSwapRows) {
+      for (const slot of row.eligibleSlots) {
+        const list = map.get(slot.key) ?? [];
+        list.push(row);
+        map.set(slot.key, list);
+      }
+    }
+    return map;
+  }, [multiclassSlotSwapRows]);
+  const featReplaceRowsBySlotKey = useMemo(() => {
+    const map = new Map<string, typeof featPowerReplaceRows>();
+    for (const row of featPowerReplaceRows) {
+      for (const slot of row.eligibleSlots) {
+        const list = map.get(slot.key) ?? [];
+        list.push(row);
+        map.set(slot.key, list);
+      }
+    }
+    return map;
+  }, [featPowerReplaceRows]);
   const selectedClassSkillNamesLower = new Set((legality.classSkillRules?.classSkillNames || []).map((s) => s.toLowerCase()));
   const skillsSortedAll = useMemo(
     () => [...index.skills].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })),
@@ -1950,7 +2013,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   }
 
   function updateBuild(next: CharacterBuild): void {
-    const pruned = pruneStalePowerSelections(index, next);
+    let pruned = pruneStalePowerSelections(index, next);
+    pruned = pruneParagonMulticlassing(index, pruned);
     const normalized = normalizeCharacterBuild(pruned, index);
     setBuild(normalized);
     saveBuild(normalized);
@@ -2004,15 +2068,65 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     updateBuild(nextBuild);
   }
 
+  function commitFeatPowerReplaceToggle(
+    featId: string,
+    slotKey: string,
+    replacementPowerId: string,
+    enabled: boolean
+  ): void {
+    let nextBuild = build;
+    if (enabled) {
+      const otherFeatId = isSlotUsedByAnotherFeatSwap(build, slotKey, featId);
+      if (otherFeatId) nextBuild = disableFeatPowerReplace(nextBuild, otherFeatId);
+      nextBuild = enableFeatPowerReplace(nextBuild, featId, slotKey, replacementPowerId);
+    } else {
+      nextBuild = disableFeatPowerReplace(nextBuild, featId);
+    }
+    const trimmed = nextBuild.classPowerSlots;
+    updateBuild({
+      ...nextBuild,
+      powerIds: orderedPowerIdsFromSlots(powerSlotDefs, trimmed)
+    });
+  }
+
+  function commitMulticlassSlotSwapToggle(
+    featId: string,
+    slotKey: string,
+    replacementPowerId: string,
+    enabled: boolean
+  ): void {
+    let nextBuild = toggleMulticlassSlotSwap(build, featId, slotKey, replacementPowerId, enabled);
+    const trimmed = nextBuild.classPowerSlots;
+    updateBuild({
+      ...nextBuild,
+      powerIds: orderedPowerIdsFromSlots(powerSlotDefs, trimmed)
+    });
+  }
+
+  function commitMulticlassSlotSwapPowerChange(featId: string, replacementPowerId: string): void {
+    const nextBuild = updateMulticlassSlotSwapReplacement(build, featId, replacementPowerId);
+    const trimmed = nextBuild.classPowerSlots;
+    updateBuild({
+      ...nextBuild,
+      powerIds: orderedPowerIdsFromSlots(powerSlotDefs, trimmed)
+    });
+  }
+
   function commitClassPowerSlot(slotKey: string, powerId: string): void {
     const defs = powerSlotDefs;
-    const prevId = build.classPowerSlots?.[slotKey];
-    const nextSlots: Record<string, string> = { ...(build.classPowerSlots || {}) };
+    let nextBase = build;
+    for (const [featId, state] of Object.entries(build.featPowerReplacements || {})) {
+      if (state.slotKey === slotKey) {
+        nextBase = disableFeatPowerReplace(nextBase, featId);
+      }
+    }
+    const prevId = nextBase.classPowerSlots?.[slotKey];
+    const nextSlots: Record<string, string> = { ...(nextBase.classPowerSlots || {}) };
     if (powerId) nextSlots[slotKey] = powerId;
     else delete nextSlots[slotKey];
     const trimmed = Object.keys(nextSlots).length ? nextSlots : undefined;
     let nextBuild: CharacterBuild = {
-      ...build,
+      ...nextBase,
       classPowerSlots: trimmed,
       powerIds: orderedPowerIdsFromSlots(defs, trimmed)
     };
@@ -3671,9 +3785,12 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             {(racePowerGroups.some((g) => g.powerIds.length > 0 || g.dilettantePick) ||
               classAutoGrantedPowers.length > 0 ||
               featGrantedPowers.length > 0 ||
+              featPowerReplaceRows.length > 0 ||
+              multiclassSlotSwapRows.length > 0 ||
               featModifiedPowers.length > 0 ||
               themeGrantedPowers.length > 0 ||
               paragonPathGrantedPowers.length > 0 ||
+              paragonMcGrantedPowers.length > 0 ||
               epicDestinyGrantedPowers.length > 0) && (
               <section style={{ marginBottom: "1.1rem", padding: "0.65rem 0.75rem", backgroundColor: "var(--surface-1)", borderRadius: "8px", border: "1px solid var(--panel-border)" }}>
                 {racePowerGroups.some((g) => g.powerIds.length > 0 || g.dilettantePick) && (
@@ -3802,6 +3919,19 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     </div>
                   </div>
                 )}
+                {paragonMcGrantedPowers.length > 0 && (
+                  <div style={{ marginBottom: "0.65rem" }}>
+                    <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "0.25rem" }}>
+                      Paragon multiclassing{paragonMcClassName ? ` — ${paragonMcClassName}` : ""}
+                    </div>
+                    <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                      Powers from the Paragon path tab (instead of a paragon path). Configure at-will swap, encounter, utility, and daily picks there.
+                    </p>
+                    <div>
+                      {paragonMcGrantedPowers.map((p) => renderPowerCardWithSelections(p, `paragon-mc-${p.id}`))}
+                    </div>
+                  </div>
+                )}
                 {epicDestinyGrantedPowers.length > 0 && (
                   <div style={{ marginBottom: "0.65rem" }}>
                     <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "0.25rem" }}>
@@ -3827,6 +3957,57 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                           </div>
                         </li>
                       ))}
+                    </ul>
+                  </div>
+                )}
+                {featPowerReplaceRows.length > 0 && (
+                  <div style={{ marginBottom: "0.65rem" }}>
+                    <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "0.25rem" }}>
+                      Feat power swaps
+                    </div>
+                    <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                      Use the swap checkboxes on eligible class power slots in the Powers tab.
+                    </p>
+                    <ul style={{ margin: 0, paddingLeft: "1.1rem", fontSize: "0.82rem", color: "var(--text-secondary)" }}>
+                      {featPowerReplaceRows.map((row) => (
+                        <li key={row.feat.id} style={{ marginBottom: "0.2rem" }}>
+                          <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{row.feat.name}</span>
+                          {" → "}
+                          {row.offer.replacementPowerName}
+                          {row.activeSlotKey
+                            ? ` (${powerSlotDefs.find((d) => d.key === row.activeSlotKey)?.label ?? row.activeSlotKey})`
+                            : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {multiclassSlotSwapRows.length > 0 && (
+                  <div style={{ marginBottom: "0.65rem" }}>
+                    <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "0.25rem" }}>
+                      Multiclass power swaps
+                    </div>
+                    <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                      Swap one class power slot for a power from{" "}
+                      <span style={{ fontWeight: 600 }}>
+                        {classNameById.get(multiclassSlotSwapRows[0]?.multiclassClassId ?? "") ?? "your multiclass"}
+                      </span>
+                      . Use the controls on eligible slots below.
+                    </p>
+                    <ul style={{ margin: 0, paddingLeft: "1.1rem", fontSize: "0.82rem", color: "var(--text-secondary)" }}>
+                      {multiclassSlotSwapRows.map((row) => {
+                        const replName = row.activeReplacementPowerId
+                          ? index.powers.find((p) => p.id === row.activeReplacementPowerId)?.name
+                          : undefined;
+                        return (
+                          <li key={row.feat.id} style={{ marginBottom: "0.2rem" }}>
+                            <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{row.feat.name}</span>
+                            {replName && row.activeSlotKey
+                              ? ` → ${replName} (${powerSlotDefs.find((d) => d.key === row.activeSlotKey)?.label ?? row.activeSlotKey})`
+                              : " — not configured yet"}
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
                 )}
@@ -3979,12 +4160,138 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                             No powers match this filter; clear search to see options for this slot.
                           </p>
                         )}
-                        {selPow && (
+                        {(featReplaceRowsBySlotKey.get(def.key) || []).map((row) => {
+                          const active = row.activeSlotKey === def.key;
+                          const replPow = index.powers.find((p) => p.id === row.offer.replacementPowerId);
+                          return (
+                            <div
+                              key={`${row.feat.id}-${def.key}`}
+                              style={{
+                                marginTop: "0.45rem",
+                                padding: "0.4rem 0.5rem",
+                                borderRadius: "6px",
+                                border: "1px solid color-mix(in srgb, var(--status-info) 35%, var(--panel-border))",
+                                backgroundColor: "color-mix(in srgb, var(--status-info) 8%, var(--surface-1))"
+                              }}
+                            >
+                              <label
+                                style={{
+                                  display: "flex",
+                                  alignItems: "flex-start",
+                                  gap: "0.4rem",
+                                  fontSize: "0.78rem",
+                                  color: "var(--text-secondary)",
+                                  cursor: "pointer"
+                                }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={active}
+                                  onChange={(e) =>
+                                    commitFeatPowerReplaceToggle(
+                                      row.feat.id,
+                                      def.key,
+                                      row.offer.replacementPowerId,
+                                      e.target.checked
+                                    )
+                                  }
+                                  style={{ marginTop: "0.15rem" }}
+                                />
+                                <span>
+                                  <strong style={{ color: "var(--text-primary)" }}>Swap</strong> for{" "}
+                                  <span style={{ color: "var(--status-info)" }}>{row.offer.replacementPowerName}</span>
+                                  {row.offer.optional ? " (optional)" : ""} — from{" "}
+                                  <span style={{ fontWeight: 600 }}>{row.feat.name}</span>
+                                </span>
+                              </label>
+                              {active && replPow ? (
+                                <div style={{ marginTop: "0.35rem" }}>
+                                  {renderPowerCardWithSelections(replPow, `swap-${row.feat.id}-${def.key}`)}
+                                </div>
+                              ) : null}
+                            </div>
+                          );
+                        })}
+                        {(multiclassSwapRowsBySlotKey.get(def.key) || []).map((row) => {
+                          const active = row.activeSlotKey === def.key;
+                          const mcPowers = multiclassPowersForSlotSwap(index, row.multiclassClassId, def, row.offer);
+                          const selectedRepl = active ? row.activeReplacementPowerId || "" : "";
+                          const replPow = selectedRepl ? index.powers.find((p) => p.id === selectedRepl) : undefined;
+                          const mcClassName = classNameById.get(row.multiclassClassId) ?? "multiclass";
+                          return (
+                            <div
+                              key={`mc-${row.feat.id}-${def.key}`}
+                              style={{
+                                marginTop: "0.45rem",
+                                padding: "0.4rem 0.5rem",
+                                borderRadius: "6px",
+                                border: "1px solid color-mix(in srgb, var(--status-info) 35%, var(--panel-border))",
+                                backgroundColor: "color-mix(in srgb, var(--status-info) 8%, var(--surface-1))"
+                              }}
+                            >
+                              <div style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "0.35rem" }}>
+                                {row.feat.name} — swap for {mcClassName} power
+                              </div>
+                              {mcPowers.length === 0 ? (
+                                <p style={{ margin: 0, fontSize: "0.76rem", color: "var(--text-muted)" }}>
+                                  No {def.bucket} powers from {mcClassName} at printed level {def.gainLevel} or below.
+                                </p>
+                              ) : (
+                                <>
+                                  <label style={{ display: "block", fontSize: "0.76rem", marginBottom: "0.25rem", color: "var(--text-secondary)" }}>
+                                    Multiclass power
+                                    <select
+                                      value={selectedRepl}
+                                      onChange={(e) => {
+                                        const pid = e.target.value;
+                                        if (!pid) {
+                                          if (active) commitMulticlassSlotSwapToggle(row.feat.id, def.key, "", false);
+                                          return;
+                                        }
+                                        if (active) commitMulticlassSlotSwapPowerChange(row.feat.id, pid);
+                                        else commitMulticlassSlotSwapToggle(row.feat.id, def.key, pid, true);
+                                      }}
+                                      style={{
+                                        display: "block",
+                                        width: "100%",
+                                        maxWidth: "28rem",
+                                        marginTop: "0.15rem",
+                                        padding: "0.35rem",
+                                        borderRadius: "6px",
+                                        border: "1px solid var(--panel-border)"
+                                      }}
+                                    >
+                                      <option value="">— Choose multiclass power —</option>
+                                      {mcPowers.map((p) => (
+                                        <option key={p.id} value={p.id}>
+                                          {p.name} (Lv {p.level ?? "?"}, {p.usage || "?"})
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </label>
+                                  <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.74rem", color: "var(--text-muted)" }}>
+                                    Choose a power to swap this slot{row.offer.optional ? " (optional)" : ""}.
+                                    {row.offer.replacementUsedAsEncounter
+                                      ? " Swapped power is usable once per encounter."
+                                      : ""}
+                                  </p>
+                                </>
+                              )}
+                              {active && replPow ? (
+                                <div style={{ marginTop: "0.35rem" }}>
+                                  {renderPowerCardWithSelections(replPow, `mc-swap-${row.feat.id}-${def.key}`)}
+                                </div>
+                              ) : null}
+                            </div>
+                          );
+                        })}
+
+                        {selPow && !featReplaceRowsBySlotKey.get(def.key)?.some((r) => r.activeSlotKey === def.key) && !multiclassSwapRowsBySlotKey.get(def.key)?.some((r) => r.activeSlotKey === def.key) ? (
                           <div style={{ marginTop: "0.5rem" }}>
                             <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--text-secondary)" }}>Selected power card</div>
                             {renderPowerCardWithSelections(selPow, `slot-${def.key}-${selPow.id}`)}
                           </div>
-                        )}
+                        ) : null}
                       </div>
                     </section>
                   );

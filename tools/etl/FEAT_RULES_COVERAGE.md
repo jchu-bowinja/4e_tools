@@ -12,6 +12,8 @@ For feats (and the same helpers for themes, paragon paths, epic destinies):
 | `raw.specific["Bonus to Defense"]` | `nadBonusesFromSpecific` | NAD bumps alongside `statAdds` |
 | `rules.grant` type Power / Class Feature / Racial Trait | `grantedPowerIds`, `grantedClassFeatureIds`, `grantedRacialTraitIds` | Feat powers, class features on sheet/builder |
 | `rules.modify` type Power + `specific['Associated Powers']` | `modifiedPowerIds`, `powerModifications` | Style / arena fighting augmentations (not grants) |
+| `rules.replace` `power-replace` + `_DisplayPowers` | `powerReplaceOffers` | Named optional class slot swaps (Gythka, weapon mastery, …) |
+| `rules.replace` `multiclass` + `Level` (no `power-replace`) | `multiclassSlotSwapOffers` | PHB Novice / Acolyte / Adept + PHB3 psionic slot swaps (user picks multiclass power) |
 | `rules.grant` type Proficiency | `proficiencyGrants` | Weapon/armor/shield/implement validation and attack previews |
 | `rules.grant` type Multiclass | `hasMulticlassGrant` | Multiclass feat detection in builder summary |
 | `rules.grant` type CountsAsClass | `countsAsClassNames`, `countsAsClassIds` | Class prereqs (e.g. paragon feats for trained class) |
@@ -77,7 +79,7 @@ Add `generated/feat_heavy_rules.json` to `.gitignore` if you do not want it comm
 
 ## Runtime follow-ups (multiclass pass 2)
 
-- **Paragon multiclassing** — `paragonMulticlassing` + `paragonMulticlassPowers` on `CharacterBuild`; requires Novice/Acolyte/Adept + one training feat; power picks from multiclass class at 11/12/20.
+- **Paragon multiclassing** — `paragonMulticlassing` + `paragonMulticlassPowers` wired to builder UI, power card index (`collectParagonMulticlassPowerIds`), and character sheet combat powers. Psionic paragon MC variants (power point changes) still deferred.
 - **Internal grants** — `KI_FOCUS_USER`, `PSIONIC_SECOND_CLASS`, bloodline heritage limits in `internalGrantValidation.ts`.
 - **Compendium tags** — `MULTICLASS` / `Unlimited Multiclass` prereq tags on entry feats evaluated in `prereqEvaluator`.
 

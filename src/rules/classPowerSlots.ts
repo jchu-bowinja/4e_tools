@@ -6,6 +6,7 @@ import {
   expectedClassUtilityPowerCount
 } from "./advancement";
 import { getClassPowersForLevelRange, powerTypeCategory } from "./classPowersQuery";
+import { activeFeatReplacementPowerIds } from "./featPowerReplace";
 
 /** PHB-style class encounter attack slot unlock levels (1st slot at 1st, 2nd at 3rd, …). */
 export const ENCOUNTER_ATTACK_SLOT_GAIN_LEVELS = [1, 3, 7, 13] as const;
@@ -137,6 +138,7 @@ export function reconcileClassPowerSlotsForBuild(
   const attacks = getClassPowersForLevelRange(index, build.classId, level, "attack");
   const utils = getClassPowersForLevelRange(index, build.classId, level, "utility");
   const allowed = new Set([...attacks, ...utils].map((p) => p.id));
+  for (const id of activeFeatReplacementPowerIds(index, build)) allowed.add(id);
 
   const defByKey = new Map(defs.map((d) => [d.key, d]));
   const next: Record<string, string> = { ...(build.classPowerSlots || {}) };

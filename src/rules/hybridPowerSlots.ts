@@ -1,4 +1,5 @@
 import type { CharacterBuild, Power, RulesIndex } from "./models";
+import { activeFeatReplacementPowerIds } from "./featPowerReplace";
 import {
   expectedClassAtWillAttackSlots,
   expectedClassDailyAttackSlots,
@@ -137,6 +138,7 @@ export function reconcileHybridClassPowerSlotsForBuild(
   const attacks = hybridPowerPoolUnion(index, baseClassIdA, baseClassIdB, level, "attack");
   const utils = hybridPowerPoolUnion(index, baseClassIdA, baseClassIdB, level, "utility");
   const allowed = new Set([...attacks, ...utils].map((p) => p.id));
+  for (const id of activeFeatReplacementPowerIds(index, build)) allowed.add(id);
 
   const defByKey = new Map(defs.map((d) => [d.key, d]));
   const next: Record<string, string> = { ...(build.classPowerSlots || {}) };

@@ -74,6 +74,11 @@ export function normalizeState(input: unknown): CharacterSheetState {
     characterEquipment: characterEquipmentFromStored(v as Record<string, unknown>),
     themeId: typeof v.themeId === "string" && v.themeId.trim() ? v.themeId : undefined,
     paragonPathId: typeof v.paragonPathId === "string" && v.paragonPathId.trim() ? v.paragonPathId : undefined,
+    paragonMulticlassing: typeof v.paragonMulticlassing === "boolean" ? v.paragonMulticlassing : undefined,
+    paragonMulticlassPowers:
+      v.paragonMulticlassPowers && typeof v.paragonMulticlassPowers === "object"
+        ? (v.paragonMulticlassPowers as CharacterSheetState["paragonMulticlassPowers"])
+        : undefined,
     epicDestinyId: typeof v.epicDestinyId === "string" && v.epicDestinyId.trim() ? v.epicDestinyId : undefined
   };
   return next;

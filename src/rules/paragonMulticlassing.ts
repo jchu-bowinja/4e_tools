@@ -118,3 +118,93 @@ export function validateParagonMulticlassing(index: RulesIndex, build: Character
 
   return errors;
 }
+
+/** Power ids from paragon multiclass picks (level-gated). */
+export function collectParagonMulticlassPowerIds(
+  build: Pick<CharacterBuild, "level" | "paragonMulticlassing" | "paragonMulticlassPowers">
+): string[] {
+  if (!build.paragonMulticlassing || build.level < 11) return [];
+  const picks = build.paragonMulticlassPowers;
+  if (!picks) return [];
+  const ids: string[] = [];
+  if (picks.atWillSwapPowerId) ids.push(picks.atWillSwapPowerId);
+  if (picks.encounterPowerId) ids.push(picks.encounterPowerId);
+  if (build.level >= 12 && picks.utilityPowerId) ids.push(picks.utilityPowerId);
+  if (build.level >= 20 && picks.dailyPowerId) ids.push(picks.dailyPowerId);
+  return ids;
+}
+
+export function resolveParagonMulticlassPowers(index: RulesIndex, build: CharacterBuild): Power[] {
+  const out: Power[] = [];
+  for (const id of collectParagonMulticlassPowerIds(build)) {
+    const p = index.powers.find((x) => x.id === id);
+    if (p) out.push(p);
+  }
+  return out;
+}
+
+/** Clear paragon multiclassing when ineligible or picks are illegal. */
+export function pruneParagonMulticlassing(index: RulesIndex, build: CharacterBuild): CharacterBuild {
+  if (!build.paragonMulticlassing && !build.paragonMulticlassPowers) return build;
+  if (!canChooseParagonMulticlassing(index, build)) {
+    return {
+      ...build,
+      paragonMulticlassing: undefined,
+      paragonMulticlassPowers: undefined
+    };
+  }
+  const picks = build.paragonMulticlassPowers;
+  if (!picks) return build;
+
+  const mcClassId = multiclassEntryClassId(index, build);
+  if (!mcClassId) {
+    return { ...build, paragonMulticlassPowers: undefined };
+  }
+
+  const atk7 = paragonMulticlassAttackPowers(index, mcClassId, 7);
+  const util10 = paragonMulticlassUtilityPowers(index, mcClassId, 10);
+  const atk19 = paragonMulticlassAttackPowers(index, mcClassId, 19);
+  const atkAll = paragonMulticlassAttackPowers(index, mcClassId, build.level);
+
+  const legalAtWill = new Set(filterParagonMulticlassAtWillOptions(atkAll).map((p) => p.id));
+  const legalEncounter = new Set(filterParagonMulticlassEncounterOptions(atk7).map((p) => p.id));
+  const legalUtility = new Set(util10.map((p) => p.id));
+  const legalDaily = new Set(filterParagonMulticlassDailyOptions(atk19).map((p) => p.id));
+
+  const nextPicks = { ...picks };
+  let changed = false;
+  if (nextPicks.atWillSwapPowerId && !legalAtWill.has(nextPicks.atWillSwapPowerId)) {
+    delete nextPicks.atWillSwapPowerId;
+    changed = true;
+  }
+  if (nextPicks.encounterPowerId && !legalEncounter.has(nextPicks.encounterPowerId)) {
+    delete nextPicks.encounterPowerId;
+    changed = true;
+  }
+  if (build.level < 12 && nextPicks.utilityPowerId) {
+    delete nextPicks.utilityPowerId;
+    changed = true;
+  } else if (nextPicks.utilityPowerId && !legalUtility.has(nextPicks.utilityPowerId)) {
+    delete nextPicks.utilityPowerId;
+    changed = true;
+  }
+  if (build.level < 20 && nextPicks.dailyPowerId) {
+    delete nextPicks.dailyPowerId;
+    changed = true;
+  } else if (nextPicks.dailyPowerId && !legalDaily.has(nextPicks.dailyPowerId)) {
+    delete nextPicks.dailyPowerId;
+    changed = true;
+  }
+
+  if (!changed) return build;
+  const hasAny = Boolean(
+    nextPicks.atWillSwapPowerId ||
+      nextPicks.encounterPowerId ||
+      nextPicks.utilityPowerId ||
+      nextPicks.dailyPowerId
+  );
+  return {
+    ...build,
+    paragonMulticlassPowers: hasAny ? nextPicks : undefined
+  };
+}

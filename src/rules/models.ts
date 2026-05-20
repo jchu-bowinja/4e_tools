@@ -132,6 +132,40 @@ export interface FeatPowerModification {
   value: string;
 }
 
+/** ETL: optional class slot swap from `rules.replace` power-replace (e.g. Gythka Expert). */
+export interface FeatPowerReplaceOffer {
+  replacementPowerId: string;
+  replacementPowerName: string;
+  usageBucket: "atWill" | "encounter" | "daily" | "utility";
+  minSlotGainLevel: number;
+  optional: boolean;
+}
+
+/** PHB Novice / Acolyte / Adept (and PHB3 psionic variants): swap one class slot for a user-picked multiclass power. */
+export interface FeatMulticlassSlotSwapOffer {
+  /** Class power slot bucket being swapped out. */
+  usageBucket: "atWill" | "encounter" | "daily" | "utility";
+  /** When set, replacement must come from this bucket (psionic Dabbler / Conventionalist). */
+  replacementUsageBucket?: "atWill" | "encounter" | "daily" | "utility";
+  maxSlotGainLevel: number;
+  optional: boolean;
+  /** Slot must currently hold an augmentable at-will (Complement / Conventionalist). */
+  requireAugmentableSlot?: boolean;
+  /** Replacement pick must be augmentable at-will (Complement / Dabbler). */
+  requireAugmentableReplacement?: boolean;
+  /** Swapped-in power is used once per encounter (paired rules.modify in compendium). */
+  replacementUsedAsEncounter?: boolean;
+}
+
+/** Active power-replace (named or multiclass slot swap). */
+export interface FeatPowerReplaceState {
+  slotKey: string;
+  /** Class power id in the slot before the swap (for restore). */
+  originalPowerId?: string;
+  /** Multiclass swap: user-picked power from the multiclass class. */
+  replacementPowerId?: string;
+}
+
 export interface Feat extends RulesEntity {
   tier?: string | null;
   category?: string | null;
@@ -150,6 +184,9 @@ export interface Feat extends RulesEntity {
   modifiedPowerIds?: string[];
   /** ETL: structured power augmentations (Corellon's Wrath Style, Gulg Hunter Practice, etc.). */
   powerModifications?: FeatPowerModification[];
+  /** ETL: named `power-replace` swap offers (weapon mastery, gythka chain, …). */
+  powerReplaceOffers?: FeatPowerReplaceOffer[];
+  multiclassSlotSwapOffers?: FeatMulticlassSlotSwapOffer[];
   /** ETL: `rules.grant` entries with type Class Feature. */
   grantedClassFeatureIds?: string[];
   /** ETL: `rules.grant` entries with type Racial Trait. */
@@ -528,6 +565,11 @@ export interface CharacterBuild {
    * Values are power ids; `powerIds` should stay in sync (see `orderedPowerIdsFromSlots` in rules).
    */
   classPowerSlots?: Record<string, string>;
+  /**
+   * Named feat power swaps (`power-replace`): feat id → slot using the replacement power.
+   * The slot’s `classPowerSlots` entry holds the replacement power id while active.
+   */
+  featPowerReplacements?: Record<string, FeatPowerReplaceState>;
 }
 
 export interface ValidationResult {

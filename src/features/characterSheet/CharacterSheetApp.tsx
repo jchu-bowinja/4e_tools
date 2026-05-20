@@ -26,6 +26,7 @@ import {
 } from "../../rules/featProficiencies";
 import { collectFeatModificationsByPowerId } from "../../rules/featPowerModifications";
 import { collectFeatGrantedPowersForBuild } from "../../rules/grantedPowersQuery";
+import { multiclassEntryClassId } from "../../rules/paragonMulticlassing";
 import { computeSkillSheetRows } from "../../rules/skillCalculator";
 import {
   ABILITY_SCORE_COLUMNS,
@@ -220,6 +221,7 @@ type CharacterIdentitySectionProps = {
   level: number;
   themeName?: string;
   paragonPathName?: string;
+  paragonMulticlassLabel?: string;
   epicDestinyName?: string;
   onRaceLabelMouseEnter?: (event: ReactMouseEvent<HTMLElement>) => void;
   onRaceLabelMouseLeave?: () => void;
@@ -238,6 +240,7 @@ function CharacterIdentitySection({
   level,
   themeName,
   paragonPathName,
+  paragonMulticlassLabel,
   epicDestinyName,
   onRaceLabelMouseEnter,
   onRaceLabelMouseLeave,
@@ -248,7 +251,7 @@ function CharacterIdentitySection({
   onLevelLabelFocus,
   onLevelLabelBlur
 }: CharacterIdentitySectionProps): JSX.Element {
-  const showAdvancement = Boolean(themeName || paragonPathName || epicDestinyName);
+  const showAdvancement = Boolean(themeName || paragonPathName || paragonMulticlassLabel || epicDestinyName);
 
   return (
     <section className="character-sheet-identity">
@@ -286,6 +289,9 @@ function CharacterIdentitySection({
           <div className="character-sheet-identity__advancement">
             {themeName && <CharacterIdentityField label="Theme">{themeName}</CharacterIdentityField>}
             {paragonPathName && <CharacterIdentityField label="Paragon path">{paragonPathName}</CharacterIdentityField>}
+            {paragonMulticlassLabel && (
+              <CharacterIdentityField label="Paragon multiclass">{paragonMulticlassLabel}</CharacterIdentityField>
+            )}
             {epicDestinyName && <CharacterIdentityField label="Epic destiny">{epicDestinyName}</CharacterIdentityField>}
           </div>
         )}
@@ -934,6 +940,13 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     () => (sheet.themeId ? index.themes.find((t) => t.id === sheet.themeId) : undefined),
     [index.themes, sheet.themeId]
   );
+  const paragonMulticlassLabel = useMemo(() => {
+    if (!sheet.paragonMulticlassing) return undefined;
+    const mcId = multiclassEntryClassId(index, toBuildLikeState(sheet, index));
+    const mcName = mcId ? index.classes.find((c) => c.id === mcId)?.name : undefined;
+    return mcName ? `Multiclass (${mcName})` : "Paragon multiclassing";
+  }, [index, sheet.paragonMulticlassing, sheet.featIds, sheet.level]);
+
   const selectedParagonPath = useMemo(
     () => (sheet.paragonPathId ? index.paragonPaths.find((p) => p.id === sheet.paragonPathId) : undefined),
     [index.paragonPaths, sheet.paragonPathId]
@@ -1028,6 +1041,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
       if (
         prev.themeId === build.themeId &&
         prev.paragonPathId === build.paragonPathId &&
+        prev.paragonMulticlassing === build.paragonMulticlassing &&
+        JSON.stringify(prev.paragonMulticlassPowers ?? {}) === JSON.stringify(build.paragonMulticlassPowers ?? {}) &&
         prev.epicDestinyId === build.epicDestinyId &&
         prev.level === build.level
       ) {
@@ -1038,6 +1053,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         level: build.level,
         themeId: build.themeId,
         paragonPathId: build.paragonPathId,
+        paragonMulticlassing: build.paragonMulticlassing,
+        paragonMulticlassPowers: build.paragonMulticlassPowers
+          ? { ...build.paragonMulticlassPowers }
+          : undefined,
         epicDestinyId: build.epicDestinyId
       };
     });
@@ -2265,7 +2284,12 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 }
                 level={sheet.level}
                 themeName={sheet.themeId ? (selectedTheme?.name ?? sheet.themeId) : undefined}
-                paragonPathName={sheet.paragonPathId ? (selectedParagonPath?.name ?? sheet.paragonPathId) : undefined}
+                paragonPathName={
+                  !sheet.paragonMulticlassing && sheet.paragonPathId
+                    ? (selectedParagonPath?.name ?? sheet.paragonPathId)
+                    : undefined
+                }
+                paragonMulticlassLabel={paragonMulticlassLabel}
                 epicDestinyName={sheet.epicDestinyId ? (selectedEpicDestiny?.name ?? sheet.epicDestinyId) : undefined}
                 onRaceLabelMouseEnter={derived.race ? startRaceHoverInfoTimer : undefined}
                 onRaceLabelMouseLeave={derived.race ? stopRaceHoverInfoTimerAndHide : undefined}

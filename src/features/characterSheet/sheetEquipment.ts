@@ -836,6 +836,10 @@ export function buildLikeStateFromSheet(state: CharacterSheetState, index: Rules
     hybridClassIdB: state.hybridClassIdB,
     themeId: state.themeId,
     paragonPathId: state.paragonPathId,
+    paragonMulticlassing: state.paragonMulticlassing,
+    paragonMulticlassPowers: state.paragonMulticlassPowers
+      ? { ...state.paragonMulticlassPowers }
+      : undefined,
     epicDestinyId: state.epicDestinyId,
     abilityScores: state.abilityScores,
     trainedSkillIds: state.trainedSkillIds,

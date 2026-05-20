@@ -5,7 +5,8 @@ import type {
   EquippedSlotKey,
   EquipmentSlot,
   InventoryItem,
-  InventoryItemKind
+  InventoryItemKind,
+  ParagonMulticlassPowers
 } from "../../rules/models";
 
 export type AbilityScores = Record<Ability, number>;
@@ -71,6 +72,8 @@ export interface CharacterSheetState {
   hybridClassIdB?: string;
   themeId?: string;
   paragonPathId?: string;
+  paragonMulticlassing?: boolean;
+  paragonMulticlassPowers?: ParagonMulticlassPowers;
   epicDestinyId?: string;
   /** Builder-aligned equipment (base, enchantment, plus per slot). Drives derived combat bonuses. */
   characterEquipment?: CharacterEquipment;

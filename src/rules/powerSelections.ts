@@ -6,6 +6,7 @@ import {
   resolveFeatGrantedPowers
 } from "./grantedPowersQuery";
 import type { CharacterBuild, RulesIndex } from "./models";
+import { collectParagonMulticlassPowerIds } from "./paragonMulticlassing";
 import { getChildTraitIdsForSubrace, getRaceSubraceData } from "./raceSubraces";
 
 /**
@@ -66,6 +67,8 @@ export function collectCharacterPowerIdsForSelections(index: RulesIndex, build: 
     if (!feat) continue;
     for (const p of resolveFeatGrantedPowers(index, feat)) ids.add(p.id);
   }
+
+  for (const pid of collectParagonMulticlassPowerIds(build)) ids.add(pid);
 
   return ids;
 }

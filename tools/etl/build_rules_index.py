@@ -1243,6 +1243,241 @@ def extract_feat_power_modifications(
     }
 
 
+_POWER_REPLACE_SPEC_RE = re.compile(r"^(.+):([^,]+),(\d+)\+?$")
+
+
+def _normalize_power_replace_bucket(raw: str) -> Optional[str]:
+    """Map compendium power-replace usage token to builder slot bucket."""
+    token = raw.strip().lower()
+    if token == "utility":
+        return "utility"
+    if token == "encounter":
+        return "encounter"
+    if token == "daily":
+        return "daily"
+    if token in ("at-will", "atwill", "at will"):
+        return "atWill"
+    if token == "attack":
+        return "encounter"
+    return None
+
+
+def _parse_power_replace_spec(value: str) -> Optional[tuple[str, str, int]]:
+    """Parse 'Gythka Parry:utility,6+' -> (powerNameOrId, bucket, minSlotGainLevel)."""
+    m = _POWER_REPLACE_SPEC_RE.match(value.strip())
+    if not m:
+        return None
+    name = m.group(1).strip()
+    bucket = _normalize_power_replace_bucket(m.group(2))
+    if not bucket or not name:
+        return None
+    try:
+        min_level = int(m.group(3))
+    except ValueError:
+        return None
+    return name, bucket, min_level
+
+
+def _build_power_id_to_name(powers_raw: List[Dict[str, Any]]) -> Dict[str, str]:
+    lookup: Dict[str, str] = {}
+    for power in powers_raw:
+        pid = power.get("internal_id")
+        pname = power.get("name")
+        if isinstance(pid, str) and isinstance(pname, str) and pname.strip():
+            lookup[pid] = pname.strip()
+    return lookup
+
+
+def extract_feat_power_replace_offers(
+    feat: Dict[str, Any],
+    power_name_to_id: Dict[str, str],
+    power_id_to_name: Dict[str, str],
+) -> Dict[str, Any]:
+    """
+    Named `rules.replace` rows with `power-replace` (weapon mastery, gythka chain, etc.).
+    Skips multiclass `encounter swap` style rows (no power-replace attribute).
+    """
+    rules = feat.get("rules") if isinstance(feat.get("rules"), dict) else {}
+    spec = feat.get("specific") if isinstance(feat.get("specific"), dict) else {}
+    display_raw = str(spec.get("_DisplayPowers") or "").strip()
+    display_ids = [x.strip() for x in display_raw.split(",") if x.strip()] if display_raw else []
+
+    offers: List[Dict[str, Any]] = []
+    for idx, rep in enumerate(rules.get("replace") or []):
+        if not isinstance(rep, dict):
+            continue
+        attrs = rep.get("attrs") or {}
+        pr = attrs.get("power-replace")
+        if not isinstance(pr, str) or not pr.strip():
+            continue
+        parsed = _parse_power_replace_spec(pr)
+        if not parsed:
+            continue
+        name_or_id, bucket, min_level = parsed
+        repl_id: Optional[str] = None
+        if name_or_id.startswith("ID_FMP_POWER_"):
+            repl_id = name_or_id
+        elif idx < len(display_ids):
+            repl_id = display_ids[idx]
+        else:
+            repl_id = power_name_to_id.get(name_or_id.lower())
+        if not repl_id:
+            continue
+        repl_name = power_id_to_name.get(repl_id) or name_or_id
+        optional = str(attrs.get("optional", "")).strip().lower() == "true"
+        offers.append(
+            {
+                "replacementPowerId": repl_id,
+                "replacementPowerName": repl_name,
+                "usageBucket": bucket,
+                "minSlotGainLevel": min_level,
+                "optional": optional,
+            }
+        )
+
+    return {"powerReplaceOffers": offers}
+
+
+_MULTICLASS_SLOT_BUCKET: Dict[str, str] = {
+    "encounter": "encounter",
+    "utility": "utility",
+    "daily": "daily",
+    "augmentable at-will": "atWill",
+}
+
+
+def _multiclass_token_bucket(token: str) -> Optional[str]:
+    return _MULTICLASS_SLOT_BUCKET.get(token.strip().lower())
+
+
+def _feat_has_power_usage_encounter_modify(rules: Dict[str, Any]) -> bool:
+    for mod in rules.get("modify") or []:
+        if not isinstance(mod, dict):
+            continue
+        attrs = mod.get("attrs") or {}
+        if str(attrs.get("Field", "")).strip() == "Power Usage" and str(attrs.get("value", "")).strip().lower() == "encounter":
+            return True
+    return False
+
+
+# PHB3 psionic swap feats share `encounter|Augmentable At-Will` in data; direction is feat-specific.
+_PSIONIC_MULTICLASS_SWAP_BY_FEAT: Dict[str, Dict[str, Any]] = {
+    "psionic complement": {
+        "usageBucket": "atWill",
+        "replacementUsageBucket": "atWill",
+        "requireAugmentableSlot": True,
+        "requireAugmentableReplacement": True,
+    },
+    "psionic dabbler": {
+        "usageBucket": "encounter",
+        "replacementUsageBucket": "atWill",
+        "requireAugmentableReplacement": True,
+        "replacementUsedAsEncounter": True,
+    },
+    "psionic conventionalist": {
+        "usageBucket": "atWill",
+        "replacementUsageBucket": "encounter",
+        "requireAugmentableSlot": True,
+    },
+}
+
+
+def extract_feat_multiclass_slot_swap_offers(feat: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    PHB multiclass slot swaps (Novice / Acolyte / Adept) and PHB3 psionic variants.
+    `rules.replace` with `multiclass` + `Level`, no `power-replace`. Collapses level rows into one offer.
+    """
+    rules = feat.get("rules") if isinstance(feat.get("rules"), dict) else {}
+    feat_name = str(feat.get("name") or "").strip().lower()
+    psionic_spec = _PSIONIC_MULTICLASS_SWAP_BY_FEAT.get(feat_name)
+
+    slot_buckets: set[str] = set()
+    repl_buckets: set[str] = set()
+    max_slot_gain_level = 0
+    optional = True
+    require_augmentable_slot = False
+    require_augmentable_replacement = False
+
+    for rep in rules.get("replace") or []:
+        if not isinstance(rep, dict):
+            continue
+        attrs = rep.get("attrs") or {}
+        if attrs.get("power-replace"):
+            continue
+        mc_raw = attrs.get("multiclass")
+        if not isinstance(mc_raw, str) or not mc_raw.strip():
+            continue
+        level_raw = attrs.get("Level")
+        try:
+            level = int(str(level_raw).strip())
+        except (TypeError, ValueError):
+            continue
+
+        tokens = [t.strip() for t in mc_raw.split("|") if t.strip()]
+        if len(tokens) == 1:
+            bucket = _multiclass_token_bucket(tokens[0])
+            if not bucket:
+                continue
+            slot_buckets.add(bucket)
+            repl_buckets.add(bucket)
+            if "augmentable" in tokens[0].lower():
+                require_augmentable_slot = True
+                require_augmentable_replacement = True
+        elif len(tokens) == 2:
+            b0 = _multiclass_token_bucket(tokens[0])
+            b1 = _multiclass_token_bucket(tokens[1])
+            if not b0 or not b1:
+                continue
+            if psionic_spec:
+                slot_buckets.add(psionic_spec["usageBucket"])
+                repl_buckets.add(psionic_spec.get("replacementUsageBucket", psionic_spec["usageBucket"]))
+            else:
+                slot_buckets.add(b0)
+                repl_buckets.add(b1)
+            if "augmentable" in tokens[0].lower():
+                require_augmentable_slot = True
+            if "augmentable" in tokens[1].lower():
+                require_augmentable_replacement = True
+        else:
+            continue
+
+        max_slot_gain_level = max(max_slot_gain_level, level)
+        if str(attrs.get("optional", "")).strip().lower() != "true":
+            optional = False
+
+    if psionic_spec:
+        slot_buckets = {psionic_spec["usageBucket"]}
+        repl_buckets = {psionic_spec.get("replacementUsageBucket", psionic_spec["usageBucket"])}
+        require_augmentable_slot = bool(psionic_spec.get("requireAugmentableSlot"))
+        require_augmentable_replacement = bool(psionic_spec.get("requireAugmentableReplacement"))
+
+    if len(slot_buckets) != 1 or max_slot_gain_level < 1:
+        return {}
+
+    slot_bucket = next(iter(slot_buckets))
+    repl_bucket = next(iter(repl_buckets)) if repl_buckets else slot_bucket
+    if psionic_spec and psionic_spec.get("replacementUsedAsEncounter"):
+        replacement_used_as_encounter = True
+    else:
+        replacement_used_as_encounter = _feat_has_power_usage_encounter_modify(rules)
+
+    offer: Dict[str, Any] = {
+        "usageBucket": slot_bucket,
+        "maxSlotGainLevel": max_slot_gain_level,
+        "optional": optional,
+    }
+    if repl_bucket != slot_bucket:
+        offer["replacementUsageBucket"] = repl_bucket
+    if require_augmentable_slot:
+        offer["requireAugmentableSlot"] = True
+    if require_augmentable_replacement:
+        offer["requireAugmentableReplacement"] = True
+    if replacement_used_as_encounter:
+        offer["replacementUsedAsEncounter"] = True
+
+    return {"multiclassSlotSwapOffers": [offer]}
+
+
 def extract_stat_adds_from_rules(rules: Any) -> List[Dict[str, Any]]:
     """rules.statadd from a compendium row (feat, theme, paragon path, epic destiny, etc.)."""
     if not isinstance(rules, dict):
@@ -1768,6 +2003,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
             skill_name_to_id[sname.strip().lower()] = sid
 
     power_name_to_id = _build_power_name_to_id(powers_raw)
+    power_id_to_name = _build_power_id_to_name(powers_raw)
 
     feats: List[Dict[str, Any]] = []
     for feat in feats_raw:
@@ -1798,6 +2034,10 @@ def build_index(input_path: Path, output_dir: Path) -> None:
             class_feature_id_by_name,
         )
         feat_power_mods = extract_feat_power_modifications(feat, power_name_to_id)
+        feat_power_replace = extract_feat_power_replace_offers(
+            feat, power_name_to_id, power_id_to_name
+        )
+        feat_multiclass_slot_swap = extract_feat_multiclass_slot_swap_offers(feat)
         feats.append(
             {
                 "id": feat.get("internal_id"),
@@ -1815,6 +2055,8 @@ def build_index(input_path: Path, output_dir: Path) -> None:
                 **support_entity_stat_bonuses(feat),
                 **feat_grants,
                 **feat_power_mods,
+                **feat_power_replace,
+                **feat_multiclass_slot_swap,
             }
         )
 

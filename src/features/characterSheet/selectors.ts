@@ -1,5 +1,6 @@
 import { attackPowerBucketFromUsage } from "../../rules/classPowerSlots";
 import { getPowersForOwnerId } from "../../rules/classPowersQuery";
+import { collectParagonMulticlassPowerIds } from "../../rules/paragonMulticlassing";
 import {
   autoGrantedClassPowers,
   collectFeatGrantedPowersForBuild,
@@ -234,12 +235,21 @@ export function groupCombatPowers(state: CharacterSheetState, index: RulesIndex)
   const featGranted = collectFeatGrantedPowersForBuild(index, {
     featIds: state.featIds ?? []
   }).flatMap((row) => row.powers);
+  const paragonMcIds = collectParagonMulticlassPowerIds({
+    level: state.level,
+    paragonMulticlassing: state.paragonMulticlassing,
+    paragonMulticlassPowers: state.paragonMulticlassPowers
+  });
+  const paragonMcGranted = paragonMcIds
+    .map((id) => byId.get(id))
+    .filter((p): p is Power => Boolean(p));
   const allPowers = [
     ...selected,
     ...autoClass,
     ...raceGranted,
     ...themeGranted,
     ...paragonGranted,
+    ...paragonMcGranted,
     ...epicGranted,
     ...featGranted
   ];
@@ -273,6 +283,10 @@ export function sheetStateFromBuild(build: CharacterBuild, index: RulesIndex): C
     hybridClassIdB: normalized.hybridClassIdB,
     themeId: normalized.themeId,
     paragonPathId: normalized.paragonPathId,
+    paragonMulticlassing: normalized.paragonMulticlassing,
+    paragonMulticlassPowers: normalized.paragonMulticlassPowers
+      ? { ...normalized.paragonMulticlassPowers }
+      : undefined,
     epicDestinyId: normalized.epicDestinyId,
     characterEquipment,
     abilityScores: normalized.abilityScores,

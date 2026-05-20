@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   canChooseParagonMulticlassing,
+  collectParagonMulticlassPowerIds,
   hasFullMulticlassPowerChain,
   multiclassEntryClassId,
+  pruneParagonMulticlassing,
   validateParagonMulticlassing
 } from "../../src/rules/paragonMulticlassing";
 import type { CharacterBuild, RulesIndex } from "../../src/rules/models";
@@ -64,5 +66,38 @@ describe("paragonMulticlassing", () => {
       paragonPathId: "pp1"
     });
     expect(errors.some((e) => e.includes("Clear paragon path"))).toBe(true);
+  });
+
+  it("collects paragon multiclass power ids by level", () => {
+    const withPicks = {
+      ...build,
+      level: 20,
+      paragonMulticlassing: true,
+      paragonMulticlassPowers: {
+        atWillSwapPowerId: "aw1",
+        encounterPowerId: "enc1",
+        utilityPowerId: "util1",
+        dailyPowerId: "daily1"
+      }
+    };
+    expect(collectParagonMulticlassPowerIds(withPicks).sort()).toEqual(["aw1", "daily1", "enc1", "util1"].sort());
+    expect(
+      collectParagonMulticlassPowerIds({
+        ...withPicks,
+        level: 11,
+        paragonMulticlassPowers: { atWillSwapPowerId: "aw1", encounterPowerId: "enc1", utilityPowerId: "util1" }
+      })
+    ).toEqual(["aw1", "enc1"]);
+  });
+
+  it("prunes paragon multiclass when chain is lost", () => {
+    const next = pruneParagonMulticlassing(index, {
+      ...build,
+      paragonMulticlassing: true,
+      paragonMulticlassPowers: { encounterPowerId: "enc1" },
+      featIds: ["mc"]
+    });
+    expect(next.paragonMulticlassing).toBeUndefined();
+    expect(next.paragonMulticlassPowers).toBeUndefined();
   });
 });
