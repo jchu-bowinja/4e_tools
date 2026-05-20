@@ -17,6 +17,8 @@ import { useGlossaryTooltip } from "../../ui/useGlossaryTooltip";
 import { resolveMonsterGlossaryHoverSections, resolveMonsterStyleTooltip } from "./monsterTooltipResolve";
 import { GlossaryTooltipRichText } from "../builder/RulesRichText";
 import { CollapsibleDisclosure, CollapsibleDisclosureArrow } from "../../ui/CollapsibleDisclosure";
+import { MonsterDataQualityAlerts } from "./MonsterDataQualityAlerts";
+import { MonsterJsonEditorPanel } from "./MonsterJsonEditorPanel";
 import { monsterPowerCardShellStyle, type MonsterPowerActionBucket } from "../../ui/powerCard";
 import { findCaseInsensitiveMatches, scrollTextareaToMatch } from "../../ui/jsonSearch";
 import {
@@ -589,6 +591,20 @@ const centerSubsectionPanelStyle: CSSProperties = {
 };
 
 /** Flow subsection inside the monster sheet column — no second panel border (column uses sheetPanel). */
+type MonsterCenterPane = "sheet" | "json";
+
+const monsterCenterPaneToggleBtnStyle = (active: boolean): CSSProperties => ({
+  padding: "0.22rem 0.5rem",
+  fontSize: "0.8125rem",
+  lineHeight: 1.2,
+  borderRadius: "0.25rem",
+  border: "1px solid var(--panel-border)",
+  backgroundColor: active ? "var(--surface-2)" : "var(--surface-0)",
+  color: "var(--text-primary)",
+  fontWeight: active ? 600 : 400,
+  cursor: "pointer"
+});
+
 const centerFlowSubsectionStyle: CSSProperties = {
   marginBottom: "0.65rem",
   minWidth: 0
@@ -3259,6 +3275,8 @@ export function MonsterEditorApp({
   );
   /** When set, monster sheet shows base creature merged with up to two templates (preview only). */
   const [monsterTemplatePreviewIdxs, setMonsterTemplatePreviewIdxs] = useState<number[]>([]);
+  /** Monsters tab center column: stat block sheet vs entry JSON (replaces bottom JSON panel). */
+  const [monsterCenterPane, setMonsterCenterPane] = useState<MonsterCenterPane>("sheet");
   /** DMG quick level adjustment preview (−5…+5): attacks, defenses, AC, role HP, damage. */
   const [monsterLevelDelta, setMonsterLevelDelta] = useState(0);
   const [templateNameQuery, setTemplateNameQuery] = useState<string>("");
@@ -3959,6 +3977,10 @@ export function MonsterEditorApp({
   useEffect(() => {
     glossaryResolutionCacheRef.current.clear();
   }, [index, tooltipGlossary]);
+
+  useEffect(() => {
+    setMonsterCenterPane("sheet");
+  }, [selectedId]);
 
   useEffect(() => {
     setJsonSearchResultIdx(0);
@@ -5686,7 +5708,20 @@ export function MonsterEditorApp({
               </div>
             )}
 
-            <div style={{ ...sheetPanel, padding: "0.75rem" }}>
+            <div
+              style={{
+                ...sheetPanel,
+                padding: "0.75rem",
+                ...(viewerTab === "monsters"
+                  ? {
+                      display: "flex",
+                      flexDirection: "column",
+                      minHeight: 0,
+                      maxHeight: "97.5vh"
+                    }
+                  : {})
+              }}
+            >
           {!formatMonster ? (
             <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.8125rem", lineHeight: 1.45 }}>
               {viewerTab === "createMonster"
@@ -5694,7 +5729,8 @@ export function MonsterEditorApp({
                 : "Select a monster to view its generated JSON data."}
             </p>
           ) : (
-            <div style={{ minWidth: 0 }}>
+            <div style={{ minWidth: 0, ...(viewerTab === "monsters" ? { display: "flex", flexDirection: "column", minHeight: 0, flex: 1 } : {}) }}>
+              {viewerTab === "monsters" ? <MonsterDataQualityAlerts entry={activeMonster} /> : null}
               {viewerTab === "monsters" && selectedTemplatePrereqFailures.length > 0 ? (
                 <div
                   role="status"
@@ -5752,46 +5788,122 @@ export function MonsterEditorApp({
                   </div>
                 ) : null}
                 {viewerTab === "monsters" ? (
-                  <button
-                    type="button"
-                    disabled={!formatMonster || !selectedId || !encounterStore.activeEncounterId}
-                    title={
-                      !formatMonster || !selectedId
-                        ? "Select a monster and wait for the sheet to load"
-                        : "Adds the creature as shown (templates + level adjustment) to the encounter selected above"
-                    }
-                    onClick={() => {
-                      if (!formatMonster || !selectedId) return;
-                      const encLabel = encounterActive?.name?.trim() || "encounter";
-                      const templateDedupeKeys = templatePreviewIdxsToDedupeKeys(
-                        monsterTemplatePreviewIdxs,
-                        templateRows
-                      );
-                      setEncounterStore((prev) => {
-                        const targetId = prev.activeEncounterId;
-                        if (!targetId) return prev;
-                        const extras: EncounterSnapshotExtras = {};
-                        if (templateDedupeKeys.length > 0) extras.templateDedupeKeys = templateDedupeKeys;
-                        if (monsterLevelDelta !== 0) extras.levelAdjustment = monsterLevelDelta;
-                        return storeAddSnapshotToEncounter(
-                          prev,
-                          targetId,
-                          formatMonster,
-                          selectedId,
-                          Object.keys(extras).length > 0 ? extras : undefined
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", alignItems: "center", flexShrink: 0 }}>
+                    <div
+                      role="group"
+                      aria-label="Center column view"
+                      style={{ display: "flex", borderRadius: "0.25rem", overflow: "hidden", border: "1px solid var(--panel-border)" }}
+                    >
+                      <button
+                        type="button"
+                        aria-pressed={monsterCenterPane === "sheet"}
+                        onClick={() => setMonsterCenterPane("sheet")}
+                        style={{
+                          ...monsterCenterPaneToggleBtnStyle(monsterCenterPane === "sheet"),
+                          borderRadius: 0,
+                          border: "none",
+                          borderRight: "1px solid var(--panel-border)"
+                        }}
+                      >
+                        Stat block
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={monsterCenterPane === "json"}
+                        onClick={() => setMonsterCenterPane("json")}
+                        style={{ ...monsterCenterPaneToggleBtnStyle(monsterCenterPane === "json"), borderRadius: 0, border: "none" }}
+                      >
+                        JSON
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!formatMonster || !selectedId || !encounterStore.activeEncounterId}
+                      title={
+                        !formatMonster || !selectedId
+                          ? "Select a monster and wait for the sheet to load"
+                          : "Adds the creature as shown (templates + level adjustment) to the encounter selected above"
+                      }
+                      onClick={() => {
+                        if (!formatMonster || !selectedId) return;
+                        const encLabel = encounterActive?.name?.trim() || "encounter";
+                        const templateDedupeKeys = templatePreviewIdxsToDedupeKeys(
+                          monsterTemplatePreviewIdxs,
+                          templateRows
                         );
-                      });
-                      setMessage(`Added “${formatMonster.name}” to encounter “${encLabel}”.`);
-                    }}
-                    style={{
-                      flexShrink: 0,
-                      alignSelf: "center"
-                    }}
-                  >
-                    Add to encounter
-                  </button>
+                        setEncounterStore((prev) => {
+                          const targetId = prev.activeEncounterId;
+                          if (!targetId) return prev;
+                          const extras: EncounterSnapshotExtras = {};
+                          if (templateDedupeKeys.length > 0) extras.templateDedupeKeys = templateDedupeKeys;
+                          if (monsterLevelDelta !== 0) extras.levelAdjustment = monsterLevelDelta;
+                          return storeAddSnapshotToEncounter(
+                            prev,
+                            targetId,
+                            formatMonster,
+                            selectedId,
+                            Object.keys(extras).length > 0 ? extras : undefined
+                          );
+                        });
+                        setMessage(`Added “${formatMonster.name}” to encounter “${encLabel}”.`);
+                      }}
+                    >
+                      Add to encounter
+                    </button>
+                  </div>
                 ) : null}
               </div>
+              {viewerTab === "monsters" && monsterCenterPane === "json" ? (
+                <MonsterJsonEditorPanel
+                  value={rawJsonText}
+                  readOnly
+                  textareaRef={jsonTextareaRef}
+                  searchInput={jsonSearchInput}
+                  onSearchInputChange={setJsonSearchInput}
+                  onSearchEnter={() => {
+                    const committed = jsonSearchInput.trim();
+                    setJsonSearchQuery(committed);
+                    setJsonSearchResultIdx(0);
+                    setJsonSearchJumpTick((prev) => prev + 1);
+                  }}
+                  searchStatusText={
+                    jsonSearchQuery.trim()
+                      ? jsonSearchMatches.length > 0
+                        ? `${Math.min(jsonSearchResultIdx + 1, jsonSearchMatches.length)} of ${jsonSearchMatches.length}`
+                        : "0 matches"
+                      : "Type and press Enter"
+                  }
+                  onSearchPrevious={() =>
+                    setJsonSearchResultIdx((prev) => {
+                      const nextIdx =
+                        jsonSearchMatches.length === 0
+                          ? 0
+                          : (prev - 1 + jsonSearchMatches.length) % jsonSearchMatches.length;
+                      setJsonSearchJumpTick((tick) => tick + 1);
+                      return nextIdx;
+                    })
+                  }
+                  onSearchNext={() =>
+                    setJsonSearchResultIdx((prev) => {
+                      const nextIdx =
+                        jsonSearchMatches.length === 0 ? 0 : (prev + 1) % jsonSearchMatches.length;
+                      setJsonSearchJumpTick((tick) => tick + 1);
+                      return nextIdx;
+                    })
+                  }
+                  searchNavDisabled={jsonSearchMatches.length === 0}
+                  onCopy={() => {
+                    if (!navigator.clipboard?.writeText) {
+                      alert("Clipboard API unavailable in this browser.");
+                      return;
+                    }
+                    void navigator.clipboard.writeText(rawJsonText);
+                  }}
+                  fillColumn
+                />
+              ) : null}
+              {viewerTab === "monsters" && monsterCenterPane === "json" ? null : (
+              <>
               {viewerTab === "monsters" && templatePreviewDescriptions.length > 0
                 ? templatePreviewDescriptions.map(({ key, templateName, description }) => (
                     <div key={key} style={centerFlowSubsectionStyle}>
@@ -5955,6 +6067,9 @@ export function MonsterEditorApp({
                   </div>
                 </div>
               ) : null}
+
+              </>
+              )}
 
                   </>
                 );
@@ -6432,9 +6547,10 @@ export function MonsterEditorApp({
           )}
       </div>
 
+      {viewerTab !== "monsters" ? (
       <div style={{ marginTop: "0.85rem", ...panelStyle, padding: "0.55rem" }}>
         <CollapsibleDisclosure
-          open={viewerTab !== "monsters"}
+          open
           summaryStyle={jsonSummaryStyle}
           summary={
             viewerTab === "createTemplate"
@@ -6444,75 +6560,7 @@ export function MonsterEditorApp({
                 : "JSON"
           }
         >
-          <div style={{ marginTop: "0.5rem", display: "flex", flexWrap: "wrap", gap: "0.35rem", alignItems: "center" }}>
-            <input
-              value={jsonSearchInput}
-              onChange={(event) => setJsonSearchInput(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key !== "Enter") return;
-                event.preventDefault();
-                const committed = jsonSearchInput.trim();
-                setJsonSearchQuery(committed);
-                setJsonSearchResultIdx(0);
-                setJsonSearchJumpTick((prev) => prev + 1);
-              }}
-              placeholder="Search JSON..."
-              style={{
-                minWidth: 260,
-                border: "1px solid var(--panel-border)",
-                borderRadius: "0.28rem",
-                padding: "0.22rem 0.3rem"
-              }}
-            />
-            <button
-              type="button"
-              disabled={jsonSearchMatches.length === 0}
-              onClick={() =>
-                setJsonSearchResultIdx((prev) => {
-                  const nextIdx = jsonSearchMatches.length === 0 ? 0 : (prev - 1 + jsonSearchMatches.length) % jsonSearchMatches.length;
-                  setJsonSearchJumpTick((tick) => tick + 1);
-                  return nextIdx;
-                })
-              }
-            >
-              Previous
-            </button>
-            <button
-              type="button"
-              disabled={jsonSearchMatches.length === 0}
-              onClick={() =>
-                setJsonSearchResultIdx((prev) => {
-                  const nextIdx = jsonSearchMatches.length === 0 ? 0 : (prev + 1) % jsonSearchMatches.length;
-                  setJsonSearchJumpTick((tick) => tick + 1);
-                  return nextIdx;
-                })
-              }
-            >
-              Next
-            </button>
-            <span style={metaSecondary}>
-              {jsonSearchQuery.trim()
-                ? jsonSearchMatches.length > 0
-                  ? `${Math.min(jsonSearchResultIdx + 1, jsonSearchMatches.length)} of ${jsonSearchMatches.length}`
-                  : "0 matches"
-                : "Type and press Enter"}
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                if (!navigator.clipboard?.writeText) {
-                  alert("Clipboard API unavailable in this browser.");
-                  return;
-                }
-                void navigator.clipboard.writeText(rawJsonText);
-              }}
-              style={{ marginLeft: "auto" }}
-            >
-              Copy Contents
-            </button>
-          </div>
-          <textarea
-            ref={jsonTextareaRef}
+          <MonsterJsonEditorPanel
             value={
               viewerTab === "createTemplate"
                 ? createDraftJson
@@ -6523,136 +6571,111 @@ export function MonsterEditorApp({
             readOnly={viewerTab !== "createTemplate" && viewerTab !== "createMonster"}
             onChange={
               viewerTab === "createTemplate"
-                ? (event) => setCreateDraftJson(event.target.value)
+                ? setCreateDraftJson
                 : viewerTab === "createMonster"
-                  ? (event) => setCreateMonsterDraftJson(event.target.value)
+                  ? setCreateMonsterDraftJson
                   : undefined
             }
-            style={{
-              margin: "0.55rem 0 0 0",
-              padding: "0.55rem",
-              borderRadius: "0.32rem",
-              border: "1px solid var(--panel-border)",
-              backgroundColor: "var(--surface-1)",
-              color: "var(--text-primary)",
-              overflow: "auto",
-              height: "44rem",
-              minHeight: "12rem",
-              width: "100%",
-              boxSizing: "border-box",
-              resize: "vertical",
-              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
-              fontSize: "0.76rem",
-              lineHeight: 1.35
+            textareaRef={jsonTextareaRef}
+            searchInput={jsonSearchInput}
+            onSearchInputChange={setJsonSearchInput}
+            onSearchEnter={() => {
+              const committed = jsonSearchInput.trim();
+              setJsonSearchQuery(committed);
+              setJsonSearchResultIdx(0);
+              setJsonSearchJumpTick((prev) => prev + 1);
+            }}
+            searchStatusText={
+              jsonSearchQuery.trim()
+                ? jsonSearchMatches.length > 0
+                  ? `${Math.min(jsonSearchResultIdx + 1, jsonSearchMatches.length)} of ${jsonSearchMatches.length}`
+                  : "0 matches"
+                : "Type and press Enter"
+            }
+            onSearchPrevious={() =>
+              setJsonSearchResultIdx((prev) => {
+                const nextIdx =
+                  jsonSearchMatches.length === 0
+                    ? 0
+                    : (prev - 1 + jsonSearchMatches.length) % jsonSearchMatches.length;
+                setJsonSearchJumpTick((tick) => tick + 1);
+                return nextIdx;
+              })
+            }
+            onSearchNext={() =>
+              setJsonSearchResultIdx((prev) => {
+                const nextIdx = jsonSearchMatches.length === 0 ? 0 : (prev + 1) % jsonSearchMatches.length;
+                setJsonSearchJumpTick((tick) => tick + 1);
+                return nextIdx;
+              })
+            }
+            searchNavDisabled={jsonSearchMatches.length === 0}
+            onCopy={() => {
+              if (!navigator.clipboard?.writeText) {
+                alert("Clipboard API unavailable in this browser.");
+                return;
+              }
+              void navigator.clipboard.writeText(rawJsonText);
             }}
           />
         </CollapsibleDisclosure>
-        {viewerTab === "monsters" && monsterTemplatePreviewIdxs.length > 0 && templateRows[monsterTemplatePreviewIdxs[0]] ? (
-          <CollapsibleDisclosure
-            open={false}
-            style={{ marginTop: "0.65rem" }}
-            summaryStyle={jsonSummaryStyle}
-            summary="Template JSON"
-          >
-            <div style={{ marginTop: "0.5rem", display: "flex", flexWrap: "wrap", gap: "0.35rem", alignItems: "center" }}>
-              <input
-                value={templateJsonSearchInput}
-                onChange={(event) => setTemplateJsonSearchInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key !== "Enter") return;
-                  event.preventDefault();
-                  const committed = templateJsonSearchInput.trim();
-                  setTemplateJsonSearchQuery(committed);
-                  setTemplateJsonSearchResultIdx(0);
-                  setTemplateJsonSearchJumpTick((prev) => prev + 1);
-                }}
-                placeholder="Search template JSON..."
-                style={{
-                  minWidth: 260,
-                  border: "1px solid var(--panel-border)",
-                  borderRadius: "0.28rem",
-                  padding: "0.22rem 0.3rem"
-                }}
-              />
-              <button
-                type="button"
-                disabled={templateJsonSearchMatches.length === 0}
-                onClick={() =>
-                  setTemplateJsonSearchResultIdx((prev) => {
-                    const nextIdx =
-                      templateJsonSearchMatches.length === 0
-                        ? 0
-                        : (prev - 1 + templateJsonSearchMatches.length) % templateJsonSearchMatches.length;
-                    setTemplateJsonSearchJumpTick((tick) => tick + 1);
-                    return nextIdx;
-                  })
-                }
-              >
-                Previous
-              </button>
-              <button
-                type="button"
-                disabled={templateJsonSearchMatches.length === 0}
-                onClick={() =>
-                  setTemplateJsonSearchResultIdx((prev) => {
-                    const nextIdx =
-                      templateJsonSearchMatches.length === 0
-                        ? 0
-                        : (prev + 1) % templateJsonSearchMatches.length;
-                    setTemplateJsonSearchJumpTick((tick) => tick + 1);
-                    return nextIdx;
-                  })
-                }
-              >
-                Next
-              </button>
-              <span style={metaSecondary}>
-                {templateJsonSearchQuery.trim()
+      </div>
+      ) : null}
+
+      {viewerTab === "monsters" && monsterTemplatePreviewIdxs.length > 0 && templateRows[monsterTemplatePreviewIdxs[0]] ? (
+        <div style={{ marginTop: "0.85rem", ...panelStyle, padding: "0.55rem" }}>
+          <CollapsibleDisclosure open={false} summaryStyle={jsonSummaryStyle} summary="Template JSON">
+            <MonsterJsonEditorPanel
+              value={templatePreviewJsonText}
+              readOnly
+              textareaRef={templateJsonTextareaRef}
+              searchInput={templateJsonSearchInput}
+              onSearchInputChange={setTemplateJsonSearchInput}
+              onSearchEnter={() => {
+                const committed = templateJsonSearchInput.trim();
+                setTemplateJsonSearchQuery(committed);
+                setTemplateJsonSearchResultIdx(0);
+                setTemplateJsonSearchJumpTick((prev) => prev + 1);
+              }}
+              searchStatusText={
+                templateJsonSearchQuery.trim()
                   ? templateJsonSearchMatches.length > 0
                     ? `${Math.min(templateJsonSearchResultIdx + 1, templateJsonSearchMatches.length)} of ${templateJsonSearchMatches.length}`
                     : "0 matches"
-                  : "Type and press Enter"}
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!navigator.clipboard?.writeText) {
-                    alert("Clipboard API unavailable in this browser.");
-                    return;
-                  }
-                  void navigator.clipboard.writeText(templatePreviewJsonText);
-                }}
-                style={{ marginLeft: "auto" }}
-              >
-                Copy Contents
-              </button>
-            </div>
-            <textarea
-              ref={templateJsonTextareaRef}
-              value={templatePreviewJsonText}
-              readOnly
-              spellCheck={false}
-              style={{
-                margin: "0.55rem 0 0 0",
-                padding: "0.55rem",
-                borderRadius: "0.32rem",
-                border: "1px solid var(--panel-border)",
-                backgroundColor: "var(--surface-1)",
-                color: "var(--text-primary)",
-                overflow: "auto",
-                height: "44rem",
-                minHeight: "12rem",
-                width: "100%",
-                boxSizing: "border-box",
-                resize: "vertical",
-                fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
-                fontSize: "0.76rem",
-                lineHeight: 1.35
+                  : "Type and press Enter"
+              }
+              onSearchPrevious={() =>
+                setTemplateJsonSearchResultIdx((prev) => {
+                  const nextIdx =
+                    templateJsonSearchMatches.length === 0
+                      ? 0
+                      : (prev - 1 + templateJsonSearchMatches.length) % templateJsonSearchMatches.length;
+                  setTemplateJsonSearchJumpTick((tick) => tick + 1);
+                  return nextIdx;
+                })
+              }
+              onSearchNext={() =>
+                setTemplateJsonSearchResultIdx((prev) => {
+                  const nextIdx =
+                    templateJsonSearchMatches.length === 0
+                      ? 0
+                      : (prev + 1) % templateJsonSearchMatches.length;
+                  setTemplateJsonSearchJumpTick((tick) => tick + 1);
+                  return nextIdx;
+                })
+              }
+              searchNavDisabled={templateJsonSearchMatches.length === 0}
+              onCopy={() => {
+                if (!navigator.clipboard?.writeText) {
+                  alert("Clipboard API unavailable in this browser.");
+                  return;
+                }
+                void navigator.clipboard.writeText(templatePreviewJsonText);
               }}
             />
           </CollapsibleDisclosure>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       {encounterPrintPreviewOpen && encounterActive && encounterRoster.length > 0
         ? createPortal(
