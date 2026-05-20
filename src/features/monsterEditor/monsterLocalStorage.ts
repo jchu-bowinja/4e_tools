@@ -64,6 +64,12 @@ export function writeCustomMonsterEntries(rows: MonsterEntryFile[]): void {
 }
 
 export function monsterEntryToIndexRow(entry: MonsterEntryFile): MonsterIndexEntry {
+  const keywords = Array.isArray(entry.keywords)
+    ? entry.keywords.map((kw) => String(kw ?? "").trim()).filter(Boolean)
+    : [];
+  const sourceBooks = Array.isArray(entry.sourceBooks)
+    ? entry.sourceBooks.map((book) => String(book ?? "").trim()).filter(Boolean)
+    : [];
   return {
     id: entry.id,
     fileName: entry.fileName || `${entry.id}.json`,
@@ -73,7 +79,9 @@ export function monsterEntryToIndexRow(entry: MonsterEntryFile): MonsterIndexEnt
     role: entry.role,
     groupRole: entry.groupRole,
     isLeader: entry.isLeader,
-    parseError: entry.parseError ?? ""
+    parseError: entry.parseError ?? "",
+    keywords,
+    sourceBooks
   };
 }
 

@@ -103,8 +103,10 @@ import {
   parseMonsterTemplatePrerequisite
 } from "./templatePrerequisiteCriteria";
 import {
+  collectMonsterIndexFilterOptions,
   detectMonsterRank,
   filterAndSortMonsterIndexRows,
+  monsterIndexHasActiveFilters,
   type MonsterRankFilter
 } from "./monsterIndexFilters";
 import {
@@ -3264,6 +3266,8 @@ export function MonsterEditorApp({
   const [roleQuery, setRoleQuery] = useState<string>("");
   const [rankFilter, setRankFilter] = useState<MonsterRankFilter>("all");
   const [leaderFilter, setLeaderFilter] = useState<"both" | "leader" | "notLeader">("both");
+  const [keywordQuery, setKeywordQuery] = useState<string>("");
+  const [sourceBookQuery, setSourceBookQuery] = useState<string>("");
   const [sortBy, setSortBy] = useState<"name" | "level">("level");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [message, setMessage] = useState<string>("Load monsters from generated JSON to begin.");
@@ -3307,6 +3311,8 @@ export function MonsterEditorApp({
   const [encounterRosterExpandedRowIds, setEncounterRosterExpandedRowIds] = useState<Set<string>>(
     () => new Set()
   );
+  const [monsterNarrowLayout, setMonsterNarrowLayout] = useState(false);
+  const [encounterRosterDrawerOpen, setEncounterRosterDrawerOpen] = useState(false);
   const [encounterRosterDraggingIndex, setEncounterRosterDraggingIndex] = useState<number | null>(null);
   const [encounterRosterDragOverIndex, setEncounterRosterDragOverIndex] = useState<number | null>(null);
   const [encounterPrintPreviewOpen, setEncounterPrintPreviewOpen] = useState(false);
@@ -3561,6 +3567,8 @@ export function MonsterEditorApp({
     });
   }, [templateRows.length]);
 
+  const indexFilterOptions = useMemo(() => collectMonsterIndexFilterOptions(indexRows), [indexRows]);
+
   const filteredRows = useMemo(
     () =>
       filterAndSortMonsterIndexRows(indexRows, {
@@ -3569,10 +3577,39 @@ export function MonsterEditorApp({
         roleQuery,
         rankFilter,
         leaderFilter,
+        keywordQuery,
+        sourceBookQuery,
         sortBy,
         sortDir
       }),
-    [indexRows, nameQuery, levelQuery, roleQuery, rankFilter, leaderFilter, sortBy, sortDir]
+    [
+      indexRows,
+      nameQuery,
+      levelQuery,
+      roleQuery,
+      rankFilter,
+      leaderFilter,
+      keywordQuery,
+      sourceBookQuery,
+      sortBy,
+      sortDir
+    ]
+  );
+
+  const monsterListFiltersActive = useMemo(
+    () =>
+      monsterIndexHasActiveFilters({
+        nameQuery,
+        levelQuery,
+        roleQuery,
+        rankFilter,
+        leaderFilter,
+        keywordQuery,
+        sourceBookQuery,
+        sortBy,
+        sortDir
+      }),
+    [nameQuery, levelQuery, roleQuery, rankFilter, leaderFilter, keywordQuery, sourceBookQuery, sortBy, sortDir]
   );
 
   const encounterActive = useMemo(() => {
@@ -3746,15 +3783,6 @@ export function MonsterEditorApp({
     },
     [resetMonsterSheetAdjustments]
   );
-
-  const roleOptions = useMemo(() => {
-    const unique = new Set<string>();
-    for (const row of indexRows) {
-      const role = (row.role ?? "").trim();
-      if (role) unique.add(role);
-    }
-    return Array.from(unique).sort((a, b) => a.localeCompare(b));
-  }, [indexRows]);
 
   const sheetMonster = useMemo((): MonsterEntryFile | null => {
     if (!activeMonster) return null;
@@ -3981,6 +4009,24 @@ export function MonsterEditorApp({
   useEffect(() => {
     setMonsterCenterPane("sheet");
   }, [selectedId]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 1199px)");
+    const onLayoutChange = (event: MediaQueryListEvent): void => {
+      setMonsterNarrowLayout(event.matches);
+    };
+    setMonsterNarrowLayout(mediaQuery.matches);
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", onLayoutChange);
+      return () => mediaQuery.removeEventListener("change", onLayoutChange);
+    }
+    mediaQuery.addListener(onLayoutChange);
+    return () => mediaQuery.removeListener(onLayoutChange);
+  }, []);
+
+  useEffect(() => {
+    if (!monsterNarrowLayout) setEncounterRosterDrawerOpen(false);
+  }, [monsterNarrowLayout]);
 
   useEffect(() => {
     setJsonSearchResultIdx(0);
@@ -4534,8 +4580,26 @@ export function MonsterEditorApp({
                 color: "var(--text-primary)"
               }}
             >
-              <strong>No monsters match the current filters.</strong> Clear the name or level search, set role to “All roles”, or
-              widen the level range.
+              <strong>No monsters match the current filters.</strong> Clear name, level, role, keyword, or source filters, or widen
+              the level range.
+            </div>
+          ) : null}
+          {keywordQuery.trim() && !indexFilterOptions.hasKeywordMetadata ? (
+            <div
+              role="status"
+              style={{
+                padding: "0.4rem 0.55rem",
+                borderRadius: "0.28rem",
+                backgroundColor: "var(--surface-2)",
+                border: "1px solid var(--panel-border)",
+                fontSize: "0.8rem",
+                lineHeight: 1.45,
+                color: "var(--text-secondary)"
+              }}
+            >
+              Keyword filtering needs index metadata. Run{" "}
+              <code style={{ fontSize: "0.9em" }}>npm run etl:monsters:index-filters</code> (or a full monster ETL) to enrich{" "}
+              <code style={{ fontSize: "0.9em" }}>generated/monsters/index.json</code>.
             </div>
           ) : null}
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
@@ -4573,9 +4637,45 @@ export function MonsterEditorApp({
               }}
             >
               <option value="">All roles</option>
-              {roleOptions.map((role) => (
+              {indexFilterOptions.roles.map((role) => (
                 <option key={role} value={role}>
                   {role}
+                </option>
+              ))}
+            </select>
+            <input
+              value={keywordQuery}
+              onChange={(event) => setKeywordQuery(event.target.value)}
+              placeholder="Keyword (e.g. Undead)"
+              aria-label="Monster keyword"
+              list="monster-keyword-filter-options"
+              style={{
+                minWidth: 180,
+                border: "1px solid var(--panel-border)",
+                borderRadius: "0.28rem",
+                padding: "0.22rem 0.3rem"
+              }}
+            />
+            <datalist id="monster-keyword-filter-options">
+              {indexFilterOptions.keywords.map((keyword) => (
+                <option key={keyword} value={keyword} />
+              ))}
+            </datalist>
+            <select
+              value={sourceBookQuery}
+              onChange={(event) => setSourceBookQuery(event.target.value)}
+              aria-label="Source book"
+              style={{
+                minWidth: 200,
+                border: "1px solid var(--panel-border)",
+                borderRadius: "0.28rem",
+                padding: "0.22rem 0.3rem"
+              }}
+            >
+              <option value="">All sources</option>
+              {indexFilterOptions.sourceBooks.map((book) => (
+                <option key={book} value={book}>
+                  {book}
                 </option>
               ))}
             </select>
@@ -5266,6 +5366,16 @@ export function MonsterEditorApp({
               ))}
             </select>
           </label>
+          {monsterNarrowLayout ? (
+            <button
+              type="button"
+              aria-expanded={encounterRosterDrawerOpen}
+              onClick={() => setEncounterRosterDrawerOpen((open) => !open)}
+              title="Open encounter roster"
+            >
+              Roster{encounterRoster.length > 0 ? ` (${encounterRoster.length})` : ""}
+            </button>
+          ) : null}
           {encounterNameEditOpen ? (
             <>
               <input
@@ -5408,18 +5518,24 @@ export function MonsterEditorApp({
         </div>
       ) : null}
 
+      {viewerTab === "monsters" && monsterNarrowLayout && encounterRosterDrawerOpen ? (
+        <button
+          type="button"
+          className="monster-editor-roster-backdrop"
+          aria-label="Close encounter roster"
+          onClick={() => setEncounterRosterDrawerOpen(false)}
+        />
+      ) : null}
+
       <div
-        style={{
-          display: "grid",
-          gridTemplateColumns:
-            viewerTab === "monsters"
-              ? "minmax(0, 0.7fr) minmax(0, 1.45fr) minmax(200px, 0.72fr)"
-              : viewerTab === "templates"
-                ? "minmax(0, 0.7fr) minmax(0, 1.45fr)"
-                : "minmax(0, 0.9fr) minmax(0, 2.1fr)",
-          gap: "1rem",
-          minHeight: "65vh"
-        }}
+        className={[
+          "monster-editor-main-grid",
+          viewerTab === "monsters"
+            ? "monster-editor-main-grid--monsters"
+            : viewerTab === "templates"
+              ? "monster-editor-main-grid--templates"
+              : "monster-editor-main-grid--two-col"
+        ].join(" ")}
       >
         {(viewerTab === "monsters" || viewerTab === "createMonster") ? (
           <>
@@ -5621,7 +5737,14 @@ export function MonsterEditorApp({
                 </div>
                 </>
               ) : null}
-              <div style={{ ...indexColumnHeaderStyle, flexShrink: 0 }}>Monsters ({filteredRows.length})</div>
+              <div style={{ ...indexColumnHeaderStyle, flexShrink: 0, display: "flex", flexDirection: "column", gap: "0.15rem" }}>
+                <span>Monsters ({filteredRows.length})</span>
+                <span className="monster-index-filter-summary">
+                  {monsterListFiltersActive
+                    ? `${filteredRows.length} of ${indexRows.length} match filters`
+                    : `${indexRows.length} in index`}
+                </span>
+              </div>
               <div style={{ minHeight: 0, flex: 1, overflow: "auto" }}>
                 {filteredRows.map((entry) => {
                   const selectedRow = selectedId === entry.id;
@@ -5630,19 +5753,12 @@ export function MonsterEditorApp({
                     <button
                       key={entry.id}
                       type="button"
+                      className={
+                        selectedRow ? "monster-index-list-row monster-index-list-row--selected" : "monster-index-list-row"
+                      }
                       onClick={() => {
                         resetMonsterSheetAdjustments();
                         setSelectedId(entry.id);
-                      }}
-                      style={{
-                        display: "block",
-                        width: "100%",
-                        textAlign: "left",
-                        border: "none",
-                        borderBottom: "1px solid var(--surface-2)",
-                        padding: "0.6rem 0.75rem",
-                        background: selectedRow ? "var(--surface-2)" : "var(--surface-0)",
-                        cursor: "pointer"
                       }}
                     >
                       <div style={{ fontWeight: 700 }}>{entry.name || entry.id}</div>
@@ -6080,6 +6196,15 @@ export function MonsterEditorApp({
         </div>
             {viewerTab === "monsters" ? (
               <div
+                className={[
+                  "monster-editor-roster-column",
+                  monsterNarrowLayout ? "monster-editor-roster-column--drawer" : "",
+                  monsterNarrowLayout && encounterRosterDrawerOpen
+                    ? "monster-editor-roster-column--drawer-open"
+                    : ""
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
                 style={{
                   ...sheetPanel,
                   padding: "0.75rem",
@@ -6093,6 +6218,20 @@ export function MonsterEditorApp({
                 }}
               >
                 <>
+                    {monsterNarrowLayout && encounterRosterDrawerOpen ? (
+                      <div
+                        style={{
+                          flexShrink: 0,
+                          display: "flex",
+                          justifyContent: "flex-end",
+                          marginBottom: "0.35rem"
+                        }}
+                      >
+                        <button type="button" onClick={() => setEncounterRosterDrawerOpen(false)}>
+                          Close roster
+                        </button>
+                      </div>
+                    ) : null}
                     {encounterActive ? (
                       <div
                         style={{

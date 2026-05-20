@@ -59,37 +59,6 @@ If a local exception is needed, document the reason in the feature area and keep
 - Reserve attention-drawing colors for important states (error, warning, success, active).
 - Ensure text/background combinations meet readable contrast expectations.
 
-#### Theme contrast (light and dark)
-
-The app supports **light** and **dark** themes via `:root[data-theme="dark"]` on `body` (see `src/styles.css`). Any UI change that sets or changes **text color**, **background**, **borders**, or **state highlights** must be checked in **both** themes before merge.
-
-**Token rules**
-
-- Prefer theme-aware CSS variables (`--text-primary`, `--surface-0` / `--surface-1` / `--surface-2`, `--panel-border`, `--panel-border-strong`, `--status-success`, `--status-danger`, `--status-warning`) — not raw hex or colors that only look correct on one background.
-- If a token is defined on `:root` using `color-mix` or other derived values, ensure the **same token is redefined** (or correctly inherited) under `:root[data-theme="dark"] body` when dark theme overrides base surfaces. A common bug: dark mode updates `--surface-*` and `--button-background` on `body`, but `--control-hover-bg` still resolves from light-theme mixes — producing pale highlights and unreadable text on dark panels.
-- Status colors used on numbers or labels (for example point-buy spent turning green/red) must stay legible on the **actual surface behind them** in each theme, not only on the default page background.
-
-**What to verify (both themes)**
-
-| Check | Light | Dark |
-| --- | --- | --- |
-| Body text on section/panel backgrounds | Readable at a glance | Readable at a glance |
-| Muted/secondary text on inset surfaces | Not washed out | Not lost on brown/dark panels |
-| Hover/focus/active backgrounds behind text | Sufficient contrast for foreground | Same — no “light mode gray” on dark chrome |
-| Semantic success/error/warning accents | Clear, not neon-on-neon | Clear, not low-contrast mud |
-| Borders and inset shadows | Visible separation | Visible separation |
-
-**Workflow**
-
-1. Implement using semantic tokens only.
-2. Toggle theme in the running app (or use devtools on `data-theme`) and exercise **default**, **hover**, **focus-visible**, and any **custom state** (for example stepper focus on `AdjustableNumberInput` with `fractionLeading`).
-3. If contrast fails in one theme, fix the token or state rule for that theme — do not ship theme-specific hacks in feature code unless the bible documents a narrow exception.
-
-**Example (builder point buy `X / Y` control)**
-
-- Spent **X**: `fractionLeadingStyle` may set green (`--status-success`) or red (`crimson` / error) when spent ≠ budget; confirm both on `--surface-1` panel backgrounds.
-- Budget **Y**: stepper `:focus-within` highlight uses `--surface-2` + `--panel-border-strong` + `--text-primary` — not `--control-hover-bg` alone, which was unreadable in dark mode until dark-theme token definitions were added.
-
 ### Interactive States
 
 Every interactive component should support and visually distinguish:
@@ -118,7 +87,6 @@ State visuals should be consistent across buttons, fields, toggles, and list row
 - Required/optional semantics should be presented uniformly.
 - Validation messaging should be specific and adjacent to the affected field.
 - **Bounded numeric fields** (`AdjustableNumberInput`): allow free typing while focused; validate on blur (or Enter). If the value is out of range or not a number, revert to the last committed value instead of clamping on every keystroke.
-- **`fractionLeading` / `companionMax`**: HP-style `current / max` uses `value` + `companionMax` (steppers edit current). Point buy uses `fractionLeading` + `value` as `spent / budget` (steppers edit budget). Match typography between both sides of the slash; use `fractionLeadingStyle` for semantic spent color. Stepper focus may emphasize **Y** via CSS (`:has(.adjustable-number__stepper:focus-within)`) — verify highlight contrast in [both themes](#theme-contrast-light-and-dark).
 
 ### Cards, Panels, and Sections
 
@@ -132,13 +100,15 @@ State visuals should be consistent across buttons, fields, toggles, and list row
 
 **When a wrapper is justified**
 
-| Purpose | OK to add a container |
-| --- | --- |
-| CSS grid / flex layout (columns, rows, `minmax(0, 1fr)`) | Yes — prefer the shallowest element that owns the grid |
-| Collapsible body (`details` content, `CollapsibleDisclosure` body) | Yes — one body wrapper for padding/gap |
-| Row stripe, drag handle, or card shell | Yes — on the row or card root |
-| Scroll clipping (`overflow: auto/hidden`) | Yes — on the scrollport only |
-| Glossary / focus target | Yes — on the label affordance, not around whole sections |
+
+| Purpose                                                            | OK to add a container                                    |
+| ------------------------------------------------------------------ | -------------------------------------------------------- |
+| CSS grid / flex layout (columns, rows, `minmax(0, 1fr)`)           | Yes — prefer the shallowest element that owns the grid   |
+| Collapsible body (`details` content, `CollapsibleDisclosure` body) | Yes — one body wrapper for padding/gap                   |
+| Row stripe, drag handle, or card shell                             | Yes — on the row or card root                            |
+| Scroll clipping (`overflow: auto/hidden`)                          | Yes — on the scrollport only                             |
+| Glossary / focus target                                            | Yes — on the label affordance, not around whole sections |
+
 
 **Avoid**
 
@@ -162,24 +132,21 @@ State visuals should be consistent across buttons, fields, toggles, and list row
 **Cross-feature patterns to consolidate (when touching those areas)**
 
 - Builder: `ui.mainColumn` is the sole main-tab panel shell; use `blockInset` for subsections inside a tab (do not nest a second bordered `blockContent` wrapper).
-- Builder page header: the `h1` title and persistence actions (export, save/load, reset, import JSON) share one flex row (`pageHeaderRowStyle`); actions wrap and align to the end on wide viewports. Character name and level stay on the row below (`ui.chromeFields`). When the in-progress build differs from the last saved character (or the default new character), **Save** shows unsaved state: label suffix `*`, class `builder-persistence-save--unsaved` (`--status-warning` border/tint), and an accessible name that mentions unsaved changes.
-- Builder sticky step tabs (`BuilderTabCarousel` in `src/ui/BuilderTabCarousel.tsx`, styles in `src/styles.css`): Race / Class / Ability Scores / … stay on one row. **Wide:** each tab at natural width with `0.45rem` gaps. **Narrow:** inactive tabs compress evenly (`--builder-tab-compressed-width` from JS) with ellipsis; the **open** tab always shows full label + status; **`:hover`** / **`:focus-visible`** on any tab expands it to full width. No overlap carousel. Do not wrap to a second line.
+- Builder page header: the `h1` title and persistence actions (export, save/load, reset, import JSON) share one flex row (`pageHeaderRowStyle`); actions wrap and align to the end on wide viewports. Character name and level stay on the row below (`ui.chromeFields`).
+- Builder sticky step tabs (`BuilderTabCarousel` in `src/ui/BuilderTabCarousel.tsx`, styles in `src/styles.css`): Race / Class / Ability Scores / … stay on one row. **Wide:** each tab at natural width with `0.45rem` gaps. **Narrow:** inactive tabs compress evenly (`--builder-tab-compressed-width` from JS) with ellipsis; the **open** tab always shows full label + status; `**:hover`** / `**:focus-visible**` on any tab expands it to full width. No overlap carousel. Do not wrap to a second line.
 - Builder sidebar: `ui.sidebarPanel` supplies the section border; `LiveSheetCollapsibleSection` body is layout-only (no second border). Stack sections with flex `gap` on the panel, not an extra inner grid wrapper.
 - Character sheet overview: one `panelStyle` tab shell; character identity uses `CharacterIdentityField` / `CharacterIdentitySection` (`dl`/`dt`/`dd`, class `.character-sheet-identity` in CSS)—no nested bordered boxes per field; glossary and race/class hover on **labels** only; overview rows are direct grid children (no `character-sheet-overview-rows` wrapper); collapsible body spacing via `.character-sheet-overview-collapsible > :not(summary)` in CSS.
-- Power display: character builder and character sheet use **`CharacterPowerCard`** (`src/ui/powerCard/`) with `buildCharacterPowerCardViewModel`; pass `renderLineText`, `renderKeyword`, and `renderBody` for glossary/rich text. Monster editor keeps its own card body but shares shell/accent helpers (`monsterPowerCardShellStyle`, action bucket accents) from the same module.
-- **Monster editor — creature sheet (Monsters tab):** one column shell (`sheetPanel`) per center column; **Tactics** and **Sources** use flow spacing only (`centerFlowSubsectionStyle`)—no nested bordered panel inside the column. The stat block card keeps its own border. Do **not** render the creature’s normalized **`description`** field (compendium size/origin boilerplate). When one or two templates are merged for preview, show each template’s **`description`** in a flow subsection above **Tactics**, with the **template name only** (e.g. **Lich**, **Demagogue**) as the heading—not “Template description” or “Template: …”. Use **Tactics**, the stat block, and **Sources** for the base creature. **Exception:** template and create-template tabs still show **Description** on the template record itself when editing PDF-derived import text.
-- **Monster editor — center column toggle (Monsters tab):** **Stat block** / **JSON** in the sheet header replaces the full-width bottom JSON panel on this tab. JSON reflects the current preview (`viewMonster`: templates + level adjustment). Other tabs keep the bottom collapsible JSON (`MonsterJsonEditorPanel`). Show **`MonsterDataQualityAlerts`** above the sheet when `sections.importWarnings` or suspicious `weaknesses` rows exist (base `activeMonster`, not hidden in JSON view).
-- **Monster editor — encounter roster:** each creature row has a per-row **▶** expand control (`encounter-roster-stat-row-expand-btn`) in addition to hover on the name strip and the roster **expand all** toggle. Pinned rows keep the name strip above the stat block for collapse; do not rely on hover alone for keyboard or touch users.
+- Power display: character builder and character sheet use `**CharacterPowerCard`** (`src/ui/powerCard/`) with `buildCharacterPowerCardViewModel`; pass `renderLineText`, `renderKeyword`, and `renderBody` for glossary/rich text. Monster editor keeps its own card body but shares shell/accent helpers (`monsterPowerCardShellStyle`, action bucket accents) from the same module.
 - Character sheet HP / conditions: overview center column uses one grid per row (vitals row 1: four columns; row 2: death saves + healing surges). Healing surges cell is a single bordered grid (label + flex row for input, button column, hint); do not nest a second grid around the label. Spend Surge / Second Wind stack in a flex column on that row. Conditions panel applies `gap` on the outer bordered grid only—toolbar rows are direct children, not wrapped in an extra pass-through grid.
 
 #### Collapsible disclosure (expand / collapse)
 
-Use the shared **`CollapsibleDisclosure`** and **`CollapsibleDisclosureArrow`** components from `src/ui/CollapsibleDisclosure.tsx` whenever a section expands or collapses with a leading indicator (JSON snippets, character-sheet overview blocks such as ability scores and skills, template preview panels, roster expand-all controls).
+Use the shared `**CollapsibleDisclosure**` and `**CollapsibleDisclosureArrow**` components from `src/ui/CollapsibleDisclosure.tsx` whenever a section expands or collapses with a leading indicator (JSON snippets, character-sheet overview blocks such as ability scores and skills, template preview panels, roster expand-all controls).
 
 - **Do not** hand-roll `<details>` / `<summary>` markup with a one-off arrow character or placeholder (`?`, `+`, native markers). Reuse the component so the indicator and rotation stay consistent.
 - Styling lives in `src/styles.css` under `.template-json-collapsible` and `.template-json-collapsible-arrow`: collapsed shows **▶**; open rotates the arrow 90° (points down). Summary rows hide the browser default disclosure marker.
 - Pass section-specific layout via `style`, `summaryStyle`, and optional `bodyStyle` props; add a feature class on `className` only when local overrides are required (for example `character-sheet-overview-collapsible`).
-- For toggle buttons that are not `<details>` (for example expand-all on an encounter roster), render **`CollapsibleDisclosureArrow`** inside the button and reuse the same CSS hooks documented in `styles.css`.
+- For toggle buttons that are not `<details>` (for example expand-all on an encounter roster), render `**CollapsibleDisclosureArrow`** inside the button and reuse the same CSS hooks documented in `styles.css`.
 
 ### Lists, Tables, and Data Rows
 
@@ -191,23 +158,27 @@ Use the shared **`CollapsibleDisclosure`** and **`CollapsibleDisclosureArrow`** 
 
 Every data table — native `<table>`, `ScoreBreakdownTable`, or future grid-based tables — must follow the same **fill + scroll** contract:
 
-| Axis | Rule |
-| --- | --- |
-| **Width** | Table scrollport uses `width: 100%` and `max-width: 100%` of its panel. Flexible name/label tracks use `minmax(measured-min, 1fr)` so extra horizontal space goes into the label column, not empty margin. |
-| **Height** | Table scrollport uses **natural row height** from shared padding tokens (do not squash rows). The scrollport spans the **full width** of its slot; vertically it grows with row count. When a parent layout assigns a fixed-height region (e.g. a tall sidebar list), the scrollport may use `height: 100%` and `overflow-y: auto` — pair vertical scroll with horizontal scroll only when both axes can overflow. |
-| **Horizontal overflow** | When content is wider than the panel, show a **horizontal scrollbar** on the table scrollport (`overflow-x: auto`). Never clip or crush component/value columns to fit. |
-| **Minimum content width** | Inner grid (`score-breakdown-table__sync-grid` or per-row grids) uses `min-width: max-content` so the scrollport can scroll. Component tracks use `minmax(W, W)` so fixed columns do not collapse. |
-| **Shared name/label column** | One label track per table, never per-row widths — see [shared label column](#shared-label-column-all-breakdown-tables). |
+
+| Axis                         | Rule                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Width**                    | Table scrollport uses `width: 100%` and `max-width: 100%` of its panel. Flexible name/label tracks use `minmax(measured-min, 1fr)` so extra horizontal space goes into the label column, not empty margin.                                                                                                                                                                                                         |
+| **Height**                   | Table scrollport uses **natural row height** from shared padding tokens (do not squash rows). The scrollport spans the **full width** of its slot; vertically it grows with row count. When a parent layout assigns a fixed-height region (e.g. a tall sidebar list), the scrollport may use `height: 100%` and `overflow-y: auto` — pair vertical scroll with horizontal scroll only when both axes can overflow. |
+| **Horizontal overflow**      | When content is wider than the panel, show a **horizontal scrollbar** on the table scrollport (`overflow-x: auto`). Never clip or crush component/value columns to fit.                                                                                                                                                                                                                                            |
+| **Minimum content width**    | Inner grid (`score-breakdown-table__sync-grid` or per-row grids) uses `min-width: max-content` so the scrollport can scroll. Component tracks use `minmax(W, W)` so fixed columns do not collapse.                                                                                                                                                                                                                 |
+| **Shared name/label column** | One label track per table, never per-row widths — see [shared label column](#shared-label-column-all-breakdown-tables).                                                                                                                                                                                                                                                                                            |
+
 
 **Implementation**
 
-| Table kind | Scrollport | Notes |
-| --- | --- | --- |
-| Native `<table>` | `TableScrollport` (or `.table-h-scroll`) | Inner table: `width: 100%`, `min-width: max-content` |
-| Skills | `ScoreBreakdownTable` (`variant="skill"`) | `useMeasuredLabelWidth` → `--score-breakdown-label-width` |
-| Stat breakdowns | `ScoreBreakdownTable` (`variant="stat"`, `compact` when needed) | `useMeasuredLabelWidth` → `--score-breakdown-label-width`; inner `__sync-grid` when `compact` + `prioritizeLabel`; see [score breakdown tables](#character-sheet-score-breakdown-tables) |
 
-Shared primitives: `TableScrollport`, `useMeasuredLabelWidth`, `tableLayout.ts`, **`ScoreBreakdownTable`** (skills + stat breakdowns). Skill row helpers: `scoreBreakdownSkill.ts`, `scoreBreakdownSkillName.tsx`.
+| Table kind       | Scrollport                                                      | Notes                                                                                                                                                                                    |
+| ---------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Native `<table>` | `TableScrollport` (or `.table-h-scroll`)                        | Inner table: `width: 100%`, `min-width: max-content`                                                                                                                                     |
+| Skills           | `ScoreBreakdownTable` (`variant="skill"`)                       | `useMeasuredLabelWidth` → `--score-breakdown-label-width`                                                                                                                                |
+| Stat breakdowns  | `ScoreBreakdownTable` (`variant="stat"`, `compact` when needed) | `useMeasuredLabelWidth` → `--score-breakdown-label-width`; inner `__sync-grid` when `compact` + `prioritizeLabel`; see [score breakdown tables](#character-sheet-score-breakdown-tables) |
+
+
+Shared primitives: `TableScrollport`, `useMeasuredLabelWidth`, `tableLayout.ts`, `**ScoreBreakdownTable`** (skills + stat breakdowns). Skill row helpers: `scoreBreakdownSkill.ts`, `scoreBreakdownSkillName.tsx`.
 
 **Parent layout:** Panels that host tables must pass width constraints down (`min-width: 0` on grid/flex children). Side columns may use `overflow: hidden` on the column shell; the **table** inside still owns `overflow-x: auto` on its scrollport.
 
@@ -222,10 +193,12 @@ Shared primitives: `TableScrollport`, `useMeasuredLabelWidth`, `tableLayout.ts`,
 
 Every breakdown table with variable-width row names (skills, defenses, speed, initiative) must use **one shared label track per table instance**, sized to the **longest** label text (and column header when shown, e.g. `DEFENSE` or `Acrobatics`).
 
-| Table | Mechanism |
-| --- | --- |
-| Skills | `useMeasuredLabelWidth` on `ScoreBreakdownTable` (`variant="skill"`); sets `--score-breakdown-label-width`; every row uses `minmax(var(--score-breakdown-label-width), 1fr)` for the label column. |
+
+| Table                       | Mechanism                                                                                                                                                                                                          |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Skills                      | `useMeasuredLabelWidth` on `ScoreBreakdownTable` (`variant="skill"`); sets `--score-breakdown-label-width`; every row uses `minmax(var(--score-breakdown-label-width), 1fr)` for the label column.                 |
 | Defenses, speed, initiative | `useMeasuredLabelWidth` when `prioritizeLabel`; sets `--score-breakdown-label-width`; `compact` tables use an inner `.score-breakdown-table__sync-grid` with **subgrid** so all rows share one label column track. |
+
 
 **Rules**
 
@@ -240,11 +213,13 @@ The character sheet uses shared breakdown tables for **skills**, **defenses**, *
 
 **Canonical layout (left → right)**
 
-| Column | Role | User priority |
-| --- | --- | --- |
-| 1 — Bonus / total | Final modifier or defense value | **Primary** — always visible |
-| 2 — Name / label | Skill name, defense name, ability code, etc. | **Primary** — always visible |
-| 3+ — Components | Ability mod, ½ level, armor, trained bonus, etc. | **Secondary** — reachable via horizontal scroll when space is tight |
+
+| Column            | Role                                             | User priority                                                       |
+| ----------------- | ------------------------------------------------ | ------------------------------------------------------------------- |
+| 1 — Bonus / total | Final modifier or defense value                  | **Primary** — always visible                                        |
+| 2 — Name / label  | Skill name, defense name, ability code, etc.     | **Primary** — always visible                                        |
+| 3+ — Components   | Ability mod, ½ level, armor, trained bonus, etc. | **Secondary** — reachable via horizontal scroll when space is tight |
+
 
 **Resize contract (non-negotiable)**
 
@@ -266,12 +241,14 @@ Follows the global [table sizing and horizontal scroll](#table-sizing-and-horizo
 
 **Implementation map**
 
-| Character sheet section | Component | Required props / classes |
-| --- | --- | --- |
-| Skills | `ScoreBreakdownTable` (`variant="skill"`) | Measures `--score-breakdown-label-width`; bonus + label columns fixed priority; five component columns with fixed track widths |
-| Defenses | `ScoreBreakdownTable` (`variant="stat"`) | `prioritizeLabel`, `compact`, `labelHeader="DEFENSE"` |
-| Speed + initiative | `ScoreBreakdownTable` (`variant="stat"`) | `prioritizeLabel`, `compact`, `labelHeader={null}` |
-| Ability scores | `ScoreBreakdownTable` (`variant="stat"`) | Single component column (`Score`); short fixed labels — compact prioritize mode optional |
+
+| Character sheet section | Component                                 | Required props / classes                                                                                                       |
+| ----------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Skills                  | `ScoreBreakdownTable` (`variant="skill"`) | Measures `--score-breakdown-label-width`; bonus + label columns fixed priority; five component columns with fixed track widths |
+| Defenses                | `ScoreBreakdownTable` (`variant="stat"`)  | `prioritizeLabel`, `compact`, `labelHeader="DEFENSE"`                                                                          |
+| Speed + initiative      | `ScoreBreakdownTable` (`variant="stat"`)  | `prioritizeLabel`, `compact`, `labelHeader={null}`                                                                             |
+| Ability scores          | `ScoreBreakdownTable` (`variant="stat"`)  | Single component column (`Score`); short fixed labels — compact prioritize mode optional                                       |
+
 
 Styles live in `src/styles.css` (`.table-scrollport`, `.score-breakdown-table`, modifiers `--stat` / `--skill`). Cell primitives: `src/ui/scoreTableCells.tsx`. Table stack: `ScoreBreakdownTable` → `TableScrollport` + `useMeasuredLabelWidth`.
 
@@ -300,7 +277,6 @@ Styles live in `src/styles.css` (`.table-scrollport`, `.score-breakdown-table`, 
 **Builder ability table**
 
 - Ability Scores tab uses `ScoreBreakdownTable` (`variant="stat"`, `BUILDER_ABILITY_SCORE_COLUMNS`) — same bonus / label / component layout as the character sheet, with extra columns for base (editable), level, and racial deltas. Use `renderComponentCell` for inputs and styled deltas; `prioritizeLabel` + `compact` for horizontal scroll when component columns are wider than the panel.
-- **Point buy** (middle column): label `Point buy` + `AdjustableNumberInput` with `fractionLeading={spent}`, `value={budget}`, compact steppers on **Y** only. See [theme contrast](#theme-contrast-light-and-dark) for spent/budget colors and stepper-focus highlight.
 
 **Adding a new breakdown table**
 
@@ -321,8 +297,8 @@ See also **Layout and Responsiveness** (content priority when stacking) and the 
 
 - Attach glossary or rules-rich **hover tooltips to label copy or other explicit help affordances** (for example field titles, dotted “glossary” tokens, or a dedicated help control).
 - **Do not** wire the same hover glossary behavior to **value `<input>` controls** (number fields, text fields, selects): interacting with or mousing across the field to edit a value should not open glossary panels.
-- When a field needs both glossary context and a compact layout, use a real **`<label htmlFor="…">`** (or adjacent caption text) for the tooltip target and associate the input via `id` / `aria-labelledby` so the glossary remains discoverable without covering the value control.
-- **Do not** put a native HTML **`title`** tooltip on the same element that already opens a **glossary or custom hover panel** for the same content: the browser will show both, which reads as duplicate or conflicting help.
+- When a field needs both glossary context and a compact layout, use a real `**<label htmlFor="…">`** (or adjacent caption text) for the tooltip target and associate the input via `id` / `aria-labelledby` so the glossary remains discoverable without covering the value control.
+- **Do not** put a native HTML `**title`** tooltip on the same element that already opens a **glossary or custom hover panel** for the same content: the browser will show both, which reads as duplicate or conflicting help.
 
 ### Badges, Tags, and Status Indicators
 
@@ -384,28 +360,26 @@ Naming guidance:
 
 Use this checklist before merging UI/style/look-and-feel work:
 
-- [ ] Existing shared components were reused before creating new ones.
-- [ ] New or updated components match established typography, spacing, and state behavior.
-- [ ] Interactive elements have clear hover/focus/active/disabled states.
-- [ ] Labels, helper text, and validation/error copy are clear and consistent.
-- [ ] Layout works across intended viewport sizes without hiding critical actions.
-- [ ] Loading, empty, and error states are handled and visually consistent.
-- [ ] Accessibility basics are met (keyboard navigation, focus visibility, readable contrast).
-- [ ] **Light and dark theme:** text, backgrounds, borders, and state highlights (hover, focus, success/error) were checked in both themes; no light-only tokens on dark surfaces.
-- [ ] Derived tokens (`--control-hover-bg`, mixes) work in dark mode if used for backgrounds behind text.
-- [ ] Any local subapplication variation is documented and intentionally scoped.
-- [ ] Obvious one-off styles were avoided or justified with a clear reason.
-- [ ] Glossary or rules hover tooltips are not attached to raw value inputs; they use labels or explicit help text instead.
-- [ ] Expand/collapse sections use `CollapsibleDisclosure` (or `CollapsibleDisclosureArrow` for non-details toggles), not ad-hoc arrows or placeholders.
-- [ ] Data tables use the shared fill + scroll contract (`TableScrollport` / `ScoreBreakdownTable`, or thin wrappers) — not one-off layouts without horizontal scroll.
-- [ ] Table scrollports use `width: 100%` of their panel; flexible label/name columns grow with `1fr` when space allows.
-- [ ] Narrow panels show horizontal scroll on the table scrollport before columns crush or overlap (no `overflow: hidden` on table roots).
-- [ ] Character sheet score tables use shared `scoreTableCells` styling; variable-width names use measured label width (`--skill-name-block-width` or `--stat-label-min-width`).
-- [ ] Score breakdown tables keep **bonus/total** and **row name** readable; short labels use the same name column width as the longest label in that table.
-- [ ] Prioritize/compact stat tables use `.score-breakdown-table__sync-grid` (subgrid), not independent per-row column sizing.
-- [ ] Table scrollport uses `min-width: 0`; inner grid/rows use `min-width: max-content`.
-- [ ] Row height uses shared padding tokens — rows are not vertically crushed to fake fit.
-- [ ] New UI does not stack duplicate panel borders or pass-through wrappers; layout depth stays shallow unless collapsible, grid, or scroll requires otherwise.
+- Existing shared components were reused before creating new ones.
+- New or updated components match established typography, spacing, and state behavior.
+- Interactive elements have clear hover/focus/active/disabled states.
+- Labels, helper text, and validation/error copy are clear and consistent.
+- Layout works across intended viewport sizes without hiding critical actions.
+- Loading, empty, and error states are handled and visually consistent.
+- Accessibility basics are met (keyboard navigation, focus visibility, readable contrast).
+- Any local subapplication variation is documented and intentionally scoped.
+- Obvious one-off styles were avoided or justified with a clear reason.
+- Glossary or rules hover tooltips are not attached to raw value inputs; they use labels or explicit help text instead.
+- Expand/collapse sections use `CollapsibleDisclosure` (or `CollapsibleDisclosureArrow` for non-details toggles), not ad-hoc arrows or placeholders.
+- Data tables use the shared fill + scroll contract (`TableScrollport` / `ScoreBreakdownTable`, or thin wrappers) — not one-off layouts without horizontal scroll.
+- Table scrollports use `width: 100%` of their panel; flexible label/name columns grow with `1fr` when space allows.
+- Narrow panels show horizontal scroll on the table scrollport before columns crush or overlap (no `overflow: hidden` on table roots).
+- Character sheet score tables use shared `scoreTableCells` styling; variable-width names use measured label width (`--skill-name-block-width` or `--stat-label-min-width`).
+- Score breakdown tables keep **bonus/total** and **row name** readable; short labels use the same name column width as the longest label in that table.
+- Prioritize/compact stat tables use `.score-breakdown-table__sync-grid` (subgrid), not independent per-row column sizing.
+- Table scrollport uses `min-width: 0`; inner grid/rows use `min-width: max-content`.
+- Row height uses shared padding tokens — rows are not vertically crushed to fake fit.
+- New UI does not stack duplicate panel borders or pass-through wrappers; layout depth stays shallow unless collapsible, grid, or scroll requires otherwise.
 
 ## Update Process
 
@@ -416,3 +390,4 @@ Recommended cadence:
 - Review during major UI passes.
 - Add rules when recurring design questions appear in code review.
 - Remove or revise guidance that no longer reflects shared practice.
+

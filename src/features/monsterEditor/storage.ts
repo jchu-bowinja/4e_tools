@@ -8,6 +8,9 @@ export interface MonsterIndexEntry {
   groupRole?: string;
   isLeader?: boolean;
   parseError: string;
+  /** Present on index v5+ (ETL or enrich script) for list filters. */
+  keywords?: string[];
+  sourceBooks?: string[];
 }
 
 interface MonsterIndexPayload {

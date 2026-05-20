@@ -1304,6 +1304,8 @@ def build_monster_index(monster_root: Path, output_root: Path) -> None:
             json.dumps(entry, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"
         )
 
+        keywords = parsed_payload.get("keywords")
+        source_books = parsed_payload.get("sourceBooks")
         index_rows.append(
             {
                 "id": monster_id,
@@ -1315,10 +1317,12 @@ def build_monster_index(monster_root: Path, output_root: Path) -> None:
                 "groupRole": parsed_payload.get("groupRole", ""),
                 "isLeader": bool(parsed_payload.get("isLeader", False)),
                 "parseError": parse_error,
+                "keywords": keywords if isinstance(keywords, list) else [],
+                "sourceBooks": source_books if isinstance(source_books, list) else [],
             }
         )
 
-    index_payload = {"meta": {"version": 4, "count": len(index_rows), "source": str(monster_root)}, "monsters": index_rows}
+    index_payload = {"meta": {"version": 5, "count": len(index_rows), "source": str(monster_root)}, "monsters": index_rows}
     (monsters_dir / "index.json").write_text(
         json.dumps(index_payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"
     )

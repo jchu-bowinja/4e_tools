@@ -798,6 +798,87 @@ button.encounter-roster-stat-row-expand-btn[aria-expanded="true"] .template-json
   overflow-y: auto;
 }
 
+/* Monster editor — main grid and narrow roster drawer */
+.monster-editor-main-grid {
+  display: grid;
+  gap: 1rem;
+  min-height: 65vh;
+  min-width: 0;
+}
+
+.monster-editor-main-grid--monsters {
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.45fr) minmax(200px, 0.72fr);
+}
+
+.monster-editor-main-grid--templates {
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.45fr);
+}
+
+.monster-editor-main-grid--two-col {
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 2.1fr);
+}
+
+@media (max-width: 1199px) {
+  .monster-editor-main-grid--monsters {
+    grid-template-columns: minmax(0, 0.42fr) minmax(0, 1fr);
+  }
+
+  .monster-editor-roster-column {
+    display: none;
+  }
+}
+
+.monster-editor-roster-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: rgba(0, 0, 0, 0.38);
+  cursor: pointer;
+}
+
+.monster-editor-roster-column--drawer {
+  display: none;
+}
+
+.monster-editor-roster-column--drawer.monster-editor-roster-column--drawer-open {
+  display: flex;
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 41;
+  width: min(22rem, 92vw);
+  max-width: 100%;
+  margin: 0;
+  box-shadow: -4px 0 18px rgba(0, 0, 0, 0.22);
+}
+
+.monster-index-list-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-bottom: 1px solid var(--surface-2);
+  padding: 0.6rem 0.75rem;
+  background: var(--surface-0);
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.monster-index-list-row--selected {
+  background: var(--surface-2);
+  box-shadow: inset 3px 0 0 var(--monster-stat-block-section-bg, var(--text-primary));
+}
+
+.monster-index-filter-summary {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
 /* Monster template viewer: same stat block shell as creatures, no inner scroll cap */
 .monster-stat-block-card.monster-stat-block-card--template {
   max-height: none;

@@ -11,6 +11,7 @@
     "test:perf": "vitest run tests/perf",
     "etl:rules": "python tools/etl/build_rules_index.py",
     "etl:monsters": "python tools/etl/build_monster_index.py",
+    "etl:monsters:index-filters": "python tools/etl/enrich_monster_index_filter_fields.py",
     "etl:parse-template-paste": "python tools/etl/parse_pasted_monster_template_cli.py"
   },
   "dependencies": {
