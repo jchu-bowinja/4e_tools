@@ -34,7 +34,7 @@ export interface DerivedStats {
   fortitudeBreakdown: StatScoreBreakdown;
   reflexBreakdown: StatScoreBreakdown;
   willBreakdown: StatScoreBreakdown;
-  /** Flat bonuses from support entities' statAdds (initiative, speed, healing surges, skills). */
+  /** Flat bonuses from feats, theme, path, destiny, and racial trait statAdds (initiative, speed, surges, skills). */
   supportPassiveOther: PassiveOtherBonuses;
 }
 

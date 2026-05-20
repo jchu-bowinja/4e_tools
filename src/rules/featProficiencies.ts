@@ -1,24 +1,44 @@
+import { collectActiveRacialTraitsFromBuild } from "./activeRacialTraits";
 import type { Armor, CharacterBuild, Feat, Implement, ProficiencyGrant, RulesIndex, Weapon } from "./models";
+import {
+  collectRacialProficiencyGrantsFromBuild,
+  proficiencyGrantsFromRacialTrait
+} from "./racialTraitProficiencies";
 import { parseProficiencyPhrases } from "./weaponAttack";
 
 function norm(s: string): string {
   return s.trim().toLowerCase();
 }
 
-/** All structured proficiency grants from selected feats (deduped). */
-export function collectFeatProficiencyGrants(index: RulesIndex, featIds: string[]): ProficiencyGrant[] {
+function dedupeProficiencyGrants(grants: ProficiencyGrant[]): ProficiencyGrant[] {
   const out: ProficiencyGrant[] = [];
   const seen = new Set<string>();
+  for (const g of grants) {
+    const key = `${g.kind}:${g.value}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(g);
+  }
+  return out;
+}
+
+/** All structured proficiency grants from selected feats (deduped). */
+export function collectFeatProficiencyGrants(index: RulesIndex, featIds: string[]): ProficiencyGrant[] {
+  const all: ProficiencyGrant[] = [];
   for (const fid of featIds) {
     const feat = index.feats.find((f) => f.id === fid);
     for (const g of feat?.proficiencyGrants ?? []) {
-      const key = `${g.kind}:${g.value}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push(g);
+      all.push(g);
     }
   }
-  return out;
+  return dedupeProficiencyGrants(all);
+}
+
+/** Feat + active racial trait proficiency grants (attack, armor/shield validation, display). */
+export function collectCharacterProficiencyGrants(index: RulesIndex, build: CharacterBuild): ProficiencyGrant[] {
+  const feat = collectFeatProficiencyGrants(index, build.featIds ?? []);
+  const racial = collectRacialProficiencyGrantsFromBuild(index, build);
+  return dedupeProficiencyGrants([...feat, ...racial]);
 }
 
 export function formatProficiencyGrant(g: ProficiencyGrant): string {
@@ -47,22 +67,67 @@ export interface FeatProficiencyDisplayRow {
   grants: string[];
 }
 
+export interface ProficiencyDisplayRow {
+  sourceId: string;
+  sourceName: string;
+  grants: string[];
+}
+
 export function collectFeatProficiencyDisplayRows(
   index: RulesIndex,
   featIds: string[]
 ): FeatProficiencyDisplayRow[] {
-  const rows: FeatProficiencyDisplayRow[] = [];
+  return collectFeatProficiencySourceDisplayRows(index, featIds).map((row) => ({
+    featId: row.sourceId,
+    featName: row.sourceName,
+    grants: row.grants
+  }));
+}
+
+function collectFeatProficiencySourceDisplayRows(
+  index: RulesIndex,
+  featIds: string[]
+): ProficiencyDisplayRow[] {
+  const rows: ProficiencyDisplayRow[] = [];
   for (const fid of featIds) {
     const feat = index.feats.find((f) => f.id === fid);
     const grants = feat?.proficiencyGrants ?? [];
     if (!feat || grants.length === 0) continue;
     rows.push({
-      featId: feat.id,
-      featName: feat.name,
+      sourceId: feat.id,
+      sourceName: feat.name,
       grants: grants.map(formatProficiencyGrant)
     });
   }
   return rows;
+}
+
+export function collectRacialProficiencyDisplayRows(
+  index: Pick<RulesIndex, "races" | "racialTraits">,
+  build: Pick<CharacterBuild, "raceId" | "raceSelections">
+): ProficiencyDisplayRow[] {
+  const rows: ProficiencyDisplayRow[] = [];
+  for (const trait of collectActiveRacialTraitsFromBuild(index, build)) {
+    const grants = proficiencyGrantsFromRacialTrait(trait);
+    if (grants.length === 0) continue;
+    rows.push({
+      sourceId: trait.id,
+      sourceName: trait.name,
+      grants: grants.map(formatProficiencyGrant)
+    });
+  }
+  return rows.sort((a, b) => a.sourceName.localeCompare(b.sourceName, undefined, { sensitivity: "base" }));
+}
+
+/** Overview list: proficiencies from feats and active racial traits. */
+export function collectCharacterProficiencyDisplayRows(
+  index: RulesIndex,
+  build: CharacterBuild
+): ProficiencyDisplayRow[] {
+  return [
+    ...collectFeatProficiencySourceDisplayRows(index, build.featIds ?? []),
+    ...collectRacialProficiencyDisplayRows(index, build)
+  ];
 }
 
 export function weaponMatchesProficiencyGrant(weapon: Weapon, grant: ProficiencyGrant): boolean {

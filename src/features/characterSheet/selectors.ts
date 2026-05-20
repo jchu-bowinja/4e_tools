@@ -46,7 +46,7 @@ export interface SheetDerivedData {
   };
   armorCheckPenalty: number;
   abilityMods: Record<"STR" | "CON" | "DEX" | "INT" | "WIS" | "CHA", number>;
-  /** Initiative / speed / surge / skill flat bonuses from feat, theme, path, destiny statAdds. */
+  /** Initiative / speed / surge / skill flat bonuses from feat, theme, path, destiny, and racial traits. */
   supportPassiveOther: PassiveOtherBonuses;
   acBreakdown: AcBreakdown;
   speedBreakdown: StatScoreBreakdown;

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { autoGrantedTrainedSkillIds } from "../../src/rules/grantedSkillsQuery";
+import {
+  autoGrantedTrainedSkillIds,
+  effectiveTrainedSkillIdsForBuild
+} from "../../src/rules/grantedSkillsQuery";
 import type { CharacterBuild, RulesIndex } from "../../src/rules/models";
 
 describe("autoGrantedTrainedSkillIds", () => {
@@ -17,6 +20,23 @@ describe("autoGrantedTrainedSkillIds", () => {
     } as unknown as RulesIndex;
     const build = { classId: "ID_FMP_CLASS_9" } as CharacterBuild;
     expect(autoGrantedTrainedSkillIds(index, build)).toEqual(["SK_ARC"]);
+  });
+
+  it("includes racial skill training picks from raceSelections", () => {
+    const index = {
+      skills: [{ id: "SK_DIP", name: "Diplomacy", slug: "diplomacy", raw: {} }],
+      feats: [],
+      races: [{ id: "R_H", name: "Human", slug: "human", raw: {} }]
+    } as unknown as RulesIndex;
+    const build = {
+      raceId: "R_H",
+      raceSelections: { "skillTraining:TR_HUMAN_SKILL:0": "SK_DIP" },
+      trainedSkillIds: []
+    } as CharacterBuild;
+    expect(autoGrantedTrainedSkillIds(index, build)).toEqual(["SK_DIP"]);
+    expect(effectiveTrainedSkillIdsForBuild(index, { ...build, trainedSkillIds: ["SK_DIP"] })).toEqual([
+      "SK_DIP"
+    ]);
   });
 });
 

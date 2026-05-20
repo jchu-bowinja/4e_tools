@@ -1,5 +1,6 @@
 import type { CharacterBuild, RulesIndex } from "./models";
 import { collectFeatGrantedSkillTrainingIds } from "./featGrantFlags";
+import { collectRacialSkillTrainingIdsFromBuild } from "./racialSkillSelections";
 
 function normalized(s: string): string {
   return s.trim().toLowerCase();
@@ -43,6 +44,56 @@ export function autoGrantedTrainedSkillIds(index: RulesIndex, build: CharacterBu
       seen.add(id);
       out.push(id);
     }
+  }
+  for (const id of collectRacialSkillTrainingIdsFromBuild(index, build)) {
+    if (!seen.has(id)) {
+      seen.add(id);
+      out.push(id);
+    }
+  }
+  return out.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+}
+
+/** Auto-granted plus manually selected trained skills (builder, sheet, validation). */
+export function effectiveTrainedSkillIdsForBuild(index: RulesIndex, build: CharacterBuild): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const push = (id: string) => {
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    out.push(id);
+  };
+  for (const id of autoGrantedTrainedSkillIds(index, build)) {
+    push(id);
+  }
+  for (const id of build.trainedSkillIds ?? []) {
+    push(id);
+  }
+  return out;
+}
+
+export function effectiveTrainedSkillIdSet(index: RulesIndex, build: CharacterBuild): Set<string> {
+  return new Set(effectiveTrainedSkillIdsForBuild(index, build));
+}
+
+/**
+ * Reconcile stored trained skills with current auto-grants (matches builder `useEffect` logic).
+ * Manual picks are ids not in the previous auto-grant set; result is manual ∪ current auto.
+ */
+export function reconcileTrainedSkillIds(
+  index: RulesIndex,
+  build: CharacterBuild,
+  currentTrainedSkillIds: string[],
+  previousAutoGrantedIds: Set<string>
+): string[] {
+  const auto = autoGrantedTrainedSkillIds(index, build);
+  const manual = currentTrainedSkillIds.filter((id) => !previousAutoGrantedIds.has(id));
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const id of [...manual, ...auto]) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
   }
   return out.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
 }

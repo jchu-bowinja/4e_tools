@@ -24,8 +24,8 @@ import {
   type TraitDisplayRow
 } from "../../rules/supportTraits";
 import {
-  collectFeatProficiencyDisplayRows,
-  collectFeatProficiencyGrants
+  collectCharacterProficiencyDisplayRows,
+  collectCharacterProficiencyGrants
 } from "../../rules/featProficiencies";
 import { collectFeatModificationsByPowerId } from "../../rules/featPowerModifications";
 import { collectFeatGrantedPowersForBuild } from "../../rules/grantedPowersQuery";
@@ -36,6 +36,7 @@ import {
   summarizePsionicPowerPointAdjustments
 } from "../../rules/psionicPowerPoints";
 import { hybridHpAtFirstLevel, hybridHpPerLevelGain } from "../../rules/hybridDerivedStats";
+import { autoGrantedTrainedSkillIds, effectiveTrainedSkillIdSet, reconcileTrainedSkillIds } from "../../rules/grantedSkillsQuery";
 import { computeSkillSheetRows } from "../../rules/skillCalculator";
 import {
   ABILITY_SCORE_COLUMNS,
@@ -989,6 +990,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     resetDeps: [sheet.classId, sheet.characterStyle, sheet.hybridClassIdA, sheet.hybridClassIdB]
   });
   const glossaryTermLookupCacheRef = useRef<Map<string, boolean>>(new Map());
+  const prevAutoGrantedSkillIdsRef = useRef<Set<string>>(new Set());
 
   const derived = useMemo(() => computeSheetDerivedData(sheet, index), [sheet, index]);
   const groupedPowers = useMemo(() => groupCombatPowers(sheet, index), [sheet, index]);
@@ -1121,13 +1123,13 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     () => psionicAugmentationPoolLabel(index, toBuildLikeState(sheet, index)),
     [index, sheet]
   );
-  const featProficiencyGrants = useMemo(
-    () => collectFeatProficiencyGrants(index, sheet.featIds ?? []),
-    [index, sheet.featIds]
+  const proficiencyGrants = useMemo(
+    () => collectCharacterProficiencyGrants(index, toBuildLikeState(sheet, index)),
+    [index, sheet, sheet.featIds, sheet.raceId, sheet.raceSelections]
   );
-  const featProficiencyDisplayRows = useMemo(
-    () => collectFeatProficiencyDisplayRows(index, sheet.featIds ?? []),
-    [index, sheet.featIds]
+  const proficiencyDisplayRows = useMemo(
+    () => collectCharacterProficiencyDisplayRows(index, toBuildLikeState(sheet, index)),
+    [index, sheet, sheet.featIds, sheet.raceId, sheet.raceSelections]
   );
 
   useEffect(() => {
@@ -1158,18 +1160,51 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     });
   }, []);
 
-  const skillRows = useMemo(
-    () =>
-      computeSkillSheetRows(
-        index,
-        sheet.level,
-        sheet.abilityScores,
-        new Set(sheet.trainedSkillIds),
-        derived.armorCheckPenalty,
-        derived.supportPassiveOther.skillFlatBySkillId
-      ),
-    [index, sheet.level, sheet.abilityScores, sheet.trainedSkillIds, derived.armorCheckPenalty, derived.supportPassiveOther]
-  );
+  useEffect(() => {
+    const build = toBuildLikeState(sheet, index);
+    const currentAuto = new Set(autoGrantedTrainedSkillIds(index, build));
+    const prevAuto = prevAutoGrantedSkillIdsRef.current;
+    const next = reconcileTrainedSkillIds(index, build, sheet.trainedSkillIds, prevAuto);
+    prevAutoGrantedSkillIdsRef.current = currentAuto;
+    if (next.length === sheet.trainedSkillIds.length && next.every((id, i) => id === sheet.trainedSkillIds[i])) {
+      return;
+    }
+    setSheet((prev) => ({ ...prev, trainedSkillIds: next }));
+  }, [
+    index,
+    sheet.raceId,
+    sheet.classId,
+    sheet.characterStyle,
+    sheet.hybridClassIdA,
+    sheet.hybridClassIdB,
+    sheet.themeId,
+    sheet.featIds?.join("|"),
+    sheet.raceSelections,
+    sheet.classSelections,
+    sheet.trainedSkillIds.join("|")
+  ]);
+
+  const skillRows = useMemo(() => {
+    const build = toBuildLikeState(sheet, index);
+    return computeSkillSheetRows(
+      index,
+      sheet.level,
+      sheet.abilityScores,
+      effectiveTrainedSkillIdSet(index, build),
+      derived.armorCheckPenalty,
+      derived.supportPassiveOther.skillFlatBySkillId
+    );
+  }, [
+    index,
+    sheet,
+    sheet.level,
+    sheet.abilityScores,
+    sheet.trainedSkillIds,
+    sheet.raceId,
+    sheet.raceSelections,
+    derived.armorCheckPenalty,
+    derived.supportPassiveOther
+  ]);
 
   const mainHandWeapon = useMemo(() => findWeaponEquippedInSlot(sheet, index, "mainHand"), [sheet.equipment, sheet.inventory, index]);
   const offHandWeapon = useMemo(() => findWeaponEquippedInSlot(sheet, index, "offHand"), [sheet.equipment, sheet.inventory, index]);
@@ -1199,7 +1234,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         mainHandWeapon,
         sheetWeaponProfText,
         magicCombat.mainWeaponAttack,
-        featProficiencyGrants,
+        proficiencyGrants,
         "mainHand",
         sheet.equipment
       ),
@@ -1209,7 +1244,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
       mainHandWeapon,
       sheetWeaponProfText,
       magicCombat.mainWeaponAttack,
-      featProficiencyGrants,
+      proficiencyGrants,
       sheet.equipment
     ]
   );
@@ -1221,7 +1256,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         offHandWeapon,
         sheetWeaponProfText,
         magicCombat.offHandWeaponAttack,
-        featProficiencyGrants,
+        proficiencyGrants,
         "offHand",
         sheet.equipment
       ),
@@ -1231,7 +1266,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
       offHandWeapon,
       sheetWeaponProfText,
       magicCombat.offHandWeaponAttack,
-      featProficiencyGrants,
+      proficiencyGrants,
       sheet.equipment
     ]
   );
@@ -1244,7 +1279,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         equippedImplement,
         sheetImplementProfText,
         magicCombat.implementAttack,
-        featProficiencyGrants
+        proficiencyGrants
       ),
     [
       sheet.level,
@@ -1253,7 +1288,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
       equippedImplement,
       sheetImplementProfText,
       magicCombat.implementAttack,
-      featProficiencyGrants
+      proficiencyGrants
     ]
   );
 
@@ -2600,12 +2635,12 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   </div>
                 </OverviewCollapsibleSection>
               )}
-              {featProficiencyDisplayRows.length > 0 && (
-                <OverviewCollapsibleSection title="Proficiencies from feats">
+              {proficiencyDisplayRows.length > 0 && (
+                <OverviewCollapsibleSection title="Proficiencies from feats & race">
                   <ul style={{ margin: 0, paddingLeft: "1.1rem", fontSize: "0.8rem", color: "var(--text-primary)" }}>
-                    {featProficiencyDisplayRows.map((row) => (
-                      <li key={row.featId} style={{ marginBottom: "0.35rem" }}>
-                        <span style={{ fontWeight: 700 }}>{row.featName}</span>
+                    {proficiencyDisplayRows.map((row) => (
+                      <li key={row.sourceId} style={{ marginBottom: "0.35rem" }}>
+                        <span style={{ fontWeight: 700 }}>{row.sourceName}</span>
                         <ul style={{ margin: "0.12rem 0 0 0", paddingLeft: "1rem", color: "var(--text-secondary)" }}>
                           {row.grants.map((g, i) => (
                             <li key={i}>{g}</li>

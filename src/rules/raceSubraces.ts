@@ -1,4 +1,5 @@
 import type { CharacterBuild, Race, RacialTrait } from "./models";
+import { grantedRacialTraitIdsFromTrait } from "./racialTraitGrants";
 import { parseRacialTraitIdsFromRace } from "./racialTraits";
 
 export interface RaceSubraceData {
@@ -278,6 +279,9 @@ export function getStructuralChildTraitIdsForSubrace(subraceTrait: RacialTrait |
 export function getChildTraitIdsForSubrace(subraceTrait: RacialTrait | undefined): string[] {
   if (!subraceTrait) return [];
   const ids = new Set(getStructuralChildTraitIdsForSubrace(subraceTrait));
+  for (const id of grantedRacialTraitIdsFromTrait(subraceTrait)) {
+    ids.add(id);
+  }
   const rules = (subraceTrait.raw?.rules as Record<string, unknown> | undefined) || {};
   const selects = (rules["select"] as Array<{ attrs?: Record<string, unknown> }> | undefined) || [];
   for (const s of selects) {

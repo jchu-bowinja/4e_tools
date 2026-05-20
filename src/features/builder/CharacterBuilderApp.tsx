@@ -100,7 +100,7 @@ import {
   pruneHiddenClassFeatureSelections
 } from "../../rules/classFeatureChoices";
 import { getClassTraitRows, getHybridClassTraitRows, type TraitDisplayRow } from "../../rules/supportTraits";
-import { autoGrantedTrainedSkillIds } from "../../rules/grantedSkillsQuery";
+import { autoGrantedTrainedSkillIds, effectiveTrainedSkillIdSet } from "../../rules/grantedSkillsQuery";
 import { computeSkillSheetRows } from "../../rules/skillCalculator";
 import {
   BUILDER_ABILITY_SCORE_COLUMNS,
@@ -157,8 +157,8 @@ import {
 } from "../../rules/psionicPowerPoints";
 import type { HybridPsionicAugmentationChoice } from "../../rules/models";
 import {
-  collectFeatProficiencyDisplayRows,
-  collectFeatProficiencyGrants
+  collectCharacterProficiencyDisplayRows,
+  collectCharacterProficiencyGrants
 } from "../../rules/featProficiencies";
 import {
   normalizeCharacterBuild,
@@ -1297,12 +1297,11 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   }
 
   const skillSheetRows = useMemo(() => {
-    const ids = new Set<string>([...autoGrantedSkillIds, ...build.trainedSkillIds]);
     return computeSkillSheetRows(
       index,
       build.level,
       effectiveAbilityScores,
-      ids,
+      effectiveTrainedSkillIdSet(index, build),
       derived.armorCheckPenalty,
       derived.supportPassiveOther.skillFlatBySkillId
     );
@@ -1334,13 +1333,13 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       .filter((x): x is string => typeof x === "string")
       .join("; ");
   }, [isHybridBuild, selectedHybridA, selectedHybridB, classSpecific]);
-  const featProficiencyGrants = useMemo(
-    () => collectFeatProficiencyGrants(index, build.featIds),
-    [index, build.featIds]
+  const proficiencyGrants = useMemo(
+    () => collectCharacterProficiencyGrants(index, build),
+    [index, build.featIds, build.raceId, build.raceSelections]
   );
-  const featProficiencyDisplayRows = useMemo(
-    () => collectFeatProficiencyDisplayRows(index, build.featIds),
-    [index, build.featIds]
+  const proficiencyDisplayRows = useMemo(
+    () => collectCharacterProficiencyDisplayRows(index, build),
+    [index, build.featIds, build.raceId, build.raceSelections]
   );
 
   const magicCombat = useMemo(() => computeMagicItemCombatBonuses(index, build), [index, build]);
@@ -1367,7 +1366,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         selectedMainWeapon,
         classWeaponProfText,
         magicCombat.mainWeaponAttack,
-        featProficiencyGrants,
+        proficiencyGrants,
         "mainHand",
         wieldSlotsForPreview
       ),
@@ -1377,7 +1376,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       selectedMainWeapon,
       classWeaponProfText,
       magicCombat.mainWeaponAttack,
-      featProficiencyGrants,
+      proficiencyGrants,
       wieldSlotsForPreview
     ]
   );
@@ -1389,7 +1388,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         selectedOffHandWeapon,
         classWeaponProfText,
         magicCombat.offHandWeaponAttack,
-        featProficiencyGrants,
+        proficiencyGrants,
         "offHand",
         wieldSlotsForPreview
       ),
@@ -1399,7 +1398,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       selectedOffHandWeapon,
       classWeaponProfText,
       magicCombat.offHandWeaponAttack,
-      featProficiencyGrants,
+      proficiencyGrants,
       wieldSlotsForPreview
     ]
   );
@@ -1412,7 +1411,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         selectedImplement,
         classImplementProfText,
         magicCombat.implementAttack,
-        featProficiencyGrants
+        proficiencyGrants
       ),
     [
       build.level,
@@ -1422,7 +1421,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       selectedImplement,
       classImplementProfText,
       magicCombat.implementAttack,
-      featProficiencyGrants
+      proficiencyGrants
     ]
   );
   const multiclassFeatIdList = useMemo(() => multiclassFeatIds(index, build), [index, build]);
@@ -4388,15 +4387,15 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     </ul>
                   </div>
                 )}
-                {featProficiencyDisplayRows.length > 0 && (
+                {proficiencyDisplayRows.length > 0 && (
                   <div style={{ marginTop: "0.65rem" }}>
                     <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "0.25rem" }}>
-                      Proficiencies from feats
+                      Proficiencies from feats & race
                     </div>
                     <ul style={{ margin: 0, paddingLeft: "1.1rem", fontSize: "0.82rem", color: "var(--text-primary)" }}>
-                      {featProficiencyDisplayRows.map((row) => (
-                        <li key={row.featId} style={{ marginBottom: "0.35rem" }}>
-                          <span style={{ fontWeight: 600 }}>{row.featName}</span>
+                      {proficiencyDisplayRows.map((row) => (
+                        <li key={row.sourceId} style={{ marginBottom: "0.35rem" }}>
+                          <span style={{ fontWeight: 600 }}>{row.sourceName}</span>
                           <ul style={{ margin: "0.15rem 0 0 0", paddingLeft: "1rem", color: "var(--text-secondary)" }}>
                             {row.grants.map((g, i) => (
                               <li key={i}>{g}</li>

@@ -1,4 +1,16 @@
-import type { Ability, CharacterBuild, NadBonusesFromSpecific, RulesIndex, StatAddEntry } from "./models";
+import { collectActiveRacialTraitsFromBuild } from "./activeRacialTraits";
+import {
+  collectActiveClassFeaturesFromBuild,
+  nadBonusesFromClassFeatureSpecific,
+  statAddsFromClassFeature
+} from "./classFeatureStatAdds";
+import type { Ability, CharacterBuild, NadBonusesFromSpecific, RulesIndex, RacialTrait, StatAddEntry } from "./models";
+import { collectRaceSkillBonusFlatBySkillId } from "./racialSkillSelections";
+import {
+  nadBonusesFromRacialTraitSpecific,
+  statAddsFromRacialTrait
+} from "./racialTraitStatAdds";
+import { racialTraitStatAddRowApplies, type RacialTraitStatAddContext } from "./statAddApply";
 
 /** NAD keys as used on `CharacterBuild` / `DerivedStats` defenses (PascalCase). */
 export type NadDefenseKey = "Fortitude" | "Reflex" | "Will";
@@ -25,13 +37,24 @@ function parseDirectPlusInt(value: string): number | null {
   return m ? Number(m[1]) : null;
 }
 
+type StatAddRowApplies = (entry: StatAddEntry) => boolean;
+
+function defaultStatAddRowApplies(entry: StatAddEntry, level: number): boolean {
+  if (entry.condition || entry.wearing) return false;
+  return appliesRequires(entry.requires, level);
+}
+
 /** Sums statadd rows whose `name` matches `bonusName` (e.g. Iron Will) with plain +N values and applicable `requires`. */
-function resolveNamedTieredBonus(entries: StatAddEntry[], bonusName: string, level: number): number {
+function resolveNamedTieredBonus(
+  entries: StatAddEntry[],
+  bonusName: string,
+  level: number,
+  rowApplies: StatAddRowApplies
+): number {
   let sum = 0;
   for (const e of entries) {
     if (e.name !== bonusName) continue;
-    if (e.condition || e.wearing) continue;
-    if (!appliesRequires(e.requires, level)) continue;
+    if (!rowApplies(e)) continue;
     const n = parseDirectPlusInt(e.value);
     if (n !== null) sum += n;
   }
@@ -54,13 +77,14 @@ function defenseBucketFromStatName(name: string): keyof PassiveDefenseBonuses | 
  */
 export function passiveDefenseBonusesFromStatAdds(
   statAdds: StatAddEntry[] | undefined,
-  level: number
+  level: number,
+  rowApplies?: StatAddRowApplies
 ): PassiveDefenseBonuses {
   const entries = statAdds ?? [];
+  const applies = rowApplies ?? ((e) => defaultStatAddRowApplies(e, level));
   const out: PassiveDefenseBonuses = { ac: 0, fortitude: 0, reflex: 0, will: 0 };
   for (const e of entries) {
-    if (e.condition || e.wearing) continue;
-    if (!appliesRequires(e.requires, level)) continue;
+    if (!applies(e)) continue;
     const bucket = defenseBucketFromStatName(e.name);
     if (!bucket) continue;
     let n = 0;
@@ -68,7 +92,7 @@ export function passiveDefenseBonusesFromStatAdds(
     if (direct !== null) n = direct;
     else if (e.value.startsWith("+")) {
       const refName = e.value.slice(1).trim();
-      if (refName) n = resolveNamedTieredBonus(entries, refName, level);
+      if (refName) n = resolveNamedTieredBonus(entries, refName, level, applies);
     }
     out[bucket] += n;
   }
@@ -172,14 +196,15 @@ export function passiveOtherBonusesFromStatAdds(
   statAdds: StatAddEntry[] | undefined,
   level: number,
   abilityScores: Record<Ability, number>,
-  skillLowerToId: Map<string, string>
+  skillLowerToId: Map<string, string>,
+  rowApplies?: StatAddRowApplies
 ): PassiveOtherBonuses {
   const entries = statAdds ?? [];
+  const applies = rowApplies ?? ((e) => defaultStatAddRowApplies(e, level));
   const out = emptyPassiveOther();
 
   for (const e of entries) {
-    if (e.condition || e.wearing) continue;
-    if (!appliesRequires(e.requires, level)) continue;
+    if (!applies(e)) continue;
     const nameRaw = e.name.trim();
     const nameLower = nameRaw.toLowerCase();
     const val = String(e.value || "").trim();
@@ -187,7 +212,7 @@ export function passiveOtherBonusesFromStatAdds(
     const direct = parseDirectPlusInt(val);
     const namedRef =
       val.startsWith("+") && !direct
-        ? resolveNamedTieredBonus(entries, val.slice(1).trim(), level)
+        ? resolveNamedTieredBonus(entries, val.slice(1).trim(), level, applies)
         : 0;
 
     if (nameLower === "speed") {
@@ -229,18 +254,24 @@ function passiveOtherFromEntityStatAdds(
   return passiveOtherBonusesFromStatAdds(statAdds, level, abilityScores, skillLowerToId);
 }
 
-/**
- * Sums initiative, speed, healing surge count, and skill flat bonuses from feats, theme, paragon path, and epic destiny.
- */
-export function aggregateSupportPassiveOtherBonuses(
-  index: RulesIndex,
-  build: CharacterBuild
-): PassiveOtherBonuses {
+function buildSkillLowerToIdMap(index: RulesIndex): Map<string, string> {
   const skillLowerToId = new Map<string, string>();
   for (const s of index.skills ?? []) {
     const k = s.name.trim().toLowerCase();
     if (!skillLowerToId.has(k)) skillLowerToId.set(k, s.id);
   }
+  return skillLowerToId;
+}
+
+/**
+ * Sums initiative, speed, healing surge count, and skill flat bonuses from feats, theme, paragon path,
+ * epic destiny, active racial traits, and class/path/theme/destiny features (`raw.rules.statadd`).
+ */
+export function aggregateSupportPassiveOtherBonuses(
+  index: RulesIndex,
+  build: CharacterBuild
+): PassiveOtherBonuses {
+  const skillLowerToId = buildSkillLowerToIdMap(index);
   const scores = build.abilityScores;
   let total = emptyPassiveOther();
   for (const id of build.featIds ?? []) {
@@ -260,17 +291,19 @@ export function aggregateSupportPassiveOtherBonuses(
     const e = index.epicDestinies.find((x) => x.id === build.epicDestinyId);
     if (e) total = mergePassiveOtherBonuses(total, passiveOtherFromEntityStatAdds(build.level, e.statAdds, scores, skillLowerToId));
   }
-  return total;
+  total = mergeRacialTraitPassiveOther(index, build, total, skillLowerToId);
+  return mergeClassFeaturePassiveOther(index, build, total, skillLowerToId);
 }
 
 const emptyPassiveDefense = (): PassiveDefenseBonuses => ({ ac: 0, fortitude: 0, reflex: 0, will: 0 });
 
-function passiveFromStatAddsAndNad(
+export function passiveDefenseFromStatAddsAndNad(
   level: number,
   statAdds: StatAddEntry[] | undefined,
-  nad: NadBonusesFromSpecific | undefined
+  nad: NadBonusesFromSpecific | undefined,
+  rowApplies?: StatAddRowApplies
 ): PassiveDefenseBonuses {
-  const fromAdds = passiveDefenseBonusesFromStatAdds(statAdds, level);
+  const fromAdds = passiveDefenseBonusesFromStatAdds(statAdds, level, rowApplies);
   const nadPartial = nadSpecificToDefensePartial(nad);
   const fromNad: PassiveDefenseBonuses = {
     ac: 0,
@@ -281,28 +314,153 @@ function passiveFromStatAddsAndNad(
   return mergePassiveDefenseBonuses(fromAdds, fromNad);
 }
 
+function racialTraitRowApplies(trait: RacialTrait, level: number): StatAddRowApplies {
+  const ctx: RacialTraitStatAddContext = {
+    traitId: trait.id,
+    traitSlug: trait.slug,
+    traitName: trait.name
+  };
+  return (e) => racialTraitStatAddRowApplies(e, level, ctx);
+}
+
+function mergeRacialTraitPassiveDefense(
+  index: RulesIndex,
+  build: CharacterBuild,
+  total: PassiveDefenseBonuses
+): PassiveDefenseBonuses {
+  for (const trait of collectActiveRacialTraitsFromBuild(index, build)) {
+    const applies = racialTraitRowApplies(trait, build.level);
+    total = mergePassiveDefenseBonuses(
+      total,
+      passiveDefenseFromStatAddsAndNad(
+        build.level,
+        statAddsFromRacialTrait(trait),
+        nadBonusesFromRacialTraitSpecific(trait),
+        applies
+      )
+    );
+  }
+  return total;
+}
+
+function mergeClassFeaturePassiveDefense(
+  index: RulesIndex,
+  build: CharacterBuild,
+  total: PassiveDefenseBonuses
+): PassiveDefenseBonuses {
+  for (const feature of collectActiveClassFeaturesFromBuild(index, build)) {
+    total = mergePassiveDefenseBonuses(
+      total,
+      passiveDefenseFromStatAddsAndNad(
+        build.level,
+        statAddsFromClassFeature(feature),
+        nadBonusesFromClassFeatureSpecific(feature)
+      )
+    );
+  }
+  return total;
+}
+
+function mergeRaceSkillBonusPicks(
+  build: CharacterBuild,
+  total: PassiveOtherBonuses,
+  index: RulesIndex
+): PassiveOtherBonuses {
+  const picks = collectRaceSkillBonusFlatBySkillId(index, build);
+  const skills = { ...total.skillFlatBySkillId };
+  for (const [skillId, amount] of Object.entries(picks)) {
+    if (!amount) continue;
+    skills[skillId] = (skills[skillId] || 0) + amount;
+  }
+  return { ...total, skillFlatBySkillId: skills };
+}
+
+function mergeRacialTraitPassiveOther(
+  index: RulesIndex,
+  build: CharacterBuild,
+  total: PassiveOtherBonuses,
+  skillLowerToId: Map<string, string>
+): PassiveOtherBonuses {
+  const scores = build.abilityScores;
+  for (const trait of collectActiveRacialTraitsFromBuild(index, build)) {
+    const applies = racialTraitRowApplies(trait, build.level);
+    total = mergePassiveOtherBonuses(
+      total,
+      passiveOtherBonusesFromStatAdds(
+        statAddsFromRacialTrait(trait),
+        build.level,
+        scores,
+        skillLowerToId,
+        applies
+      )
+    );
+  }
+  return mergeRaceSkillBonusPicks(build, total, index);
+}
+
+function mergeClassFeaturePassiveOther(
+  index: RulesIndex,
+  build: CharacterBuild,
+  total: PassiveOtherBonuses,
+  skillLowerToId: Map<string, string>
+): PassiveOtherBonuses {
+  const scores = build.abilityScores;
+  for (const feature of collectActiveClassFeaturesFromBuild(index, build)) {
+    total = mergePassiveOtherBonuses(
+      total,
+      passiveOtherBonusesFromStatAdds(
+        statAddsFromClassFeature(feature),
+        build.level,
+        scores,
+        skillLowerToId
+      )
+    );
+  }
+  return total;
+}
+
 /**
- * Sums unconditional defense bonuses from selected feats, theme, paragon path, and epic destiny
- * (ETL `statAdds` + `nadBonusesFromSpecific`). Situational `statAdds` rows (condition / wearing) are skipped.
+ * Sums unconditional defense bonuses from selected feats, theme, paragon path, epic destiny, and active
+ * racial traits, and class features (ETL or `raw.rules.statadd`). Most situational rows are skipped;
+ * genasi manifestation bonuses apply while that manifestation trait is active.
  */
 export function aggregateSupportPassiveDefenseBonuses(index: RulesIndex, build: CharacterBuild): PassiveDefenseBonuses {
   let total = emptyPassiveDefense();
   for (const id of build.featIds ?? []) {
     const f = index.feats.find((x) => x.id === id);
     if (!f) continue;
-    total = mergePassiveDefenseBonuses(total, passiveFromStatAddsAndNad(build.level, f.statAdds, f.nadBonusesFromSpecific));
+    total = mergePassiveDefenseBonuses(
+      total,
+      passiveDefenseFromStatAddsAndNad(build.level, f.statAdds, f.nadBonusesFromSpecific)
+    );
   }
   if (build.themeId) {
     const t = index.themes.find((x) => x.id === build.themeId);
-    if (t) total = mergePassiveDefenseBonuses(total, passiveFromStatAddsAndNad(build.level, t.statAdds, t.nadBonusesFromSpecific));
+    if (t) {
+      total = mergePassiveDefenseBonuses(
+        total,
+        passiveDefenseFromStatAddsAndNad(build.level, t.statAdds, t.nadBonusesFromSpecific)
+      );
+    }
   }
   if (build.paragonPathId) {
     const p = index.paragonPaths.find((x) => x.id === build.paragonPathId);
-    if (p) total = mergePassiveDefenseBonuses(total, passiveFromStatAddsAndNad(build.level, p.statAdds, p.nadBonusesFromSpecific));
+    if (p) {
+      total = mergePassiveDefenseBonuses(
+        total,
+        passiveDefenseFromStatAddsAndNad(build.level, p.statAdds, p.nadBonusesFromSpecific)
+      );
+    }
   }
   if (build.epicDestinyId) {
     const e = index.epicDestinies.find((x) => x.id === build.epicDestinyId);
-    if (e) total = mergePassiveDefenseBonuses(total, passiveFromStatAddsAndNad(build.level, e.statAdds, e.nadBonusesFromSpecific));
+    if (e) {
+      total = mergePassiveDefenseBonuses(
+        total,
+        passiveDefenseFromStatAddsAndNad(build.level, e.statAdds, e.nadBonusesFromSpecific)
+      );
+    }
   }
-  return total;
+  total = mergeRacialTraitPassiveDefense(index, build, total);
+  return mergeClassFeaturePassiveDefense(index, build, total);
 }

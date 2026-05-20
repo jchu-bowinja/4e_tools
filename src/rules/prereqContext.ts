@@ -10,8 +10,7 @@ import {
 } from "./featGrantFlags";
 import { featureNameMatches } from "./featureNameMatch";
 import { collectCharacterPowerIdsForSelections } from "./powerSelections";
-import { getRaceExtraTraitIdsFromBuild } from "./raceSubraces";
-import { parseRacialTraitIdsFromRace } from "./racialTraits";
+import { collectActiveRacialTraitIdsFromBuild } from "./activeRacialTraits";
 import {
   buildClassFeatureLookups,
   parseTraitIdsFromField,
@@ -219,20 +218,8 @@ export function characterFeatNames(index: RulesIndex, build: CharacterBuild): Se
 
 export function characterRacialTraitNames(index: RulesIndex, build: CharacterBuild): Set<string> {
   const names = new Set<string>();
-  if (!build.raceId) return names;
-  const race = index.races.find((r) => r.id === build.raceId);
-  if (!race) return names;
   const byId = new Map((index.racialTraits ?? []).map((t) => [t.id, t]));
-  const seen = new Set<string>();
-  for (const id of parseRacialTraitIdsFromRace(race)) {
-    if (seen.has(id)) continue;
-    seen.add(id);
-    const t = byId.get(id);
-    if (t?.name) names.add(t.name);
-  }
-  for (const id of getRaceExtraTraitIdsFromBuild(index, build)) {
-    if (seen.has(id)) continue;
-    seen.add(id);
+  for (const id of collectActiveRacialTraitIdsFromBuild(index, build)) {
     const t = byId.get(id);
     if (t?.name) names.add(t.name);
   }
