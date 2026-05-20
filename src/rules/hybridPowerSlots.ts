@@ -1,6 +1,7 @@
 import type { CharacterBuild, Power, RulesIndex } from "./models";
 import { activeFeatReplacementPowerIds } from "./featPowerReplace";
 import { activeParagonAtWillSwapPowerId } from "./paragonMulticlassing";
+import { paragonMulticlassPrimaryAtWillSlotPenalty } from "./psionicPowerPoints";
 import {
   expectedClassAtWillAttackSlots,
   expectedClassDailyAttackSlots,
@@ -222,6 +223,7 @@ export function inferHybridClassPowerSlotsFromPowerIds(
 
 /** When not hybrid, delegates to standard slot builder (for shared code paths). */
 export function effectivePowerSlotDefinitions(
+  index: RulesIndex,
   build: CharacterBuild,
   level: number,
   bonusThirdClassAtWill: boolean
@@ -229,5 +231,6 @@ export function effectivePowerSlotDefinitions(
   if (build.characterStyle === "hybrid") {
     return buildHybridPowerSlotDefinitions(level, bonusThirdClassAtWill);
   }
-  return buildClassPowerSlotDefinitions(level, bonusThirdClassAtWill);
+  const penalty = paragonMulticlassPrimaryAtWillSlotPenalty(index, build);
+  return buildClassPowerSlotDefinitions(level, bonusThirdClassAtWill, penalty);
 }

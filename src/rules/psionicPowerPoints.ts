@@ -9,7 +9,7 @@ export function powerPointsForPrintedLevel(printedLevel: number): number {
   return 6;
 }
 
-function classIsPsionic(index: RulesIndex, classId: string | undefined): boolean {
+export function classIsPsionic(index: RulesIndex, classId: string | undefined): boolean {
   if (!classId) return false;
   const cls = index.classes.find((c) => c.id === classId);
   const ps = String(cls?.powerSource ?? "").toLowerCase();
@@ -26,6 +26,22 @@ export interface PsionicPowerPointSummary {
   /** Net adjustment from heroic multiclass swaps + paragon multiclassing. */
   total: number;
   lines: PsionicPowerPointAdjustmentLine[];
+  /** PHB3: non-psionic → psionic paragon MC loses one class at-will slot at 11+. */
+  paragonPrimaryAtWillSlotPenalty: number;
+}
+
+/** Lose one class at-will slot when paragon multiclassing into psionic from a non-psionic class. */
+export function paragonMulticlassPrimaryAtWillSlotPenalty(
+  index: RulesIndex,
+  build: CharacterBuild
+): number {
+  if (!build.paragonMulticlassing || build.level < 11) return 0;
+  if (build.characterStyle === "hybrid") return 0;
+  const mcId = multiclassEntryClassId(index, build);
+  if (!mcId || !classIsPsionic(index, mcId)) return 0;
+  const primaryId = build.classId;
+  if (!primaryId || classIsPsionic(index, primaryId)) return 0;
+  return 1;
 }
 
 /** +2 at 11 when paragon multiclassing into a psionic class (both psionic, or non-psionic → psionic). */
@@ -99,5 +115,6 @@ export function summarizePsionicPowerPointAdjustments(
   }
 
   const total = lines.reduce((sum, l) => sum + l.delta, 0);
-  return { total, lines };
+  const paragonPrimaryAtWillSlotPenalty = paragonMulticlassPrimaryAtWillSlotPenalty(index, build);
+  return { total, lines, paragonPrimaryAtWillSlotPenalty };
 }

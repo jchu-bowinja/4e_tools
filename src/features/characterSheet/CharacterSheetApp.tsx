@@ -2442,6 +2442,11 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                     Net {psionicPowerPointSummary.total > 0 ? "+" : ""}
                     {psionicPowerPointSummary.total} to your class power point pool (add to base from class).
                   </p>
+                  {psionicPowerPointSummary.paragonPrimaryAtWillSlotPenalty > 0 && (
+                    <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                      Lose one class at-will slot (non-psionic primary, psionic paragon multiclass).
+                    </p>
+                  )}
                 </OverviewCollapsibleSection>
               )}
               {featGrantedTraitRows.length > 0 && (

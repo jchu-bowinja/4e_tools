@@ -3,6 +3,7 @@ import { buildClassPowerSlotDefinitions } from "./classPowerSlots";
 import type { CharacterBuild, Power, RulesIndex } from "./models";
 import { collectMulticlassEntryFeatIds } from "./featGrantFlags";
 import { bonusClassAtWillSlotFromRaceBuild } from "./grantedPowersQuery";
+import { paragonMulticlassPrimaryAtWillSlotPenalty } from "./psionicPowerPoints";
 import { getClassPowersForLevelRange } from "./classPowersQuery";
 import { buildHybridPowerSlotDefinitions } from "./hybridPowerSlots";
 import { MULTICLASS_POWER_CHAIN } from "./multiclassValidation";
@@ -125,10 +126,11 @@ export function validateParagonMulticlassing(index: RulesIndex, build: Character
 
 export function paragonAtWillSlotDefs(index: RulesIndex, build: CharacterBuild): ClassPowerSlotDef[] {
   const bonus = bonusClassAtWillSlotFromRaceBuild(index, build);
+  const penalty = paragonMulticlassPrimaryAtWillSlotPenalty(index, build);
   const defs =
     build.characterStyle === "hybrid"
       ? buildHybridPowerSlotDefinitions(build.level, bonus)
-      : buildClassPowerSlotDefinitions(build.level, bonus);
+      : buildClassPowerSlotDefinitions(build.level, bonus, penalty);
   return defs.filter((d) => d.bucket === "atWill");
 }
 

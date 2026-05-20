@@ -126,6 +126,7 @@ import {
 import { pruneStalePowerSelections } from "../../rules/powerSelections";
 import {
   powerPointsForPrintedLevel,
+  paragonMulticlassPrimaryAtWillSlotPenalty,
   summarizePsionicPowerPointAdjustments
 } from "../../rules/psionicPowerPoints";
 import {
@@ -1643,10 +1644,11 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
 
   function reconcilePowerSlotsForBuild(nextBase: CharacterBuild, lv: number): { classPowerSlots?: Record<string, string>; powerIds: string[] } {
     const bonus = bonusClassAtWillSlotFromRaceBuild(index, nextBase);
+    const atWillPenalty = paragonMulticlassPrimaryAtWillSlotPenalty(index, nextBase);
     const defs =
       nextBase.characterStyle === "hybrid"
         ? buildHybridPowerSlotDefinitions(lv, bonus)
-        : buildClassPowerSlotDefinitions(lv, bonus);
+        : buildClassPowerSlotDefinitions(lv, bonus, atWillPenalty);
     let pruned = pruneFeatPowerReplacements(nextBase, index, defs);
     pruned = pruneMulticlassSlotSwaps(pruned, index, defs);
     if (pruned.characterStyle === "hybrid") {
@@ -1671,10 +1673,14 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     if (pick === ID_RACIAL_TRAIT_HEROIC_EFFORT) return [ID_RACIAL_TRAIT_HEROIC_EFFORT];
     return [];
   }, [selectedRace, build.raceSelections]);
+  const paragonAtWillPenalty = useMemo(
+    () => paragonMulticlassPrimaryAtWillSlotPenalty(index, build),
+    [index, build]
+  );
   const powerSlotDefs = useMemo(() => {
     if (isHybridBuild) return buildHybridPowerSlotDefinitions(build.level, bonusClassAtWill);
-    return buildClassPowerSlotDefinitions(build.level, bonusClassAtWill);
-  }, [build.level, bonusClassAtWill, isHybridBuild]);
+    return buildClassPowerSlotDefinitions(build.level, bonusClassAtWill, paragonAtWillPenalty);
+  }, [build.level, bonusClassAtWill, isHybridBuild, paragonAtWillPenalty]);
   const racePowerGroups = useMemo(
     () =>
       racePowerGroupsForRace(selectedRace, racialTraitById, [
@@ -4069,6 +4075,12 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                           Net {psionicPowerPointSummary.total > 0 ? "+" : ""}
                           {psionicPowerPointSummary.total} to your class power point pool (add to your base from class).
                         </p>
+                        {psionicPowerPointSummary.paragonPrimaryAtWillSlotPenalty > 0 && (
+                          <p style={{ margin: "0.2rem 0 0 0", fontSize: "0.76rem", color: "var(--text-muted)" }}>
+                            Paragon multiclassing into a psionic class from a non-psionic class: lose one class at-will
+                            slot (in addition to the at-will swap).
+                          </p>
+                        )}
                       </div>
                     )}
                   </div>
@@ -4550,7 +4562,13 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   <p style={{ margin: "0.35rem 0 0 1.55rem", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
                     Requires Novice, Acolyte, and Adept Power. Replaces paragon path benefits with powers from your multiclass class.
                     {psionicPowerPointSummary.lines.some((l) => l.label === "Paragon multiclassing") ? (
-                      <> At 11th level you gain +2 power points when multiclassing into a psionic class.</>
+                      <>
+                        {" "}
+                        At 11th level you gain +2 power points when multiclassing into a psionic class.
+                        {psionicPowerPointSummary.paragonPrimaryAtWillSlotPenalty > 0
+                          ? " You also have one fewer class at-will attack slot from your primary class."
+                          : ""}
+                      </>
                     ) : null}
                   </p>
                   {build.paragonMulticlassing && paragonMcClassId && (

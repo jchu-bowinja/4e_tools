@@ -32,6 +32,7 @@ import { autoGrantedTrainedSkillIds } from "./grantedSkillsQuery";
 import { validateInternalGrantFeats } from "./internalGrantValidation";
 import { validateMulticlassFeats } from "./multiclassValidation";
 import { validateParagonMulticlassing } from "./paragonMulticlassing";
+import { paragonMulticlassPrimaryAtWillSlotPenalty } from "./psionicPowerPoints";
 import { equipmentDuplicateEnchantmentWarnings } from "./equipment";
 
 export { getClassPowersForLevelRange };
@@ -241,7 +242,11 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
     const raceName = index.races.find((r) => r.id === build.raceId)?.name;
     const human = isHumanRace(raceName);
     const bonusThirdClassAtWill = bonusClassAtWillSlotFromRaceBuild(index, build);
-    const wantAw = expectedClassAtWillAttackSlots(build.level, bonusThirdClassAtWill);
+    const atWillPenalty = paragonMulticlassPrimaryAtWillSlotPenalty(index, build);
+    const wantAw = Math.max(
+      0,
+      expectedClassAtWillAttackSlots(build.level, bonusThirdClassAtWill) - atWillPenalty
+    );
     const wantEnc = expectedClassEncounterAttackSlots(build.level);
     const wantDaily = expectedClassDailyAttackSlots(build.level);
     const wantUtil = expectedClassUtilityPowerCount(build.level);
@@ -335,7 +340,7 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
 
     const slots = build.classPowerSlots;
     if (slots) {
-      const slotDefs = buildClassPowerSlotDefinitions(build.level, bonusThirdClassAtWill);
+      const slotDefs = buildClassPowerSlotDefinitions(build.level, bonusThirdClassAtWill, atWillPenalty);
       const defByKey = new Map(slotDefs.map((d) => [d.key, d]));
       for (const [key, rawId] of Object.entries(slots)) {
         const id = String(rawId || "").trim();
@@ -431,7 +436,11 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
     const raceName = index.races.find((r) => r.id === build.raceId)?.name;
     const human = isHumanRace(raceName);
     const bonusThirdClassAtWill = bonusClassAtWillSlotFromRaceBuild(index, build);
-    const wantAw = expectedClassAtWillAttackSlots(build.level, bonusThirdClassAtWill);
+    const atWillPenalty = paragonMulticlassPrimaryAtWillSlotPenalty(index, build);
+    const wantAw = Math.max(
+      0,
+      expectedClassAtWillAttackSlots(build.level, bonusThirdClassAtWill) - atWillPenalty
+    );
     const wantEnc = expectedClassEncounterAttackSlots(build.level);
     const wantDaily = expectedClassDailyAttackSlots(build.level);
     const wantUtil = expectedClassUtilityPowerCount(build.level);

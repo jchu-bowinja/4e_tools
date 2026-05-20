@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   heroicPsionicSwapPowerPointAdjustments,
   paragonMulticlassPowerPointBonus,
+  paragonMulticlassPrimaryAtWillSlotPenalty,
   powerPointsForPrintedLevel,
   summarizePsionicPowerPointAdjustments
 } from "../../src/rules/psionicPowerPoints";
@@ -215,5 +216,62 @@ describe("summarizePsionicPowerPointAdjustments", () => {
     expect(summary.total).toBe(4);
     expect(summary.lines.map((l) => l.label)).toContain("Psionic Dabbler");
     expect(summary.lines.map((l) => l.label)).toContain("Paragon multiclassing");
+  });
+});
+
+describe("paragonMulticlassPrimaryAtWillSlotPenalty", () => {
+  const psionicClass = { id: "c_psion", name: "Psion", slug: "psion", powerSource: "Psionic", raw: {} };
+  const martialClass = { id: "c_fighter", name: "Fighter", slug: "fighter", powerSource: "Martial", raw: {} };
+  const mcFeat = {
+    id: "mc",
+    name: "Disciple of the Mind",
+    slug: "dotm",
+    hasMulticlassGrant: true,
+    countsAsClassIds: ["c_psion"],
+    countsAsClassNames: ["Psion"],
+    prereqTokens: [],
+    raw: {}
+  };
+  const indexWithMc: RulesIndex = {
+    classes: [psionicClass, martialClass],
+    feats: [mcFeat],
+    powers: [],
+    skills: [],
+    races: [],
+    themes: [],
+    paragonPaths: [],
+    epicDestinies: [],
+    backgrounds: [],
+    rituals: [],
+    items: [],
+    hybridClasses: []
+  };
+
+  it("applies when non-psionic primary paragon MC into psionic", () => {
+    const build: CharacterBuild = {
+      level: 11,
+      classId: "c_fighter",
+      featIds: ["mc"],
+      paragonMulticlassing: true,
+      powerIds: [],
+      abilityScores: { STR: 10, CON: 10, DEX: 10, INT: 10, WIS: 10, CHA: 10 },
+      trainedSkillIds: []
+    };
+    expect(paragonMulticlassPrimaryAtWillSlotPenalty(indexWithMc, build)).toBe(1);
+    expect(summarizePsionicPowerPointAdjustments(indexWithMc, build).paragonPrimaryAtWillSlotPenalty).toBe(1);
+  });
+
+  it("does not apply for psionic primary or below 11", () => {
+    const build: CharacterBuild = {
+      level: 11,
+      classId: "c_psion",
+      featIds: ["mc"],
+      paragonMulticlassing: true,
+      powerIds: [],
+      abilityScores: { STR: 10, CON: 10, DEX: 10, INT: 10, WIS: 10, CHA: 10 },
+      trainedSkillIds: []
+    };
+    expect(paragonMulticlassPrimaryAtWillSlotPenalty(indexWithMc, build)).toBe(0);
+    expect(paragonMulticlassPrimaryAtWillSlotPenalty(indexWithMc, { ...build, level: 10 })).toBe(0);
   });
 });

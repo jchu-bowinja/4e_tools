@@ -8,6 +8,8 @@ import {
 import { getClassPowersForLevelRange, powerTypeCategory } from "./classPowersQuery";
 import { activeFeatReplacementPowerIds } from "./featPowerReplace";
 import { activeParagonAtWillSwapPowerId } from "./paragonMulticlassing";
+import { paragonMulticlassPrimaryAtWillSlotPenalty } from "./psionicPowerPoints";
+import type { ParagonMulticlassPowers } from "./models";
 
 /** PHB-style class encounter attack slot unlock levels (1st slot at 1st, 2nd at 3rd, …). */
 export const ENCOUNTER_ATTACK_SLOT_GAIN_LEVELS = [1, 3, 7, 13] as const;
@@ -61,9 +63,16 @@ export function attackPowerBucketFromUsage(usage: string | null | undefined): "a
   return k === "other" ? "encounter" : k;
 }
 
-export function buildClassPowerSlotDefinitions(level: number, bonusThirdClassAtWill: boolean): ClassPowerSlotDef[] {
+export function buildClassPowerSlotDefinitions(
+  level: number,
+  bonusThirdClassAtWill: boolean,
+  atWillSlotPenalty = 0
+): ClassPowerSlotDef[] {
   const defs: ClassPowerSlotDef[] = [];
-  const nAw = expectedClassAtWillAttackSlots(level, bonusThirdClassAtWill);
+  const nAw = Math.max(
+    0,
+    expectedClassAtWillAttackSlots(level, bonusThirdClassAtWill) - Math.max(0, atWillSlotPenalty)
+  );
   for (let i = 0; i < nAw; i++) {
     defs.push({
       key: `atWill:${i}`,
@@ -134,7 +143,8 @@ export function reconcileClassPowerSlotsForBuild(
   bonusThirdClassAtWill: boolean,
   index: RulesIndex
 ): { classPowerSlots?: Record<string, string>; powerIds: string[] } {
-  const defs = buildClassPowerSlotDefinitions(level, bonusThirdClassAtWill);
+  const penalty = paragonMulticlassPrimaryAtWillSlotPenalty(index, build);
+  const defs = buildClassPowerSlotDefinitions(level, bonusThirdClassAtWill, penalty);
   const validKeys = new Set(defs.map((d) => d.key));
   const attacks = getClassPowersForLevelRange(index, build.classId, level, "attack");
   const utils = getClassPowersForLevelRange(index, build.classId, level, "utility");
@@ -160,7 +170,35 @@ export function reconcileClassPowerSlotsForBuild(
     else next[k] = v;
   }
 
-  const cleaned = Object.keys(next).length > 0 ? next : undefined;
+  let merged: CharacterBuild = { ...build, classPowerSlots: Object.keys(next).length > 0 ? next : undefined };
+  if (penalty > 0) {
+    const validAw = new Set(defs.filter((d) => d.bucket === "atWill").map((d) => d.key));
+    const picks = merged.paragonMulticlassPowers;
+    if (picks?.atWillSwapSlotKey && !validAw.has(picks.atWillSwapSlotKey)) {
+      const slots = { ...(merged.classPowerSlots || {}) };
+      if (picks.atWillSwapOriginalPowerId) slots[picks.atWillSwapSlotKey] = picks.atWillSwapOriginalPowerId;
+      else delete slots[picks.atWillSwapSlotKey];
+      const nextPicks: ParagonMulticlassPowers = { ...picks };
+      delete nextPicks.atWillSwapPowerId;
+      delete nextPicks.atWillSwapSlotKey;
+      delete nextPicks.atWillSwapOriginalPowerId;
+      const hasOther = Boolean(nextPicks.encounterPowerId || nextPicks.utilityPowerId || nextPicks.dailyPowerId);
+      merged = {
+        ...merged,
+        classPowerSlots: Object.keys(slots).length > 0 ? slots : undefined,
+        paragonMulticlassPowers: hasOther ? nextPicks : undefined
+      };
+    }
+    const slots = { ...(merged.classPowerSlots || {}) };
+    for (const k of Object.keys(slots)) {
+      if (k.startsWith("atWill:") && !validAw.has(k)) delete slots[k];
+    }
+    merged = {
+      ...merged,
+      classPowerSlots: Object.keys(slots).length > 0 ? slots : undefined
+    };
+  }
+  const cleaned = merged.classPowerSlots;
   return {
     classPowerSlots: cleaned,
     powerIds: orderedPowerIdsFromSlots(defs, cleaned)
