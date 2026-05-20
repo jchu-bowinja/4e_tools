@@ -149,6 +149,29 @@ class TestFeatPowerModifications(unittest.TestCase):
         out = extract_feat_power_modifications(feat, power_lookup, norm_lookup, {})
         self.assertEqual(out["powerModifications"][0]["powerId"], "ID_CMD")
 
+    def test_alias_resolves_hand_of_fury_to_hand_of_radiance(self):
+        feat = {
+            "name": "Hand of Fury",
+            "specific": {},
+            "rules": {
+                "modify": [
+                    {
+                        "attrs": {
+                            "name": "Hand of Fury",
+                            "type": "Power",
+                            "Field": "Hand of Fury",
+                            "value": "Use hand of radiance as a minor action.",
+                        }
+                    }
+                ]
+            },
+        }
+        power_lookup = {"hand of radiance": "ID_FMP_POWER_7151"}
+        norm_lookup = {"handofradiance": "ID_FMP_POWER_7151"}
+        out = extract_feat_power_modifications(feat, power_lookup, norm_lookup, {})
+        self.assertEqual(out["powerModifications"][0]["powerId"], "ID_FMP_POWER_7151")
+        self.assertEqual(out["powerModifications"][0]["powerName"], "Hand of Fury")
+
 
 if __name__ == "__main__":
     unittest.main()

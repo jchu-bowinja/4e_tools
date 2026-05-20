@@ -1132,6 +1132,8 @@ _FEAT_POWER_NAME_ALIASES: Dict[str, str] = {
     "overhwleming strike": "overwhelming strike",
     "haunting sounds": "ghost sound",
     "ghost sounds": "ghost sound",
+    # Hand of Fury feat: modify name is wrong in Dragon 387; targets Hand of Radiance.
+    "hand of fury": "hand of radiance",
 }
 
 

@@ -4,7 +4,9 @@ const FEAT_POWER_NAME_ALIASES: Record<string, string> = {
   "predator's strike": "predator strike",
   "overhwleming strike": "overwhelming strike",
   "haunting sounds": "ghost sound",
-  "ghost sounds": "ghost sound"
+  "ghost sounds": "ghost sound",
+  /** Compendium mislabels modify target; feat augments Hand of Radiance (Invoker). */
+  "hand of fury": "hand of radiance"
 };
 
 /** Collapse punctuation/spacing for fuzzy power name match (wolfpack → Wolf Pack). */

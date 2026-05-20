@@ -115,6 +115,42 @@ describe("featPowerModifications", () => {
     expect(action?.text).toContain("Standard Action");
   });
 
+  it("resolves Hand of Fury modify target to Hand of Radiance", () => {
+    const index = {
+      feats: [
+        {
+          id: "ID_FMP_FEAT_2990",
+          name: "Hand of Fury",
+          slug: "hand-of-fury",
+          prereqTokens: [],
+          powerModifications: [
+            {
+              powerName: "Hand of Fury",
+              powerId: null,
+              field: "Hand of Fury",
+              value:
+                "When you miss all targets with a daily invoker power, you can use hand of radiance as a minor action once before the end of your turn."
+            }
+          ],
+          raw: {}
+        }
+      ],
+      powers: [
+        {
+          id: "ID_FMP_POWER_7151",
+          name: "Hand of Radiance",
+          slug: "hand-of-radiance",
+          raw: { specific: {} }
+        }
+      ]
+    } as unknown as RulesIndex;
+
+    const map = collectFeatModificationsByPowerId(index, ["ID_FMP_FEAT_2990"]);
+    const mods = map.get("ID_FMP_POWER_7151");
+    expect(mods?.augmentations).toHaveLength(1);
+    expect(mods?.augmentations[0]?.featName).toBe("Hand of Fury");
+  });
+
   it("buildCharacterPowerCardViewModel merges feat mods when provided", () => {
     const power: Power = {
       id: "P1",
