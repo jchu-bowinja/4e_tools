@@ -155,7 +155,7 @@ describe("racePowerGroupsForRace", () => {
     ]);
   });
 
-  it("maps Half-Elf Power Selection to a Dilettante power pick", () => {
+  it("defers Half-Elf Power Selection until a subrace variant is chosen", () => {
     const parentId = "ID_FMP_RACIAL_TRAIT_3482";
     const dilettanteId = "ID_FMP_RACIAL_TRAIT_643";
     const knackId = "ID_FMP_RACIAL_TRAIT_3437";
@@ -197,12 +197,21 @@ describe("racePowerGroupsForRace", () => {
       ["TR_OTHER", { id: "TR_OTHER", name: "Group Diplomacy", slug: "gd", raw: {} }]
     ]);
     const groups = racePowerGroupsForRace(race, m);
-    expect(groups).toContainEqual({
-      traitId: parentId,
-      traitName: "Half-Elf Power Selection",
+    expect(groups.some((g) => g.traitId === parentId)).toBe(false);
+    const withDilettante = racePowerGroupsForRace(race, m, [dilettanteId]);
+    expect(withDilettante).toContainEqual({
+      traitId: dilettanteId,
+      traitName: "Dilettante",
       choiceOnly: true,
       dilettantePick: true,
       powerIds: []
+    });
+    const withKnack = racePowerGroupsForRace(race, m, [knackId]);
+    expect(withKnack).toContainEqual({
+      traitId: knackId,
+      traitName: "Knack for Success",
+      choiceOnly: false,
+      powerIds: ["ID_FMP_POWER_KNACK"]
     });
   });
 });

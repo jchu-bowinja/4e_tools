@@ -36,6 +36,7 @@ import {
   showPsionicPowerPointSummary,
   summarizePsionicPowerPointAdjustments
 } from "../../rules/psionicPowerPoints";
+import { hybridHpAtFirstLevel, hybridHpPerLevelGain } from "../../rules/hybridDerivedStats";
 import { computeSkillSheetRows } from "../../rules/skillCalculator";
 import {
   ABILITY_SCORE_COLUMNS,
@@ -46,7 +47,14 @@ import {
   motionUnifiedRowValues
 } from "../../rules/statScoreBreakdown";
 import { CollapsibleDisclosure } from "../../ui/CollapsibleDisclosure";
-import { contentPanelPaddedStyle, flowSubsectionStyle, pageTitleStyle, sectionTitleStyle } from "../../ui/panels";
+import {
+  contentPanelPaddedStyle,
+  flowSubsectionStyle,
+  pageTitleStyle,
+  rulesPageShellStyle,
+  sectionTitleStyle
+} from "../../ui/panels";
+import { HybridClassHoverDetail } from "../../ui/HybridClassDetailPanel";
 import { SegmentedControl } from "../../ui/SegmentedControl";
 import { SKILL_BREAKDOWN_COLUMNS } from "../../ui/scoreBreakdownColumns";
 import {
@@ -178,6 +186,8 @@ type CharacterIdentityFieldProps = {
   onLabelFocus?: (event: ReactFocusEvent<HTMLElement>) => void;
   onLabelBlur?: () => void;
   labelTabIndex?: number;
+  /** When the rich-info / glossary panel for this label is open. */
+  labelAriaDescribedBy?: string;
 };
 
 function CharacterIdentityField({
@@ -188,7 +198,8 @@ function CharacterIdentityField({
   onLabelMouseLeave,
   onLabelFocus,
   onLabelBlur,
-  labelTabIndex
+  labelTabIndex,
+  labelAriaDescribedBy
 }: CharacterIdentityFieldProps): JSX.Element {
   const hasLabelAffordance = Boolean(onLabelMouseEnter || onLabelFocus);
   const fieldClass = className ? `character-sheet-identity__field ${className}` : "character-sheet-identity__field";
@@ -199,6 +210,7 @@ function CharacterIdentityField({
           <span
             className="character-sheet-identity__label-affordance"
             tabIndex={labelTabIndex ?? 0}
+            aria-describedby={labelAriaDescribedBy}
             onMouseEnter={onLabelMouseEnter}
             onMouseLeave={onLabelMouseLeave}
             onFocus={onLabelFocus}
@@ -226,12 +238,19 @@ type CharacterIdentitySectionProps = {
   epicDestinyName?: string;
   onRaceLabelMouseEnter?: (event: ReactMouseEvent<HTMLElement>) => void;
   onRaceLabelMouseLeave?: () => void;
+  onRaceLabelFocus?: (event: ReactFocusEvent<HTMLElement>) => void;
+  onRaceLabelBlur?: () => void;
   onClassLabelMouseEnter?: (event: React.MouseEvent<HTMLElement>) => void;
   onClassLabelMouseLeave?: () => void;
+  onClassLabelFocus?: (event: React.FocusEvent<HTMLElement>) => void;
+  onClassLabelBlur?: () => void;
   onLevelLabelMouseEnter?: (event: React.MouseEvent<HTMLElement>) => void;
   onLevelLabelMouseLeave?: () => void;
   onLevelLabelFocus?: (event: React.FocusEvent<HTMLElement>) => void;
   onLevelLabelBlur?: () => void;
+  raceLabelAriaDescribedBy?: string;
+  classLabelAriaDescribedBy?: string;
+  levelLabelAriaDescribedBy?: string;
 };
 
 function CharacterIdentitySection({
@@ -245,12 +264,19 @@ function CharacterIdentitySection({
   epicDestinyName,
   onRaceLabelMouseEnter,
   onRaceLabelMouseLeave,
+  onRaceLabelFocus,
+  onRaceLabelBlur,
   onClassLabelMouseEnter,
   onClassLabelMouseLeave,
+  onClassLabelFocus,
+  onClassLabelBlur,
   onLevelLabelMouseEnter,
   onLevelLabelMouseLeave,
   onLevelLabelFocus,
-  onLevelLabelBlur
+  onLevelLabelBlur,
+  raceLabelAriaDescribedBy,
+  classLabelAriaDescribedBy,
+  levelLabelAriaDescribedBy
 }: CharacterIdentitySectionProps): JSX.Element {
   const showAdvancement = Boolean(themeName || paragonPathName || paragonMulticlassLabel || epicDestinyName);
 
@@ -265,6 +291,9 @@ function CharacterIdentitySection({
             label="Race"
             onLabelMouseEnter={onRaceLabelMouseEnter}
             onLabelMouseLeave={onRaceLabelMouseLeave}
+            onLabelFocus={onRaceLabelFocus}
+            onLabelBlur={onRaceLabelBlur}
+            labelAriaDescribedBy={raceLabelAriaDescribedBy}
           >
             {raceName || "—"}
           </CharacterIdentityField>
@@ -272,6 +301,9 @@ function CharacterIdentitySection({
             label="Class"
             onLabelMouseEnter={onClassLabelMouseEnter}
             onLabelMouseLeave={onClassLabelMouseLeave}
+            onLabelFocus={onClassLabelFocus}
+            onLabelBlur={onClassLabelBlur}
+            labelAriaDescribedBy={classLabelAriaDescribedBy}
           >
             {classDisplay || "—"}
           </CharacterIdentityField>
@@ -282,6 +314,7 @@ function CharacterIdentitySection({
             onLabelMouseLeave={onLevelLabelMouseLeave}
             onLabelFocus={onLevelLabelFocus}
             onLabelBlur={onLevelLabelBlur}
+            labelAriaDescribedBy={levelLabelAriaDescribedBy}
           >
             {level}
           </CharacterIdentityField>
@@ -904,6 +937,8 @@ type GlossaryKey =
   | "extendedRest"
   | "secondWind";
 const CHARACTER_SHEET_GLOSSARY_TOOLTIP_ID = "character-sheet-glossary-tooltip";
+const CHARACTER_SHEET_RACE_INFO_PANEL_ID = "character-sheet-race-info-panel";
+const CHARACTER_SHEET_CLASS_INFO_PANEL_ID = "character-sheet-class-info-panel";
 
 export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesIndex; tooltipGlossary: Record<string, string> }): JSX.Element {
   const [sheet, setSheet] = useState<CharacterSheetState>(() => loadCharacterSheetState());
@@ -981,6 +1016,14 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         ? index.hybridClasses?.find((h) => h.id === sheet.hybridClassIdB)
         : undefined,
     [index.hybridClasses, sheet.characterStyle, sheet.hybridClassIdB]
+  );
+  const hybridBaseClassA = useMemo(
+    () => (hybridClassA?.baseClassId ? index.classes.find((c) => c.id === hybridClassA.baseClassId) : undefined),
+    [index.classes, hybridClassA?.baseClassId]
+  );
+  const hybridBaseClassB = useMemo(
+    () => (hybridClassB?.baseClassId ? index.classes.find((c) => c.id === hybridClassB.baseClassId) : undefined),
+    [index.classes, hybridClassB?.baseClassId]
   );
   const classTraitRows = useMemo(() => {
     let rows;
@@ -2183,14 +2226,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   return (
     <div
       style={{
+        ...rulesPageShellStyle,
         padding: "clamp(0.65rem, 1.4vw, 1rem)",
-        maxWidth: "1440px",
-        margin: "0 auto",
-        boxSizing: "border-box",
-        background: "var(--character-sheet-background, linear-gradient(180deg, var(--surface-1) 0%, var(--surface-1) 100%))",
         minHeight: "100%",
-        minWidth: 0,
-        color: "var(--character-sheet-foreground)"
+        minWidth: 0
       }}
     >
       <h1 style={{ ...pageTitleStyle, marginBottom: "0.25rem" }}>D&amp;D 4e Character Sheet</h1>
@@ -2250,11 +2289,32 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 epicDestinyName={sheet.epicDestinyId ? (selectedEpicDestiny?.name ?? sheet.epicDestinyId) : undefined}
                 onRaceLabelMouseEnter={derived.race ? raceInfoHover.startHover : undefined}
                 onRaceLabelMouseLeave={derived.race ? raceInfoHover.leaveHover : undefined}
+                onRaceLabelFocus={derived.race ? raceInfoHover.startHover : undefined}
+                onRaceLabelBlur={derived.race ? raceInfoHover.leaveHover : undefined}
                 onClassLabelMouseEnter={
                   derived.cls || (hybridClassA && hybridClassB) ? classInfoHover.startHover : undefined
                 }
                 onClassLabelMouseLeave={
                   derived.cls || (hybridClassA && hybridClassB) ? classInfoHover.leaveHover : undefined
+                }
+                onClassLabelFocus={
+                  derived.cls || (hybridClassA && hybridClassB) ? classInfoHover.startHover : undefined
+                }
+                onClassLabelBlur={
+                  derived.cls || (hybridClassA && hybridClassB) ? classInfoHover.leaveHover : undefined
+                }
+                raceLabelAriaDescribedBy={
+                  raceInfoHover.showPanel && derived.race ? CHARACTER_SHEET_RACE_INFO_PANEL_ID : undefined
+                }
+                classLabelAriaDescribedBy={
+                  classInfoHover.showPanel && (derived.cls || (hybridClassA && hybridClassB))
+                    ? CHARACTER_SHEET_CLASS_INFO_PANEL_ID
+                    : undefined
+                }
+                levelLabelAriaDescribedBy={
+                  glossaryTooltipUi.showPanel && glossaryTooltipUi.hoverKey === "level"
+                    ? CHARACTER_SHEET_GLOSSARY_TOOLTIP_ID
+                    : undefined
                 }
                 onLevelLabelMouseEnter={(event) => glossaryTooltipUi.startHover(event, "level")}
                 onLevelLabelMouseLeave={glossaryTooltipUi.leaveHover}
@@ -2725,6 +2785,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           <FloatingHoverPanel
             show={raceInfoHover.showPanel}
             position={raceInfoHover.panelPos}
+            id={CHARACTER_SHEET_RACE_INFO_PANEL_ID}
             widthPx={360}
             onMouseEnter={raceInfoHover.cancelPendingClose}
             onMouseLeave={raceInfoHover.leaveHover}
@@ -2761,7 +2822,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
           <FloatingHoverPanel
             show={classInfoHover.showPanel}
             position={classInfoHover.panelPos}
-            widthPx={380}
+            id={CHARACTER_SHEET_CLASS_INFO_PANEL_ID}
+            widthPx={hybridClassA && hybridClassB ? 420 : 380}
             onMouseEnter={classInfoHover.cancelPendingClose}
             onMouseLeave={classInfoHover.leaveHover}
           >
@@ -2797,6 +2859,34 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                     />
                   </div>
                 ) : null}
+              </>
+            ) : hybridClassA && hybridClassB ? (
+              <>
+                <div>
+                  <strong>Hybrid:</strong> {hybridClassA.name} / {hybridClassB.name}
+                </div>
+                <div>
+                  <strong>HP at 1 (combined):</strong>{" "}
+                  {hybridHpAtFirstLevel(hybridClassA, hybridClassB, sheet.abilityScores.CON ?? 10)}
+                </div>
+                <div>
+                  <strong>HP per Level (combined):</strong> {hybridHpPerLevelGain(hybridClassA, hybridClassB)}
+                </div>
+                <div>
+                  <strong>Healing Surges / day:</strong> {derived.healingSurgesPerDay}
+                </div>
+                <HybridClassHoverDetail
+                  hybrid={hybridClassA}
+                  baseClassName={hybridBaseClassA?.name}
+                  sectionTitle="Side A"
+                  style={{ marginTop: "0.55rem", paddingTop: "0.45rem", borderTop: "1px solid var(--panel-border)" }}
+                />
+                <HybridClassHoverDetail
+                  hybrid={hybridClassB}
+                  baseClassName={hybridBaseClassB?.name}
+                  sectionTitle="Side B"
+                  style={{ marginTop: "0.55rem", paddingTop: "0.45rem", borderTop: "1px solid var(--panel-border)" }}
+                />
               </>
             ) : null}
           </FloatingHoverPanel>

@@ -78,7 +78,12 @@ import { buildPrereqCharacterContext } from "../../rules/prereqContext";
 import { evaluateSupportOptionLegality } from "../../rules/supportOptionLegality";
 import { applyRacialBonuses, getAbilityLabel, parseRaceAbilityBonusInfo } from "../../rules/abilityScores";
 import { getRaceSecondarySelectSlots, selectableStartingLanguages } from "../../rules/raceRuleSelects";
-import { parseRacialTraitIdsFromRace, resolveRacialTraitsForRace } from "../../rules/racialTraits";
+import { parseRacialTraitIdsFromRace } from "../../rules/racialTraits";
+import {
+  getRaceExtraTraitIds,
+  getRaceSubraceData,
+  resolveDisplayedRacialTraitsForRace
+} from "../../rules/raceSubraces";
 import { getClassBuildOptions } from "../../rules/classBuildOptions";
 import { autoGrantedTrainedSkillIds } from "../../rules/grantedSkillsQuery";
 import { computeSkillSheetRows } from "../../rules/skillCalculator";
@@ -166,8 +171,9 @@ import {
 } from "./LiveSheetCollapsibleSection";
 import { GlossaryTooltipRichText, RulesRichText } from "./RulesRichText";
 import { CharacterPowerCard, powerCardUsageBucketFromLabel } from "../../ui/powerCard";
-import { NEUTRAL_PAGE_BG } from "../../ui/tokens";
-import { STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE } from "../../ui/glossaryTooltip";
+import { rulesPageShellStyle, rulesStickyTabBarStyle } from "../../ui/panels";
+import { FloatingHoverPanel } from "../../ui/FloatingHoverPanel";
+import { HybridClassDetailPanel } from "../../ui/HybridClassDetailPanel";
 import { useGlossaryTooltip } from "../../ui/useGlossaryTooltip";
 import { SupportPassiveMotionBreakdown } from "../shared/SupportPassiveMotionBreakdown";
 import { AdjustableNumberInput } from "../../ui/AdjustableNumberInput";
@@ -479,137 +485,6 @@ function PowerConstructionSelects(props: {
   );
 }
 
-function hybridRawSpecific(hybrid: HybridClassDef): Record<string, unknown> {
-  return (hybrid.raw?.specific as Record<string, unknown> | undefined) || {};
-}
-
-function formatHybridStatNumber(n: number | null | undefined): string {
-  if (n == null || Number.isNaN(Number(n))) return "—";
-  const x = Number(n);
-  return Number.isInteger(x) ? String(x) : String(x);
-}
-
-function HybridClassDetailPanel(props: {
-  hybrid: HybridClassDef;
-  baseClassName: string | undefined;
-  slotNote: string;
-}): JSX.Element {
-  const spec = hybridRawSpecific(props.hybrid);
-  const h = props.hybrid;
-  const hpAt1Raw = spec["Hit Points at 1st Level"];
-  const hpAt1Display =
-    typeof hpAt1Raw === "string" && String(hpAt1Raw).trim()
-      ? String(hpAt1Raw)
-      : h.hitPointsAt1 != null
-        ? `${h.hitPointsAt1} + Constitution score`
-        : "—";
-  const hpPerRaw = spec["Hit Points per Level Gained"];
-  const hpPerDisplay =
-    typeof hpPerRaw === "string" && String(hpPerRaw).trim()
-      ? String(hpPerRaw)
-      : formatHybridStatNumber(h.hitPointsPerLevel ?? null);
-  const surgesRaw = spec["Healing Surges"];
-  const surgesDisplay =
-    typeof surgesRaw === "string" && String(surgesRaw).trim()
-      ? String(surgesRaw)
-      : formatHybridStatNumber(h.healingSurgesBase ?? null);
-
-  const trainedSkills = spec["Trained Skills"];
-  const trainedDisplay = typeof trainedSkills === "string" && trainedSkills.trim() ? trainedSkills : null;
-  const body = typeof h.raw?.body === "string" ? h.raw.body : "";
-
-  return (
-    <div
-      style={{
-        border: "1px solid var(--panel-border)",
-        borderRadius: "8px",
-        padding: "0.65rem 0.75rem",
-        backgroundColor: "var(--surface-1)"
-      }}
-    >
-      <p style={{ margin: 0, fontWeight: 700, fontSize: "0.95rem", color: "var(--text-primary)" }}>{h.name}</p>
-      <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.8rem", color: "var(--text-muted)" }}>
-        {h.source ? `Source: ${h.source} · ` : ""}
-        {props.slotNote}
-      </p>
-      <p style={{ margin: "0.45rem 0 0 0", fontSize: "0.84rem", lineHeight: 1.5 }}>
-        <strong>Base class (powers):</strong> {props.baseClassName ?? "—"}
-      </p>
-      <p style={{ margin: "0.28rem 0 0 0", fontSize: "0.84rem", lineHeight: 1.5 }}>
-        <strong>Role:</strong> {String(h.role || spec["Role"] || "-")}
-      </p>
-      <p style={{ margin: "0.28rem 0 0 0", fontSize: "0.84rem", lineHeight: 1.5 }}>
-        <strong>Power Source:</strong> {String(h.powerSource || spec["Power Source"] || "-")}
-      </p>
-      <p style={{ margin: "0.28rem 0 0 0", fontSize: "0.84rem", lineHeight: 1.5 }}>
-        <strong>Key Abilities:</strong> {String(h.keyAbilities || spec["Key Abilities"] || "-")}
-      </p>
-      <p style={{ margin: "0.28rem 0 0 0", fontSize: "0.84rem", lineHeight: 1.5 }}>
-        <strong>Hit Points at 1st Level:</strong> {hpAt1Display}
-      </p>
-      <p style={{ margin: "0.28rem 0 0 0", fontSize: "0.84rem", lineHeight: 1.5 }}>
-        <strong>Hit Points per Level Gained:</strong> {hpPerDisplay}
-      </p>
-      <p style={{ margin: "0.28rem 0 0 0", fontSize: "0.84rem", lineHeight: 1.5 }}>
-        <strong>Healing Surges (without Con):</strong> {surgesDisplay}
-      </p>
-      <p style={{ margin: "0.28rem 0 0 0", fontSize: "0.84rem", lineHeight: 1.5 }}>
-        <strong>Bonus to Defense:</strong> {String(h.bonusToDefense || spec["Bonus to Defense"] || "-")}
-      </p>
-      <p style={{ margin: "0.28rem 0 0 0", fontSize: "0.84rem", lineHeight: 1.5 }}>
-        <strong>Armor Proficiencies:</strong> {String(h.armorProficiencies || spec["Armor Proficiencies"] || "-")}
-      </p>
-      <p style={{ margin: "0.28rem 0 0 0", fontSize: "0.84rem", lineHeight: 1.5 }}>
-        <strong>Weapon Proficiencies:</strong> {String(h.weaponProficiencies || spec["Weapon Proficiencies"] || "-")}
-      </p>
-      <p style={{ margin: "0.28rem 0 0 0", fontSize: "0.84rem", lineHeight: 1.5 }}>
-        <strong>Implements:</strong> {String(h.implementText || spec["Implements"] || spec["Implement"] || "-")}
-      </p>
-      <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.84rem", lineHeight: 1.5 }}>
-        <strong>Class Skills:</strong> {String(h.classSkillsRaw || spec["Class Skills"] || "—")}
-      </p>
-      {trainedDisplay && (
-        <p style={{ margin: "0.28rem 0 0 0", fontSize: "0.84rem", lineHeight: 1.5 }}>
-          <strong>Trained Skills (text):</strong> {trainedDisplay}
-        </p>
-      )}
-      {h.hybridTalentOptions &&
-      String(h.hybridTalentOptions).trim() &&
-      !(h.hybridTalentClassFeatures && h.hybridTalentClassFeatures.length > 0) ? (
-        <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.84rem", lineHeight: 1.45 }}>
-          <strong>Hybrid Talent Options:</strong> {String(h.hybridTalentOptions)}
-        </p>
-      ) : null}
-      {spec["Build Options"] ? (
-        <CollapsibleDisclosure
-          open
-          style={{ marginTop: "0.45rem" }}
-          summary="Build Options"
-          summaryStyle={disclosureSummaryStyle}
-          bodyStyle={{ marginTop: "0.35rem", fontSize: "0.82rem", color: "var(--text-secondary)" }}
-        >
-            <RulesRichText
-              text={String(spec["Build Options"])}
-              paragraphStyle={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}
-              listItemStyle={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}
-            />
-        </CollapsibleDisclosure>
-      ) : null}
-      {body ? (
-        <CollapsibleDisclosure
-          open
-          style={{ marginTop: "0.45rem" }}
-          summary="Description"
-          summaryStyle={disclosureSummaryStyle}
-          bodyStyle={{ marginTop: "0.35rem", fontSize: "0.82rem", color: "var(--text-secondary)" }}
-        >
-            <RulesRichText text={body} paragraphStyle={{ fontSize: "0.82rem", color: "var(--text-secondary)" }} listItemStyle={{ fontSize: "0.82rem", color: "var(--text-secondary)" }} />
-        </CollapsibleDisclosure>
-      ) : null}
-    </div>
-  );
-}
-
 const abilities: Array<keyof CharacterBuild["abilityScores"]> = ["STR", "CON", "DEX", "INT", "WIS", "CHA"];
 type BuilderTab =
   | "race"
@@ -636,35 +511,20 @@ const POINT_BUY_RELATIVE_TO_10: Record<number, number> = {
 };
 const DEFAULT_POINT_BUY_BUDGET = 22;
 
-/** Neutral grey panels for visual hierarchy (builder chrome only). */
+/** Builder layout shells; parchment background matches character sheet (rulesPageShellStyle). */
 const ui = {
   page: {
+    ...rulesPageShellStyle,
     display: "flex" as const,
     flexDirection: "column" as const,
     gap: "0.65rem",
     alignItems: "stretch" as const,
     padding: "clamp(0.75rem, 1.5vw, 1.25rem)",
     minHeight: "100%",
-    width: "100%",
-    maxWidth: "1440px",
-    margin: "0 auto",
-    boxSizing: "border-box" as const,
-    fontFamily: "system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
-    backgroundColor: "var(--app-background, " + NEUTRAL_PAGE_BG + ")",
-    color: "var(--text-primary)"
+    width: "100%"
   },
   stickyTabBar: {
-    position: "sticky" as const,
-    top: "var(--app-header-sticky-offset, 3.25rem)",
-    zIndex: 15,
-    backgroundColor: "var(--app-background, " + NEUTRAL_PAGE_BG + ")",
-    paddingTop: "0.65rem",
-    paddingBottom: "0.65rem",
-    borderBottom: "1px solid var(--panel-border)",
-    boxShadow: "0 4px 12px color-mix(in srgb, var(--app-background, " + NEUTRAL_PAGE_BG + ") 88%, transparent)",
-    minWidth: 0,
-    maxWidth: "100%",
-    boxSizing: "border-box" as const
+    ...rulesStickyTabBarStyle
   },
   builderBody: {
     minWidth: 0,
@@ -1158,11 +1018,18 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     () => new Map<string, RacialTrait>((index.racialTraits ?? []).map((t) => [t.id, t])),
     [index.racialTraits]
   );
-  const racialTraitRows = useMemo(
-    () => resolveRacialTraitsForRace(selectedRace, racialTraitById),
+  const raceSubraceData = useMemo(
+    () => getRaceSubraceData(selectedRace, racialTraitById),
     [selectedRace, racialTraitById]
   );
-  const displayedRacialTraitRows = racialTraitRows;
+  const raceExtraTraitIds = useMemo(
+    () => getRaceExtraTraitIds(selectedRace, racialTraitById, build.raceSelections),
+    [selectedRace, racialTraitById, build.raceSelections]
+  );
+  const displayedRacialTraitRows = useMemo(
+    () => resolveDisplayedRacialTraitsForRace(selectedRace, racialTraitById, build.raceSelections),
+    [selectedRace, racialTraitById, build.raceSelections]
+  );
   const scoresAfterLevel = useMemo(
     () => applyAsiBonusesToScores(build.abilityScores, build.level, build.asiChoices),
     [build.abilityScores, build.level, build.asiChoices]
@@ -1686,9 +1553,10 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   const racePowerGroups = useMemo(
     () =>
       racePowerGroupsForRace(selectedRace, racialTraitById, [
-        ...humanPowerExtraTraitIds
+        ...humanPowerExtraTraitIds,
+        ...raceExtraTraitIds
       ]),
-    [selectedRace, racialTraitById, humanPowerExtraTraitIds]
+    [selectedRace, racialTraitById, humanPowerExtraTraitIds, raceExtraTraitIds]
   );
   const classAutoGrantedPowers = useMemo(() => {
     if (isHybridBuild && hybridBaseClassAId && hybridBaseClassBId) {
@@ -1919,7 +1787,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       return "epicDestiny";
     }
     if (m === "choose a race." || m.startsWith("race:")) return "race";
-    if (m === "choose a class.") return "class";
+    if (m === "choose a class." || m.startsWith("class:")) return "class";
     if (m.startsWith("power:")) return "powers";
     if (m.includes("hybrid class")) return "class";
     if (m.includes("hybrid talent")) return "class";
@@ -1963,7 +1831,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       }
     );
 
-    const requiresRacialChoice = raceAbilityBonusInfo.chooseOne.length > 0 && !build.racialAbilityChoice;
     const classReady = isHybridBuild ? hybridClassSelectionComplete : !!selectedClass;
     const statuses: Record<BuilderTab, "complete" | "incomplete"> = {
       race: !!selectedRace && errorsByTab.race === 0 ? "complete" : "incomplete",
@@ -1971,8 +1838,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       abilities:
         errorsByTab.abilities === 0 &&
         pointBuy.remaining === 0 &&
-        pointBuy.invalidScores.length === 0 &&
-        !requiresRacialChoice
+        pointBuy.invalidScores.length === 0
           ? "complete"
           : "incomplete",
       skills: classReady && errorsByTab.skills === 0 ? "complete" : "incomplete",
@@ -2003,8 +1869,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     build.powerIds.length,
     pointBuy.remaining,
     pointBuy.invalidScores.length,
-    raceAbilityBonusInfo.chooseOne.length,
-    build.racialAbilityChoice,
     build.level,
     build.themeId,
     build.paragonPathId,
@@ -2083,6 +1947,20 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         <PowerConstructionSelects power={p} build={build} onChange={updateBuild} />
       </div>
     );
+  }
+
+  function commitSubraceSelection(subraceId: string): void {
+    const next = { ...(build.raceSelections || {}) };
+    if (subraceId) next.subrace = subraceId;
+    else delete next.subrace;
+    for (const key of Object.keys(next)) {
+      if (key.startsWith("racialPower:")) delete next[key];
+    }
+    const keys = Object.keys(next);
+    let nextBuild: CharacterBuild = { ...build, raceSelections: keys.length ? next : undefined };
+    nextBuild = pruneStalePowerSelections(index, nextBuild);
+    const { classPowerSlots, powerIds } = reconcilePowerSlotsForBuild(nextBuild, build.level);
+    updateBuild({ ...nextBuild, classPowerSlots, powerIds });
   }
 
   function commitRacePowerSelection(traitId: string, powerId: string): void {
@@ -2355,12 +2233,32 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               {index.races.map((race) => <option key={race.id} value={race.id}>{race.name}</option>)}
             </select>
             {selectedRace &&
-              (raceAbilityBonusInfo.chooseOne.length > 0 ||
+              (raceSubraceData ||
+                raceAbilityBonusInfo.chooseOne.length > 0 ||
                 raceSecondarySlots.length > 0 ||
                 racePowerGroups.some((g) => g.choiceOnly) ||
                 parseRacialTraitIdsFromRace(selectedRace).includes(ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION)) && (
                 <div style={{ marginTop: "0.65rem", ...ui.blockSubsection, backgroundColor: "var(--surface-1)", borderColor: "var(--panel-border)" }}>
                   <h4 style={subsectionTitleStyle}>Race choices</h4>
+                  {raceSubraceData && (
+                    <label style={{ display: "block", marginBottom: "0.75rem" }}>
+                      <span style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem", fontSize: "0.85rem" }}>
+                        {raceSubraceData.parentTraitName}
+                      </span>
+                      <select
+                        value={build.raceSelections?.subrace || ""}
+                        onChange={(e) => commitSubraceSelection(e.target.value)}
+                        style={{ width: "100%", maxWidth: "28rem", padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--panel-border)" }}
+                      >
+                        <option value="">Select variant…</option>
+                        {raceSubraceData.options.map((opt) => (
+                          <option key={opt.id} value={opt.id}>
+                            {opt.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
                   {parseRacialTraitIdsFromRace(selectedRace).includes(ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION) && (
                     <label style={{ display: "block", marginBottom: "0.75rem" }}>
                       <span style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem", fontSize: "0.85rem" }}>
@@ -5558,23 +5456,15 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             onUnequipItem={(itemId, slot) => updateBuild(unequipInventoryItemOnBuild(build, itemId, slot))}
           />
 
-          {glossaryTooltipUi.showPanel && glossaryTooltipUi.hoverKey && glossaryTooltipUi.panelPos && (
-            <div
-              id={BUILDER_GLOSSARY_TOOLTIP_ID}
-              role="tooltip"
-              onMouseEnter={glossaryTooltipUi.cancelPendingClose}
-              onMouseLeave={glossaryTooltipUi.leaveHover}
-              style={{
-                position: "fixed",
-                top: glossaryTooltipUi.panelPos.top,
-                left: glossaryTooltipUi.panelPos.left,
-                transform: glossaryTooltipUi.panelPos.transform ?? "none",
-                ...STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE
-              }}
-            >
-              {glossaryContent(glossaryTooltipUi.hoverKey as BuilderGlossaryKey)}
-            </div>
-          )}
+          <FloatingHoverPanel
+            show={glossaryTooltipUi.showPanel && glossaryTooltipUi.hoverKey != null}
+            position={glossaryTooltipUi.panelPos}
+            id={BUILDER_GLOSSARY_TOOLTIP_ID}
+            onMouseEnter={glossaryTooltipUi.cancelPendingClose}
+            onMouseLeave={glossaryTooltipUi.leaveHover}
+          >
+            {glossaryTooltipUi.hoverKey ? glossaryContent(glossaryTooltipUi.hoverKey as BuilderGlossaryKey) : null}
+          </FloatingHoverPanel>
         </div>
         )}
       </div>

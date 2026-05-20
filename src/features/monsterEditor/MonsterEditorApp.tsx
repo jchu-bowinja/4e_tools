@@ -12,7 +12,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import type { RulesIndex } from "../../rules/models";
-import { STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE } from "../../ui/glossaryTooltip";
+import { FloatingHoverPanel } from "../../ui/FloatingHoverPanel";
 import { useGlossaryTooltip } from "../../ui/useGlossaryTooltip";
 import { resolveMonsterGlossaryHoverSections, resolveMonsterStyleTooltip } from "./monsterTooltipResolve";
 import { GlossaryTooltipRichText } from "../builder/RulesRichText";
@@ -21,6 +21,7 @@ import {
   contentPanelStyle,
   flowSubsectionStyle,
   pageTitleWithBottomGapStyle,
+  rulesPageShellStyle,
   sectionTitleStyle
 } from "../../ui/panels";
 import { SegmentedControl } from "../../ui/SegmentedControl";
@@ -4406,12 +4407,8 @@ export function MonsterEditorApp({
   return (
     <div
       style={{
-        maxWidth: 1440,
-        margin: "0 auto",
+        ...rulesPageShellStyle,
         padding: "clamp(0.65rem, 1.4vw, 1rem)",
-        boxSizing: "border-box",
-        color: "var(--text-primary)",
-        background: "var(--character-sheet-background, linear-gradient(180deg, var(--surface-1) 0%, var(--surface-1) 100%))",
         border: "1px solid var(--panel-border)",
         borderRadius: "0.45rem"
       }}
@@ -6991,23 +6988,17 @@ export function MonsterEditorApp({
           )
         : null}
 
-      {glossaryTooltipUi.showPanel && glossaryTooltipUi.hoverKey && glossaryTooltipUi.panelPos && (
-        <div
-          id={MONSTER_GLOSSARY_TOOLTIP_ID}
-          role="tooltip"
-          onMouseEnter={glossaryTooltipUi.cancelPendingClose}
-          onMouseLeave={leaveGlossaryHover}
-          style={{
-            position: "fixed",
-            top: glossaryTooltipUi.panelPos.top,
-            left: glossaryTooltipUi.panelPos.left,
-            transform: glossaryTooltipUi.panelPos.transform ?? "none",
-            ...STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE
-          }}
-        >
-          {monsterGlossaryContent(glossaryTooltipUi.hoverKey as MonsterGlossaryHoverKey)}
-        </div>
-      )}
+      <FloatingHoverPanel
+        show={glossaryTooltipUi.showPanel && glossaryTooltipUi.hoverKey != null}
+        position={glossaryTooltipUi.panelPos}
+        id={MONSTER_GLOSSARY_TOOLTIP_ID}
+        onMouseEnter={glossaryTooltipUi.cancelPendingClose}
+        onMouseLeave={leaveGlossaryHover}
+      >
+        {glossaryTooltipUi.hoverKey
+          ? monsterGlossaryContent(glossaryTooltipUi.hoverKey as MonsterGlossaryHoverKey)
+          : null}
+      </FloatingHoverPanel>
     </div>
   );
 }

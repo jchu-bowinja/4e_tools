@@ -26,7 +26,9 @@ import {
   hybridPowerPoolUnion,
   powerAllowedForHybridSlot
 } from "./hybridPowerSlots";
-import { getChildTraitIdsForSubrace, getRaceSubraceData } from "./raceSubraces";
+import { parseRaceAbilityBonusInfo } from "./abilityScores";
+import { getClassBuildOptions } from "./classBuildOptions";
+import { getRaceExtraTraitIds, getRaceSubraceData } from "./raceSubraces";
 import { getRaceSecondarySelectSlots, selectableStartingLanguages } from "./raceRuleSelects";
 import { autoGrantedTrainedSkillIds } from "./grantedSkillsQuery";
 import { validateInternalGrantFeats } from "./internalGrantValidation";
@@ -125,6 +127,18 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
   if (!isHybrid && !build.classId) {
     errors.push("Choose a class.");
   }
+  if (!isHybrid && build.classId) {
+    const clsForBuild = index.classes.find((c) => c.id === build.classId);
+    const buildOpts = getClassBuildOptions(index, clsForBuild);
+    if (buildOpts.length > 0) {
+      const picked = build.classSelections?.buildOptionId || build.classSelections?.buildOption;
+      if (!picked) {
+        errors.push("Class: choose a build option.");
+      } else if (!buildOpts.some((o) => o.id === picked || o.name === picked)) {
+        errors.push("Class: choose a valid build option.");
+      }
+    }
+  }
   if (isHybrid) {
     if (!build.hybridClassIdA || !build.hybridClassIdB) {
       errors.push("Choose two hybrid classes.");
@@ -155,16 +169,17 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
         }
       }
 
+      const abilityInfo = parseRaceAbilityBonusInfo(race);
+      if (abilityInfo.chooseOne.length > 0 && !build.racialAbilityChoice) {
+        errors.push("Race: choose a racial ability bonus (+2).");
+      }
+
       const racialTraitById = new Map((index.racialTraits ?? []).map((t) => [t.id, t]));
       const raceSubraceData = getRaceSubraceData(race, racialTraitById);
-      const subPick = rs["subrace"];
-      const selectedSubrace =
-        subPick && raceSubraceData ? raceSubraceData.options.find((o) => o.id === subPick) : undefined;
-      const extraTraitIds: string[] = [];
-      if (selectedSubrace) {
-        extraTraitIds.push(selectedSubrace.id);
-        extraTraitIds.push(...getChildTraitIdsForSubrace(selectedSubrace));
+      if (raceSubraceData && !rs["subrace"]) {
+        errors.push(`Race: ${raceSubraceData.parentTraitName} — make a selection.`);
       }
+      const extraTraitIds = getRaceExtraTraitIds(race, racialTraitById, rs);
       for (const g of racePowerGroupsForRace(race, racialTraitById, extraTraitIds)) {
         if (!g.choiceOnly) continue;
         const pk = racePowerSelectSelectionKey(g.traitId);

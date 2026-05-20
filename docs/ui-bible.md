@@ -96,7 +96,9 @@ Use `SegmentedControl` from `src/ui/SegmentedControl.tsx` with styles in `src/st
 
 - Use `useDelayedHoverPanel` + `FloatingHoverPanel` for delayed open/close panels (glossary tooltips, race/class summary on character sheet identity labels).
 - Panel chrome comes from `STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE` in `src/ui/glossaryTooltip.ts` (`--tooltip-panel-shadow` token in `styles.css`).
-- Glossary tooltips use `useGlossaryTooltip` (wraps `useDelayedHoverPanel` with keyed content). **Do not** add native `title` on elements that also show glossary or custom hover panels.
+- Glossary tooltips use `useGlossaryTooltip` (wraps `useDelayedHoverPanel` with keyed content). Render panels with `FloatingHoverPanel` in builder, character sheet, and monster editor. **Do not** add native `title` on elements that also show glossary or custom hover panels.
+- Rich-info labels (race/class on character sheet identity) wire `onLabelMouseEnter` / `onLabelFocus` and matching leave/blur handlers to `useDelayedHoverPanel`. Set `aria-describedby` on the label to the panel `id` while the panel is open (race/class/level glossary). Hybrid class hovers use `HybridClassHoverDetail` (shared with builder’s `HybridClassDetailPanel` in `ui/HybridClassDetailPanel.tsx`) plus combined HP/surge lines from `hybridDerivedStats`.
+- Rules content pages (builder, character sheet, monster editor) use `rulesPageShellStyle` / `rulesStickyTabBarStyle` (`--character-sheet-background` parchment gradient). App chrome (`--app-chrome-bg`) stays neutral grey.
 
 #### Editor subapplications (Glossary, Resource Editor)
 
@@ -154,7 +156,7 @@ Use `SegmentedControl` from `src/ui/SegmentedControl.tsx` with styles in `src/st
 
 **Cross-feature patterns to consolidate (when touching those areas)**
 
-- Builder: `ui.mainColumn` is the sole main-tab panel shell; use `blockInset` for subsections inside a tab (do not nest a second bordered `blockContent` wrapper).
+- Builder: page shell uses `rulesPageShellStyle` (same parchment gradient as character sheet); `ui.mainColumn` is the sole main-tab panel shell; use `blockInset` for subsections inside a tab (do not nest a second bordered `blockContent` wrapper).
 - Builder page header: the `h1` title and persistence actions (export, save/load, reset, import JSON) share one flex row (`pageHeaderRowStyle`); actions wrap and align to the end on wide viewports. Character name and level stay on the row below (`ui.chromeFields`).
 - Builder sticky step tabs (`BuilderTabCarousel` in `src/ui/BuilderTabCarousel.tsx`, styles in `src/styles.css`): Race / Class / Ability Scores / … stay on one row. **Wide:** each tab at natural width with `0.45rem` gaps. **Narrow:** inactive tabs compress evenly (`--builder-tab-compressed-width` from JS) with ellipsis; the **open** tab always shows full label + status; `**:hover`** / `**:focus-visible**` on any tab expands it to full width. No overlap carousel. Do not wrap to a second line.
 - Builder sidebar: `ui.sidebarPanel` supplies the section border; `LiveSheetCollapsibleSection` body is layout-only (no second border). Stack sections with flex `gap` on the panel, not an extra inner grid wrapper.

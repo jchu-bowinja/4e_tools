@@ -1,6 +1,6 @@
 import type { CharacterBuild, Feat, Power, Race, RacialTrait, RulesIndex } from "./models";
 import { parseRacialTraitIdsFromRace } from "./racialTraits";
-import { getChildTraitIdsForSubrace, getRaceSubraceData } from "./raceSubraces";
+import { getRaceExtraTraitIds, getRaceSubraceData } from "./raceSubraces";
 
 function parseCommaSeparatedPowerIds(raw: string): string[] {
   return raw
@@ -95,15 +95,7 @@ export function bonusClassAtWillSlotFromRaceBuild(
 ): boolean {
   const race = index.races.find((r) => r.id === build.raceId);
   const traitsById = new Map((index.racialTraits ?? []).map((t) => [t.id, t]));
-  const raceSubraceData = getRaceSubraceData(race, traitsById);
-  const subPick = build.raceSelections?.["subrace"];
-  const selectedSubrace =
-    subPick && raceSubraceData ? raceSubraceData.options.find((o) => o.id === subPick) : undefined;
-  const extraTraitIds: string[] = [];
-  if (selectedSubrace) {
-    extraTraitIds.push(selectedSubrace.id);
-    extraTraitIds.push(...getChildTraitIdsForSubrace(selectedSubrace));
-  }
+  const extraTraitIds = getRaceExtraTraitIds(race, traitsById, build.raceSelections);
   return raceGrantsBonusClassAtWillSlot(race, traitsById, extraTraitIds, build.raceSelections);
 }
 
@@ -234,6 +226,7 @@ export function racePowerGroupsForRace(
   extraTraitIds: string[] = []
 ): RacePowerGroup[] {
   if (!race) return [];
+  const subraceData = getRaceSubraceData(race, traitsById);
   const out: RacePowerGroup[] = [];
   const seen = new Set<string>();
   const allTraitIds = [...parseRacialTraitIdsFromRace(race), ...extraTraitIds].filter((id) => {
@@ -246,6 +239,9 @@ export function racePowerGroupsForRace(
     const traitName = trait?.name || traitId;
     if (!trait) {
       out.push({ traitId, traitName, choiceOnly: false, powerIds: [] });
+      continue;
+    }
+    if (subraceData?.parentTraitId === traitId) {
       continue;
     }
     if (traitHasPowerSelect(trait)) {

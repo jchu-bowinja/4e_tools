@@ -7,7 +7,7 @@ import {
 } from "./grantedPowersQuery";
 import type { CharacterBuild, RulesIndex } from "./models";
 import { collectParagonMulticlassPowerIds } from "./paragonMulticlassing";
-import { getChildTraitIdsForSubrace, getRaceSubraceData } from "./raceSubraces";
+import { getRaceExtraTraitIds } from "./raceSubraces";
 
 /**
  * Every power instance the character has from class slots, race, auto-granted class/theme/path/destiny, and feats
@@ -17,15 +17,7 @@ export function collectCharacterPowerIdsForSelections(index: RulesIndex, build: 
   const ids = new Set<string>(build.powerIds);
   const race = index.races.find((r) => r.id === build.raceId);
   const traitsById = new Map((index.racialTraits ?? []).map((t) => [t.id, t]));
-  const raceSubraceData = getRaceSubraceData(race, traitsById);
-  const subPick = build.raceSelections?.["subrace"];
-  const selectedSubrace =
-    subPick && raceSubraceData ? raceSubraceData.options.find((o) => o.id === subPick) : undefined;
-  const extraTraitIds: string[] = [];
-  if (selectedSubrace) {
-    extraTraitIds.push(selectedSubrace.id);
-    extraTraitIds.push(...getChildTraitIdsForSubrace(selectedSubrace));
-  }
+  const extraTraitIds = getRaceExtraTraitIds(race, traitsById, build.raceSelections);
   for (const g of racePowerGroupsForRace(race, traitsById, extraTraitIds)) {
     if (g.choiceOnly) {
       const pick = build.raceSelections?.[racePowerSelectSelectionKey(g.traitId)];

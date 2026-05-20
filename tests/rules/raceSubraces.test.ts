@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { Race, RacialTrait } from "../../src/rules/models";
-import { getChildTraitIdsForSubrace, getRaceSubraceData } from "../../src/rules/raceSubraces";
+import {
+  getChildTraitIdsForSubrace,
+  getRaceExtraTraitIds,
+  getRaceSubraceData,
+  resolveDisplayedRacialTraitsForRace
+} from "../../src/rules/raceSubraces";
 
 describe("getRaceSubraceData", () => {
   it("extracts options from a race subrace parent trait", () => {
@@ -159,6 +164,68 @@ describe("getRaceSubraceData", () => {
       "Gold Dwarf",
       "Shield Dwarf",
       "Standard Dwarf Racial Traits"
+    ]);
+  });
+});
+
+describe("getRaceExtraTraitIds", () => {
+  it("returns child traits for the selected subrace", () => {
+    const race: Race = {
+      id: "R1",
+      name: "Elf",
+      slug: "elf",
+      raw: { specific: { "Racial Traits": "TR_SUB" } }
+    };
+    const parent: RacialTrait = {
+      id: "TR_SUB",
+      name: "Elf Subrace",
+      slug: "elf-subrace",
+      raw: { specific: { _PARSED_SUB_FEATURES: "TR_A" } }
+    };
+    const a: RacialTrait = {
+      id: "TR_A",
+      name: "Sun Elf",
+      slug: "sun-elf",
+      raw: { specific: { _PARSED_CHILD_FEATURES: "TR_C" } }
+    };
+    const c: RacialTrait = { id: "TR_C", name: "Sun Elf Grace", slug: "grace", raw: {} };
+    const byId = new Map<string, RacialTrait>([
+      ["TR_SUB", parent],
+      ["TR_A", a],
+      ["TR_C", c]
+    ]);
+    expect(getRaceExtraTraitIds(race, byId, { subrace: "TR_A" })).toEqual(["TR_A", "TR_C"]);
+    expect(getRaceExtraTraitIds(race, byId, {})).toEqual([]);
+  });
+});
+
+describe("resolveDisplayedRacialTraitsForRace", () => {
+  it("hides subrace parent and unselected options until a variant is picked", () => {
+    const race: Race = {
+      id: "R1",
+      name: "Elf",
+      slug: "elf",
+      raw: { specific: { "Racial Traits": "TR_BASE,TR_SUB" } }
+    };
+    const base: RacialTrait = { id: "TR_BASE", name: "Group Awareness", slug: "ga", raw: {} };
+    const parent: RacialTrait = {
+      id: "TR_SUB",
+      name: "Elf Subrace",
+      slug: "elf-subrace",
+      raw: { specific: { _PARSED_SUB_FEATURES: "TR_A,TR_B" } }
+    };
+    const a: RacialTrait = { id: "TR_A", name: "Sun Elf", slug: "sun-elf", raw: {} };
+    const b: RacialTrait = { id: "TR_B", name: "Wood Elf", slug: "wood-elf", raw: {} };
+    const byId = new Map<string, RacialTrait>([
+      ["TR_BASE", base],
+      ["TR_SUB", parent],
+      ["TR_A", a],
+      ["TR_B", b]
+    ]);
+    expect(resolveDisplayedRacialTraitsForRace(race, byId, {}).map((r) => r.id)).toEqual(["TR_BASE"]);
+    expect(resolveDisplayedRacialTraitsForRace(race, byId, { subrace: "TR_A" }).map((r) => r.id)).toEqual([
+      "TR_BASE",
+      "TR_A"
     ]);
   });
 });

@@ -1,4 +1,4 @@
-import type { Race, RacialTrait } from "./models";
+import type { CharacterBuild, Race, RacialTrait } from "./models";
 import { parseRacialTraitIdsFromRace } from "./racialTraits";
 
 export interface RaceSubraceData {
@@ -182,4 +182,79 @@ export function getChildTraitIdsForSubrace(subraceTrait: RacialTrait | undefined
     }
   }
   return [...ids];
+}
+
+/** Trait ids from the selected subrace variant (subrace row + nested child features). */
+export function getRaceExtraTraitIds(
+  race: Race | undefined,
+  traitsById: Map<string, RacialTrait>,
+  raceSelections?: Record<string, string>
+): string[] {
+  const raceSubraceData = getRaceSubraceData(race, traitsById);
+  const subPick = raceSelections?.["subrace"];
+  const selectedSubrace =
+    subPick && raceSubraceData ? raceSubraceData.options.find((o) => o.id === subPick) : undefined;
+  const extraTraitIds: string[] = [];
+  if (selectedSubrace) {
+    extraTraitIds.push(selectedSubrace.id);
+    extraTraitIds.push(...getChildTraitIdsForSubrace(selectedSubrace));
+  }
+  return extraTraitIds;
+}
+
+export function getRaceExtraTraitIdsFromBuild(
+  index: { races: Race[]; racialTraits?: RacialTrait[] },
+  build: Pick<CharacterBuild, "raceId" | "raceSelections">
+): string[] {
+  const race = index.races.find((r) => r.id === build.raceId);
+  const traitsById = new Map((index.racialTraits ?? []).map((t) => [t.id, t]));
+  return getRaceExtraTraitIds(race, traitsById, build.raceSelections);
+}
+
+/**
+ * Racial traits to show on the Race tab: top-level race traits plus the chosen subrace bundle,
+ * hiding the subrace parent picker and unselected variant options.
+ */
+export function resolveDisplayedRacialTraitsForRace(
+  race: Race | undefined,
+  traitsById: Map<string, RacialTrait>,
+  raceSelections?: Record<string, string>
+): Array<{ id: string; trait?: RacialTrait }> {
+  const topIds = parseRacialTraitIdsFromRace(race);
+  const subraceData = getRaceSubraceData(race, traitsById);
+  const subPick = raceSelections?.["subrace"];
+  const selectedSubrace =
+    subPick && subraceData ? subraceData.options.find((o) => o.id === subPick) : undefined;
+
+  const hideIds = new Set<string>();
+  if (subraceData) {
+    if (subraceData.parentTraitId) hideIds.add(subraceData.parentTraitId);
+    for (const opt of subraceData.options) {
+      if (!selectedSubrace || opt.id !== selectedSubrace.id) hideIds.add(opt.id);
+    }
+  }
+
+  const rows: Array<{ id: string; trait?: RacialTrait }> = [];
+  const seen = new Set<string>();
+
+  for (const id of topIds) {
+    if (hideIds.has(id)) continue;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    rows.push({ id, trait: traitsById.get(id) });
+  }
+
+  if (selectedSubrace) {
+    if (!seen.has(selectedSubrace.id)) {
+      seen.add(selectedSubrace.id);
+      rows.push({ id: selectedSubrace.id, trait: selectedSubrace });
+    }
+    for (const childId of getChildTraitIdsForSubrace(selectedSubrace)) {
+      if (seen.has(childId)) continue;
+      seen.add(childId);
+      rows.push({ id: childId, trait: traitsById.get(childId) });
+    }
+  }
+
+  return rows;
 }

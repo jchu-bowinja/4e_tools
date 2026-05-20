@@ -678,6 +678,63 @@ describe("validateCharacterBuild", () => {
     expect(ok.errors.filter((e) => e.includes("Test Construction Power"))).toEqual([]);
   });
 
+  it("requires subrace, racial ability, and class build option when applicable", () => {
+    const subraceParentId = "trait_sub_parent";
+    const subraceAId = "trait_sub_a";
+    const idx: RulesIndex = {
+      ...index,
+      races: [
+        {
+          id: "race_sub",
+          name: "Subrace Test",
+          slug: "subrace-test",
+          raw: {
+            specific: { "Racial Traits": subraceParentId, "Ability Scores": "+2 Dexterity or +2 Intelligence" },
+            rules: { select: [{ attrs: { type: "Race Ability Bonus", number: "1", Category: "Dexterity|Intelligence" } }] }
+          }
+        }
+      ],
+      racialTraits: [
+        {
+          id: subraceParentId,
+          name: "Subrace Test Subrace",
+          slug: "subrace-test-subrace",
+          raw: { specific: { _PARSED_SUB_FEATURES: subraceAId } }
+        },
+        { id: subraceAId, name: "Variant A", slug: "variant-a", raw: {} }
+      ],
+      classes: [
+        {
+          ...index.classes[0],
+          id: "class_build",
+          name: "Buildy",
+          slug: "buildy",
+          raw: { ...index.classes[0].raw }
+        }
+      ],
+      classBuildOptionsByClassId: {
+        class_build: [
+          {
+            id: "opt_a",
+            name: "Option A",
+            parentFeatureId: "cf1",
+            parentFeatureName: "Build",
+            powerIds: []
+          }
+        ]
+      }
+    };
+    const build = {
+      ...legalLevel1Base,
+      raceId: "race_sub",
+      classId: "class_build"
+    };
+    const result = validateCharacterBuild(idx, build);
+    expect(result.errors).toContain("Race: Subrace Test Subrace — make a selection.");
+    expect(result.errors).toContain("Race: choose a racial ability bonus (+2).");
+    expect(result.errors).toContain("Class: choose a build option.");
+  });
+
   it("requires two hybrid classes when characterStyle is hybrid", () => {
     const indexHybrid: RulesIndex = {
       ...index,

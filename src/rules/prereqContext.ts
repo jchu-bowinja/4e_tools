@@ -10,6 +10,7 @@ import {
 } from "./featGrantFlags";
 import { featureNameMatches } from "./featureNameMatch";
 import { collectCharacterPowerIdsForSelections } from "./powerSelections";
+import { getRaceExtraTraitIdsFromBuild } from "./raceSubraces";
 import { parseRacialTraitIdsFromRace } from "./racialTraits";
 import {
   buildClassFeatureLookups,
@@ -139,8 +140,13 @@ export function characterClassFeatureNames(index: RulesIndex, build: CharacterBu
   }
 
   if (build.classId) {
-    for (const opt of index.classBuildOptionsByClassId?.[build.classId] ?? []) {
-      if (opt.name) names.add(opt.name);
+    const picked =
+      build.classSelections?.buildOptionId?.trim() || build.classSelections?.buildOption?.trim();
+    if (picked) {
+      const opts = index.classBuildOptionsByClassId?.[build.classId] ?? [];
+      const row = opts.find((o) => o.id === picked || o.name === picked);
+      if (row?.name) names.add(row.name);
+      else names.add(picked);
     }
   }
 
@@ -217,7 +223,16 @@ export function characterRacialTraitNames(index: RulesIndex, build: CharacterBui
   const race = index.races.find((r) => r.id === build.raceId);
   if (!race) return names;
   const byId = new Map((index.racialTraits ?? []).map((t) => [t.id, t]));
+  const seen = new Set<string>();
   for (const id of parseRacialTraitIdsFromRace(race)) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const t = byId.get(id);
+    if (t?.name) names.add(t.name);
+  }
+  for (const id of getRaceExtraTraitIdsFromBuild(index, build)) {
+    if (seen.has(id)) continue;
+    seen.add(id);
     const t = byId.get(id);
     if (t?.name) names.add(t.name);
   }

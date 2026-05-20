@@ -105,3 +105,28 @@ export const editorInsetPreviewStyle: CSSProperties = {
   borderRadius: "var(--ui-panel-radius, 0.35rem)",
   fontSize: "0.88rem"
 };
+
+/** Parchment gradient shell shared by builder, character sheet, and monster editor. */
+export const rulesPageShellStyle: CSSProperties = {
+  maxWidth: "1440px",
+  margin: "0 auto",
+  boxSizing: "border-box",
+  fontFamily: "system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
+  background: "var(--character-sheet-background, linear-gradient(180deg, var(--surface-1) 0%, var(--surface-1) 100%))",
+  color: "var(--character-sheet-foreground, var(--text-primary))"
+};
+
+/** Sticky tab bar on rules pages — matches `rulesPageShellStyle` background. */
+export const rulesStickyTabBarStyle: CSSProperties = {
+  position: "sticky",
+  top: "var(--app-header-sticky-offset, 3.25rem)",
+  zIndex: 15,
+  background: "var(--character-sheet-background, linear-gradient(180deg, var(--surface-1) 0%, var(--surface-1) 100%))",
+  paddingTop: "0.65rem",
+  paddingBottom: "0.65rem",
+  borderBottom: "1px solid var(--panel-border)",
+  boxShadow: "0 4px 12px color-mix(in srgb, var(--surface-2) 88%, transparent)",
+  minWidth: 0,
+  maxWidth: "100%",
+  boxSizing: "border-box"
+};
