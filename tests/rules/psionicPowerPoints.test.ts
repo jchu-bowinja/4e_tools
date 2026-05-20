@@ -234,9 +234,40 @@ describe("paragonMulticlassPowerPointBonus", () => {
     expect(paragonMulticlassPowerPointBonus(indexWithMc, { ...mcChain, classId: "c_psion" })).toBe(2);
   });
 
-  it("returns 0 below 11 or for hybrid", () => {
+  it("returns 0 below 11", () => {
     expect(paragonMulticlassPowerPointBonus(indexWithMc, { ...mcChain, level: 10 })).toBe(0);
-    expect(paragonMulticlassPowerPointBonus(indexWithMc, { ...mcChain, characterStyle: "hybrid" })).toBe(0);
+  });
+
+  it("grants +2 for hybrid paragon MC into psionic", () => {
+    const indexHybrid: RulesIndex = {
+      ...indexWithMc,
+      hybridClasses: [
+        {
+          id: "h_fighter",
+          name: "Hybrid Fighter",
+          slug: "hybrid-fighter",
+          baseClassId: "c_fighter",
+          powerSource: "Martial",
+          raw: {}
+        },
+        {
+          id: "h_psion",
+          name: "Hybrid Psion",
+          slug: "hybrid-psion",
+          baseClassId: "c_psion",
+          powerSource: "Psionic",
+          raw: {}
+        }
+      ]
+    };
+    expect(
+      paragonMulticlassPowerPointBonus(indexHybrid, {
+        ...mcChain,
+        characterStyle: "hybrid",
+        hybridClassIdA: "h_fighter",
+        hybridClassIdB: "h_psion"
+      })
+    ).toBe(2);
   });
 });
 
@@ -333,6 +364,47 @@ describe("paragonMulticlassPrimaryAtWillSlotPenalty", () => {
     };
     expect(paragonMulticlassPrimaryAtWillSlotPenalty(indexWithMc, build)).toBe(0);
     expect(paragonMulticlassPrimaryAtWillSlotPenalty(indexWithMc, { ...build, level: 10 })).toBe(0);
+  });
+
+  it("applies for non-psionic hybrid paragon MC into psionic", () => {
+    const indexHybrid: RulesIndex = {
+      ...indexWithMc,
+      classes: [
+        ...indexWithMc.classes,
+        { id: "c_rogue", name: "Rogue", slug: "rogue", powerSource: "Martial", raw: {} }
+      ],
+      hybridClasses: [
+        {
+          id: "h_fighter",
+          name: "Hybrid Fighter",
+          slug: "hybrid-fighter",
+          baseClassId: "c_fighter",
+          powerSource: "Martial",
+          raw: {}
+        },
+        {
+          id: "h_rogue",
+          name: "Hybrid Rogue",
+          slug: "hybrid-rogue",
+          baseClassId: "c_rogue",
+          powerSource: "Martial",
+          raw: {}
+        }
+      ]
+    };
+    expect(
+      paragonMulticlassPrimaryAtWillSlotPenalty(indexHybrid, {
+        level: 11,
+        characterStyle: "hybrid",
+        hybridClassIdA: "h_fighter",
+        hybridClassIdB: "h_rogue",
+        featIds: ["mc"],
+        paragonMulticlassing: true,
+        powerIds: [],
+        abilityScores: { STR: 10, CON: 10, DEX: 10, INT: 10, WIS: 10, CHA: 10 },
+        trainedSkillIds: []
+      })
+    ).toBe(1);
   });
 });
 

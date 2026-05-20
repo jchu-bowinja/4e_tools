@@ -1,4 +1,4 @@
-import type { CharacterBuild, Power, RulesIndex } from "./models";
+import type { CharacterBuild, ParagonMulticlassPowers, Power, RulesIndex } from "./models";
 import { activeFeatReplacementPowerIds } from "./featPowerReplace";
 import { activeParagonAtWillSwapPowerId } from "./paragonMulticlassing";
 import { paragonMulticlassPrimaryAtWillSlotPenalty } from "./psionicPowerPoints";
@@ -32,9 +32,16 @@ function ordinalWord(n: number): string {
 /**
  * Hybrid uses the same total slot counts as the PHB single-class schedule; at-will slots 0..1 are locked to each base class pool, further at-wills are flexible.
  */
-export function buildHybridPowerSlotDefinitions(level: number, bonusThirdClassAtWill: boolean): ClassPowerSlotDef[] {
+export function buildHybridPowerSlotDefinitions(
+  level: number,
+  bonusThirdClassAtWill: boolean,
+  atWillSlotPenalty = 0
+): ClassPowerSlotDef[] {
   const defs: ClassPowerSlotDef[] = [];
-  const nAw = expectedClassAtWillAttackSlots(level, bonusThirdClassAtWill);
+  const nAw = Math.max(
+    0,
+    expectedClassAtWillAttackSlots(level, bonusThirdClassAtWill) - Math.max(0, atWillSlotPenalty)
+  );
   for (let i = 0; i < nAw; i++) {
     let key: string;
     let label: string;
@@ -135,7 +142,8 @@ export function reconcileHybridClassPowerSlotsForBuild(
   baseClassIdA: string | undefined,
   baseClassIdB: string | undefined
 ): { classPowerSlots?: Record<string, string>; powerIds: string[] } {
-  const defs = buildHybridPowerSlotDefinitions(level, bonusThirdClassAtWill);
+  const penalty = paragonMulticlassPrimaryAtWillSlotPenalty(index, build);
+  const defs = buildHybridPowerSlotDefinitions(level, bonusThirdClassAtWill, penalty);
   const validKeys = new Set(defs.map((d) => d.key));
   const attacks = hybridPowerPoolUnion(index, baseClassIdA, baseClassIdB, level, "attack");
   const utils = hybridPowerPoolUnion(index, baseClassIdA, baseClassIdB, level, "utility");
@@ -178,7 +186,36 @@ export function reconcileHybridClassPowerSlotsForBuild(
     else next[k] = v;
   }
 
-  const cleaned = Object.keys(next).length > 0 ? next : undefined;
+  let merged: CharacterBuild = { ...build, classPowerSlots: Object.keys(next).length > 0 ? next : undefined };
+  if (penalty > 0) {
+    const validAw = new Set(defs.filter((d) => d.bucket === "atWill").map((d) => d.key));
+    const picks = merged.paragonMulticlassPowers;
+    if (picks?.atWillSwapSlotKey && !validAw.has(picks.atWillSwapSlotKey)) {
+      const slots = { ...(merged.classPowerSlots || {}) };
+      if (picks.atWillSwapOriginalPowerId) slots[picks.atWillSwapSlotKey] = picks.atWillSwapOriginalPowerId;
+      else delete slots[picks.atWillSwapSlotKey];
+      const nextPicks: ParagonMulticlassPowers = { ...picks };
+      delete nextPicks.atWillSwapPowerId;
+      delete nextPicks.atWillSwapSlotKey;
+      delete nextPicks.atWillSwapOriginalPowerId;
+      const hasOther = Boolean(nextPicks.encounterPowerId || nextPicks.utilityPowerId || nextPicks.dailyPowerId);
+      merged = {
+        ...merged,
+        classPowerSlots: Object.keys(slots).length > 0 ? slots : undefined,
+        paragonMulticlassPowers: hasOther ? nextPicks : undefined
+      };
+    }
+    const slots = { ...(merged.classPowerSlots || {}) };
+    for (const k of Object.keys(slots)) {
+      if (k.startsWith("hybrid:aw") && !validAw.has(k)) delete slots[k];
+    }
+    merged = {
+      ...merged,
+      classPowerSlots: Object.keys(slots).length > 0 ? slots : undefined
+    };
+  }
+
+  const cleaned = merged.classPowerSlots;
   return {
     classPowerSlots: cleaned,
     powerIds: orderedPowerIdsFromSlots(defs, cleaned)
@@ -228,9 +265,9 @@ export function effectivePowerSlotDefinitions(
   level: number,
   bonusThirdClassAtWill: boolean
 ): ClassPowerSlotDef[] {
-  if (build.characterStyle === "hybrid") {
-    return buildHybridPowerSlotDefinitions(level, bonusThirdClassAtWill);
-  }
   const penalty = paragonMulticlassPrimaryAtWillSlotPenalty(index, build);
+  if (build.characterStyle === "hybrid") {
+    return buildHybridPowerSlotDefinitions(level, bonusThirdClassAtWill, penalty);
+  }
   return buildClassPowerSlotDefinitions(level, bonusThirdClassAtWill, penalty);
 }

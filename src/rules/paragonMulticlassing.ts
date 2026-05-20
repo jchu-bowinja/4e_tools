@@ -129,7 +129,7 @@ export function paragonAtWillSlotDefs(index: RulesIndex, build: CharacterBuild):
   const penalty = paragonMulticlassPrimaryAtWillSlotPenalty(index, build);
   const defs =
     build.characterStyle === "hybrid"
-      ? buildHybridPowerSlotDefinitions(build.level, bonus)
+      ? buildHybridPowerSlotDefinitions(build.level, bonus, penalty)
       : buildClassPowerSlotDefinitions(build.level, bonus, penalty);
   return defs.filter((d) => d.bucket === "atWill");
 }

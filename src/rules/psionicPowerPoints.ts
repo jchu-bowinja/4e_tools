@@ -172,9 +172,12 @@ export function paragonMulticlassPrimaryAtWillSlotPenalty(
   build: CharacterBuild
 ): number {
   if (!build.paragonMulticlassing || build.level < 11) return 0;
-  if (build.characterStyle === "hybrid") return 0;
   const mcId = multiclassEntryClassId(index, build);
   if (!mcId || !classIsPsionic(index, mcId)) return 0;
+  if (build.characterStyle === "hybrid") {
+    if (hybridHasPsionicComponent(index, build)) return 0;
+    return 1;
+  }
   const primaryId = build.classId;
   if (!primaryId || classIsPsionic(index, primaryId)) return 0;
   return 1;
@@ -183,9 +186,9 @@ export function paragonMulticlassPrimaryAtWillSlotPenalty(
 /** +2 at 11 when paragon multiclassing into a psionic class (both psionic, or non-psionic → psionic). */
 export function paragonMulticlassPowerPointBonus(index: RulesIndex, build: CharacterBuild): number {
   if (!build.paragonMulticlassing || build.level < 11) return 0;
-  if (build.characterStyle === "hybrid") return 0;
   const mcId = multiclassEntryClassId(index, build);
   if (!mcId || !classIsPsionic(index, mcId)) return 0;
+  if (build.characterStyle === "hybrid") return 2;
   const primaryId = build.classId;
   if (!primaryId) return 0;
   if (!classIsPsionic(index, primaryId)) return 2;

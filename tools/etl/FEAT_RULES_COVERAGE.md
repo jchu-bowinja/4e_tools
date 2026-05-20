@@ -80,7 +80,7 @@ Add `generated/feat_heavy_rules.json` to `.gitignore` if you do not want it comm
 ## Runtime follow-ups (multiclass pass 2)
 
 - **Paragon multiclassing** — `paragonMulticlassing` + `paragonMulticlassPowers` wired to builder UI, power card index, character sheet combat powers, and at-will swap into class slots.
-- **Psionic power points** — class pool from Psionic Augmentation (single-class table) or hybrid augmentable at-will table; feat swap deltas; paragon +2 PP; non-psionic → psionic paragon MC loses one at-will slot. Hybrid assumes power-point option at all augmentation breakpoints. Paragon MC PP/at-will for hybrid deferred.
+- **Psionic power points** — class pool from Psionic Augmentation (single-class table) or hybrid augmentable at-will table; feat swap deltas; paragon +2 PP; non-psionic → psionic paragon MC loses one at-will slot (single-class and hybrid). Hybrid assumes power-point option at all augmentation breakpoints.
 - **Feat power modification resolution** — ETL + runtime resolve compendium ids, normalized names, and known aliases so augmentations attach to power cards. A few class-specific names may still lack compendium rows.
 - **Internal grants** — `KI_FOCUS_USER`, `PSIONIC_SECOND_CLASS`, bloodline heritage limits in `internalGrantValidation.ts`.
 - **Compendium tags** — `MULTICLASS` / `Unlimited Multiclass` prereq tags on entry feats evaluated in `prereqEvaluator`.

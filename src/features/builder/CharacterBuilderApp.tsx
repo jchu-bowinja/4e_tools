@@ -1653,7 +1653,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     const atWillPenalty = paragonMulticlassPrimaryAtWillSlotPenalty(index, nextBase);
     const defs =
       nextBase.characterStyle === "hybrid"
-        ? buildHybridPowerSlotDefinitions(lv, bonus)
+        ? buildHybridPowerSlotDefinitions(lv, bonus, atWillPenalty)
         : buildClassPowerSlotDefinitions(lv, bonus, atWillPenalty);
     let pruned = pruneFeatPowerReplacements(nextBase, index, defs);
     pruned = pruneMulticlassSlotSwaps(pruned, index, defs);
@@ -1684,7 +1684,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     [index, build]
   );
   const powerSlotDefs = useMemo(() => {
-    if (isHybridBuild) return buildHybridPowerSlotDefinitions(build.level, bonusClassAtWill);
+    if (isHybridBuild) return buildHybridPowerSlotDefinitions(build.level, bonusClassAtWill, paragonAtWillPenalty);
     return buildClassPowerSlotDefinitions(build.level, bonusClassAtWill, paragonAtWillPenalty);
   }, [build.level, bonusClassAtWill, isHybridBuild, paragonAtWillPenalty]);
   const racePowerGroups = useMemo(
@@ -2200,7 +2200,11 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         const ba = ha?.baseClassId ?? undefined;
         const bb = hb?.baseClassId ?? undefined;
         if (!ba || !bb) return prev;
-        defs = buildHybridPowerSlotDefinitions(prev.level, bonus);
+        defs = buildHybridPowerSlotDefinitions(
+          prev.level,
+          bonus,
+          paragonMulticlassPrimaryAtWillSlotPenalty(index, prev)
+        );
         inferred = inferHybridClassPowerSlotsFromPowerIds(defs, prev.powerIds, index, ba, bb, prev.level);
       } else {
         defs = buildClassPowerSlotDefinitions(prev.level, bonus);

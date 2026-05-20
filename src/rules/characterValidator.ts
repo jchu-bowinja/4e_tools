@@ -535,7 +535,7 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
 
     const slotsHy = build.classPowerSlots;
     if (slotsHy) {
-      const slotDefsHy = buildHybridPowerSlotDefinitions(build.level, bonusThirdClassAtWill);
+      const slotDefsHy = buildHybridPowerSlotDefinitions(build.level, bonusThirdClassAtWill, atWillPenalty);
       const defByKeyHy = new Map(slotDefsHy.map((d) => [d.key, d]));
       for (const [key, rawId] of Object.entries(slotsHy)) {
         const id = String(rawId || "").trim();
