@@ -29,6 +29,27 @@ class TestFeatPowerModifications(unittest.TestCase):
         self.assertEqual(modify[0]["attrs"]["Field"], "Gulg Hunter Practice")
         self.assertEqual(modify[0]["attrs"]["name"], "footwork lure")
 
+    def test_keywords_list_addition_becomes_value(self):
+        feat = {
+            "name": "Firepulse Master",
+            "specific": {},
+            "rules": {
+                "modify": [
+                    {
+                        "attrs": {
+                            "name": "Firepulse",
+                            "type": "Power",
+                            "Field": "Keywords",
+                            "list-addition": "Reliable",
+                        }
+                    }
+                ]
+            },
+        }
+        power_lookup = {"firepulse": "ID_FP"}
+        out = extract_feat_power_modifications(feat, power_lookup, power_lookup, {})
+        self.assertEqual(out["powerModifications"][0]["value"], "Reliable")
+
     def test_corellons_wrath_uses_explicit_modify_rules(self):
         feat = {
             "internal_id": "ID_FMP_FEAT_1298",

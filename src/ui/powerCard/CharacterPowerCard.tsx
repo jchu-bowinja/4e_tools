@@ -170,6 +170,34 @@ export function CharacterPowerCard({
         </div>
       ) : null}
 
+      {vm.metadataNotes.length > 0 ? (
+        <div style={{ marginTop: "0.35rem", display: "flex", flexDirection: "column", gap: "0.28rem" }}>
+          {vm.metadataNotes.map((note) => (
+            <div
+              key={`${vm.id}-meta-${note.featId}`}
+              style={{
+                padding: "0.3rem 0.42rem",
+                borderRadius: "6px",
+                borderLeft: "3px solid var(--text-secondary)",
+                backgroundColor: "color-mix(in srgb, var(--text-secondary) 8%, var(--surface-1))"
+              }}
+            >
+              <div
+                style={{
+                  fontSize: keywordFontSize,
+                  fontWeight: 600,
+                  color: "var(--text-secondary)",
+                  marginBottom: "0.1rem"
+                }}
+              >
+                {note.featName}
+              </div>
+              <div style={{ fontSize: bodyFontSize, color: bodyColor, lineHeight: 1.4 }}>{note.summary}</div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
       <CharacterPowerCardLabeledBlock
         lines={vm.preAttackLines}
         renderLineText={renderText}

@@ -1,6 +1,6 @@
 export type PowerCardUsageBucket = "atWill" | "encounter" | "daily" | "utility";
 
-import type { FeatPowerAugmentation } from "../../rules/featPowerModifications";
+import type { FeatPowerAugmentation, FeatPowerMetadataNote } from "../../rules/featPowerModifications";
 
 export type CharacterPowerCardLabeledLine = {
   label: string;
@@ -21,6 +21,8 @@ export type CharacterPowerCardViewModel = {
   outcomeLines: CharacterPowerCardLabeledLine[];
   /** Feat augmentations (style, arena fighting, domain) applied to this power. */
   augmentationLines: FeatPowerAugmentation[];
+  /** Feat-driven header changes (usage, keywords, type, display). */
+  metadataNotes: FeatPowerMetadataNote[];
   body: string;
   flavor: string;
 };

@@ -1,6 +1,25 @@
 import type { Feat, FeatPowerModification, Power, RulesIndex } from "./models";
+import { attackPowerBucketFromUsage } from "./classPowerSlots";
 import { resolveFeatPowerModifications } from "./grantedPowersQuery";
 import { buildPowerNameLookups, resolvePowerReference } from "./powerNameResolution";
+
+type PowerCardUsageBucket = "atWill" | "encounter" | "daily" | "utility";
+
+function splitKeywordTokens(raw: string): string[] {
+  return raw
+    .split(/[;,]/)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+}
+
+function usageBucketFromLabel(label: string): PowerCardUsageBucket | undefined {
+  const u = label.toLowerCase();
+  if (u.includes("at-will") || u.includes("at will")) return "atWill";
+  if (u.includes("encounter")) return "encounter";
+  if (u.includes("daily")) return "daily";
+  if (u.includes("utility")) return "utility";
+  return undefined;
+}
 
 /** Display text for a feat augmentation on a power card. */
 export type FeatPowerAugmentation = {
@@ -15,6 +34,14 @@ export type FeatPowerMetadataPatch = {
   featName: string;
   field: string;
   value: string;
+};
+
+/** Header/metadata change attributed to a feat (usage, keywords, type, display). */
+export type FeatPowerMetadataNote = {
+  featId: string;
+  featName: string;
+  /** Short line for the card, e.g. "Usage: Encounter" or "Keywords: +Reliable". */
+  summary: string;
 };
 
 export type PowerFeatModifications = {
@@ -66,6 +93,37 @@ export function isFeatPowerMetadataField(field: string): boolean {
 /** Style / arena / domain augmentations (not compendium field patches). */
 export function isFeatPowerAugmentation(mod: FeatPowerModification): boolean {
   return !isFeatPowerMetadataField(mod.field);
+}
+
+/** Merge keyword additions from feat metadata (case-insensitive dedupe). */
+export function mergePowerKeywords(existing: readonly string[], additions: string): string[] {
+  const add = splitKeywordTokens(additions);
+  if (add.length === 0) return [...existing];
+  const seen = new Set(existing.map((k) => k.toLowerCase()));
+  const out = [...existing];
+  for (const kw of add) {
+    const key = kw.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(kw);
+  }
+  return out;
+}
+
+const METADATA_NOTE_LABEL: Record<string, string> = {
+  "Power Usage": "Usage",
+  "Power Type": "Type",
+  Keywords: "Keywords",
+  Display: "Display"
+};
+
+export function formatFeatMetadataNoteSummary(field: string, value: string): string {
+  const label = METADATA_NOTE_LABEL[field] ?? field;
+  if (field === "Keywords") {
+    const parts = splitKeywordTokens(value).map((k) => `+${k}`);
+    return parts.length > 0 ? `${label}: ${parts.join(", ")}` : label;
+  }
+  return `${label}: ${value}`;
 }
 
 export function resolveAugmentationText(mod: FeatPowerModification, feat: Feat): string {
@@ -167,9 +225,14 @@ export type CharacterPowerCardLine = {
 
 export type CharacterPowerCardVmShape = {
   display: string;
+  usageLabel?: string;
+  usageBucket?: PowerCardUsageBucket;
+  powerType?: string;
+  keywords?: string[];
   preAttackLines: CharacterPowerCardLine[];
   outcomeLines: CharacterPowerCardLine[];
   augmentationLines: FeatPowerAugmentation[];
+  metadataNotes?: FeatPowerMetadataNote[];
 };
 
 /** Apply feat metadata patches and collect augmentation lines for a power card view model. */
@@ -179,22 +242,60 @@ export function applyFeatModificationsToPowerCardVm<T extends CharacterPowerCard
   powerId: string
 ): T {
   if (!mods || (mods.augmentations.length === 0 && mods.metadata.length === 0)) {
-    return { ...vm, augmentationLines: [] };
+    return { ...vm, augmentationLines: [], metadataNotes: [] };
   }
 
   const preAttackLines = vm.preAttackLines.map((l) => ({ ...l }));
   const outcomeLines = vm.outcomeLines.map((l) => ({ ...l }));
   let display = vm.display;
+  let usageLabel = vm.usageLabel;
+  let usageBucket = vm.usageBucket;
+  let powerType = vm.powerType;
+  let keywords = vm.keywords ? [...vm.keywords] : undefined;
+  const metadataNotes: FeatPowerMetadataNote[] = [];
 
   const preAttackLabels = new Set(["Action", "Range/Area", "Target", "Trigger", "Requirement"]);
 
   for (const patch of mods.metadata) {
     if (isInternalFeatPowerMetadataField(patch.field)) continue;
+    const value = patch.value.trim();
+    if (!value) continue;
+
     if (patch.field === "Display") {
-      if (patch.value) display = patch.value;
+      display = value;
+      metadataNotes.push({
+        featId: patch.featId,
+        featName: patch.featName,
+        summary: formatFeatMetadataNoteSummary(patch.field, value)
+      });
       continue;
     }
-    if (patch.field === "Keywords" || patch.field === "Power Usage" || patch.field === "Power Type") {
+    if (patch.field === "Power Usage") {
+      usageLabel = value;
+      usageBucket = usageBucketFromLabel(value) ?? attackPowerBucketFromUsage(value) ?? usageBucket;
+      metadataNotes.push({
+        featId: patch.featId,
+        featName: patch.featName,
+        summary: formatFeatMetadataNoteSummary(patch.field, value)
+      });
+      continue;
+    }
+    if (patch.field === "Power Type") {
+      powerType = value;
+      metadataNotes.push({
+        featId: patch.featId,
+        featName: patch.featName,
+        summary: formatFeatMetadataNoteSummary(patch.field, value)
+      });
+      continue;
+    }
+    if (patch.field === "Keywords") {
+      keywords = mergePowerKeywords(keywords ?? [], value);
+      metadataNotes.push({
+        featId: patch.featId,
+        featName: patch.featName,
+        summary: formatFeatMetadataNoteSummary(patch.field, value)
+      });
       continue;
     }
     const lineLabel = FIELD_TO_LINE_LABEL[patch.field];
@@ -210,8 +311,13 @@ export function applyFeatModificationsToPowerCardVm<T extends CharacterPowerCard
   return {
     ...vm,
     display,
+    ...(usageLabel !== undefined ? { usageLabel } : {}),
+    ...(usageBucket !== undefined ? { usageBucket } : {}),
+    ...(powerType !== undefined ? { powerType } : {}),
+    ...(keywords !== undefined ? { keywords } : {}),
     preAttackLines,
     outcomeLines,
-    augmentationLines: [...mods.augmentations]
+    augmentationLines: [...mods.augmentations],
+    metadataNotes
   };
 }

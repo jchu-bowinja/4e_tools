@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   applyFeatModificationsToPowerCardVm,
   collectFeatModificationsByPowerId,
+  formatFeatMetadataNoteSummary,
   isFeatPowerAugmentation,
   isFeatPowerMetadataField,
+  mergePowerKeywords,
   resolveAugmentationText
 } from "../../src/rules/featPowerModifications";
 import { buildCharacterPowerCardViewModel } from "../../src/ui/powerCard/characterPowerCardViewModel";
@@ -151,6 +153,46 @@ describe("featPowerModifications", () => {
     expect(mods?.augmentations[0]?.featName).toBe("Hand of Fury");
   });
 
+  it("merges keyword additions without duplicates", () => {
+    expect(mergePowerKeywords(["Fire", "Weapon"], "Reliable, fire")).toEqual(["Fire", "Weapon", "Reliable"]);
+  });
+
+  it("formats metadata note summaries", () => {
+    expect(formatFeatMetadataNoteSummary("Power Usage", "Encounter")).toBe("Usage: Encounter");
+    expect(formatFeatMetadataNoteSummary("Keywords", "Reliable, Arcane")).toBe("Keywords: +Reliable, +Arcane");
+  });
+
+  it("applies Power Usage and Keywords metadata to card header", () => {
+    const power: Power = {
+      id: "P_HQ",
+      name: "Hunter's Quarry",
+      slug: "hq",
+      usage: "At-Will",
+      raw: {
+        specific: {
+          "Power Usage": "At-Will",
+          Keywords: "Martial"
+        }
+      }
+    };
+
+    const base = buildCharacterPowerCardViewModel(power);
+    const withMods = applyFeatModificationsToPowerCardVm(base, {
+      augmentations: [],
+      metadata: [
+        { featId: "F_WOW", featName: "Warrior of the Wild", field: "Power Usage", value: "Encounter" },
+        { featId: "F_FP", featName: "Firepulse Master", field: "Keywords", value: "Reliable" }
+      ]
+    }, power.id);
+
+    expect(withMods.usageLabel).toBe("Encounter");
+    expect(withMods.usageBucket).toBe("encounter");
+    expect(withMods.keywords).toEqual(["Martial", "Reliable"]);
+    expect(withMods.metadataNotes).toHaveLength(2);
+    expect(withMods.metadataNotes?.[0]?.summary).toBe("Usage: Encounter");
+    expect(withMods.metadataNotes?.[1]?.summary).toBe("Keywords: +Reliable");
+  });
+
   it("buildCharacterPowerCardViewModel merges feat mods when provided", () => {
     const power: Power = {
       id: "P1",
@@ -161,8 +203,10 @@ describe("featPowerModifications", () => {
     };
     const vm = buildCharacterPowerCardViewModel(power, {
       augmentations: [{ featId: "F1", featName: "Corellon's Wrath Style", text: "Extra damage vs spider." }],
-      metadata: []
+      metadata: [{ featId: "F2", featName: "Fey Cantrip", field: "Power Type", value: "Utility" }]
     });
     expect(vm.augmentationLines).toHaveLength(1);
+    expect(vm.powerType).toBe("Utility");
+    expect(vm.metadataNotes).toHaveLength(1);
   });
 });

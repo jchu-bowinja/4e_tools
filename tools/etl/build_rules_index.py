@@ -1283,6 +1283,8 @@ def extract_feat_power_modifications(
         seen_names.add(key)
         field = str(attrs.get("Field") or attrs.get("field") or feat_name).strip()
         value = str(attrs.get("value") or "").strip()
+        if not value and field == "Keywords":
+            value = str(attrs.get("list-addition") or "").strip()
         pid = _resolve_power_id(pname, power_name_to_id, power_normalized_to_id, power_id_to_name)
         cfid = None
         if not pid and class_feature_id_by_name:

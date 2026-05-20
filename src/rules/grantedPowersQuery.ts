@@ -308,12 +308,17 @@ export function resolveFeatPowerModifications(feat: Feat): Array<{
     if (!attrs || String(attrs.type ?? "").toLowerCase() !== "power") continue;
     const powerName = String(attrs.name ?? "").trim();
     if (!powerName) continue;
+    const field = String(attrs.Field ?? attrs.field ?? featName).trim();
+    let value = String(attrs.value ?? "").trim();
+    if (!value && field === "Keywords" && attrs["list-addition"]) {
+      value = String(attrs["list-addition"]).trim();
+    }
     out.push({
       powerName,
       powerId: null,
       classFeatureId: null,
-      field: String(attrs.Field ?? attrs.field ?? featName).trim(),
-      value: String(attrs.value ?? "").trim()
+      field,
+      value
     });
   }
   return out;

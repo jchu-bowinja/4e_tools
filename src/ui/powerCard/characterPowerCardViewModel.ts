@@ -53,6 +53,7 @@ export function buildCharacterPowerCardViewModel(
     preAttackLines,
     outcomeLines,
     augmentationLines: [],
+    metadataNotes: [],
     body: typeof raw.body === "string" ? raw.body : "",
     flavor: typeof raw.flavor === "string" ? raw.flavor : ""
   };
