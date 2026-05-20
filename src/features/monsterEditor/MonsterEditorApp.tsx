@@ -3809,6 +3809,24 @@ export function MonsterEditorApp({
     return viewMonster;
   }, [viewerTab, createMonsterDraftEntry, viewMonster]);
 
+  const templatePreviewDescriptions = useMemo((): Array<{
+    key: string;
+    templateName: string;
+    description: string;
+  }> => {
+    if (viewerTab !== "monsters" || monsterTemplatePreviewIdxs.length === 0) return [];
+    const out: Array<{ key: string; templateName: string; description: string }> = [];
+    for (const idx of monsterTemplatePreviewIdxs.slice(0, 2)) {
+      const row = templateRows[idx];
+      if (!row) continue;
+      const description = String(row.description ?? "").trim();
+      if (!isRenderableCardValue(description)) continue;
+      const templateName = String(row.templateName ?? "").trim() || "Template";
+      out.push({ key: `${idx}-${templateName}`, templateName, description });
+    }
+    return out;
+  }, [viewerTab, monsterTemplatePreviewIdxs, templateRows]);
+
   const templatePreviewDelta = useMemo((): TemplateApplicationDelta | null => {
     if (!activeMonster || monsterTemplatePreviewIdxs.length === 0) return null;
     let base = activeMonster;
@@ -5774,6 +5792,23 @@ export function MonsterEditorApp({
                   </button>
                 ) : null}
               </div>
+              {viewerTab === "monsters" && templatePreviewDescriptions.length > 0
+                ? templatePreviewDescriptions.map(({ key, templateName, description }) => (
+                    <div key={key} style={centerFlowSubsectionStyle}>
+                      <h3 style={sectionTitleStyle}>{templateName}</h3>
+                      <div style={{ ...richTextBodyPrimary.paragraphStyle, whiteSpace: "pre-wrap" }}>
+                        {renderGlossaryAwareText(
+                          description,
+                          commonDescriptiveGlossaryPhrases,
+                          startGlossaryHover,
+                          leaveGlossaryHover,
+                          `template-preview-desc-${key}`,
+                          shouldHighlightGlossaryTerm
+                        )}
+                      </div>
+                    </div>
+                  ))
+                : null}
               {isRenderableCardValue(viewMonster.tactics) ? (
                 <div style={centerFlowSubsectionStyle}>
                   <h3 style={sectionTitleStyle}>Tactics</h3>
