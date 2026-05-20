@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  basePsionicPowerPointsForBuild,
+  basePsionicPowerPointsFromLevel,
+  buildHasPsionicAugmentationClass,
   heroicPsionicSwapPowerPointAdjustments,
   paragonMulticlassPowerPointBonus,
   paragonMulticlassPrimaryAtWillSlotPenalty,
@@ -79,6 +82,62 @@ const index: RulesIndex = {
   items: [],
   hybridClasses: []
 };
+
+describe("basePsionicPowerPointsFromLevel", () => {
+  it("matches Psionic Augmentation table breakpoints", () => {
+    expect(basePsionicPowerPointsFromLevel(1)).toBe(2);
+    expect(basePsionicPowerPointsFromLevel(7)).toBe(6);
+    expect(basePsionicPowerPointsFromLevel(13)).toBe(7);
+    expect(basePsionicPowerPointsFromLevel(21)).toBe(11);
+    expect(basePsionicPowerPointsFromLevel(27)).toBe(15);
+  });
+});
+
+describe("basePsionicPowerPointsForBuild", () => {
+  const index: RulesIndex = {
+    classes: [
+      { id: "c_psion", name: "Psion", slug: "psion", powerSource: "Psionic", raw: {} },
+      { id: "c_fighter", name: "Fighter", slug: "fighter", powerSource: "Martial", raw: {} }
+    ],
+    feats: [],
+    powers: [],
+    skills: [],
+    races: [],
+    themes: [],
+    paragonPaths: [],
+    epicDestinies: [],
+    backgrounds: [],
+    rituals: [],
+    items: [],
+    hybridClasses: []
+  };
+
+  it("returns class pool for psionic primary", () => {
+    const build: CharacterBuild = {
+      level: 11,
+      classId: "c_psion",
+      featIds: [],
+      powerIds: [],
+      abilityScores: { STR: 10, CON: 10, DEX: 10, INT: 10, WIS: 10, CHA: 10 },
+      trainedSkillIds: []
+    };
+    expect(buildHasPsionicAugmentationClass(index, build)).toBe(true);
+    expect(basePsionicPowerPointsForBuild(index, build)).toBe(6);
+  });
+
+  it("returns 0 for martial primary or hybrid", () => {
+    const martial: CharacterBuild = {
+      level: 11,
+      classId: "c_fighter",
+      featIds: [],
+      powerIds: [],
+      abilityScores: { STR: 10, CON: 10, DEX: 10, INT: 10, WIS: 10, CHA: 10 },
+      trainedSkillIds: []
+    };
+    expect(basePsionicPowerPointsForBuild(index, martial)).toBe(0);
+    expect(basePsionicPowerPointsForBuild(index, { ...martial, characterStyle: "hybrid" })).toBe(0);
+  });
+});
 
 describe("powerPointsForPrintedLevel", () => {
   it("maps heroic, paragon, and epic tiers", () => {
@@ -213,7 +272,9 @@ describe("summarizePsionicPowerPointAdjustments", () => {
       ]
     };
     const summary = summarizePsionicPowerPointAdjustments(indexWithMc, build);
-    expect(summary.total).toBe(4);
+    expect(summary.baseFromClass).toBe(0);
+    expect(summary.totalAdjustments).toBe(4);
+    expect(summary.poolTotal).toBe(4);
     expect(summary.lines.map((l) => l.label)).toContain("Psionic Dabbler");
     expect(summary.lines.map((l) => l.label)).toContain("Paragon multiclassing");
   });
@@ -273,5 +334,37 @@ describe("paragonMulticlassPrimaryAtWillSlotPenalty", () => {
     };
     expect(paragonMulticlassPrimaryAtWillSlotPenalty(indexWithMc, build)).toBe(0);
     expect(paragonMulticlassPrimaryAtWillSlotPenalty(indexWithMc, { ...build, level: 10 })).toBe(0);
+  });
+});
+
+describe("summarizePsionicPowerPointAdjustments pool total", () => {
+  const psionicClass = { id: "c_psion", name: "Psion", slug: "psion", powerSource: "Psionic", raw: {} };
+  const index: RulesIndex = {
+    classes: [psionicClass],
+    feats: [],
+    powers: [],
+    skills: [],
+    races: [],
+    themes: [],
+    paragonPaths: [],
+    epicDestinies: [],
+    backgrounds: [],
+    rituals: [],
+    items: [],
+    hybridClasses: []
+  };
+
+  it("combines class pool and adjustments", () => {
+    const build: CharacterBuild = {
+      level: 7,
+      classId: "c_psion",
+      featIds: [],
+      powerIds: [],
+      abilityScores: { STR: 10, CON: 10, DEX: 10, INT: 10, WIS: 10, CHA: 10 },
+      trainedSkillIds: []
+    };
+    const summary = summarizePsionicPowerPointAdjustments(index, build);
+    expect(summary.baseFromClass).toBe(6);
+    expect(summary.poolTotal).toBe(6);
   });
 });

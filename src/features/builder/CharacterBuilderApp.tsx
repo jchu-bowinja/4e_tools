@@ -127,6 +127,7 @@ import { pruneStalePowerSelections } from "../../rules/powerSelections";
 import {
   powerPointsForPrintedLevel,
   paragonMulticlassPrimaryAtWillSlotPenalty,
+  showPsionicPowerPointSummary,
   summarizePsionicPowerPointAdjustments
 } from "../../rules/psionicPowerPoints";
 import {
@@ -4047,7 +4048,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                         );
                       })}
                     </ul>
-                    {psionicPowerPointSummary.lines.length > 0 && (
+                    {showPsionicPowerPointSummary(psionicPowerPointSummary) && (
                       <div
                         style={{
                           marginTop: "0.45rem",
@@ -4058,23 +4059,42 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                         }}
                       >
                         <div style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "0.25rem" }}>
-                          Power point adjustments
+                          {psionicPowerPointSummary.baseFromClass > 0 ? "Power points" : "Power point adjustments"}
                         </div>
-                        <ul style={{ margin: 0, paddingLeft: "1.1rem", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
-                          {psionicPowerPointSummary.lines.map((line) => (
-                            <li key={line.label} style={{ marginBottom: "0.15rem" }}>
-                              <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{line.label}</span>
-                              {": "}
-                              {line.delta > 0 ? "+" : ""}
-                              {line.delta}
-                              {line.detail ? ` (${line.detail})` : ""}
-                            </li>
-                          ))}
-                        </ul>
-                        <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.76rem", color: "var(--text-muted)" }}>
-                          Net {psionicPowerPointSummary.total > 0 ? "+" : ""}
-                          {psionicPowerPointSummary.total} to your class power point pool (add to your base from class).
-                        </p>
+                        {psionicPowerPointSummary.baseFromClass > 0 && (
+                          <p style={{ margin: "0 0 0.25rem 0", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                            <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>Class pool</span>
+                            {": "}
+                            {psionicPowerPointSummary.baseFromClass} (Psionic Augmentation)
+                          </p>
+                        )}
+                        {psionicPowerPointSummary.lines.length > 0 && (
+                          <ul style={{ margin: 0, paddingLeft: "1.1rem", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                            {psionicPowerPointSummary.lines.map((line) => (
+                              <li key={line.label} style={{ marginBottom: "0.15rem" }}>
+                                <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{line.label}</span>
+                                {": "}
+                                {line.delta > 0 ? "+" : ""}
+                                {line.delta}
+                                {line.detail ? ` (${line.detail})` : ""}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        {(psionicPowerPointSummary.baseFromClass > 0 || psionicPowerPointSummary.lines.length > 0) && (
+                          <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.76rem", color: "var(--text-muted)" }}>
+                            Total pool: <strong>{psionicPowerPointSummary.poolTotal}</strong>
+                            {psionicPowerPointSummary.totalAdjustments !== 0 && (
+                              <>
+                                {" "}
+                                ({psionicPowerPointSummary.baseFromClass} base
+                                {psionicPowerPointSummary.totalAdjustments > 0 ? " + " : " "}
+                                {psionicPowerPointSummary.totalAdjustments > 0 ? "+" : ""}
+                                {psionicPowerPointSummary.totalAdjustments} adjustments)
+                              </>
+                            )}
+                          </p>
+                        )}
                         {psionicPowerPointSummary.paragonPrimaryAtWillSlotPenalty > 0 && (
                           <p style={{ margin: "0.2rem 0 0 0", fontSize: "0.76rem", color: "var(--text-muted)" }}>
                             Paragon multiclassing into a psionic class from a non-psionic class: lose one class at-will

@@ -2,6 +2,43 @@ import { getFeatMulticlassSlotSwapOffer } from "./featMulticlassSlotSwap";
 import type { CharacterBuild, RulesIndex } from "./models";
 import { multiclassEntryClassId } from "./paragonMulticlassing";
 
+/**
+ * Cumulative power points from the Psionic Augmentation class feature (PHB3 table).
+ * Levels between listed breakpoints keep the previous total.
+ */
+const PSIONIC_AUGMENTATION_POWER_POINTS_BY_LEVEL: Record<number, number> = {
+  1: 2,
+  2: 2,
+  3: 4,
+  4: 4,
+  5: 4,
+  6: 4,
+  7: 6,
+  8: 6,
+  9: 6,
+  10: 6,
+  11: 6,
+  12: 6,
+  13: 7,
+  14: 7,
+  15: 7,
+  16: 7,
+  17: 9,
+  18: 9,
+  19: 9,
+  20: 9,
+  21: 11,
+  22: 11,
+  23: 13,
+  24: 13,
+  25: 13,
+  26: 13,
+  27: 15,
+  28: 15,
+  29: 15,
+  30: 15
+};
+
 /** Power points from PHB3 swap tier (printed level of the augmentable at-will). */
 export function powerPointsForPrintedLevel(printedLevel: number): number {
   if (printedLevel <= 10) return 2;
@@ -23,11 +60,39 @@ export interface PsionicPowerPointAdjustmentLine {
 }
 
 export interface PsionicPowerPointSummary {
+  /** Pool from Psionic Augmentation on a psionic class (0 for non-psionic or hybrid). */
+  baseFromClass: number;
   /** Net adjustment from heroic multiclass swaps + paragon multiclassing. */
-  total: number;
+  totalAdjustments: number;
+  /** baseFromClass + totalAdjustments. */
+  poolTotal: number;
   lines: PsionicPowerPointAdjustmentLine[];
   /** PHB3: non-psionic → psionic paragon MC loses one class at-will slot at 11+. */
   paragonPrimaryAtWillSlotPenalty: number;
+}
+
+export function basePsionicPowerPointsFromLevel(level: number): number {
+  const lv = Math.max(1, Math.min(30, Math.floor(level)));
+  return PSIONIC_AUGMENTATION_POWER_POINTS_BY_LEVEL[lv] ?? 2;
+}
+
+/** Primary class uses Psionic Augmentation (single-class psionic only; hybrid deferred). */
+export function buildHasPsionicAugmentationClass(index: RulesIndex, build: CharacterBuild): boolean {
+  if (build.characterStyle === "hybrid") return false;
+  return classIsPsionic(index, build.classId);
+}
+
+export function basePsionicPowerPointsForBuild(index: RulesIndex, build: CharacterBuild): number {
+  if (!buildHasPsionicAugmentationClass(index, build)) return 0;
+  return basePsionicPowerPointsFromLevel(build.level);
+}
+
+export function showPsionicPowerPointSummary(summary: PsionicPowerPointSummary): boolean {
+  return (
+    summary.baseFromClass > 0 ||
+    summary.lines.length > 0 ||
+    summary.paragonPrimaryAtWillSlotPenalty > 0
+  );
 }
 
 /** Lose one class at-will slot when paragon multiclassing into psionic from a non-psionic class. */
@@ -114,7 +179,14 @@ export function summarizePsionicPowerPointAdjustments(
     });
   }
 
-  const total = lines.reduce((sum, l) => sum + l.delta, 0);
+  const totalAdjustments = lines.reduce((sum, l) => sum + l.delta, 0);
   const paragonPrimaryAtWillSlotPenalty = paragonMulticlassPrimaryAtWillSlotPenalty(index, build);
-  return { total, lines, paragonPrimaryAtWillSlotPenalty };
+  const baseFromClass = basePsionicPowerPointsForBuild(index, build);
+  return {
+    baseFromClass,
+    totalAdjustments,
+    poolTotal: baseFromClass + totalAdjustments,
+    lines,
+    paragonPrimaryAtWillSlotPenalty
+  };
 }

@@ -27,7 +27,10 @@ import {
 import { collectFeatModificationsByPowerId } from "../../rules/featPowerModifications";
 import { collectFeatGrantedPowersForBuild } from "../../rules/grantedPowersQuery";
 import { multiclassEntryClassId } from "../../rules/paragonMulticlassing";
-import { summarizePsionicPowerPointAdjustments } from "../../rules/psionicPowerPoints";
+import {
+  showPsionicPowerPointSummary,
+  summarizePsionicPowerPointAdjustments
+} from "../../rules/psionicPowerPoints";
 import { computeSkillSheetRows } from "../../rules/skillCalculator";
 import {
   ABILITY_SCORE_COLUMNS,
@@ -2425,22 +2428,33 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   emptyMessage="No feats selected."
                 />
               </OverviewCollapsibleSection>
-              {psionicPowerPointSummary.lines.length > 0 && (
-                <OverviewCollapsibleSection title="Power point adjustments" defaultOpen>
-                  <ul style={{ margin: 0, paddingLeft: "1.1rem", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
-                    {psionicPowerPointSummary.lines.map((line) => (
-                      <li key={line.label} style={{ marginBottom: "0.2rem" }}>
-                        <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{line.label}</span>
-                        {": "}
-                        {line.delta > 0 ? "+" : ""}
-                        {line.delta}
-                        {line.detail ? ` (${line.detail})` : ""}
-                      </li>
-                    ))}
-                  </ul>
+              {showPsionicPowerPointSummary(psionicPowerPointSummary) && (
+                <OverviewCollapsibleSection
+                  title={psionicPowerPointSummary.baseFromClass > 0 ? "Power points" : "Power point adjustments"}
+                  defaultOpen
+                >
+                  {psionicPowerPointSummary.baseFromClass > 0 && (
+                    <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
+                      <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>Class pool</span>
+                      {": "}
+                      {psionicPowerPointSummary.baseFromClass} (Psionic Augmentation)
+                    </p>
+                  )}
+                  {psionicPowerPointSummary.lines.length > 0 && (
+                    <ul style={{ margin: 0, paddingLeft: "1.1rem", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
+                      {psionicPowerPointSummary.lines.map((line) => (
+                        <li key={line.label} style={{ marginBottom: "0.2rem" }}>
+                          <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{line.label}</span>
+                          {": "}
+                          {line.delta > 0 ? "+" : ""}
+                          {line.delta}
+                          {line.detail ? ` (${line.detail})` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.78rem", color: "var(--text-muted)" }}>
-                    Net {psionicPowerPointSummary.total > 0 ? "+" : ""}
-                    {psionicPowerPointSummary.total} to your class power point pool (add to base from class).
+                    Total pool: {psionicPowerPointSummary.poolTotal}
                   </p>
                   {psionicPowerPointSummary.paragonPrimaryAtWillSlotPenalty > 0 && (
                     <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.78rem", color: "var(--text-muted)" }}>
