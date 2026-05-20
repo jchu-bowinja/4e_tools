@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  abilitiesFromRaceAbilityGrantRules,
   abilitiesFromRaceAbilitySelects,
   getRaceSecondarySelectSlots,
   selectableStartingLanguages
@@ -41,6 +42,18 @@ describe("abilitiesFromRaceAbilitySelects", () => {
       }
     };
     expect(abilitiesFromRaceAbilitySelects(race).sort()).toEqual(["STR", "WIS"].sort());
+  });
+});
+
+describe("abilitiesFromRaceAbilityGrantRules", () => {
+  it("maps internal compendium grant ids to abilities", () => {
+    const rules = {
+      grant: [
+        { attrs: { name: "ID_INTERNAL_RACE_ABILITY_BONUS_CHARISMA", type: "Race Ability Bonus" } },
+        { attrs: { name: "ID_INTERNAL_RACE_ABILITY_BONUS_DEXTERITY", type: "Race Ability Bonus" } }
+      ]
+    };
+    expect(abilitiesFromRaceAbilityGrantRules(rules).sort()).toEqual(["CHA", "DEX"].sort());
   });
 });
 

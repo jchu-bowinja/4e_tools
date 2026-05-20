@@ -830,6 +830,8 @@ export function buildLikeStateFromSheet(state: CharacterSheetState, index: Rules
     name: state.name,
     level: state.level,
     raceId: state.raceId,
+    raceSelections: state.raceSelections ? { ...state.raceSelections } : undefined,
+    racialAbilityChoice: state.racialAbilityChoice,
     classId: state.classId,
     characterStyle: state.characterStyle,
     hybridClassIdA: state.hybridClassIdA,

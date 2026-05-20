@@ -76,15 +76,22 @@ import { collectCharacterPowerIdsForSelections } from "../../rules/powerSelectio
 import { hybridBaseClassNames } from "../../rules/prereqEvaluator";
 import { buildPrereqCharacterContext } from "../../rules/prereqContext";
 import { evaluateSupportOptionLegality } from "../../rules/supportOptionLegality";
-import { applyRacialBonuses, getAbilityLabel, parseRaceAbilityBonusInfo } from "../../rules/abilityScores";
+import {
+  applyRacialBonuses,
+  formatRaceAbilityBonusSummary,
+  getAbilityLabel,
+  raceDefersAbilityBonusToSubrace,
+  resolveRaceAbilityBonusInfo
+} from "../../rules/abilityScores";
+import { countsAsRaceOptions, getRacialTraitRuleSelectSlots } from "../../rules/racialTraitRuleSelects";
 import { getRaceSecondarySelectSlots, selectableStartingLanguages } from "../../rules/raceRuleSelects";
 import { parseRacialTraitIdsFromRace } from "../../rules/racialTraits";
 import {
   getRaceExtraTraitIds,
-  getRaceSubraceData,
+  getRaceTraitBundleSlots,
   resolveDisplayedRacialTraitsForRace
 } from "../../rules/raceSubraces";
-import { getClassBuildOptions } from "../../rules/classBuildOptions";
+import { classBuildOptionLabel, getClassBuildOptions } from "../../rules/classBuildOptions";
 import { autoGrantedTrainedSkillIds } from "../../rules/grantedSkillsQuery";
 import { computeSkillSheetRows } from "../../rules/skillCalculator";
 import {
@@ -1004,8 +1011,46 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     [build, rulesById]
   );
   const skillById = useMemo(() => new Map(index.skills.map((skill) => [skill.id, skill])), [index.skills]);
-
-  const raceAbilityBonusInfo = useMemo(() => parseRaceAbilityBonusInfo(selectedRace), [selectedRace]);
+  const racialTraitById = useMemo(
+    () => new Map<string, RacialTrait>((index.racialTraits ?? []).map((t) => [t.id, t])),
+    [index.racialTraits]
+  );
+  const raceTraitBundleSlots = useMemo(
+    () => getRaceTraitBundleSlots(selectedRace, racialTraitById),
+    [selectedRace, racialTraitById]
+  );
+  const raceExtraTraitIds = useMemo(
+    () => getRaceExtraTraitIds(selectedRace, racialTraitById, build.raceSelections, index.races),
+    [selectedRace, racialTraitById, build.raceSelections, index.races]
+  );
+  const racialTraitRuleSelectSlots = useMemo(
+    () =>
+      getRacialTraitRuleSelectSlots(
+        selectedRace,
+        racialTraitById,
+        build.raceSelections,
+        selectedClass,
+        index.races
+      ),
+    [selectedRace, racialTraitById, build.raceSelections, selectedClass, index.races]
+  );
+  const countsAsRacePickOptions = useMemo(
+    () => countsAsRaceOptions(index, build.raceId),
+    [index, build.raceId]
+  );
+  const raceAbilityBonusInfo = useMemo(
+    () => resolveRaceAbilityBonusInfo(selectedRace, racialTraitById, build.raceSelections),
+    [selectedRace, racialTraitById, build.raceSelections]
+  );
+  const raceAbilityScoresDisplay = useMemo(() => {
+    if (!selectedRace) return "-";
+    if (raceDefersAbilityBonusToSubrace(selectedRace)) {
+      if (!build.raceSelections?.subrace) return "See the Race Chosen";
+      const summary = formatRaceAbilityBonusSummary(raceAbilityBonusInfo);
+      return summary || "See the Race Chosen";
+    }
+    return String(raceSpecific["Ability Scores"] || selectedRace.abilitySummary || "-");
+  }, [selectedRace, build.raceSelections?.subrace, raceAbilityBonusInfo, raceSpecific]);
   const raceSecondarySlots = useMemo(() => getRaceSecondarySelectSlots(selectedRace), [selectedRace]);
   const bonusLanguageOptions = useMemo(
     () =>
@@ -1013,18 +1058,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
       ),
     [index.languages]
-  );
-  const racialTraitById = useMemo(
-    () => new Map<string, RacialTrait>((index.racialTraits ?? []).map((t) => [t.id, t])),
-    [index.racialTraits]
-  );
-  const raceSubraceData = useMemo(
-    () => getRaceSubraceData(selectedRace, racialTraitById),
-    [selectedRace, racialTraitById]
-  );
-  const raceExtraTraitIds = useMemo(
-    () => getRaceExtraTraitIds(selectedRace, racialTraitById, build.raceSelections),
-    [selectedRace, racialTraitById, build.raceSelections]
   );
   const displayedRacialTraitRows = useMemo(
     () => resolveDisplayedRacialTraitsForRace(selectedRace, racialTraitById, build.raceSelections),
@@ -1949,15 +1982,43 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     );
   }
 
-  function commitSubraceSelection(subraceId: string): void {
+  function commitRaceTraitBundleSelection(selectionKey: string, optionTraitId: string): void {
     const next = { ...(build.raceSelections || {}) };
-    if (subraceId) next.subrace = subraceId;
-    else delete next.subrace;
+    if (optionTraitId) next[selectionKey] = optionTraitId;
+    else delete next[selectionKey];
     for (const key of Object.keys(next)) {
       if (key.startsWith("racialPower:")) delete next[key];
     }
     const keys = Object.keys(next);
+    const raceSelections = keys.length ? next : undefined;
+    const abilityInfo = resolveRaceAbilityBonusInfo(selectedRace, racialTraitById, raceSelections);
+    let racialAbilityChoice = build.racialAbilityChoice;
+    if (racialAbilityChoice && !abilityInfo.chooseOne.includes(racialAbilityChoice)) {
+      racialAbilityChoice = undefined;
+    }
+    let nextBuild: CharacterBuild = { ...build, raceSelections, racialAbilityChoice };
+    nextBuild = pruneStalePowerSelections(index, nextBuild);
+    const { classPowerSlots, powerIds } = reconcilePowerSlotsForBuild(nextBuild, build.level);
+    updateBuild({ ...nextBuild, classPowerSlots, powerIds });
+  }
+
+  function commitRacialTraitRuleSelection(slotKey: string, value: string): void {
+    const next = { ...(build.raceSelections || {}) };
+    if (value) next[slotKey] = value;
+    else delete next[slotKey];
+    if (slotKey.startsWith("countsAsRace:")) {
+      for (const key of Object.keys(next)) {
+        if (key.startsWith("racialPower:")) delete next[key];
+      }
+    }
+    const keys = Object.keys(next);
     let nextBuild: CharacterBuild = { ...build, raceSelections: keys.length ? next : undefined };
+    if (slotKey.startsWith("racialFeat:") && value) {
+      const featIds = nextBuild.featIds.includes(value)
+        ? nextBuild.featIds
+        : [...nextBuild.featIds, value];
+      nextBuild = { ...nextBuild, featIds };
+    }
     nextBuild = pruneStalePowerSelections(index, nextBuild);
     const { classPowerSlots, powerIds } = reconcilePowerSlotsForBuild(nextBuild, build.level);
     updateBuild({ ...nextBuild, classPowerSlots, powerIds });
@@ -2233,32 +2294,34 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               {index.races.map((race) => <option key={race.id} value={race.id}>{race.name}</option>)}
             </select>
             {selectedRace &&
-              (raceSubraceData ||
+              (raceTraitBundleSlots.length > 0 ||
+                raceAbilityBonusInfo.fixed.length > 0 ||
                 raceAbilityBonusInfo.chooseOne.length > 0 ||
                 raceSecondarySlots.length > 0 ||
+                racialTraitRuleSelectSlots.length > 0 ||
                 racePowerGroups.some((g) => g.choiceOnly) ||
                 parseRacialTraitIdsFromRace(selectedRace).includes(ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION)) && (
                 <div style={{ marginTop: "0.65rem", ...ui.blockSubsection, backgroundColor: "var(--surface-1)", borderColor: "var(--panel-border)" }}>
                   <h4 style={subsectionTitleStyle}>Race choices</h4>
-                  {raceSubraceData && (
-                    <label style={{ display: "block", marginBottom: "0.75rem" }}>
+                  {raceTraitBundleSlots.map((bundle) => (
+                    <label key={bundle.selectionKey} style={{ display: "block", marginBottom: "0.75rem" }}>
                       <span style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem", fontSize: "0.85rem" }}>
-                        {raceSubraceData.parentTraitName}
+                        {bundle.parentTraitName}
                       </span>
                       <select
-                        value={build.raceSelections?.subrace || ""}
-                        onChange={(e) => commitSubraceSelection(e.target.value)}
+                        value={build.raceSelections?.[bundle.selectionKey] || ""}
+                        onChange={(e) => commitRaceTraitBundleSelection(bundle.selectionKey, e.target.value)}
                         style={{ width: "100%", maxWidth: "28rem", padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--panel-border)" }}
                       >
-                        <option value="">Select variant…</option>
-                        {raceSubraceData.options.map((opt) => (
+                        <option value="">Select…</option>
+                        {bundle.options.map((opt) => (
                           <option key={opt.id} value={opt.id}>
                             {opt.name}
                           </option>
                         ))}
                       </select>
                     </label>
-                  )}
+                  ))}
                   {parseRacialTraitIdsFromRace(selectedRace).includes(ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION) && (
                     <label style={{ display: "block", marginBottom: "0.75rem" }}>
                       <span style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem", fontSize: "0.85rem" }}>
@@ -2321,7 +2384,19 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                         </label>
                       );
                     })}
-                  {raceAbilityBonusInfo.chooseOne.length > 0 && (
+                  {raceAbilityBonusInfo.fixed.length > 0 && (
+                    <p style={{ margin: "0 0 0.75rem 0", fontSize: "0.82rem", color: "var(--text-secondary)" }}>
+                      <strong>Racial ability (+2):</strong>{" "}
+                      {raceAbilityBonusInfo.fixed.map((a) => `+2 ${getAbilityLabel(a)}`).join(", ")}
+                    </p>
+                  )}
+                  {raceDefersAbilityBonusToSubrace(selectedRace) && !build.raceSelections?.subrace && (
+                    <p style={{ margin: "0 0 0.75rem 0", fontSize: "0.82rem", color: "var(--text-muted)" }}>
+                      Ability bonuses depend on the variant selected above.
+                    </p>
+                  )}
+                  {raceAbilityBonusInfo.chooseOne.length > 0 &&
+                    (!raceDefersAbilityBonusToSubrace(selectedRace) || !!build.raceSelections?.subrace) && (
                     <label style={{ display: "block", marginBottom: raceSecondarySlots.length > 0 ? "0.75rem" : 0 }}>
                       <span style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem", fontSize: "0.85rem" }}>
                         Racial ability (+2) — choose one
@@ -2394,6 +2469,57 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                       )}
                     </label>
                   ))}
+                  {racialTraitRuleSelectSlots.map((slot) => (
+                    <label key={slot.key} style={{ display: "block", marginBottom: "0.65rem" }}>
+                      <span style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem", fontSize: "0.85rem" }}>
+                        {slot.label}
+                      </span>
+                      {slot.kind === "skillTraining" && (
+                        <select
+                          value={(build.raceSelections || {})[slot.key] || ""}
+                          onChange={(e) => commitRacialTraitRuleSelection(slot.key, e.target.value)}
+                          style={{ width: "100%", maxWidth: "28rem", padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--panel-border)" }}
+                        >
+                          <option value="">Select skill…</option>
+                          {skillsSortedAll.map((sk) => (
+                            <option key={sk.id} value={sk.id}>
+                              {sk.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      {slot.kind === "countsAsRace" && (
+                        <select
+                          value={(build.raceSelections || {})[slot.key] || ""}
+                          onChange={(e) => commitRacialTraitRuleSelection(slot.key, e.target.value)}
+                          style={{ width: "100%", maxWidth: "28rem", padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--panel-border)" }}
+                        >
+                          <option value="">Select former race…</option>
+                          {countsAsRacePickOptions.map((r) => (
+                            <option key={r.id} value={r.id}>
+                              {r.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      {slot.kind === "feat" && (
+                        <select
+                          value={(build.raceSelections || {})[slot.key] || ""}
+                          onChange={(e) => commitRacialTraitRuleSelection(slot.key, e.target.value)}
+                          style={{ width: "100%", maxWidth: "28rem", padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--panel-border)" }}
+                        >
+                          <option value="">Select feat…</option>
+                          {featOptions
+                            .filter((o) => o.legal && (o.item.tier === "Heroic" || !o.item.tier))
+                            .map((o) => (
+                              <option key={o.item.id} value={o.item.id}>
+                                {o.item.name}
+                              </option>
+                            ))}
+                        </select>
+                      )}
+                    </label>
+                  ))}
                 </div>
               )}
             {selectedRace && (
@@ -2401,7 +2527,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 <p style={{ margin: 0 }}><strong>Source:</strong> {selectedRace.source || "Unknown"}</p>
                 <p style={{ margin: "0.25rem 0 0 0" }}><strong>Speed:</strong> {String(raceSpecific["Speed"] || selectedRace.speed || "-")}</p>
                 <p style={{ margin: "0.25rem 0 0 0" }}><strong>Size:</strong> {String(raceSpecific["Size"] || selectedRace.size || "-")}</p>
-                <p style={{ margin: "0.25rem 0 0 0" }}><strong>Ability Scores:</strong> {String(raceSpecific["Ability Scores"] || selectedRace.abilitySummary || "-")}</p>
+                <p style={{ margin: "0.25rem 0 0 0" }}><strong>Ability Scores:</strong> {raceAbilityScoresDisplay}</p>
                 <p style={{ margin: "0.25rem 0 0 0" }}><strong>Languages:</strong> {String(raceSpecific["Languages"] || selectedRace.languages || "-")}</p>
                 {displayedRacialTraitRows.length > 0 && (
                   <div style={{ marginTop: "0.65rem" }}>
@@ -2989,7 +3115,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                           if (v) {
                             next.buildOptionId = v;
                             const picked = classBuildOptions.find((o) => o.id === v);
-                            if (picked) next.buildOption = picked.name;
+                            if (picked) next.buildOption = classBuildOptionLabel(picked);
                           } else {
                             delete next.buildOptionId;
                             delete next.buildOption;
@@ -3002,7 +3128,9 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                         <option value="">Select build option…</option>
                         {classBuildOptions.map((opt) => (
                           <option key={opt.id} value={opt.id}>
-                            {opt.parentFeatureName ? `${opt.parentFeatureName}: ${opt.name}` : opt.name}
+                            {opt.parentFeatureName
+                              ? `${opt.parentFeatureName}: ${classBuildOptionLabel(opt)}`
+                              : classBuildOptionLabel(opt)}
                           </option>
                         ))}
                       </select>
@@ -3010,7 +3138,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     {selectedClassBuildOption && (
                       <div style={{ marginTop: "0.55rem" }}>
                         <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.85rem", color: "var(--text-primary)" }}>
-                          <strong>Selected:</strong> {selectedClassBuildOption.name}
+                          <strong>Selected:</strong> {classBuildOptionLabel(selectedClassBuildOption)}
                         </p>
                         {selectedClassBuildOption.shortDescription && (
                           <p style={{ margin: "0 0 0.4rem 0", fontSize: "0.82rem", color: "var(--text-secondary)" }}>

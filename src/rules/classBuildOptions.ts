@@ -14,11 +14,19 @@ function splitOptionList(raw: string): string[] {
 export interface ClassBuildOptionRow {
   id: string;
   name: string;
+  /** Player-facing build label when PHB talent name differs (e.g. Arena Training → Arena Fighter). */
+  displayName?: string | null;
   parentFeatureId: string;
   parentFeatureName: string;
   shortDescription?: string | null;
   body?: string | null;
   powerIds: string[];
+}
+
+/** Label shown in UI; compendium `name` stays for prereqs and grants. */
+export function classBuildOptionLabel(opt: Pick<ClassBuildOptionRow, "name" | "displayName">): string {
+  const display = opt.displayName?.trim();
+  return display || opt.name;
 }
 
 export function getClassBuildOptions(index: RulesIndex, cls: ClassDef | undefined): ClassBuildOptionRow[] {
@@ -28,6 +36,7 @@ export function getClassBuildOptions(index: RulesIndex, cls: ClassDef | undefine
     return rich.map((r) => ({
       id: String(r.id),
       name: String(r.name || r.id),
+      displayName: r.displayName ?? null,
       parentFeatureId: String(r.parentFeatureId || ""),
       parentFeatureName: String(r.parentFeatureName || "Class Feature"),
       shortDescription: r.shortDescription ?? null,

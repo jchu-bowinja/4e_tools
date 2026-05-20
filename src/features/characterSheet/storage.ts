@@ -1,5 +1,6 @@
 import { migrateLegacyEquipment, normalizeCharacterEquipment } from "../../rules/equipment";
 import { normalizeMagicItemSlotIds } from "../../rules/magicItemEquipment";
+import type { Ability } from "../../rules/models";
 import { normalizeActiveConditions } from "./activeConditions";
 import { createDefaultCharacterSheetState } from "./defaultState";
 import type { CharacterEquipment } from "../../rules/models";
@@ -11,6 +12,23 @@ const CHARACTER_SHEET_STORAGE_KEY = "dnd4e_character_sheet_v1";
 function clampInt(value: unknown, min: number, max: number, fallback: number): number {
   const n = typeof value === "number" ? Math.trunc(value) : fallback;
   return Math.max(min, Math.min(max, Number.isNaN(n) ? fallback : n));
+}
+
+const ABILITIES: Ability[] = ["STR", "CON", "DEX", "INT", "WIS", "CHA"];
+
+function normalizeRaceSelections(raw: unknown): Record<string, string> | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof key === "string" && typeof value === "string" && value.trim()) {
+      out[key] = value;
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+function normalizeRacialAbilityChoice(raw: unknown): Ability | undefined {
+  return typeof raw === "string" && (ABILITIES as string[]).includes(raw) ? (raw as Ability) : undefined;
 }
 
 function characterEquipmentFromStored(v: Record<string, unknown>): CharacterEquipment | undefined {
@@ -80,7 +98,9 @@ export function normalizeState(input: unknown): CharacterSheetState {
       v.paragonMulticlassPowers && typeof v.paragonMulticlassPowers === "object"
         ? (v.paragonMulticlassPowers as CharacterSheetState["paragonMulticlassPowers"])
         : undefined,
-    epicDestinyId: typeof v.epicDestinyId === "string" && v.epicDestinyId.trim() ? v.epicDestinyId : undefined
+    epicDestinyId: typeof v.epicDestinyId === "string" && v.epicDestinyId.trim() ? v.epicDestinyId : undefined,
+    raceSelections: normalizeRaceSelections(v.raceSelections),
+    racialAbilityChoice: normalizeRacialAbilityChoice(v.racialAbilityChoice)
   };
   return next;
 }

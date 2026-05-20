@@ -7,7 +7,16 @@ export interface RaceSubraceData {
   options: RacialTrait[];
 }
 
-function parseIdList(raw: unknown): string[] {
+/** One "pick one of these racial traits" bundle (subrace, manifestation, racial power, …). */
+export interface RaceTraitBundleSlot {
+  /** `subrace` for the primary subrace bundle; otherwise `racialTrait:${parentTraitId}`. */
+  selectionKey: string;
+  parentTraitId: string;
+  parentTraitName: string;
+  options: RacialTrait[];
+}
+
+export function parseIdList(raw: unknown): string[] {
   if (Array.isArray(raw)) {
     return raw.map((x) => String(x).trim()).filter(Boolean);
   }
@@ -21,9 +30,6 @@ function parseIdList(raw: unknown): string[] {
 
 function isLikelySubraceParentTrait(trait: RacialTrait): boolean {
   if (/subrace/i.test(trait.name)) return true;
-  const spec = (trait.raw?.specific as Record<string, unknown> | undefined) || {};
-  const parsed = parseIdList(spec["_PARSED_SUB_FEATURES"]);
-  if (parsed.length > 0) return true;
   const rules = (trait.raw?.rules as Record<string, unknown> | undefined) || {};
   const selects = (rules["select"] as Array<{ attrs?: Record<string, unknown> }> | undefined) || [];
   return selects.some((s) => {
@@ -41,24 +47,33 @@ function hasSubraceSignal(trait: RacialTrait, optionIds: string[]): boolean {
     if (String(s.attrs?.["type"]) !== "Racial Trait") return false;
     const cat = String(s.attrs?.["Category"] ?? "").trim();
     if (/subrace/i.test(cat)) return true;
-    // Essentials-style "pick one of these racial traits" (e.g. Half-Elf: Dilettante vs Knack for Success).
-    // Do not match "Dragonborn Racial Power" (category ends with "Racial Power", not "Power Selection").
     if (/\bpower selection$/i.test(cat)) return true;
     return false;
   });
 }
 
-function resolveTraitId(
-  id: string,
-  traitsById: Map<string, RacialTrait>
-): RacialTrait | undefined {
+function isRacialTraitBundleParent(trait: RacialTrait, optionIds: string[]): boolean {
+  const rules = trait.raw?.rules as Record<string, unknown> | undefined;
+  const selects = (rules?.["select"] as Array<{ attrs?: Record<string, unknown> }> | undefined) ?? [];
+  const hasSelect = selects.some((s) => {
+    if (String(s.attrs?.["type"]) !== "Racial Trait") return false;
+    const n = Number(s.attrs?.["number"]);
+    return Number.isFinite(n) && n > 0;
+  });
+  if (!hasSelect) return false;
+  if (optionIds.length > 0) return true;
+  return selects.some((s) => {
+    const cat = String(s.attrs?.["Category"] ?? s.attrs?.["category"] ?? "").trim();
+    return !!cat;
+  });
+}
+
+function resolveTraitId(id: string, traitsById: Map<string, RacialTrait>): RacialTrait | undefined {
   const direct = traitsById.get(id);
   if (direct) return direct;
-  // Some source rows reference SUBRACE ids while the concrete trait row uses RACIAL_TRAIT.
   const subraceToTrait = id.replace("_SUBRACE_", "_RACIAL_TRAIT_");
   if (subraceToTrait !== id) {
-    const mapped = traitsById.get(subraceToTrait);
-    if (mapped) return mapped;
+    return traitsById.get(subraceToTrait);
   }
   return undefined;
 }
@@ -69,21 +84,57 @@ function resolveSubraceOptionTraits(
 ): RacialTrait[] {
   const out: RacialTrait[] = [];
   const seen = new Set<string>();
-  // Prefer explicit SUBRACE ids when present.
   const sortedIds = [...optionIds].sort((a, b) => {
     const as = a.includes("_SUBRACE_") ? 0 : 1;
     const bs = b.includes("_SUBRACE_") ? 0 : 1;
-    if (as !== bs) return as - bs;
-    return 0;
+    return as - bs;
   });
   for (const id of sortedIds) {
     const row = resolveTraitId(id, traitsById);
-    if (!row) continue;
-    if (seen.has(row.id)) continue;
+    if (!row || seen.has(row.id)) continue;
     seen.add(row.id);
     out.push(row);
   }
   return out;
+}
+
+function resolveTraitBundleOptions(
+  parent: RacialTrait,
+  traitsById: Map<string, RacialTrait>
+): RacialTrait[] {
+  const spec = (parent.raw?.specific as Record<string, unknown> | undefined) || {};
+  const optionIds = parseIdList(spec["_PARSED_SUB_FEATURES"]);
+  if (optionIds.length > 0) {
+    return resolveSubraceOptionTraits(optionIds, traitsById);
+  }
+
+  const fromSupports = [...traitsById.values()].filter((t) => {
+    const sid = String((t.raw?.specific as Record<string, unknown> | undefined)?.["_SupportsID"] ?? "");
+    return sid === parent.id;
+  });
+  if (fromSupports.length > 0) {
+    return fromSupports.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+  }
+
+  const rules = parent.raw?.rules as Record<string, unknown> | undefined;
+  const selects = (rules?.["select"] as Array<{ attrs?: Record<string, unknown> }> | undefined) ?? [];
+  const selectRow = selects.find((s) => String(s.attrs?.["type"]) === "Racial Trait");
+  const cat = String(selectRow?.attrs?.["Category"] ?? selectRow?.attrs?.["category"] ?? "").trim();
+  const parentLower = parent.name.trim().toLowerCase();
+  if (!cat) return [];
+
+  return [...traitsById.values()]
+    .filter((t) => {
+      if (t.id === parent.id) return false;
+      const tn = t.name.trim().toLowerCase();
+      if (tn === parentLower) return false;
+      if (tn.startsWith(`${parentLower} (`) || tn.startsWith(`${parentLower}(`)) return true;
+      if (cat.toLowerCase() === parentLower && tn.startsWith(parentLower) && tn.length > parentLower.length) {
+        return true;
+      }
+      return false;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
 }
 
 function appendStandardSubraceOption(
@@ -111,7 +162,6 @@ function findFallbackSubraceParentTrait(
   for (const trait of traitsById.values()) {
     if (!isLikelySubraceParentTrait(trait)) continue;
     const tn = trait.name.trim().toLowerCase();
-    // Variant data (e.g. "Dragonborn Subrace") is sometimes not listed on race.specific["Racial Traits"].
     if (tn === `${raceName} subrace` || (tn.includes(raceName) && tn.includes("subrace"))) {
       return trait;
     }
@@ -119,55 +169,115 @@ function findFallbackSubraceParentTrait(
   return undefined;
 }
 
+function bundleSelectionKey(parent: RacialTrait, optionIds: string[], useSubraceKey: boolean): string {
+  return useSubraceKey ? "subrace" : `racialTrait:${parent.id}`;
+}
+
+export function getRaceTraitBundleSlots(
+  race: Race | undefined,
+  traitsById: Map<string, RacialTrait>
+): RaceTraitBundleSlot[] {
+  if (!race) return [];
+  const slots: RaceTraitBundleSlot[] = [];
+  const seenParents = new Set<string>();
+  let hasSubraceKey = false;
+
+  const pushBundle = (parent: RacialTrait, optionIds: string[]) => {
+    if (seenParents.has(parent.id)) return;
+    const isSubrace = hasSubraceSignal(parent, optionIds);
+    const useSubraceKey = isSubrace && !hasSubraceKey;
+    let options = resolveTraitBundleOptions(parent, traitsById);
+    if (isSubrace) {
+      options = appendStandardSubraceOption(race, options, traitsById);
+    }
+    if (options.length === 0) return;
+    seenParents.add(parent.id);
+    if (useSubraceKey) hasSubraceKey = true;
+    slots.push({
+      selectionKey: bundleSelectionKey(parent, optionIds, useSubraceKey),
+      parentTraitId: parent.id,
+      parentTraitName: parent.name,
+      options
+    });
+  };
+
+  for (const traitId of parseRacialTraitIdsFromRace(race)) {
+    const parent = traitsById.get(traitId);
+    if (!parent) continue;
+    const optionIds = parseIdList((parent.raw?.specific as Record<string, unknown> | undefined)?.["_PARSED_SUB_FEATURES"]);
+    if (!isRacialTraitBundleParent(parent, optionIds)) continue;
+    pushBundle(parent, optionIds);
+  }
+
+  if (!hasSubraceKey) {
+    const fallback = findFallbackSubraceParentTrait(race, traitsById);
+    if (fallback) {
+      const optionIds = parseIdList(
+        (fallback.raw?.specific as Record<string, unknown> | undefined)?.["_PARSED_SUB_FEATURES"]
+      );
+      pushBundle(fallback, optionIds);
+    }
+  }
+
+  return slots;
+}
+
 export function getRaceSubraceData(
   race: Race | undefined,
   traitsById: Map<string, RacialTrait>
 ): RaceSubraceData | undefined {
-  if (!race) return undefined;
-  for (const traitId of parseRacialTraitIdsFromRace(race)) {
-    const parent = traitsById.get(traitId);
-    if (!parent || !isLikelySubraceParentTrait(parent)) continue;
-    const spec = (parent.raw?.specific as Record<string, unknown> | undefined) || {};
-    const optionIds = parseIdList(spec["_PARSED_SUB_FEATURES"]);
-    if (!hasSubraceSignal(parent, optionIds)) continue;
-    const options = appendStandardSubraceOption(
-      race,
-      resolveSubraceOptionTraits(optionIds, traitsById),
-      traitsById
-    );
-    if (options.length === 0) continue;
-    return {
-      parentTraitId: parent.id,
-      parentTraitName: parent.name,
-      options
-    };
-  }
-  const fallbackParent = findFallbackSubraceParentTrait(race, traitsById);
-  if (fallbackParent) {
-    const spec = (fallbackParent.raw?.specific as Record<string, unknown> | undefined) || {};
-    const optionIds = parseIdList(spec["_PARSED_SUB_FEATURES"]);
-    const options = appendStandardSubraceOption(
-      race,
-      resolveSubraceOptionTraits(optionIds, traitsById),
-      traitsById
-    );
-    if (options.length > 0) {
-      return {
-        parentTraitId: fallbackParent.id,
-        parentTraitName: fallbackParent.name,
-        options
-      };
-    }
+  const slot = getRaceTraitBundleSlots(race, traitsById).find((s) => s.selectionKey === "subrace");
+  if (!slot) return undefined;
+  return {
+    parentTraitId: slot.parentTraitId,
+    parentTraitName: slot.parentTraitName,
+    options: slot.options
+  };
+}
+
+/** Past Spirit trait granted after a CountsAsRace pick (Revenant past life). */
+export function findPastSpiritTraitForCountsAsRace(
+  selectedRaceId: string,
+  traitsById: Map<string, RacialTrait>,
+  races: Race[]
+): RacialTrait | undefined {
+  const picked = races.find((r) => r.id === selectedRaceId);
+  if (!picked) return undefined;
+  const target = `past spirit (${picked.name.trim().toLowerCase()})`;
+  for (const t of traitsById.values()) {
+    if (t.name.trim().toLowerCase() === target) return t;
   }
   return undefined;
 }
 
-/** Child traits granted/selected inside a chosen subrace trait. */
-export function getChildTraitIdsForSubrace(subraceTrait: RacialTrait | undefined): string[] {
+function countsAsRaceExtraTraitIds(
+  race: Race,
+  traitsById: Map<string, RacialTrait>,
+  races: Race[],
+  raceSelections?: Record<string, string>
+): string[] {
+  const out: string[] = [];
+  for (const traitId of parseRacialTraitIdsFromRace(race)) {
+    const key = `countsAsRace:${traitId}`;
+    const pickedRaceId = raceSelections?.[key];
+    if (!pickedRaceId) continue;
+    const pastSpirit = findPastSpiritTraitForCountsAsRace(pickedRaceId, traitsById, races);
+    if (pastSpirit) out.push(pastSpirit.id);
+  }
+  return out;
+}
+
+/** Child traits listed in `specific._PARSED_CHILD_FEATURES` (excludes select-category option ids). */
+export function getStructuralChildTraitIdsForSubrace(subraceTrait: RacialTrait | undefined): string[] {
   if (!subraceTrait) return [];
   const spec = (subraceTrait.raw?.specific as Record<string, unknown> | undefined) || {};
-  const ids = new Set(parseIdList(spec["_PARSED_CHILD_FEATURES"]));
-  // Fallback: derive linked racial trait ids from select categories.
+  return parseIdList(spec["_PARSED_CHILD_FEATURES"]);
+}
+
+/** Child traits granted/selected inside a chosen bundle option. */
+export function getChildTraitIdsForSubrace(subraceTrait: RacialTrait | undefined): string[] {
+  if (!subraceTrait) return [];
+  const ids = new Set(getStructuralChildTraitIdsForSubrace(subraceTrait));
   const rules = (subraceTrait.raw?.rules as Record<string, unknown> | undefined) || {};
   const selects = (rules["select"] as Array<{ attrs?: Record<string, unknown> }> | undefined) || [];
   for (const s of selects) {
@@ -184,20 +294,25 @@ export function getChildTraitIdsForSubrace(subraceTrait: RacialTrait | undefined
   return [...ids];
 }
 
-/** Trait ids from the selected subrace variant (subrace row + nested child features). */
+/** Trait ids from all selected racial trait bundles + past-life past spirit. */
 export function getRaceExtraTraitIds(
   race: Race | undefined,
   traitsById: Map<string, RacialTrait>,
-  raceSelections?: Record<string, string>
+  raceSelections?: Record<string, string>,
+  races?: Race[]
 ): string[] {
-  const raceSubraceData = getRaceSubraceData(race, traitsById);
-  const subPick = raceSelections?.["subrace"];
-  const selectedSubrace =
-    subPick && raceSubraceData ? raceSubraceData.options.find((o) => o.id === subPick) : undefined;
+  if (!race) return [];
   const extraTraitIds: string[] = [];
-  if (selectedSubrace) {
-    extraTraitIds.push(selectedSubrace.id);
-    extraTraitIds.push(...getChildTraitIdsForSubrace(selectedSubrace));
+  for (const slot of getRaceTraitBundleSlots(race, traitsById)) {
+    const pick = raceSelections?.[slot.selectionKey];
+    const selected = pick ? slot.options.find((o) => o.id === pick) : undefined;
+    if (selected) {
+      extraTraitIds.push(selected.id);
+      extraTraitIds.push(...getChildTraitIdsForSubrace(selected));
+    }
+  }
+  if (races?.length) {
+    extraTraitIds.push(...countsAsRaceExtraTraitIds(race, traitsById, races, raceSelections));
   }
   return extraTraitIds;
 }
@@ -208,12 +323,12 @@ export function getRaceExtraTraitIdsFromBuild(
 ): string[] {
   const race = index.races.find((r) => r.id === build.raceId);
   const traitsById = new Map((index.racialTraits ?? []).map((t) => [t.id, t]));
-  return getRaceExtraTraitIds(race, traitsById, build.raceSelections);
+  return getRaceExtraTraitIds(race, traitsById, build.raceSelections, index.races);
 }
 
 /**
- * Racial traits to show on the Race tab: top-level race traits plus the chosen subrace bundle,
- * hiding the subrace parent picker and unselected variant options.
+ * Racial traits to show on the Race tab: top-level race traits plus chosen bundle options,
+ * hiding bundle parents and unselected variants.
  */
 export function resolveDisplayedRacialTraitsForRace(
   race: Race | undefined,
@@ -221,16 +336,15 @@ export function resolveDisplayedRacialTraitsForRace(
   raceSelections?: Record<string, string>
 ): Array<{ id: string; trait?: RacialTrait }> {
   const topIds = parseRacialTraitIdsFromRace(race);
-  const subraceData = getRaceSubraceData(race, traitsById);
-  const subPick = raceSelections?.["subrace"];
-  const selectedSubrace =
-    subPick && subraceData ? subraceData.options.find((o) => o.id === subPick) : undefined;
-
+  const bundles = getRaceTraitBundleSlots(race, traitsById);
   const hideIds = new Set<string>();
-  if (subraceData) {
-    if (subraceData.parentTraitId) hideIds.add(subraceData.parentTraitId);
-    for (const opt of subraceData.options) {
-      if (!selectedSubrace || opt.id !== selectedSubrace.id) hideIds.add(opt.id);
+
+  for (const slot of bundles) {
+    hideIds.add(slot.parentTraitId);
+    const pick = raceSelections?.[slot.selectionKey];
+    const selected = pick ? slot.options.find((o) => o.id === pick) : undefined;
+    for (const opt of slot.options) {
+      if (!selected || opt.id !== selected.id) hideIds.add(opt.id);
     }
   }
 
@@ -244,12 +358,15 @@ export function resolveDisplayedRacialTraitsForRace(
     rows.push({ id, trait: traitsById.get(id) });
   }
 
-  if (selectedSubrace) {
-    if (!seen.has(selectedSubrace.id)) {
-      seen.add(selectedSubrace.id);
-      rows.push({ id: selectedSubrace.id, trait: selectedSubrace });
+  for (const slot of bundles) {
+    const pick = raceSelections?.[slot.selectionKey];
+    const selected = pick ? slot.options.find((o) => o.id === pick) : undefined;
+    if (!selected) continue;
+    if (!seen.has(selected.id)) {
+      seen.add(selected.id);
+      rows.push({ id: selected.id, trait: selected });
     }
-    for (const childId of getChildTraitIdsForSubrace(selectedSubrace)) {
+    for (const childId of getChildTraitIdsForSubrace(selected)) {
       if (seen.has(childId)) continue;
       seen.add(childId);
       rows.push({ id: childId, trait: traitsById.get(childId) });

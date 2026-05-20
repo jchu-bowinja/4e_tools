@@ -26,9 +26,10 @@ import {
   hybridPowerPoolUnion,
   powerAllowedForHybridSlot
 } from "./hybridPowerSlots";
-import { parseRaceAbilityBonusInfo } from "./abilityScores";
+import { resolveRaceAbilityBonusInfo } from "./abilityScores";
 import { getClassBuildOptions } from "./classBuildOptions";
-import { getRaceExtraTraitIds, getRaceSubraceData } from "./raceSubraces";
+import { countsAsRaceOptions, getRacialTraitRuleSelectSlots } from "./racialTraitRuleSelects";
+import { getRaceExtraTraitIds, getRaceTraitBundleSlots } from "./raceSubraces";
 import { getRaceSecondarySelectSlots, selectableStartingLanguages } from "./raceRuleSelects";
 import { autoGrantedTrainedSkillIds } from "./grantedSkillsQuery";
 import { validateInternalGrantFeats } from "./internalGrantValidation";
@@ -169,17 +170,45 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
         }
       }
 
-      const abilityInfo = parseRaceAbilityBonusInfo(race);
+      const racialTraitById = new Map((index.racialTraits ?? []).map((t) => [t.id, t]));
+      const abilityInfo = resolveRaceAbilityBonusInfo(race, racialTraitById, rs);
       if (abilityInfo.chooseOne.length > 0 && !build.racialAbilityChoice) {
         errors.push("Race: choose a racial ability bonus (+2).");
       }
-
-      const racialTraitById = new Map((index.racialTraits ?? []).map((t) => [t.id, t]));
-      const raceSubraceData = getRaceSubraceData(race, racialTraitById);
-      if (raceSubraceData && !rs["subrace"]) {
-        errors.push(`Race: ${raceSubraceData.parentTraitName} — make a selection.`);
+      if (abilityInfo.chooseOne.length > 0 && build.racialAbilityChoice && !abilityInfo.chooseOne.includes(build.racialAbilityChoice)) {
+        errors.push("Race: racial ability bonus (+2) is not valid for the selected variant.");
       }
-      const extraTraitIds = getRaceExtraTraitIds(race, racialTraitById, rs);
+      for (const bundle of getRaceTraitBundleSlots(race, racialTraitById)) {
+        if (!rs[bundle.selectionKey]) {
+          errors.push(`Race: ${bundle.parentTraitName} — make a selection.`);
+        }
+      }
+      const clsForRaceSelects = !isHybrid ? index.classes.find((c) => c.id === build.classId) : undefined;
+      for (const slot of getRacialTraitRuleSelectSlots(race, racialTraitById, rs, clsForRaceSelects, index.races)) {
+        const picked = rs[slot.key];
+        if (!picked) {
+          errors.push(`Race: ${slot.label} — make a selection.`);
+          continue;
+        }
+        if (slot.kind === "skillTraining" && !legalSkillIds.has(picked)) {
+          errors.push(`Race: ${slot.label} — pick a valid skill.`);
+        }
+        if (slot.kind === "countsAsRace") {
+          const legalRaceIds = new Set(countsAsRaceOptions(index, build.raceId).map((r) => r.id));
+          if (!legalRaceIds.has(picked)) {
+            errors.push(`Race: ${slot.label} — pick a valid former race.`);
+          }
+        }
+        if (slot.kind === "feat") {
+          const feat = index.feats.find((f) => f.id === picked);
+          if (!feat) {
+            errors.push(`Race: ${slot.label} — pick a valid feat.`);
+          } else if (!build.featIds.includes(picked)) {
+            errors.push(`Race: ${slot.label} — add the selected feat on the Feats tab.`);
+          }
+        }
+      }
+      const extraTraitIds = getRaceExtraTraitIds(race, racialTraitById, rs, index.races);
       for (const g of racePowerGroupsForRace(race, racialTraitById, extraTraitIds)) {
         if (!g.choiceOnly) continue;
         const pk = racePowerSelectSelectionKey(g.traitId);

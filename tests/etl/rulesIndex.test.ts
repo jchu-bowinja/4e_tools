@@ -28,6 +28,10 @@ describe.skipIf(!existsSync(rulesIndexPath))("generated rules index", () => {
       magicItems?: unknown[];
       autoGrantedPowerIdsByClassId?: Record<string, string[]>;
       autoGrantedSkillTrainingNamesBySupportId?: Record<string, string[]>;
+      classBuildOptionsByClassId?: Record<
+        string,
+        Array<{ id: string; name: string; body?: string | null; powerIds?: string[] }>
+      >;
     };
 
     expect(data.races.length).toBeGreaterThan(0);
@@ -95,6 +99,39 @@ describe.skipIf(!existsSync(rulesIndexPath))("generated rules index", () => {
     expect(data.skills.every((s) => !!s.id && !!s.name)).toBe(true);
     expect(data.racialTraits.every((t) => !!t.id && !!t.name)).toBe(true);
     expect((data.hybridClasses ?? []).every((h) => !!h.id && !!h.name && !!h.baseClassId)).toBe(true);
+  });
+
+  it("includes Essentials Build rows for Cleric, Paladin, and Artificer class build options", () => {
+    const raw = readFileSync(rulesIndexPath, "utf-8");
+    const data = JSON.parse(raw) as {
+      classes: Array<{ id: string; name: string }>;
+      classBuildOptionsByClassId?: Record<string, Array<{ id: string; name: string; body?: string | null }>>;
+    };
+    const clericId = data.classes.find((c) => c.name === "Cleric")?.id;
+    const paladinId = data.classes.find((c) => c.name === "Paladin")?.id;
+    const artificerId = data.classes.find((c) => c.name === "Artificer")?.id;
+    expect(clericId).toBeTruthy();
+    expect(paladinId).toBeTruthy();
+    expect(artificerId).toBeTruthy();
+
+    const clericOpts = data.classBuildOptionsByClassId?.[clericId!] ?? [];
+    expect(clericOpts.map((o) => o.name).sort()).toEqual(
+      ["Battle Cleric", "Devoted Cleric", "Shielding Cleric"].sort()
+    );
+    const battle = clericOpts.find((o) => o.name === "Battle Cleric");
+    expect(battle?.id).toBe("ID_FMP_BUILD_6");
+    expect(battle?.body?.length).toBeGreaterThan(20);
+
+    const paladinOpts = data.classBuildOptionsByClassId?.[paladinId!] ?? [];
+    expect(paladinOpts.length).toBe(4);
+    const artificerOpts = data.classBuildOptionsByClassId?.[artificerId!] ?? [];
+    expect(artificerOpts.length).toBe(3);
+
+    const fighterId = data.classes.find((c) => c.name === "Fighter")?.id;
+    const arena = (data.classBuildOptionsByClassId?.[fighterId!] ?? []).find(
+      (o) => o.name === "Arena Training"
+    );
+    expect(arena?.displayName).toBe("Arena Fighter");
   });
 });
 

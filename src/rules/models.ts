@@ -494,6 +494,7 @@ export interface RulesIndex {
     Array<{
       id: string;
       name: string;
+      displayName?: string | null;
       parentFeatureId: string;
       parentFeatureName: string;
       shortDescription?: string | null;

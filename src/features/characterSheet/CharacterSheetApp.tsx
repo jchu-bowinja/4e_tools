@@ -10,7 +10,7 @@ import {
   type ReactNode
 } from "react";
 import type { Armor, Implement, RacialTrait, RulesIndex, Weapon } from "../../rules/models";
-import { resolveRacialTraitsForRace } from "../../rules/racialTraits";
+import { resolveDisplayedRacialTraitsForRace } from "../../rules/raceSubraces";
 import {
   applyFeatModificationsToTraitRows,
   collectFeatModificationsByClassFeatureId
@@ -977,8 +977,11 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     [index.racialTraits]
   );
   const racialTraitRows = useMemo(
-    () => resolveRacialTraitsForRace(derived.race, racialTraitsById).filter((row): row is { id: string; trait: RacialTrait } => Boolean(row.trait)),
-    [derived.race, racialTraitsById]
+    () =>
+      resolveDisplayedRacialTraitsForRace(derived.race, racialTraitsById, sheet.raceSelections).filter(
+        (row): row is { id: string; trait: RacialTrait } => Boolean(row.trait)
+      ),
+    [derived.race, racialTraitsById, sheet.raceSelections]
   );
   const selectedFeatRows = useMemo(
     () => (sheet.featIds ?? []).map((featId) => featsById.get(featId)).filter((feat): feat is NonNullable<typeof feat> => Boolean(feat)),

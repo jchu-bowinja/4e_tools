@@ -67,6 +67,9 @@ export interface CharacterSheetState {
   name: string;
   level: number;
   raceId?: string;
+  /** Race tab picks (subrace, racial powers, bonus language, …) — aligned with builder `raceSelections`. */
+  raceSelections?: Record<string, string>;
+  racialAbilityChoice?: Ability;
   classId?: string;
   /** When set with hybrid class ids, derived stats use hybrid rules (matches builder). */
   characterStyle?: CharacterStyle;

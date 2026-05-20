@@ -19,7 +19,10 @@ const LABEL_TO_ABILITY: Record<string, Ability> = {
 };
 
 function ruleSelectEntries(race: Race | undefined): unknown[] {
-  const rules = race?.raw?.rules as Record<string, unknown> | undefined;
+  return ruleSelectEntriesFromRules(race?.raw?.rules as Record<string, unknown> | undefined);
+}
+
+export function ruleSelectEntriesFromRules(rules: Record<string, unknown> | undefined): unknown[] {
   const sel = rules?.select;
   return Array.isArray(sel) ? sel : [];
 }
@@ -47,9 +50,9 @@ function abilityFromLabelToken(token: string): Ability | undefined {
 }
 
 /** Abilities declared on Race Ability Bonus selects (| separated Category). */
-export function abilitiesFromRaceAbilitySelects(race: Race | undefined): Ability[] {
+export function abilitiesFromRaceAbilitySelectRules(rules: Record<string, unknown> | undefined): Ability[] {
   const out: Ability[] = [];
-  for (const entry of ruleSelectEntries(race)) {
+  for (const entry of ruleSelectEntriesFromRules(rules)) {
     const attrs = selectAttrs(entry);
     if (attrs.type !== "Race Ability Bonus") continue;
     if (selectCount(attrs) <= 0) continue;
@@ -61,6 +64,38 @@ export function abilitiesFromRaceAbilitySelects(race: Race | undefined): Ability
     }
   }
   return [...new Set(out)];
+}
+
+/** Abilities declared on Race Ability Bonus selects (| separated Category). */
+export function abilitiesFromRaceAbilitySelects(race: Race | undefined): Ability[] {
+  return abilitiesFromRaceAbilitySelectRules(race?.raw?.rules as Record<string, unknown> | undefined);
+}
+
+/** Fixed +2 abilities from `rules.grant` type Race Ability Bonus (internal compendium ids). */
+export function abilitiesFromRaceAbilityGrantRules(rules: Record<string, unknown> | undefined): Ability[] {
+  const grants = (rules?.grant as Array<{ attrs?: Record<string, string> }> | undefined) ?? [];
+  const out: Ability[] = [];
+  for (const g of grants) {
+    if (String(g.attrs?.type ?? "") !== "Race Ability Bonus") continue;
+    const ab = abilityFromInternalRaceAbilityGrantName(String(g.attrs?.name ?? ""));
+    if (ab) out.push(ab);
+  }
+  return [...new Set(out)];
+}
+
+function abilityFromInternalRaceAbilityGrantName(name: string): Ability | undefined {
+  const direct: Record<string, Ability> = {
+    ID_INTERNAL_RACE_ABILITY_BONUS_CHARISMA: "CHA",
+    ID_INTERNAL_RACE_ABILITY_BONUS_DEXTERITY: "DEX",
+    ID_INTERNAL_RACE_ABILITY_BONUS_STRENGTH: "STR",
+    ID_INTERNAL_RACE_ABILITY_BONUS_CONSTITUTION: "CON",
+    ID_INTERNAL_RACE_ABILITY_BONUS_INTELLIGENCE: "INT",
+    ID_INTERNAL_RACE_ABILITY_BONUS_WISDOM: "WIS"
+  };
+  if (direct[name]) return direct[name];
+  const m = /ID_INTERNAL_RACE_ABILITY_BONUS_(\w+)/i.exec(name);
+  if (m) return abilityFromLabelToken(m[1]);
+  return undefined;
 }
 
 export type RaceSecondarySelectKind = "language" | "skillBonus";

@@ -4,6 +4,7 @@ import {
   getChildTraitIdsForSubrace,
   getRaceExtraTraitIds,
   getRaceSubraceData,
+  getRaceTraitBundleSlots,
   resolveDisplayedRacialTraitsForRace
 } from "../../src/rules/raceSubraces";
 
@@ -226,6 +227,79 @@ describe("resolveDisplayedRacialTraitsForRace", () => {
     expect(resolveDisplayedRacialTraitsForRace(race, byId, { subrace: "TR_A" }).map((r) => r.id)).toEqual([
       "TR_BASE",
       "TR_A"
+    ]);
+  });
+});
+
+describe("getRaceTraitBundleSlots", () => {
+  it("includes Elemental Manifestation on Genasi", () => {
+    const race: Race = {
+      id: "R_GEN",
+      name: "Genasi",
+      slug: "genasi",
+      raw: { specific: { "Racial Traits": "TR_MAN" } }
+    };
+    const parent: RacialTrait = {
+      id: "TR_MAN",
+      name: "Elemental Manifestation",
+      slug: "elemental-manifestation",
+      raw: {
+        specific: { _PARSED_SUB_FEATURES: "TR_FIRE,TR_EARTH" },
+        rules: { select: [{ attrs: { type: "Racial Trait", number: "1", Category: "Elemental Manifestation" } }] }
+      }
+    };
+    const fire: RacialTrait = { id: "TR_FIRE", name: "Firesoul", slug: "firesoul", raw: {} };
+    const earth: RacialTrait = { id: "TR_EARTH", name: "Earthsoul", slug: "earthsoul", raw: {} };
+    const byId = new Map([
+      ["TR_MAN", parent],
+      ["TR_FIRE", fire],
+      ["TR_EARTH", earth]
+    ]);
+    const slots = getRaceTraitBundleSlots(race, byId);
+    expect(slots).toHaveLength(1);
+    expect(slots[0]?.parentTraitName).toBe("Elemental Manifestation");
+    expect(slots[0]?.selectionKey).toBe("racialTrait:TR_MAN");
+    expect(slots[0]?.options.map((o) => o.name).sort()).toEqual(["Earthsoul", "Firesoul"]);
+  });
+
+  it("includes Dragonborn Racial Power alongside subrace fallback", () => {
+    const race: Race = {
+      id: "R_DB",
+      name: "Dragonborn",
+      slug: "dragonborn",
+      raw: { specific: { "Racial Traits": "TR_PWR" } }
+    };
+    const powerPick: RacialTrait = {
+      id: "TR_PWR",
+      name: "Dragonborn Racial Power",
+      slug: "dragonborn-racial-power",
+      raw: {
+        specific: { _PARSED_SUB_FEATURES: "TR_A,TR_B" },
+        rules: { select: [{ attrs: { type: "Racial Trait", number: "1", Category: "Dragonborn Racial Power" } }] }
+      }
+    };
+    const a: RacialTrait = { id: "TR_A", name: "Dragon Breath", slug: "breath", raw: {} };
+    const b: RacialTrait = { id: "TR_B", name: "Dragonborn Fury", slug: "fury", raw: {} };
+    const subParent: RacialTrait = {
+      id: "TR_SUB",
+      name: "Dragonborn Subrace",
+      slug: "dragonborn-subrace",
+      raw: { specific: { _PARSED_SUB_FEATURES: "TR_STD" } }
+    };
+    const std: RacialTrait = { id: "TR_STD", name: "Standard Dragonborn Racial Traits", slug: "std", raw: {} };
+    const byId = new Map([
+      ["TR_PWR", powerPick],
+      ["TR_A", a],
+      ["TR_B", b],
+      ["TR_SUB", subParent],
+      ["TR_STD", std]
+    ]);
+    const slots = getRaceTraitBundleSlots(race, byId);
+    expect(slots.map((s) => s.parentTraitName).sort()).toEqual(
+      ["Dragonborn Racial Power", "Dragonborn Subrace"].sort()
+    );
+    expect(slots.find((s) => s.selectionKey === "subrace")?.options.map((o) => o.name)).toEqual([
+      "Standard Dragonborn Racial Traits"
     ]);
   });
 });

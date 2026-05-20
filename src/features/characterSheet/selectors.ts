@@ -277,6 +277,8 @@ export function sheetStateFromBuild(build: CharacterBuild, index: RulesIndex): C
     name: normalized.name || "Unnamed Character",
     level: normalized.level,
     raceId: normalized.raceId,
+    raceSelections: normalized.raceSelections ? { ...normalized.raceSelections } : undefined,
+    racialAbilityChoice: normalized.racialAbilityChoice,
     classId: normalized.classId,
     characterStyle: normalized.characterStyle,
     hybridClassIdA: normalized.hybridClassIdA,

@@ -1,6 +1,8 @@
 # Vision
 The final product will be a fully integrated suite of 4th Edition Dungeons and Dragons tools to assist and manage the experience of playing and running a session or campaign.
 
+**Race/class builder fidelity:** See [class-build-options.md](./class-build-options.md) for PHB vs Essentials build indexing; run `tools/etl/list_race_class_selection_gaps.py` for coverage gaps.
+
 ## Standalone Products
 ### 1. Character Builder
         - Character Builder

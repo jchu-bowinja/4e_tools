@@ -1,5 +1,10 @@
-import { Ability, Race } from "./models";
-import { abilitiesFromRaceAbilitySelects } from "./raceRuleSelects";
+import { Ability, Race, RacialTrait } from "./models";
+import {
+  abilitiesFromRaceAbilityGrantRules,
+  abilitiesFromRaceAbilitySelectRules,
+  abilitiesFromRaceAbilitySelects
+} from "./raceRuleSelects";
+import { getRaceSubraceData, getStructuralChildTraitIdsForSubrace } from "./raceSubraces";
 
 const ABILITY_LABELS: Record<Ability, string> = {
   STR: "Strength",
@@ -40,25 +45,30 @@ function abilityFromClause(clause: string): Ability | undefined {
   return undefined;
 }
 
-/**
- * Parses PHB-style racial ability lines. Data uses comma/semicolon between clauses; "or" marks alternatives
- * for a single +2 choice (e.g. "+2 Dexterity, +2 Charisma or +2 Constitution" → +2 DEX automatic, choose CHA or CON).
- */
-export function parseRaceAbilityBonusInfo(race: Race | undefined): RaceAbilityBonusInfo {
-  const text = String((race?.raw?.specific as Record<string, unknown> | undefined)?.["Ability Scores"] || "").trim();
-  if (!text) {
+function raceAbilityScoresText(race: Race | undefined): string {
+  return String((race?.raw?.specific as Record<string, unknown> | undefined)?.["Ability Scores"] || "").trim();
+}
+
+export function raceDefersAbilityBonusToSubrace(race: Race | undefined): boolean {
+  return /see\s+the\s+race\s+chosen/i.test(raceAbilityScoresText(race));
+}
+
+/** Parses PHB-style ability score lines from `specific["Ability Scores"]` text. */
+export function parseAbilityScoresText(text: string): RaceAbilityBonusInfo {
+  const trimmed = text.trim();
+  if (!trimmed) {
     return { fixed: [], chooseOne: [] };
   }
 
-  if (/see\s+the\s+race\s+chosen/i.test(text)) {
+  if (/see\s+the\s+race\s+chosen/i.test(trimmed)) {
     return { fixed: [], chooseOne: [] };
   }
 
-  if (/\+2\s+to\s+one\s+ability\s+score\s+of\s+your\s+choice/i.test(text)) {
+  if (/\+2\s+to\s+one\s+ability\s+score\s+of\s+your\s+choice/i.test(trimmed)) {
     return { fixed: [], chooseOne: ["STR", "CON", "DEX", "INT", "WIS", "CHA"] };
   }
 
-  const normalized = text.replace(/;/g, ",");
+  const normalized = trimmed.replace(/;/g, ",");
   const segments = normalized
     .split(",")
     .map((s) => s.trim())
@@ -88,7 +98,48 @@ export function parseRaceAbilityBonusInfo(race: Race | undefined): RaceAbilityBo
   const fixedSet = new Set(fixedUnique);
   const chooseFiltered = chooseOne.filter((a) => !fixedSet.has(a));
 
-  let mergedChoose = [...new Set(chooseFiltered)];
+  return {
+    fixed: fixedUnique,
+    chooseOne: [...new Set(chooseFiltered)]
+  };
+}
+
+export function mergeRaceAbilityBonusInfo(...parts: RaceAbilityBonusInfo[]): RaceAbilityBonusInfo {
+  const fixed = [...new Set(parts.flatMap((p) => p.fixed))];
+  const fixedSet = new Set(fixed);
+  const chooseOne = [...new Set(parts.flatMap((p) => p.chooseOne).filter((a) => !fixedSet.has(a)))];
+  return { fixed, chooseOne };
+}
+
+/** Ability bonuses encoded on a racial trait row (`rules.grant` / `rules.select` and optional specific text). */
+export function parseAbilityBonusFromRacialTrait(trait: RacialTrait | undefined): RaceAbilityBonusInfo {
+  if (!trait) return { fixed: [], chooseOne: [] };
+
+  const text = String((trait.raw?.specific as Record<string, unknown> | undefined)?.["Ability Scores"] || "").trim();
+  const fromText = text && !/see\s+the\s+race\s+chosen/i.test(text) ? parseAbilityScoresText(text) : { fixed: [], chooseOne: [] };
+
+  const rules = trait.raw?.rules as Record<string, unknown> | undefined;
+  const fromGrants = abilitiesFromRaceAbilityGrantRules(rules);
+  const fromSelect = abilitiesFromRaceAbilitySelectRules(rules);
+
+  const fixed = [...new Set([...fromText.fixed, ...fromGrants])];
+  const fixedSet = new Set(fixed);
+  const chooseOne = [...new Set([...fromText.chooseOne, ...fromSelect].filter((a) => !fixedSet.has(a)))];
+
+  return { fixed, chooseOne };
+}
+
+/**
+ * Parses PHB-style racial ability lines. Data uses comma/semicolon between clauses; "or" marks alternatives
+ * for a single +2 choice (e.g. "+2 Dexterity, +2 Charisma or +2 Constitution" → +2 DEX automatic, choose CHA or CON).
+ */
+export function parseRaceAbilityBonusInfo(race: Race | undefined): RaceAbilityBonusInfo {
+  const text = raceAbilityScoresText(race);
+  const fromText = parseAbilityScoresText(text);
+
+  const fixedUnique = [...new Set(fromText.fixed)];
+  const fixedSet = new Set(fixedUnique);
+  let mergedChoose = [...new Set(fromText.chooseOne.filter((a) => !fixedSet.has(a)))];
   const fromSelect = abilitiesFromRaceAbilitySelects(race);
   if (fromSelect.length > 0 && mergedChoose.length === 0) {
     mergedChoose = [...new Set(fromSelect.filter((a) => !fixedSet.has(a)))];
@@ -100,8 +151,53 @@ export function parseRaceAbilityBonusInfo(race: Race | undefined): RaceAbilityBo
   };
 }
 
+/**
+ * Resolves racial +2 bonuses for the build, including Dragonborn-style variants where the race row says
+ * "See the Race Chosen" and the selected subrace trait supplies grants/selects.
+ */
+export function resolveRaceAbilityBonusInfo(
+  race: Race | undefined,
+  traitsById: Map<string, RacialTrait>,
+  raceSelections?: Record<string, string>
+): RaceAbilityBonusInfo {
+  const base = parseRaceAbilityBonusInfo(race);
+  const defers = raceDefersAbilityBonusToSubrace(race);
+  if (!defers && (base.fixed.length > 0 || base.chooseOne.length > 0)) {
+    return base;
+  }
+  if (!defers) {
+    return base;
+  }
+
+  const subraceData = getRaceSubraceData(race, traitsById);
+  const subPick = raceSelections?.["subrace"];
+  const selectedSubrace =
+    subPick && subraceData ? subraceData.options.find((o) => o.id === subPick) : undefined;
+  if (!selectedSubrace) {
+    return { fixed: [], chooseOne: [] };
+  }
+
+  const traitsToParse: RacialTrait[] = [selectedSubrace];
+  for (const childId of getStructuralChildTraitIdsForSubrace(selectedSubrace)) {
+    const child = traitsById.get(childId);
+    if (child) traitsToParse.push(child);
+  }
+
+  return mergeRaceAbilityBonusInfo(...traitsToParse.map(parseAbilityBonusFromRacialTrait));
+}
+
 export function getAbilityLabel(ability: Ability): string {
   return ABILITY_LABELS[ability];
+}
+
+/** Human-readable summary of fixed and optional racial +2 bonuses. */
+export function formatRaceAbilityBonusSummary(info: RaceAbilityBonusInfo): string {
+  const parts: string[] = info.fixed.map((a) => `+2 ${getAbilityLabel(a)}`);
+  if (info.chooseOne.length > 0) {
+    const opts = info.chooseOne.map((a) => getAbilityLabel(a)).join(" or ");
+    parts.push(`+2 ${opts}`);
+  }
+  return parts.join(", ");
 }
 
 export function applyRacialBonuses(

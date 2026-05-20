@@ -17,7 +17,7 @@ export function collectCharacterPowerIdsForSelections(index: RulesIndex, build: 
   const ids = new Set<string>(build.powerIds);
   const race = index.races.find((r) => r.id === build.raceId);
   const traitsById = new Map((index.racialTraits ?? []).map((t) => [t.id, t]));
-  const extraTraitIds = getRaceExtraTraitIds(race, traitsById, build.raceSelections);
+  const extraTraitIds = getRaceExtraTraitIds(race, traitsById, build.raceSelections, index.races);
   for (const g of racePowerGroupsForRace(race, traitsById, extraTraitIds)) {
     if (g.choiceOnly) {
       const pick = build.raceSelections?.[racePowerSelectSelectionKey(g.traitId)];

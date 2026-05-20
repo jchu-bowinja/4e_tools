@@ -119,13 +119,15 @@ describe("racePowerGroupsForRace", () => {
       [breathTrait.id, breathTrait],
       [fearTrait.id, fearTrait]
     ]);
-    const groups = racePowerGroupsForRace(race, m);
-    expect(groups).toEqual([
+    expect(racePowerGroupsForRace(race, m, [])).toEqual([]);
+
+    const groupsBreath = racePowerGroupsForRace(race, m, [breathTrait.id]);
+    expect(groupsBreath).toEqual([
       {
-        traitId,
-        traitName: "Dragonborn Racial Power",
-        choiceOnly: true,
-        powerIds: ["ID_FMP_POWER_1448", "ID_FMP_POWER_12577"]
+        traitId: breathTrait.id,
+        traitName: "Dragon Breath",
+        choiceOnly: false,
+        powerIds: ["ID_FMP_POWER_1448"]
       }
     ]);
   });

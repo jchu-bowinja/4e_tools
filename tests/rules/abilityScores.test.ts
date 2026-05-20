@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { applyRacialBonuses, parseRaceAbilityBonusInfo } from "../../src/rules/abilityScores";
-import { Race } from "../../src/rules/models";
+import {
+  applyRacialBonuses,
+  parseAbilityBonusFromRacialTrait,
+  parseRaceAbilityBonusInfo,
+  resolveRaceAbilityBonusInfo
+} from "../../src/rules/abilityScores";
+import { Race, RacialTrait } from "../../src/rules/models";
 
 function raceWithAbilityScores(text: string): Race {
   return {
@@ -79,6 +84,89 @@ describe("parseRaceAbilityBonusInfo", () => {
     const info = parseRaceAbilityBonusInfo(raceWithAbilityScores("+2 Dexterity, +2 Charisma or +2 Constitution"));
     expect(info.fixed).not.toContain("CHA");
     expect(info.fixed).not.toContain("CON");
+  });
+});
+
+describe("parseAbilityBonusFromRacialTrait", () => {
+  it("reads fixed Charisma grant and Strength|Constitution select (standard Dragonborn)", () => {
+    const trait: RacialTrait = {
+      id: "TR_STD",
+      name: "Standard Dragonborn Racial Traits",
+      slug: "std",
+      raw: {
+        rules: {
+          grant: [{ attrs: { name: "ID_INTERNAL_RACE_ABILITY_BONUS_CHARISMA", type: "Race Ability Bonus" } }],
+          select: [{ attrs: { type: "Race Ability Bonus", number: "1", Category: "Strength|Constitution" } }]
+        }
+      }
+    };
+    expect(parseAbilityBonusFromRacialTrait(trait)).toEqual({
+      fixed: ["CHA"],
+      chooseOne: ["STR", "CON"]
+    });
+  });
+
+  it("reads Dexterity and Charisma grants from a child trait (Kapak Sinuous Agility)", () => {
+    const trait: RacialTrait = {
+      id: "TR_SIN",
+      name: "Sinuous Agility",
+      slug: "sin",
+      raw: {
+        rules: {
+          grant: [
+            { attrs: { name: "ID_INTERNAL_RACE_ABILITY_BONUS_CHARISMA", type: "Race Ability Bonus" } },
+            { attrs: { name: "ID_INTERNAL_RACE_ABILITY_BONUS_DEXTERITY", type: "Race Ability Bonus" } }
+          ]
+        }
+      }
+    };
+    expect(parseAbilityBonusFromRacialTrait(trait)).toEqual({
+      fixed: ["CHA", "DEX"],
+      chooseOne: []
+    });
+  });
+});
+
+describe("resolveRaceAbilityBonusInfo", () => {
+  const dragonborn: Race = {
+    id: "R_DB",
+    name: "Dragonborn",
+    slug: "dragonborn",
+    abilitySummary: "See the Race Chosen",
+    raw: { specific: { "Ability Scores": "See the Race Chosen", "Racial Traits": "TR_SUB" } }
+  };
+  const standard: RacialTrait = {
+    id: "TR_STD",
+    name: "Standard Dragonborn Racial Traits",
+    slug: "std",
+    raw: {
+      specific: { _PARSED_SUB_FEATURES: "TR_CHILD" },
+      rules: {
+        grant: [{ attrs: { name: "ID_INTERNAL_RACE_ABILITY_BONUS_CHARISMA", type: "Race Ability Bonus" } }],
+        select: [{ attrs: { type: "Race Ability Bonus", number: "1", Category: "Strength|Constitution" } }]
+      }
+    }
+  };
+  const parent: RacialTrait = {
+    id: "TR_SUB",
+    name: "Dragonborn Subrace",
+    slug: "dragonborn-subrace",
+    raw: { specific: { _PARSED_SUB_FEATURES: "TR_STD" } }
+  };
+  const byId = new Map<string, RacialTrait>([
+    ["TR_SUB", parent],
+    ["TR_STD", standard]
+  ]);
+
+  it("returns empty until a subrace variant is selected", () => {
+    expect(resolveRaceAbilityBonusInfo(dragonborn, byId, {})).toEqual({ fixed: [], chooseOne: [] });
+  });
+
+  it("resolves bonuses from the selected subrace variant", () => {
+    expect(resolveRaceAbilityBonusInfo(dragonborn, byId, { subrace: "TR_STD" })).toEqual({
+      fixed: ["CHA"],
+      chooseOne: ["STR", "CON"]
+    });
   });
 });
 

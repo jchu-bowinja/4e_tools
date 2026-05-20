@@ -550,6 +550,221 @@ def build_class_build_options_by_class(
     return out
 
 
+def _power_ids_from_build_row(build: Dict[str, Any]) -> List[str]:
+    """Suggested powers on Essentials `Build` rows (specific + rules.suggest)."""
+    out: Set[str] = set()
+    spec = build.get("specific") or {}
+    for pid in _parse_internal_id_list(spec.get("_SUGGESTED_POWERS")):
+        if pid.startswith("ID_FMP_POWER"):
+            out.add(pid)
+    for sug in (build.get("rules") or {}).get("suggest") or []:
+        attrs = sug.get("attrs") or {}
+        if attrs.get("type") != "Power":
+            continue
+        pid = attrs.get("name")
+        if isinstance(pid, str) and pid.startswith("ID_FMP_POWER"):
+            out.add(pid)
+    return sorted(out)
+
+
+def _class_has_build_select(cls: Dict[str, Any]) -> bool:
+    rules = cls.get("rules") or {}
+    for item in rules.get("select") or []:
+        attrs = item.get("attrs") or {}
+        if attrs.get("type") == "Build":
+            return True
+    return False
+
+
+def build_essentials_class_build_options_by_class(
+    classes_raw: List[Dict[str, Any]],
+    builds_raw: List[Dict[str, Any]],
+) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Essentials-style class builds from compendium `Build` rows (Battle Cleric, Ardent Paladin, …).
+    PHB-style talent picks (Fighter Talents sub-features) stay in `build_class_build_options_by_class`.
+    """
+    builds_by_name: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    for row in builds_raw:
+        name = row.get("name")
+        if isinstance(name, str) and name.strip():
+            builds_by_name[name.strip()].append(row)
+
+    out: Dict[str, List[Dict[str, Any]]] = {}
+    for cls in classes_raw:
+        class_id = cls.get("internal_id")
+        if not isinstance(class_id, str) or not class_id.startswith("ID_FMP_CLASS_"):
+            continue
+        if not _class_has_build_select(cls):
+            continue
+        bo_text = str((cls.get("specific") or {}).get("Build Options") or "").strip()
+        if not bo_text:
+            continue
+
+        options: List[Dict[str, Any]] = []
+        seen: Set[str] = set()
+        for opt_name in [p.strip() for p in bo_text.split(",") if p.strip()]:
+            candidates = builds_by_name.get(opt_name) or []
+            build: Optional[Dict[str, Any]] = None
+            for cand in candidates:
+                cid = (cand.get("specific") or {}).get("Class")
+                if cid == class_id:
+                    build = cand
+                    break
+            if build is None and len(candidates) == 1:
+                build = candidates[0]
+            if not build:
+                continue
+            bid = build.get("internal_id")
+            if not isinstance(bid, str) or bid in seen:
+                continue
+            seen.add(bid)
+            spec = build.get("specific") or {}
+            short = _clean_text(str(spec.get("Key Abilities") or "")) or None
+            options.append(
+                {
+                    "id": bid,
+                    "name": build.get("name"),
+                    "parentFeatureId": "",
+                    "parentFeatureName": "Build Options",
+                    "shortDescription": short,
+                    "body": build.get("body"),
+                    "powerIds": _power_ids_from_build_row(build),
+                }
+            )
+        if options:
+            out[class_id] = sorted(options, key=lambda r: str(r.get("name") or "").lower())
+    return out
+
+
+_PHB_BUILD_LABEL_ALIASES: Dict[tuple[str, str], int] = {
+    ("two-handed weapon talent", "great weapon fighter"): 100,
+    ("one-handed weapon talent", "guardian fighter"): 100,
+    ("brawler style", "brawling fighter"): 100,
+}
+
+
+def _normalize_build_label_token(value: str) -> str:
+    s = value.lower()
+    for suffix in (
+        " fighter",
+        " warlord",
+        " ranger",
+        " wizard",
+        " rogue",
+        " cleric",
+        " paladin",
+    ):
+        if s.endswith(suffix):
+            s = s[: -len(suffix)]
+    return re.sub(r"[^a-z0-9]", "", s)
+
+
+def _score_phb_feature_to_build_label(feature_name: str, build_label: str) -> int:
+    pair = (feature_name.lower(), build_label.lower())
+    if pair in _PHB_BUILD_LABEL_ALIASES:
+        return _PHB_BUILD_LABEL_ALIASES[pair]
+    fn_words = re.findall(r"[a-z]+", feature_name.lower())
+    bl_words = re.findall(r"[a-z]+", build_label.lower())
+    skip = {
+        "the",
+        "a",
+        "of",
+        "style",
+        "technique",
+        "talent",
+        "vigor",
+        "training",
+        "weapon",
+        "handed",
+        "one",
+        "two",
+    }
+    score = len(set(fn_words) & set(bl_words) - skip) * 5
+    nfn = _normalize_build_label_token(feature_name)
+    nbl = _normalize_build_label_token(build_label)
+    prefix = 0
+    for i in range(min(len(nfn), len(nbl))):
+        if nfn[i] == nbl[i]:
+            prefix += 1
+        else:
+            break
+    score += prefix * 2
+    if nfn in nbl or nbl in nfn:
+        score = max(score, min(len(nfn), len(nbl)))
+    return score
+
+
+def enrich_phb_class_build_display_names(
+    options_by_class: Dict[str, List[Dict[str, Any]]],
+    classes_by_id: Dict[str, Dict[str, Any]],
+    *,
+    min_score: int = 4,
+) -> None:
+    """
+    PHB talent sub-features use compendium feature names (Arena Training); class text lists
+    player-facing build labels (Arena Fighter). Attach `displayName` when we can match confidently.
+    """
+    for class_id, options in options_by_class.items():
+        cls = classes_by_id.get(class_id)
+        if not cls:
+            continue
+        bo_text = str((cls.get("specific") or {}).get("Build Options") or "").strip()
+        if not bo_text:
+            continue
+        labels = [p.strip() for p in bo_text.split(",") if p.strip()]
+        if not labels:
+            continue
+        grant_opts = [
+            o
+            for o in options
+            if o.get("parentFeatureId") and o.get("parentFeatureName") != "Build Options"
+        ]
+        if not grant_opts:
+            continue
+        pair_scores: List[tuple[int, str, str]] = []
+        for opt in grant_opts:
+            fname = str(opt.get("name") or "")
+            oid = str(opt.get("id") or "")
+            if not fname or not oid:
+                continue
+            for label in labels:
+                pair_scores.append(
+                    (_score_phb_feature_to_build_label(fname, label), oid, label)
+                )
+        pair_scores.sort(key=lambda t: t[0], reverse=True)
+        assigned_opts: Set[str] = set()
+        assigned_labels: Set[str] = set()
+        opt_by_id = {str(o.get("id")): o for o in grant_opts if o.get("id")}
+        for score, oid, label in pair_scores:
+            if score < min_score or oid in assigned_opts or label in assigned_labels:
+                continue
+            opt = opt_by_id.get(oid)
+            if not opt:
+                continue
+            opt["displayName"] = label
+            assigned_opts.add(oid)
+            assigned_labels.add(label)
+
+
+def merge_class_build_options_by_class(
+    from_grants: Dict[str, List[Dict[str, Any]]],
+    from_builds: Dict[str, List[Dict[str, Any]]],
+) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Prefer PHB talent sub-features when present (Fighter Talents, Warlord Presence, …).
+    Essentials `Build` rows apply only when the class has no level-1 sub-feature bundle.
+    """
+    out: Dict[str, List[Dict[str, Any]]] = dict(from_grants)
+    for class_id, build_opts in from_builds.items():
+        if not build_opts:
+            continue
+        if out.get(class_id):
+            continue
+        out[class_id] = build_opts
+    return out
+
+
 def _clean_text(value: Optional[str]) -> str:
     if not value:
         return ""
@@ -1882,6 +2097,7 @@ def load_raw_collections_from_xml(xml_path: Path) -> Dict[str, List[Dict[str, An
         "Proficiency",
         "Background",
         "Magic Item",
+        "Build",
     }
     out: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     for _, elem in ET.iterparse(str(xml_path), events=("end",)):
@@ -1931,6 +2147,7 @@ def load_raw_collections(input_path: Path) -> Dict[str, List[Dict[str, Any]]]:
         "Proficiency": read_json("Proficiency.json"),
         "Background": read_json("Background.json"),
         "Magic Item": read_json("Magic Item.json"),
+        "Build": read_json("Build.json"),
     }
 
 
@@ -1981,7 +2198,15 @@ def build_index(input_path: Path, output_dir: Path) -> None:
     granted_class_feature_names_by_support_id = build_granted_class_feature_names_by_support(
         grants_raw, features_by_id
     )
-    class_build_options_by_class = build_class_build_options_by_class(grants_raw, features_by_id)
+    builds_raw = collections.get("Build") or []
+    classes_by_id = {
+        str(c["internal_id"]): c for c in classes_raw if c.get("internal_id")
+    }
+    class_build_options_by_class = merge_class_build_options_by_class(
+        build_class_build_options_by_class(grants_raw, features_by_id),
+        build_essentials_class_build_options_by_class(classes_raw, builds_raw),
+    )
+    enrich_phb_class_build_display_names(class_build_options_by_class, classes_by_id)
 
     known_races = {r.get("name", "") for r in races_raw}
     known_classes = {c.get("name", "").lower() for c in classes_raw}

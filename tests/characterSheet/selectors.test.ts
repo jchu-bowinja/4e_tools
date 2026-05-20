@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { computeSheetDerivedData, findWeaponEquippedInSlot, groupCombatPowers } from "../../src/features/characterSheet/selectors";
+import { computeSheetDerivedData, findWeaponEquippedInSlot, groupCombatPowers, sheetStateFromBuild } from "../../src/features/characterSheet/selectors";
+import { normalizeState } from "../../src/features/characterSheet/storage";
 import type { CharacterSheetState } from "../../src/features/characterSheet/model";
-import type { RulesIndex } from "../../src/rules/models";
+import type { CharacterBuild, Race, RacialTrait, RulesIndex } from "../../src/rules/models";
+import { resolveDisplayedRacialTraitsForRace } from "../../src/rules/raceSubraces";
 
 const index: RulesIndex = {
   meta: { version: 1, counts: {} },
@@ -265,5 +267,81 @@ describe("findWeaponEquippedInSlot", () => {
     };
     const w = findWeaponEquippedInSlot(st, idx, "mainHand");
     expect(w?.id).toBe("w_longsword");
+  });
+});
+
+describe("sheet raceSelections and displayed racial traits", () => {
+  const race: Race = {
+    id: "race_elf",
+    name: "Elf",
+    slug: "elf",
+    raw: { specific: { "Racial Traits": "trait_base,trait_sub_parent" } }
+  };
+  const parent: RacialTrait = {
+    id: "trait_sub_parent",
+    name: "Elf Subrace",
+    slug: "elf-subrace",
+    raw: { specific: { _PARSED_SUB_FEATURES: "trait_sub_a" } }
+  };
+  const subA: RacialTrait = { id: "trait_sub_a", name: "Wood Elf", slug: "wood-elf", raw: { specific: { _PARSED_CHILD_FEATURES: "trait_child" } } };
+  const child: RacialTrait = { id: "trait_child", name: "Group Awareness", slug: "ga", raw: {} };
+  const base: RacialTrait = { id: "trait_base", name: "Fey Origin", slug: "fey", raw: {} };
+  const idx: RulesIndex = {
+    meta: { version: 1, counts: {} },
+    races: [race],
+    classes: [],
+    feats: [],
+    powers: [],
+    skills: [],
+    languages: [],
+    armors: [],
+    weapons: [],
+    implements: [],
+    abilityScores: [],
+    racialTraits: [parent, subA, child, base],
+    themes: [],
+    paragonPaths: [],
+    epicDestinies: []
+  };
+  const traitsById = new Map(idx.racialTraits!.map((t) => [t.id, t]));
+
+  it("round-trips raceSelections through sheetStateFromBuild", () => {
+    const build: CharacterBuild = {
+      name: "Test",
+      level: 1,
+      abilityScores: { STR: 10, CON: 10, DEX: 10, INT: 10, WIS: 10, CHA: 10 },
+      trainedSkillIds: [],
+      featIds: [],
+      powerIds: [],
+      raceId: "race_elf",
+      raceSelections: { subrace: "trait_sub_a" },
+      racialAbilityChoice: "DEX"
+    };
+    const sheet = sheetStateFromBuild(build, idx);
+    expect(sheet.raceSelections).toEqual({ subrace: "trait_sub_a" });
+    expect(sheet.racialAbilityChoice).toBe("DEX");
+  });
+
+  it("normalizeState preserves raceSelections from storage", () => {
+    const sheet = normalizeState({
+      name: "Test",
+      level: 1,
+      abilityScores: { STR: 10, CON: 10, DEX: 10, INT: 10, WIS: 10, CHA: 10 },
+      trainedSkillIds: [],
+      featIds: [],
+      resources: { currentHp: 1, tempHp: 0, actionPoints: 0, surgesRemaining: 1, deathSaves: 0, conditions: [] },
+      inventory: [],
+      equipment: {},
+      powers: { selectedPowerIds: [], expendedPowerIds: [], manualOrderIds: [] },
+      raceSelections: { subrace: "trait_sub_a", "language-0": "lang1" }
+    });
+    expect(sheet.raceSelections).toEqual({ subrace: "trait_sub_a", "language-0": "lang1" });
+  });
+
+  it("resolveDisplayedRacialTraitsForRace hides unselected subrace options", () => {
+    const without = resolveDisplayedRacialTraitsForRace(race, traitsById, {}).map((r) => r.id);
+    expect(without).toEqual(["trait_base"]);
+    const withSub = resolveDisplayedRacialTraitsForRace(race, traitsById, { subrace: "trait_sub_a" }).map((r) => r.id);
+    expect(withSub).toEqual(["trait_base", "trait_sub_a", "trait_child"]);
   });
 });
