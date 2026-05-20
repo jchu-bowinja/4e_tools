@@ -707,7 +707,36 @@ button.encounter-roster-stat-cards-expand-btn[aria-pressed="true"] .template-jso
   transform: rotate(90deg);
 }
 
-/* Encounter roster: stat block collapsed to name until hover */
+/* Per-row roster stat block expand (keyboard/touch; hover still works on the name strip) */
+button.encounter-roster-stat-row-expand-btn {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0.1rem 0.14rem 0.1rem 0;
+  border: none;
+  border-radius: 0.2rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+button.encounter-roster-stat-row-expand-btn:focus-visible {
+  outline: 2px solid var(--monster-stat-block-header-fg);
+  outline-offset: 2px;
+}
+
+button.encounter-roster-stat-row-expand-btn .template-json-collapsible-arrow {
+  font-size: 0.68rem;
+  transform: rotate(0deg);
+}
+
+button.encounter-roster-stat-row-expand-btn[aria-expanded="true"] .template-json-collapsible-arrow {
+  transform: rotate(90deg);
+}
+
+/* Encounter roster: stat block collapsed to name until hover or expand */
 .monster-stat-block-roster-wrap {
   min-width: 0;
 }
@@ -716,7 +745,7 @@ button.encounter-roster-stat-cards-expand-btn[aria-pressed="true"] .template-jso
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: 0.35rem;
   padding: 0.32rem 0.42rem;
   font-weight: 700;
   font-size: 0.82rem;

@@ -581,11 +581,17 @@ const centerMetaLineStyle: CSSProperties = {
   color: "var(--text-secondary)"
 };
 
-/** Inline stat subsections (Tactics, Sources, etc.). */
+/** Bordered subsection for template viewer (standalone column shell). */
 const centerSubsectionPanelStyle: CSSProperties = {
   ...panelStyle,
   padding: "0.6rem 0.65rem",
   marginBottom: "0.65rem"
+};
+
+/** Flow subsection inside the monster sheet column — no second panel border (column uses sheetPanel). */
+const centerFlowSubsectionStyle: CSSProperties = {
+  marginBottom: "0.65rem",
+  minWidth: 0
 };
 
 /** Inset strip inside the monster index sheet column (template preview + level tweak). */
@@ -2381,7 +2387,9 @@ function EncounterRosterMonsterStatBlock({
   startGlossaryHover,
   leaveGlossaryHover,
   shouldHighlightGlossaryTerm,
-  expandAll = false
+  expandAll = false,
+  rowExpanded = false,
+  onToggleRowExpanded
 }: {
   monster: MonsterEntryFile;
   statBlockKeyPrefix: string;
@@ -2391,9 +2399,70 @@ function EncounterRosterMonsterStatBlock({
   shouldHighlightGlossaryTerm: (term: string) => boolean;
   /** When true (roster “Expand all”), show the full stat block without requiring hover. */
   expandAll?: boolean;
+  /** Per-row pin from the roster expand control (keyboard/touch friendly). */
+  rowExpanded?: boolean;
+  onToggleRowExpanded?: () => void;
 }): JSX.Element {
   const [hoverOpen, setHoverOpen] = useState(false);
-  const showCard = expandAll || hoverOpen;
+  const showCard = expandAll || rowExpanded || hoverOpen;
+  /** Pinned open: keep the name strip with collapse control above the stat block. */
+  const showPeekHeader = !expandAll && rowExpanded && showCard;
+  const peekRow = (
+    <div className="monster-stat-block-roster-peek-row">
+      {onToggleRowExpanded ? (
+        <button
+          type="button"
+          className="encounter-roster-stat-row-expand-btn"
+          aria-expanded={showCard}
+          aria-label={showCard ? "Collapse creature stat block" : "Expand creature stat block"}
+          title={showCard ? "Collapse stat block" : "Expand stat block (or hover the name strip)"}
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggleRowExpanded();
+          }}
+        >
+          <CollapsibleDisclosureArrow />
+        </button>
+      ) : null}
+      <div
+        className="monster-stat-block-card__title-name monster-stat-block-roster-peek-name"
+        title={onToggleRowExpanded ? "Expand stat block or hover this row" : "Hover to show creature stat block"}
+      >
+        {monster.name || "—"}
+      </div>
+      <div className="monster-stat-block-card__title-right monster-stat-block-roster-peek-meta">
+        <span {...glossaryTooltipUi.hoverA11y("glossaryTerm:Level")} className="monster-stat-block-gloss">
+          Level
+        </span>{" "}
+        {formatValue(monster.level)}
+        {isRenderableCardValue(monster.groupRole) ? (
+          <>
+            {" "}
+            <span
+              {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${String(monster.groupRole)}`)}
+              className="monster-stat-block-gloss"
+            >
+              {String(monster.groupRole)}
+            </span>
+          </>
+        ) : null}{" "}
+        <span
+          {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${monster.role || "Role"}`)}
+          className="monster-stat-block-gloss"
+        >
+          {monster.role || ""}
+        </span>
+        {monsterTitleShowLeaderSuffix(monster.isLeader, monster.role) ? (
+          <>
+            {" "}
+            <span {...glossaryTooltipUi.hoverA11y("glossaryTerm:Leader")} className="monster-stat-block-gloss">
+              (Leader)
+            </span>
+          </>
+        ) : null}
+      </div>
+    </div>
+  );
   if (!showCard) {
     return (
       <div
@@ -2401,42 +2470,7 @@ function EncounterRosterMonsterStatBlock({
         onMouseEnter={() => setHoverOpen(true)}
         onMouseLeave={() => setHoverOpen(false)}
       >
-        <div className="monster-stat-block-roster-peek-row">
-          <div className="monster-stat-block-card__title-name monster-stat-block-roster-peek-name" title="Hover to show creature stat block">
-            {monster.name || "—"}
-          </div>
-          <div className="monster-stat-block-card__title-right monster-stat-block-roster-peek-meta">
-            <span {...glossaryTooltipUi.hoverA11y("glossaryTerm:Level")} className="monster-stat-block-gloss">
-              Level
-            </span>{" "}
-            {formatValue(monster.level)}
-            {isRenderableCardValue(monster.groupRole) ? (
-              <>
-                {" "}
-                <span
-                  {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${String(monster.groupRole)}`)}
-                  className="monster-stat-block-gloss"
-                >
-                  {String(monster.groupRole)}
-                </span>
-              </>
-            ) : null}{" "}
-            <span
-              {...glossaryTooltipUi.hoverA11y(`glossaryTerm:${monster.role || "Role"}`)}
-              className="monster-stat-block-gloss"
-            >
-              {monster.role || ""}
-            </span>
-            {monsterTitleShowLeaderSuffix(monster.isLeader, monster.role) ? (
-              <>
-                {" "}
-                <span {...glossaryTooltipUi.hoverA11y("glossaryTerm:Leader")} className="monster-stat-block-gloss">
-                  (Leader)
-                </span>
-              </>
-            ) : null}
-          </div>
-        </div>
+        {peekRow}
       </div>
     );
   }
@@ -2446,6 +2480,7 @@ function EncounterRosterMonsterStatBlock({
       onMouseEnter={() => setHoverOpen(true)}
       onMouseLeave={() => setHoverOpen(false)}
     >
+      {showPeekHeader ? peekRow : null}
       <MonsterStatBlockCard
         monster={monster}
         statBlockKeyPrefix={statBlockKeyPrefix}
@@ -3251,6 +3286,9 @@ export function MonsterEditorApp({
   const [encounterNameEditKind, setEncounterNameEditKind] = useState<"new" | "rename">("rename");
   const [encounterNameEditValue, setEncounterNameEditValue] = useState("");
   const [encounterRosterStatCardsExpandAll, setEncounterRosterStatCardsExpandAll] = useState(false);
+  const [encounterRosterExpandedRowIds, setEncounterRosterExpandedRowIds] = useState<Set<string>>(
+    () => new Set()
+  );
   const [encounterRosterDraggingIndex, setEncounterRosterDraggingIndex] = useState<number | null>(null);
   const [encounterRosterDragOverIndex, setEncounterRosterDragOverIndex] = useState<number | null>(null);
   const [encounterPrintPreviewOpen, setEncounterPrintPreviewOpen] = useState(false);
@@ -3410,7 +3448,17 @@ export function MonsterEditorApp({
     setEncounterRosterDraggingIndex(null);
     setEncounterRosterDragOverIndex(null);
     setEncounterRosterStatCardsExpandAll(false);
+    setEncounterRosterExpandedRowIds(new Set());
   }, [encounterStore.activeEncounterId]);
+
+  const toggleEncounterRosterRowExpanded = useCallback((rosterInstanceId: string) => {
+    setEncounterRosterExpandedRowIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(rosterInstanceId)) next.delete(rosterInstanceId);
+      else next.add(rosterInstanceId);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     writeStoredSelectedMonsterId(selectedId);
@@ -5727,7 +5775,7 @@ export function MonsterEditorApp({
                 ) : null}
               </div>
               {isRenderableCardValue(viewMonster.tactics) ? (
-                <div style={centerSubsectionPanelStyle}>
+                <div style={centerFlowSubsectionStyle}>
                   <h3 style={sectionTitleStyle}>Tactics</h3>
                   <div style={{ ...richTextBodyPrimary.paragraphStyle, whiteSpace: "pre-wrap" }}>
                     {renderGlossaryAwareText(
@@ -5858,7 +5906,7 @@ export function MonsterEditorApp({
                     ) : null}
 
               {Array.isArray(viewMonster.sourceBooks) && viewMonster.sourceBooks.length > 0 ? (
-                <div style={centerSubsectionPanelStyle}>
+                <div style={centerFlowSubsectionStyle}>
                   <h3 style={sectionTitleStyle}>Sources</h3>
                   <div
                     style={{
@@ -5999,7 +6047,8 @@ export function MonsterEditorApp({
                       </p>
                     ) : encounterRoster.length === 0 ? (
                       <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", margin: 0 }}>
-                        No creatures yet. Use <strong>Add to encounter</strong> on the stat block.
+                        No creatures yet. Use <strong>Add to encounter</strong> on the stat block. Expand a roster row with{" "}
+                        <strong>▶</strong> beside its name, or hover the name strip.
                       </p>
                     ) : (
                       <ul
@@ -6087,6 +6136,10 @@ export function MonsterEditorApp({
                                   leaveGlossaryHover={leaveGlossaryHover}
                                   shouldHighlightGlossaryTerm={shouldHighlightGlossaryTerm}
                                   expandAll={encounterRosterStatCardsExpandAll}
+                                  rowExpanded={encounterRosterExpandedRowIds.has(row.rosterInstanceId)}
+                                  onToggleRowExpanded={() =>
+                                    toggleEncounterRosterRowExpanded(row.rosterInstanceId)
+                                  }
                                 />
                               </div>
                               <div
