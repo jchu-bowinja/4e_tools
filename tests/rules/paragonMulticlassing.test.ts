@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   canChooseParagonMulticlassing,
   collectParagonMulticlassPowerIds,
+  disableParagonAtWillSwap,
   hasFullMulticlassPowerChain,
   multiclassEntryClassId,
   pruneParagonMulticlassing,
+  setParagonAtWillSwap,
   validateParagonMulticlassing
 } from "../../src/rules/paragonMulticlassing";
 import type { CharacterBuild, RulesIndex } from "../../src/rules/models";
@@ -88,6 +90,19 @@ describe("paragonMulticlassing", () => {
         paragonMulticlassPowers: { atWillSwapPowerId: "aw1", encounterPowerId: "enc1", utilityPowerId: "util1" }
       })
     ).toEqual(["aw1", "enc1"]);
+  });
+
+  it("applies paragon at-will swap to a class slot and restores on clear", () => {
+    const next = setParagonAtWillSwap(
+      { ...build, classPowerSlots: { "atWill:0": "fighter_aw" }, powerIds: ["fighter_aw"] },
+      "atWill:0",
+      "rogue_aw"
+    );
+    expect(next.classPowerSlots?.["atWill:0"]).toBe("rogue_aw");
+    expect(next.paragonMulticlassPowers?.atWillSwapOriginalPowerId).toBe("fighter_aw");
+    const cleared = disableParagonAtWillSwap(next);
+    expect(cleared.classPowerSlots?.["atWill:0"]).toBe("fighter_aw");
+    expect(cleared.paragonMulticlassPowers?.atWillSwapPowerId).toBeUndefined();
   });
 
   it("prunes paragon multiclass when chain is lost", () => {

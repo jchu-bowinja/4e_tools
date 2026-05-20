@@ -1,5 +1,6 @@
 import type { CharacterBuild, Power, RulesIndex } from "./models";
 import { activeFeatReplacementPowerIds } from "./featPowerReplace";
+import { activeParagonAtWillSwapPowerId } from "./paragonMulticlassing";
 import {
   expectedClassAtWillAttackSlots,
   expectedClassDailyAttackSlots,
@@ -139,6 +140,9 @@ export function reconcileHybridClassPowerSlotsForBuild(
   const utils = hybridPowerPoolUnion(index, baseClassIdA, baseClassIdB, level, "utility");
   const allowed = new Set([...attacks, ...utils].map((p) => p.id));
   for (const id of activeFeatReplacementPowerIds(index, build)) allowed.add(id);
+  const paragonAw = activeParagonAtWillSwapPowerId(build);
+  const paragonAwSlot = build.paragonMulticlassPowers?.atWillSwapSlotKey;
+  if (paragonAw) allowed.add(paragonAw);
 
   const defByKey = new Map(defs.map((d) => [d.key, d]));
   const next: Record<string, string> = { ...(build.classPowerSlots || {}) };
@@ -147,13 +151,24 @@ export function reconcileHybridClassPowerSlotsForBuild(
   }
   for (const k of Object.keys(next)) {
     const v = next[k]?.trim();
-    if (!v || !allowed.has(v)) {
+    if (!v) {
       delete next[k];
       continue;
     }
     const def = defByKey.get(k);
     const p = index.powers.find((x) => x.id === v);
-    if (!def || !p) continue;
+    if (!def || !p) {
+      delete next[k];
+      continue;
+    }
+    if (paragonAw && k === paragonAwSlot && v === paragonAw) {
+      next[k] = v;
+      continue;
+    }
+    if (!allowed.has(v)) {
+      delete next[k];
+      continue;
+    }
     if (!powerAllowedForHybridSlot(k, p, baseClassIdA, baseClassIdB)) {
       delete next[k];
       continue;

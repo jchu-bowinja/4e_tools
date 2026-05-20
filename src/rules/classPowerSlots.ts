@@ -7,6 +7,7 @@ import {
 } from "./advancement";
 import { getClassPowersForLevelRange, powerTypeCategory } from "./classPowersQuery";
 import { activeFeatReplacementPowerIds } from "./featPowerReplace";
+import { activeParagonAtWillSwapPowerId } from "./paragonMulticlassing";
 
 /** PHB-style class encounter attack slot unlock levels (1st slot at 1st, 2nd at 3rd, …). */
 export const ENCOUNTER_ATTACK_SLOT_GAIN_LEVELS = [1, 3, 7, 13] as const;
@@ -139,6 +140,8 @@ export function reconcileClassPowerSlotsForBuild(
   const utils = getClassPowersForLevelRange(index, build.classId, level, "utility");
   const allowed = new Set([...attacks, ...utils].map((p) => p.id));
   for (const id of activeFeatReplacementPowerIds(index, build)) allowed.add(id);
+  const paragonAw = activeParagonAtWillSwapPowerId(build);
+  if (paragonAw) allowed.add(paragonAw);
 
   const defByKey = new Map(defs.map((d) => [d.key, d]));
   const next: Record<string, string> = { ...(build.classPowerSlots || {}) };

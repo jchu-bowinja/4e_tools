@@ -1,6 +1,10 @@
+import type { ClassPowerSlotDef } from "./classPowerSlots";
+import { buildClassPowerSlotDefinitions } from "./classPowerSlots";
 import type { CharacterBuild, Power, RulesIndex } from "./models";
 import { collectMulticlassEntryFeatIds } from "./featGrantFlags";
+import { bonusClassAtWillSlotFromRaceBuild } from "./grantedPowersQuery";
 import { getClassPowersForLevelRange } from "./classPowersQuery";
+import { buildHybridPowerSlotDefinitions } from "./hybridPowerSlots";
 import { MULTICLASS_POWER_CHAIN } from "./multiclassValidation";
 
 import type { ParagonMulticlassPowers } from "./models";
@@ -119,6 +123,83 @@ export function validateParagonMulticlassing(index: RulesIndex, build: Character
   return errors;
 }
 
+export function paragonAtWillSlotDefs(index: RulesIndex, build: CharacterBuild): ClassPowerSlotDef[] {
+  const bonus = bonusClassAtWillSlotFromRaceBuild(index, build);
+  const defs =
+    build.characterStyle === "hybrid"
+      ? buildHybridPowerSlotDefinitions(build.level, bonus)
+      : buildClassPowerSlotDefinitions(build.level, bonus);
+  return defs.filter((d) => d.bucket === "atWill");
+}
+
+export function activeParagonAtWillSwapPowerId(build: CharacterBuild): string | undefined {
+  const picks = build.paragonMulticlassPowers;
+  if (!build.paragonMulticlassing || !picks?.atWillSwapSlotKey || !picks.atWillSwapPowerId) return undefined;
+  return picks.atWillSwapPowerId;
+}
+
+export function isSlotUsedByParagonAtWillSwap(build: CharacterBuild, slotKey: string): boolean {
+  return build.paragonMulticlassPowers?.atWillSwapSlotKey === slotKey;
+}
+
+/** Apply or clear paragon at-will swap on a class at-will slot. */
+export function setParagonAtWillSwap(
+  build: CharacterBuild,
+  slotKey: string | undefined,
+  replacementPowerId: string | undefined
+): CharacterBuild {
+  const priorPicks = build.paragonMulticlassPowers ?? {};
+  let next = disableParagonAtWillSwap(build);
+
+  if (!slotKey || !replacementPowerId) {
+    const nextPicks: ParagonMulticlassPowers = { ...priorPicks };
+    delete nextPicks.atWillSwapPowerId;
+    delete nextPicks.atWillSwapSlotKey;
+    delete nextPicks.atWillSwapOriginalPowerId;
+    const hasOther = Boolean(
+      nextPicks.encounterPowerId || nextPicks.utilityPowerId || nextPicks.dailyPowerId
+    );
+    return {
+      ...next,
+      paragonMulticlassPowers: hasOther ? nextPicks : undefined
+    };
+  }
+
+  const slots = { ...(next.classPowerSlots || {}) };
+  const originalPowerId = slots[slotKey]?.trim() || undefined;
+  slots[slotKey] = replacementPowerId;
+  const nextPicks: ParagonMulticlassPowers = {
+    ...priorPicks,
+    atWillSwapPowerId: replacementPowerId,
+    atWillSwapSlotKey: slotKey,
+    atWillSwapOriginalPowerId: originalPowerId
+  };
+  return {
+    ...next,
+    classPowerSlots: slots,
+    paragonMulticlassPowers: nextPicks
+  };
+}
+
+/** Restore the class at-will slot and strip swap metadata. */
+export function disableParagonAtWillSwap(build: CharacterBuild): CharacterBuild {
+  const picks = build.paragonMulticlassPowers;
+  if (!picks?.atWillSwapSlotKey) return build;
+  const slots = { ...(build.classPowerSlots || {}) };
+  if (picks.atWillSwapOriginalPowerId) slots[picks.atWillSwapSlotKey] = picks.atWillSwapOriginalPowerId;
+  else delete slots[picks.atWillSwapSlotKey];
+  const nextPicks = { ...picks };
+  delete nextPicks.atWillSwapPowerId;
+  delete nextPicks.atWillSwapSlotKey;
+  delete nextPicks.atWillSwapOriginalPowerId;
+  const hasOther = Boolean(nextPicks.encounterPowerId || nextPicks.utilityPowerId || nextPicks.dailyPowerId);
+  return {
+    ...build,
+    classPowerSlots: Object.keys(slots).length > 0 ? slots : undefined,
+    paragonMulticlassPowers: hasOther ? nextPicks : undefined
+  };
+}
+
 /** Power ids from paragon multiclass picks (level-gated). */
 export function collectParagonMulticlassPowerIds(
   build: Pick<CharacterBuild, "level" | "paragonMulticlassing" | "paragonMulticlassPowers">
@@ -174,8 +255,11 @@ export function pruneParagonMulticlassing(index: RulesIndex, build: CharacterBui
   const nextPicks = { ...picks };
   let changed = false;
   if (nextPicks.atWillSwapPowerId && !legalAtWill.has(nextPicks.atWillSwapPowerId)) {
-    delete nextPicks.atWillSwapPowerId;
-    changed = true;
+    return disableParagonAtWillSwap(build);
+  }
+  const awSlots = paragonAtWillSlotDefs(index, build);
+  if (nextPicks.atWillSwapSlotKey && !awSlots.some((d) => d.key === nextPicks.atWillSwapSlotKey)) {
+    return disableParagonAtWillSwap(build);
   }
   if (nextPicks.encounterPowerId && !legalEncounter.has(nextPicks.encounterPowerId)) {
     delete nextPicks.encounterPowerId;

@@ -506,6 +506,10 @@ export type CharacterStyle = "standard" | "hybrid";
 /** Paragon-tier picks from a multiclass class (PHB paragon multiclassing). */
 export interface ParagonMulticlassPowers {
   atWillSwapPowerId?: string;
+  /** Class at-will slot replaced by `atWillSwapPowerId` (PHB 11+ at-will swap). */
+  atWillSwapSlotKey?: string;
+  /** Prior class power in the slot before the paragon at-will swap. */
+  atWillSwapOriginalPowerId?: string;
   encounterPowerId?: string;
   utilityPowerId?: string;
   dailyPowerId?: string;

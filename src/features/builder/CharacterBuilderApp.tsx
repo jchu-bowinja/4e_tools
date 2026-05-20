@@ -112,8 +112,12 @@ import {
   multiclassEntryClassId,
   paragonMulticlassAttackPowers,
   paragonMulticlassUtilityPowers,
+  disableParagonAtWillSwap,
+  isSlotUsedByParagonAtWillSwap,
+  paragonAtWillSlotDefs,
   pruneParagonMulticlassing,
-  resolveParagonMulticlassPowers
+  resolveParagonMulticlassPowers,
+  setParagonAtWillSwap
 } from "../../rules/paragonMulticlassing";
 import {
   characterHasKiFocusUser,
@@ -1603,9 +1607,17 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
     });
   }, [index, build.epicDestinyId, build.level]);
-  const paragonMcGrantedPowers = useMemo(
-    () => (build.paragonMulticlassing ? resolveParagonMulticlassPowers(index, build) : []),
-    [index, build.paragonMulticlassing, build.paragonMulticlassPowers, build.level]
+  const paragonMcGrantedPowers = useMemo(() => {
+    if (!build.paragonMulticlassing) return [];
+    const all = resolveParagonMulticlassPowers(index, build);
+    const awId = build.paragonMulticlassPowers?.atWillSwapPowerId;
+    const awSlot = build.paragonMulticlassPowers?.atWillSwapSlotKey;
+    if (awId && awSlot) return all.filter((p) => p.id !== awId);
+    return all;
+  }, [index, build.paragonMulticlassing, build.paragonMulticlassPowers, build.level]);
+  const paragonAtWillSlots = useMemo(
+    () => (build.paragonMulticlassing ? paragonAtWillSlotDefs(index, build) : []),
+    [index, build.paragonMulticlassing, build.level, build.characterStyle, build.raceSelections]
   );
   const themeGrantedPowers = useMemo(() => {
     if (!build.themeId) return [];
@@ -2103,6 +2115,15 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     });
   }
 
+  function commitParagonAtWillSwap(slotKey: string, powerId: string): void {
+    const nextBuild = setParagonAtWillSwap(build, slotKey || undefined, powerId || undefined);
+    const trimmed = nextBuild.classPowerSlots;
+    updateBuild({
+      ...nextBuild,
+      powerIds: orderedPowerIdsFromSlots(powerSlotDefs, trimmed)
+    });
+  }
+
   function commitMulticlassSlotSwapPowerChange(featId: string, replacementPowerId: string): void {
     const nextBuild = updateMulticlassSlotSwapReplacement(build, featId, replacementPowerId);
     const trimmed = nextBuild.classPowerSlots;
@@ -2119,6 +2140,9 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       if (state.slotKey === slotKey) {
         nextBase = disableFeatPowerReplace(nextBase, featId);
       }
+    }
+    if (isSlotUsedByParagonAtWillSwap(build, slotKey)) {
+      nextBase = disableParagonAtWillSwap(nextBase);
     }
     const prevId = nextBase.classPowerSlots?.[slotKey];
     const nextSlots: Record<string, string> = { ...(nextBase.classPowerSlots || {}) };
@@ -4126,6 +4150,12 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                         <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.35rem", color: "var(--text-primary)" }}>
                           {def.label}
                         </label>
+                        {isSlotUsedByParagonAtWillSwap(build, def.key) && (
+                          <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.76rem", color: "var(--status-info)" }}>
+                            Paragon multiclass at-will swap
+                            {paragonMcClassName ? ` from ${paragonMcClassName}` : ""}.
+                          </p>
+                        )}
                         {poolForSlot.length === 0 ? (
                           <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.86rem" }}>
                             No powers of this type at printed level {def.gainLevel} or below for your level yet.
@@ -4442,14 +4472,24 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     <input
                       type="checkbox"
                       checked={Boolean(build.paragonMulticlassing)}
-                      onChange={(e) =>
-                        updateBuild({
-                          ...build,
-                          paragonMulticlassing: e.target.checked,
-                          paragonPathId: e.target.checked ? undefined : build.paragonPathId,
-                          paragonMulticlassPowers: e.target.checked ? build.paragonMulticlassPowers : undefined
-                        })
-                      }
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          updateBuild({
+                            ...build,
+                            paragonMulticlassing: true,
+                            paragonPathId: undefined
+                          });
+                          return;
+                        }
+                        updateBuild(
+                          disableParagonAtWillSwap({
+                            ...build,
+                            paragonMulticlassing: undefined,
+                            paragonPathId: build.paragonPathId,
+                            paragonMulticlassPowers: undefined
+                          })
+                        );
+                      }}
                     />
                     <span>
                       <strong>Paragon multiclassing</strong>
@@ -4464,18 +4504,51 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                       {build.level >= 11 && (
                         <>
                           <label style={{ fontSize: "0.82rem" }}>
-                            At-will swap (optional)
+                            At-will slot to swap
+                            <select
+                              value={build.paragonMulticlassPowers?.atWillSwapSlotKey ?? ""}
+                              onChange={(e) => {
+                                const slotKey = e.target.value;
+                                const powerId = build.paragonMulticlassPowers?.atWillSwapPowerId ?? "";
+                                if (!slotKey || !powerId) {
+                                  commitParagonAtWillSwap(slotKey, "");
+                                  return;
+                                }
+                                commitParagonAtWillSwap(slotKey, powerId);
+                              }}
+                              style={{ display: "block", width: "100%", maxWidth: "24rem", marginTop: "0.15rem" }}
+                            >
+                              <option value="">— Choose at-will slot —</option>
+                              {paragonAtWillSlots.map((d) => (
+                                <option key={d.key} value={d.key}>
+                                  {d.label}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label style={{ fontSize: "0.82rem" }}>
+                            Multiclass at-will power (optional)
                             <select
                               value={build.paragonMulticlassPowers?.atWillSwapPowerId ?? ""}
-                              onChange={(e) =>
-                                updateBuild({
-                                  ...build,
-                                  paragonMulticlassPowers: {
-                                    ...build.paragonMulticlassPowers,
-                                    atWillSwapPowerId: e.target.value || undefined
-                                  }
-                                })
-                              }
+                              onChange={(e) => {
+                                const powerId = e.target.value;
+                                const slotKey = build.paragonMulticlassPowers?.atWillSwapSlotKey ?? "";
+                                if (!powerId) {
+                                  commitParagonAtWillSwap("", "");
+                                  return;
+                                }
+                                if (!slotKey) {
+                                  updateBuild({
+                                    ...build,
+                                    paragonMulticlassPowers: {
+                                      ...build.paragonMulticlassPowers,
+                                      atWillSwapPowerId: powerId
+                                    }
+                                  });
+                                  return;
+                                }
+                                commitParagonAtWillSwap(slotKey, powerId);
+                              }}
                               style={{ display: "block", width: "100%", maxWidth: "24rem", marginTop: "0.15rem" }}
                             >
                               <option value="">—</option>
