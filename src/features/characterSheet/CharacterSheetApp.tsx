@@ -45,6 +45,7 @@ import {
 } from "../../ui/scoreBreakdownSkill";
 import { SkillModifierNameContent } from "../../ui/scoreBreakdownSkillName";
 import { ScoreBreakdownTable, type ScoreBreakdownRowDef } from "../../ui/ScoreBreakdownTable";
+import { formatSavedCharacterClassLevel } from "../builder/savedCharacterDisplay";
 import { loadBuild, loadSavedCharacters, type SavedCharacterEntry } from "../builder/storage";
 import { GlossaryTooltipRichText, RulesRichText } from "../builder/RulesRichText";
 import { CharacterPowerCard, powerCardUsageAccentBarColor } from "../../ui/powerCard";
@@ -2235,7 +2236,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               <option value="">Load saved Builder character...</option>
               {savedCharacters.map((entry) => (
                 <option key={entry.id} value={entry.id}>
-                  {entry.name} ({new Date(entry.updatedAt).toLocaleString()})
+                  {entry.name} ({formatSavedCharacterClassLevel(entry.build, index)} ·{" "}
+                  {new Date(entry.updatedAt).toLocaleString()})
                 </option>
               ))}
             </select>

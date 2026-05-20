@@ -20,6 +20,7 @@ import {
   saveBuildToSavedCharacters,
   type SavedCharacterEntry
 } from "./storage";
+import { formatSavedCharacterClassLevel } from "./savedCharacterDisplay";
 import { mergeHybridProficiencyLines } from "../../rules/hybridDerivedStats";
 import {
   buildHybridPowerSlotDefinitions,
@@ -1043,7 +1044,8 @@ function BuilderPersistenceToolbar({
               <span>
                 {entry.name}{" "}
                 <span style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
-                  ({new Date(entry.updatedAt).toLocaleString()})
+                  ({formatSavedCharacterClassLevel(entry.build, index)} ·{" "}
+                  {new Date(entry.updatedAt).toLocaleString()})
                 </span>
               </span>
             </label>
