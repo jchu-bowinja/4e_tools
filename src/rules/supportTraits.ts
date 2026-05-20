@@ -1,9 +1,17 @@
 import type { ClassDef, ClassFeature, EpicDestiny, Feat, HybridClassDef, ParagonPath, RacialTrait, RulesIndex, Theme } from "./models";
 
+export type TraitFeatAugmentation = {
+  featId: string;
+  featName: string;
+  text: string;
+};
+
 export interface TraitDisplayRow {
   id: string;
   name: string;
   shortDescription?: string | null;
+  /** Feat augmentations that modify this class feature (not a compendium power). */
+  featAugmentations?: TraitFeatAugmentation[];
 }
 
 const TRAIT_BODY_FALLBACK_MAX_LEN = 240;

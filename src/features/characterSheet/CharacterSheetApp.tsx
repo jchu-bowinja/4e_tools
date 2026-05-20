@@ -12,6 +12,10 @@ import {
 import type { Armor, Implement, RacialTrait, RulesIndex, Weapon } from "../../rules/models";
 import { resolveRacialTraitsForRace } from "../../rules/racialTraits";
 import {
+  applyFeatModificationsToTraitRows,
+  collectFeatModificationsByClassFeatureId
+} from "../../rules/featClassFeatureModifications";
+import {
   getClassTraitRows,
   getEpicDestinyTraitRows,
   getHybridClassTraitRows,
@@ -365,6 +369,24 @@ function TraitRowsList({ rows, emptyMessage }: { rows: TraitDisplayRow[]; emptyM
               >
                 {trait.shortDescription}
               </div>
+            )}
+            {trait.featAugmentations && trait.featAugmentations.length > 0 && (
+              <ul
+                style={{
+                  margin: "0.2rem 0 0 0",
+                  paddingLeft: "1rem",
+                  fontSize: "0.74rem",
+                  color: "var(--text-secondary)"
+                }}
+              >
+                {trait.featAugmentations.map((aug) => (
+                  <li key={`${aug.featId}-${aug.text.slice(0, 24)}`} style={{ marginBottom: "0.12rem" }}>
+                    <span style={{ fontWeight: 600, color: "var(--status-info)" }}>{aug.featName}</span>
+                    {": "}
+                    {aug.text}
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
         ))}
@@ -981,11 +1003,24 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     [index.hybridClasses, sheet.characterStyle, sheet.hybridClassIdB]
   );
   const classTraitRows = useMemo(() => {
+    let rows;
     if (sheet.characterStyle === "hybrid" && sheet.hybridClassIdA && sheet.hybridClassIdB) {
-      return getHybridClassTraitRows(hybridClassA, hybridClassB, index);
+      rows = getHybridClassTraitRows(hybridClassA, hybridClassB, index);
+    } else {
+      rows = getClassTraitRows(derived.cls, index);
     }
-    return getClassTraitRows(derived.cls, index);
-  }, [sheet.characterStyle, sheet.hybridClassIdA, sheet.hybridClassIdB, hybridClassA, hybridClassB, derived.cls, index]);
+    const featMods = collectFeatModificationsByClassFeatureId(index, sheet.featIds ?? []);
+    return applyFeatModificationsToTraitRows(rows, featMods);
+  }, [
+    sheet.characterStyle,
+    sheet.hybridClassIdA,
+    sheet.hybridClassIdB,
+    sheet.featIds,
+    hybridClassA,
+    hybridClassB,
+    derived.cls,
+    index
+  ]);
   const themeTraitRows = useMemo(
     () => getThemeTraitRows(selectedTheme, index, sheet.level),
     [selectedTheme, index, sheet.level]

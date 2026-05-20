@@ -57,6 +57,7 @@ import {
   racePowerSelectSelectionKey
 } from "../../rules/grantedPowersQuery";
 import { collectFeatModificationsByPowerId } from "../../rules/featPowerModifications";
+import { collectFeatClassFeatureModificationsForBuild } from "../../rules/featClassFeatureModifications";
 import {
   collectMulticlassSlotSwapRows,
   multiclassPowersForSlotSwap,
@@ -1729,6 +1730,10 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   const featModifiedPowers = useMemo(
     () => collectFeatModifiedPowersForBuild(index, build, characterPowerIds),
     [index, build.featIds, characterPowerIds]
+  );
+  const featClassFeatureModifications = useMemo(
+    () => collectFeatClassFeatureModificationsForBuild(index, build),
+    [index, build]
   );
   const featPowerReplaceRows = useMemo(
     () => collectFeatPowerReplaceRows(index, build, powerSlotDefs),
@@ -3845,6 +3850,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               featPowerReplaceRows.length > 0 ||
               multiclassSlotSwapRows.length > 0 ||
               featModifiedPowers.length > 0 ||
+              featClassFeatureModifications.length > 0 ||
               themeGrantedPowers.length > 0 ||
               paragonPathGrantedPowers.length > 0 ||
               paragonMcGrantedPowers.length > 0 ||
@@ -4184,6 +4190,29 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                         )}
                       </div>
                     )}
+                  </div>
+                )}
+                {featClassFeatureModifications.length > 0 && (
+                  <div style={{ marginBottom: "0.65rem" }}>
+                    <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "0.25rem" }}>
+                      Feat augmentations on class features
+                    </div>
+                    <ul style={{ margin: 0, paddingLeft: "1.1rem", fontSize: "0.82rem", color: "var(--text-secondary)" }}>
+                      {featClassFeatureModifications.map((row) => (
+                        <li key={row.classFeatureId} style={{ marginBottom: "0.35rem" }}>
+                          <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{row.classFeatureName}</span>
+                          <ul style={{ margin: "0.15rem 0 0 0", paddingLeft: "1rem" }}>
+                            {row.augmentations.map((aug) => (
+                              <li key={aug.featId} style={{ marginBottom: "0.12rem" }}>
+                                <span style={{ fontWeight: 600 }}>{aug.featName}</span>
+                                {": "}
+                                {aug.text}
+                              </li>
+                            ))}
+                          </ul>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
                 {featModifiedPowers.length > 0 && (

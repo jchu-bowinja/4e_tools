@@ -128,6 +128,8 @@ export interface ProficiencyGrant {
 export interface FeatPowerModification {
   powerName: string;
   powerId?: string | null;
+  /** When the compendium targets a class feature (type Power) with no power row. */
+  classFeatureId?: string | null;
   field: string;
   value: string;
 }

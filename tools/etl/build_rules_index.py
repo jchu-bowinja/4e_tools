@@ -1229,11 +1229,30 @@ def _append_synthesized_power_modify_rules(
         )
 
 
+def _resolve_class_feature_id(name_or_id: str, class_feature_id_by_name: Dict[str, str]) -> Optional[str]:
+    raw = name_or_id.strip()
+    if not raw:
+        return None
+    if raw.startswith("ID_") and raw in class_feature_id_by_name.values():
+        return raw
+    lower = raw.lower()
+    if lower in class_feature_id_by_name:
+        return class_feature_id_by_name[lower]
+    norm = _normalize_power_match_key(lower)
+    for key, fid in class_feature_id_by_name.items():
+        if _normalize_power_match_key(key) == norm:
+            return fid
+    if raw.startswith("ID_"):
+        return raw
+    return None
+
+
 def extract_feat_power_modifications(
     feat: Dict[str, Any],
     power_name_to_id: Dict[str, str],
     power_normalized_to_id: Dict[str, str],
     power_id_to_name: Dict[str, str],
+    class_feature_id_by_name: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     """
   Powers a feat augments (style / arena fighting), not grants.
@@ -1265,10 +1284,14 @@ def extract_feat_power_modifications(
         field = str(attrs.get("Field") or attrs.get("field") or feat_name).strip()
         value = str(attrs.get("value") or "").strip()
         pid = _resolve_power_id(pname, power_name_to_id, power_normalized_to_id, power_id_to_name)
+        cfid = None
+        if not pid and class_feature_id_by_name:
+            cfid = _resolve_class_feature_id(pname, class_feature_id_by_name)
         entries.append(
             {
                 "powerName": pname,
                 "powerId": pid,
+                "classFeatureId": cfid,
                 "field": field,
                 "value": value,
             }
@@ -1280,9 +1303,16 @@ def extract_feat_power_modifications(
         if key in seen_names:
             continue
         seen_names.add(key)
+        apid = _resolve_power_id(pname, power_name_to_id, power_normalized_to_id, power_id_to_name)
+        acfid = (
+            _resolve_class_feature_id(pname, class_feature_id_by_name)
+            if not apid and class_feature_id_by_name
+            else None
+        )
         entry = {
             "powerName": pname,
-            "powerId": _resolve_power_id(pname, power_name_to_id, power_normalized_to_id, power_id_to_name),
+            "powerId": apid,
+            "classFeatureId": acfid,
             "field": feat_name,
             "value": "",
         }
@@ -2102,7 +2132,11 @@ def build_index(input_path: Path, output_dir: Path) -> None:
             class_feature_id_by_name,
         )
         feat_power_mods = extract_feat_power_modifications(
-            feat, power_name_to_id, power_normalized_to_id, power_id_to_name
+            feat,
+            power_name_to_id,
+            power_normalized_to_id,
+            power_id_to_name,
+            class_feature_id_by_name,
         )
         feat_power_replace = extract_feat_power_replace_offers(
             feat, power_name_to_id, power_id_to_name

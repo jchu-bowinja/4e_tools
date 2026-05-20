@@ -289,13 +289,20 @@ export function featModifiedPowerIdsFromEtl(feat: Feat): string[] {
 export function resolveFeatPowerModifications(feat: Feat): Array<{
   powerName: string;
   powerId?: string | null;
+  classFeatureId?: string | null;
   field: string;
   value: string;
 }> {
   if (feat.powerModifications?.length) return feat.powerModifications;
   const featName = feat.name;
   const rules = feat.raw?.rules as { modify?: Array<{ attrs?: Record<string, string> }> } | undefined;
-  const out: Array<{ powerName: string; powerId?: string | null; field: string; value: string }> = [];
+  const out: Array<{
+    powerName: string;
+    powerId?: string | null;
+    classFeatureId?: string | null;
+    field: string;
+    value: string;
+  }> = [];
   for (const row of rules?.modify ?? []) {
     const attrs = row.attrs;
     if (!attrs || String(attrs.type ?? "").toLowerCase() !== "power") continue;
@@ -304,6 +311,7 @@ export function resolveFeatPowerModifications(feat: Feat): Array<{
     out.push({
       powerName,
       powerId: null,
+      classFeatureId: null,
       field: String(attrs.Field ?? attrs.field ?? featName).trim(),
       value: String(attrs.value ?? "").trim()
     });

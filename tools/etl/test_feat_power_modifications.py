@@ -149,6 +149,34 @@ class TestFeatPowerModifications(unittest.TestCase):
         out = extract_feat_power_modifications(feat, power_lookup, norm_lookup, {})
         self.assertEqual(out["powerModifications"][0]["powerId"], "ID_CMD")
 
+    def test_resolves_class_feature_when_no_power(self):
+        feat = {
+            "name": "Moon Sight",
+            "specific": {},
+            "rules": {
+                "modify": [
+                    {
+                        "attrs": {
+                            "name": "Virtue of Prescience",
+                            "type": "Power",
+                            "Field": "Moon Sight",
+                            "value": "Psychic damage.",
+                        }
+                    }
+                ]
+            },
+        }
+        power_lookup = {}
+        norm_lookup = {}
+        cf_lookup = {"virtue of prescience": "ID_FMP_CLASS_FEATURE_1347"}
+        out = extract_feat_power_modifications(
+            feat, power_lookup, norm_lookup, {}, cf_lookup
+        )
+        self.assertIsNone(out["powerModifications"][0]["powerId"])
+        self.assertEqual(
+            out["powerModifications"][0]["classFeatureId"], "ID_FMP_CLASS_FEATURE_1347"
+        )
+
     def test_alias_resolves_hand_of_fury_to_hand_of_radiance(self):
         feat = {
             "name": "Hand of Fury",
