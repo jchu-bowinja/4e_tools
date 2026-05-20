@@ -28,6 +28,7 @@ import { collectFeatModificationsByPowerId } from "../../rules/featPowerModifica
 import { collectFeatGrantedPowersForBuild } from "../../rules/grantedPowersQuery";
 import { multiclassEntryClassId } from "../../rules/paragonMulticlassing";
 import {
+  psionicAugmentationPoolLabel,
   showPsionicPowerPointSummary,
   summarizePsionicPowerPointAdjustments
 } from "../../rules/psionicPowerPoints";
@@ -1031,6 +1032,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   );
   const psionicPowerPointSummary = useMemo(
     () => summarizePsionicPowerPointAdjustments(index, toBuildLikeState(sheet, index)),
+    [index, sheet]
+  );
+  const psionicPoolLabel = useMemo(
+    () => psionicAugmentationPoolLabel(index, toBuildLikeState(sheet, index)),
     [index, sheet]
   );
   const featProficiencyGrants = useMemo(
@@ -2437,7 +2442,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                     <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
                       <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>Class pool</span>
                       {": "}
-                      {psionicPowerPointSummary.baseFromClass} (Psionic Augmentation)
+                      {psionicPowerPointSummary.baseFromClass} ({psionicPoolLabel})
                     </p>
                   )}
                   {psionicPowerPointSummary.lines.length > 0 && (

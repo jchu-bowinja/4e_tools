@@ -125,7 +125,7 @@ describe("basePsionicPowerPointsForBuild", () => {
     expect(basePsionicPowerPointsForBuild(index, build)).toBe(6);
   });
 
-  it("returns 0 for martial primary or hybrid", () => {
+  it("returns 0 for martial primary", () => {
     const martial: CharacterBuild = {
       level: 11,
       classId: "c_fighter",
@@ -135,7 +135,6 @@ describe("basePsionicPowerPointsForBuild", () => {
       trainedSkillIds: []
     };
     expect(basePsionicPowerPointsForBuild(index, martial)).toBe(0);
-    expect(basePsionicPowerPointsForBuild(index, { ...martial, characterStyle: "hybrid" })).toBe(0);
   });
 });
 

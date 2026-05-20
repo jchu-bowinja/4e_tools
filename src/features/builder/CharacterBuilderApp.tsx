@@ -127,6 +127,7 @@ import { pruneStalePowerSelections } from "../../rules/powerSelections";
 import {
   powerPointsForPrintedLevel,
   paragonMulticlassPrimaryAtWillSlotPenalty,
+  psionicAugmentationPoolLabel,
   showPsionicPowerPointSummary,
   summarizePsionicPowerPointAdjustments
 } from "../../rules/psionicPowerPoints";
@@ -1627,6 +1628,10 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   );
   const psionicPowerPointSummary = useMemo(
     () => summarizePsionicPowerPointAdjustments(index, build),
+    [index, build]
+  );
+  const psionicPoolLabel = useMemo(
+    () => psionicAugmentationPoolLabel(index, build),
     [index, build]
   );
   const themeGrantedPowers = useMemo(() => {
@@ -4065,7 +4070,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                           <p style={{ margin: "0 0 0.25rem 0", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
                             <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>Class pool</span>
                             {": "}
-                            {psionicPowerPointSummary.baseFromClass} (Psionic Augmentation)
+                            {psionicPowerPointSummary.baseFromClass} ({psionicPoolLabel})
                           </p>
                         )}
                         {psionicPowerPointSummary.lines.length > 0 && (

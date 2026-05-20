@@ -1,5 +1,6 @@
+import { isAugmentableAtWillPower } from "./featMulticlassSlotSwap";
 import { getFeatMulticlassSlotSwapOffer } from "./featMulticlassSlotSwap";
-import type { CharacterBuild, RulesIndex } from "./models";
+import type { CharacterBuild, HybridClassDef, Power, RulesIndex } from "./models";
 import { multiclassEntryClassId } from "./paragonMulticlassing";
 
 /**
@@ -60,7 +61,7 @@ export interface PsionicPowerPointAdjustmentLine {
 }
 
 export interface PsionicPowerPointSummary {
-  /** Pool from Psionic Augmentation on a psionic class (0 for non-psionic or hybrid). */
+  /** Pool from Psionic Augmentation (single-class or hybrid). */
   baseFromClass: number;
   /** Net adjustment from heroic multiclass swaps + paragon multiclassing. */
   totalAdjustments: number;
@@ -76,14 +77,84 @@ export function basePsionicPowerPointsFromLevel(level: number): number {
   return PSIONIC_AUGMENTATION_POWER_POINTS_BY_LEVEL[lv] ?? 2;
 }
 
-/** Primary class uses Psionic Augmentation (single-class psionic only; hybrid deferred). */
+function hybridClassIsPsionic(index: RulesIndex, hybrid: HybridClassDef | undefined): boolean {
+  if (!hybrid) return false;
+  if (String(hybrid.powerSource ?? "").toLowerCase().includes("psionic")) return true;
+  const baseId = hybrid.baseClassId ?? undefined;
+  return classIsPsionic(index, baseId);
+}
+
+/** Hybrid with at least one psionic component (Psionic Augmentation hybrid). */
+export function hybridHasPsionicComponent(index: RulesIndex, build: CharacterBuild): boolean {
+  if (build.characterStyle !== "hybrid") return false;
+  const ha = index.hybridClasses?.find((h) => h.id === build.hybridClassIdA);
+  const hb = index.hybridClasses?.find((h) => h.id === build.hybridClassIdB);
+  return hybridClassIsPsionic(index, ha) || hybridClassIsPsionic(index, hb);
+}
+
+/** Augmentable at-will powers currently in hybrid at-will slots. */
+export function collectHybridAugmentableAtWillPowers(index: RulesIndex, build: CharacterBuild): Power[] {
+  const slots = build.classPowerSlots ?? {};
+  const out: Power[] = [];
+  const seen = new Set<string>();
+  for (const [key, rawId] of Object.entries(slots)) {
+    if (!key.startsWith("hybrid:aw")) continue;
+    const pid = String(rawId ?? "").trim();
+    if (!pid || seen.has(pid)) continue;
+    const p = index.powers.find((x) => x.id === pid);
+    if (p && isAugmentableAtWillPower(p)) {
+      seen.add(pid);
+      out.push(p);
+    }
+  }
+  return out;
+}
+
+/**
+ * PHB3 hybrid power point option: assumes PP at each augmentation breakpoint (not encounter picks).
+ * Gains at 3rd/7th depend on printed level of augmentable at-wills in slots.
+ */
+export function hybridPsionicPowerPointsFromAugmentableAtWills(
+  augmentableAtWills: readonly Power[],
+  characterLevel: number
+): number {
+  if (augmentableAtWills.length === 0 || characterLevel < 1) return 0;
+  const minPrinted = Math.min(...augmentableAtWills.map((p) => p.level ?? 1));
+  let total = 0;
+  if (characterLevel >= 1) total += 2;
+  if (characterLevel >= 3) total += minPrinted <= 3 ? 2 : 1;
+  if (characterLevel >= 7) total += minPrinted <= 7 ? 2 : 1;
+  if (characterLevel >= 13) total += 1;
+  if (characterLevel >= 17) total += 2;
+  if (characterLevel >= 21) total += 2;
+  if (characterLevel >= 23) total += 2;
+  if (characterLevel >= 27) total += 2;
+  return total;
+}
+
+export function hybridPsionicBasePowerPoints(index: RulesIndex, build: CharacterBuild): number {
+  if (!hybridHasPsionicComponent(index, build)) return 0;
+  const atWills = collectHybridAugmentableAtWillPowers(index, build);
+  return hybridPsionicPowerPointsFromAugmentableAtWills(atWills, build.level);
+}
+
+/** Character uses Psionic Augmentation (single-class psionic or psionic hybrid). */
 export function buildHasPsionicAugmentationClass(index: RulesIndex, build: CharacterBuild): boolean {
-  if (build.characterStyle === "hybrid") return false;
+  if (build.characterStyle === "hybrid") return hybridHasPsionicComponent(index, build);
   return classIsPsionic(index, build.classId);
 }
 
+export function psionicAugmentationPoolLabel(index: RulesIndex, build: CharacterBuild): string {
+  return build.characterStyle === "hybrid" && hybridHasPsionicComponent(index, build)
+    ? "Hybrid Psionic Augmentation"
+    : "Psionic Augmentation";
+}
+
 export function basePsionicPowerPointsForBuild(index: RulesIndex, build: CharacterBuild): number {
-  if (!buildHasPsionicAugmentationClass(index, build)) return 0;
+  if (build.characterStyle === "hybrid") {
+    return hybridPsionicBasePowerPoints(index, build);
+  }
+  if (!classIsPsionic(index, build.classId)) return 0;
   return basePsionicPowerPointsFromLevel(build.level);
 }
 
