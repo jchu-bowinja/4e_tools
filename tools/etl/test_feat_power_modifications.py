@@ -19,7 +19,7 @@ class TestFeatPowerModifications(unittest.TestCase):
             "intuitive strike": "ID_FMP_POWER_10889",
             "nimble strike": "ID_FMP_POWER_919",
         }
-        out = extract_feat_power_modifications(feat, power_lookup)
+        out = extract_feat_power_modifications(feat, power_lookup, power_lookup, {})
         self.assertEqual(len(out["powerModifications"]), 4)
         self.assertEqual(len(out["modifiedPowerIds"]), 4)
         self.assertEqual(out["modifiedPowerIds"][0], "ID_FMP_POWER_2105")
@@ -56,10 +56,14 @@ class TestFeatPowerModifications(unittest.TestCase):
             },
         }
         power_lookup = {
-            "command's strike": "ID_CMD",
+            "commander's strike": "ID_CMD",
             "twin strike": "ID_TWIN",
         }
-        out = extract_feat_power_modifications(feat, power_lookup)
+        norm_lookup = {
+            "commandersstrike": "ID_CMD",
+            "twinstrike": "ID_TWIN",
+        }
+        out = extract_feat_power_modifications(feat, power_lookup, norm_lookup, {})
         self.assertEqual(len(out["powerModifications"]), 2)
         self.assertEqual(out["powerModifications"][0]["value"], "Bonus vs demon, drow, orc, or spider.")
         self.assertEqual(out["modifiedPowerIds"], ["ID_CMD", "ID_TWIN"])
@@ -83,11 +87,67 @@ class TestFeatPowerModifications(unittest.TestCase):
             },
         }
         power_lookup = {"bolstering strike": "P1", "grasping shards": "P2"}
-        out = extract_feat_power_modifications(feat, power_lookup)
+        out = extract_feat_power_modifications(feat, power_lookup, power_lookup, {})
         self.assertEqual(len(out["powerModifications"]), 2)
         names = [e["powerName"] for e in out["powerModifications"]]
         self.assertEqual(names, ["Bolstering Strike", "Grasping Shards"])
         self.assertEqual(len(feat["rules"]["modify"]), 2)
+
+    def test_resolves_compendium_power_id_in_modify_name(self):
+        feat = {
+            "name": "Initiate of the Faith",
+            "specific": {},
+            "rules": {
+                "modify": [
+                    {
+                        "attrs": {
+                            "name": "ID_FMP_POWER_1455",
+                            "type": "Power",
+                            "Field": "Initiate of the Faith",
+                            "value": "Extra healing.",
+                        }
+                    }
+                ]
+            },
+        }
+        power_lookup = {"healing word": "ID_FMP_POWER_1455"}
+        id_to_name = {"ID_FMP_POWER_1455": "Healing Word"}
+        out = extract_feat_power_modifications(feat, power_lookup, power_lookup, id_to_name)
+        self.assertEqual(out["powerModifications"][0]["powerId"], "ID_FMP_POWER_1455")
+        self.assertIn("ID_FMP_POWER_1455", out["modifiedPowerIds"])
+
+    def test_normalized_name_resolves_wolfpack_tactics(self):
+        feat = {
+            "name": "Eldaarich Guarded Practice",
+            "specific": {"Associated Powers": "wolfpack tactics"},
+            "rules": {},
+        }
+        power_lookup = {"wolf pack tactics": "ID_WOLF"}
+        norm_lookup = {"wolfpacktactics": "ID_WOLF"}
+        out = extract_feat_power_modifications(feat, power_lookup, norm_lookup, {})
+        self.assertEqual(out["powerModifications"][0]["powerId"], "ID_WOLF")
+
+    def test_alias_resolves_command_strike_typo(self):
+        feat = {
+            "name": "Corellon's Wrath Style",
+            "specific": {},
+            "rules": {
+                "modify": [
+                    {
+                        "attrs": {
+                            "name": "Command's Strike",
+                            "type": "Power",
+                            "Field": "Corellon's Wrath Style",
+                            "value": "Bonus.",
+                        }
+                    }
+                ]
+            },
+        }
+        power_lookup = {"commander's strike": "ID_CMD"}
+        norm_lookup = {"commandersstrike": "ID_CMD"}
+        out = extract_feat_power_modifications(feat, power_lookup, norm_lookup, {})
+        self.assertEqual(out["powerModifications"][0]["powerId"], "ID_CMD")
 
 
 if __name__ == "__main__":

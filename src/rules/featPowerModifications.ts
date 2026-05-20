@@ -1,5 +1,6 @@
 import type { Feat, FeatPowerModification, Power, RulesIndex } from "./models";
 import { resolveFeatPowerModifications } from "./grantedPowersQuery";
+import { buildPowerNameLookups, resolvePowerReference } from "./powerNameResolution";
 
 /** Display text for a feat augmentation on a power card. */
 export type FeatPowerAugmentation = {
@@ -77,14 +78,14 @@ export function resolveAugmentationText(mod: FeatPowerModification, feat: Feat):
 
 function resolveModificationPowerId(
   mod: FeatPowerModification,
-  powerIdByName: Map<string, string>
+  lookups: ReturnType<typeof buildPowerNameLookups>
 ): string | undefined {
   const pid = mod.powerId?.trim();
-  if (pid && pid.startsWith("ID_")) return pid;
-  const byName = powerIdByName.get(mod.powerName.trim().toLowerCase());
-  if (byName) return byName;
-  if (pid) return pid;
-  return undefined;
+  if (pid) {
+    const resolved = resolvePowerReference(pid, lookups);
+    if (resolved) return resolved;
+  }
+  return resolvePowerReference(mod.powerName, lookups);
 }
 
 /**
@@ -94,7 +95,7 @@ export function collectFeatModificationsByPowerId(
   index: RulesIndex,
   featIds: readonly string[]
 ): Map<string, PowerFeatModifications> {
-  const powerIdByName = new Map(index.powers.map((p) => [p.name.trim().toLowerCase(), p.id]));
+  const powerLookups = buildPowerNameLookups(index.powers);
   const byPower = new Map<string, PowerFeatModifications>();
 
   for (const fid of featIds) {
@@ -102,7 +103,7 @@ export function collectFeatModificationsByPowerId(
     if (!feat) continue;
 
     for (const mod of resolveFeatPowerModifications(feat)) {
-      const powerId = resolveModificationPowerId(mod, powerIdByName);
+      const powerId = resolveModificationPowerId(mod, powerLookups);
       if (!powerId) continue;
 
       const bucket = byPower.get(powerId) ?? { augmentations: [], metadata: [] };

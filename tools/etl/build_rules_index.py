@@ -1118,6 +1118,23 @@ def _parse_associated_power_names(spec: Any) -> List[str]:
     return [part.strip() for part in raw.split(",") if part.strip()]
 
 
+def _normalize_power_match_key(name: str) -> str:
+    """Collapse punctuation/spacing for fuzzy power name match (wolfpack → Wolf Pack)."""
+    s = name.strip().lower()
+    s = s.replace("\u2019", "'").replace("\u2018", "'").replace("`", "'")
+    return re.sub(r"[^a-z0-9]", "", s)
+
+
+# Known compendium typos / shorthand in feat Associated Powers or modify rows.
+_FEAT_POWER_NAME_ALIASES: Dict[str, str] = {
+    "command's strike": "commander's strike",
+    "predator's strike": "predator strike",
+    "overhwleming strike": "overwhelming strike",
+    "haunting sounds": "ghost sound",
+    "ghost sounds": "ghost sound",
+}
+
+
 def _build_power_name_to_id(powers_raw: List[Dict[str, Any]]) -> Dict[str, str]:
     """First compendium row per display name (case-insensitive), matching builder name resolution."""
     lookup: Dict[str, str] = {}
@@ -1130,6 +1147,48 @@ def _build_power_name_to_id(powers_raw: List[Dict[str, Any]]) -> Dict[str, str]:
         if key and key not in lookup:
             lookup[key] = pid
     return lookup
+
+
+def _build_power_normalized_name_to_id(powers_raw: List[Dict[str, Any]]) -> Dict[str, str]:
+    """Normalized display names (alphanumeric only) → first compendium power id."""
+    lookup: Dict[str, str] = {}
+    for power in powers_raw:
+        pid = power.get("internal_id")
+        pname = power.get("name")
+        if not isinstance(pid, str) or not isinstance(pname, str):
+            continue
+        key = _normalize_power_match_key(pname)
+        if key and key not in lookup:
+            lookup[key] = pid
+    return lookup
+
+
+def _resolve_power_id(
+    name_or_id: str,
+    power_name_to_id: Dict[str, str],
+    power_normalized_to_id: Dict[str, str],
+    power_id_to_name: Dict[str, str],
+) -> Optional[str]:
+    """Resolve feat power modification target from compendium id or display name."""
+    raw = name_or_id.strip()
+    if not raw:
+        return None
+    if raw.startswith("ID_") and raw in power_id_to_name:
+        return raw
+
+    lower = _FEAT_POWER_NAME_ALIASES.get(raw.lower(), raw.lower())
+    exact = power_name_to_id.get(lower)
+    if exact:
+        return exact
+
+    norm = _normalize_power_match_key(lower)
+    by_norm = power_normalized_to_id.get(norm)
+    if by_norm:
+        return by_norm
+
+    if raw.startswith("ID_"):
+        return raw
+    return None
 
 
 def _append_synthesized_power_modify_rules(
@@ -1171,6 +1230,8 @@ def _append_synthesized_power_modify_rules(
 def extract_feat_power_modifications(
     feat: Dict[str, Any],
     power_name_to_id: Dict[str, str],
+    power_normalized_to_id: Dict[str, str],
+    power_id_to_name: Dict[str, str],
 ) -> Dict[str, Any]:
     """
   Powers a feat augments (style / arena fighting), not grants.
@@ -1201,7 +1262,7 @@ def extract_feat_power_modifications(
         seen_names.add(key)
         field = str(attrs.get("Field") or attrs.get("field") or feat_name).strip()
         value = str(attrs.get("value") or "").strip()
-        pid = power_name_to_id.get(key)
+        pid = _resolve_power_id(pname, power_name_to_id, power_normalized_to_id, power_id_to_name)
         entries.append(
             {
                 "powerName": pname,
@@ -1219,7 +1280,7 @@ def extract_feat_power_modifications(
         seen_names.add(key)
         entry = {
             "powerName": pname,
-            "powerId": power_name_to_id.get(key),
+            "powerId": _resolve_power_id(pname, power_name_to_id, power_normalized_to_id, power_id_to_name),
             "field": feat_name,
             "value": "",
         }
@@ -2007,6 +2068,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
             skill_name_to_id[sname.strip().lower()] = sid
 
     power_name_to_id = _build_power_name_to_id(powers_raw)
+    power_normalized_to_id = _build_power_normalized_name_to_id(powers_raw)
     power_id_to_name = _build_power_id_to_name(powers_raw)
 
     feats: List[Dict[str, Any]] = []
@@ -2037,7 +2099,9 @@ def build_index(input_path: Path, output_dir: Path) -> None:
             class_feature_name_lookup,
             class_feature_id_by_name,
         )
-        feat_power_mods = extract_feat_power_modifications(feat, power_name_to_id)
+        feat_power_mods = extract_feat_power_modifications(
+            feat, power_name_to_id, power_normalized_to_id, power_id_to_name
+        )
         feat_power_replace = extract_feat_power_replace_offers(
             feat, power_name_to_id, power_id_to_name
         )

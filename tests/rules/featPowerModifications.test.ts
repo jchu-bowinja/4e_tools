@@ -36,6 +36,33 @@ describe("featPowerModifications", () => {
     ).toBe("Extra damage.");
   });
 
+  it("resolves power id from compendium id in modification row", () => {
+    const index = {
+      feats: [
+        {
+          id: "F_INIT",
+          name: "Initiate of the Faith",
+          slug: "initiate",
+          prereqTokens: [],
+          modifiedPowerIds: ["ID_FMP_POWER_1455"],
+          powerModifications: [
+            {
+              powerName: "ID_FMP_POWER_1455",
+              powerId: "ID_FMP_POWER_1455",
+              field: "Initiate of the Faith",
+              value: "Extra healing."
+            }
+          ],
+          raw: {}
+        }
+      ],
+      powers: [{ id: "ID_FMP_POWER_1455", name: "Healing Word", slug: "healing-word", raw: { specific: {} } }]
+    } as unknown as RulesIndex;
+
+    const map = collectFeatModificationsByPowerId(index, ["F_INIT"]);
+    expect(map.get("ID_FMP_POWER_1455")?.augmentations[0]?.text).toBe("Extra healing.");
+  });
+
   it("collects modifications by power id from selected feats", () => {
     const index = {
       feats: [
