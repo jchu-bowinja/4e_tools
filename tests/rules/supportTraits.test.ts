@@ -70,6 +70,29 @@ describe("supportTraits", () => {
     expect(rows[1]?.shortDescription).toBeUndefined();
   });
 
+  it("filters class traits by character level when provided", () => {
+    const fighter: ClassDef = {
+      id: "ID_FMP_CLASS_3",
+      name: "Fighter",
+      slug: "fighter",
+      raw: { specific: { _PARSED_CLASS_FEATURE: "Combat Challenge, Level 5 Feature" } }
+    };
+    const index = miniIndex();
+    index.classFeatures = [
+      ...(index.classFeatures ?? []),
+      {
+        id: "ID_LEVEL5",
+        name: "Level 5 Feature",
+        slug: "level-5-feature",
+        raw: { specific: { Level: "5" } }
+      }
+    ];
+    const at1 = getClassTraitRows(fighter, index, 1);
+    expect(at1.map((r) => r.name)).toEqual(["Combat Challenge"]);
+    const at5 = getClassTraitRows(fighter, index, 5);
+    expect(at5.map((r) => r.name).sort()).toEqual(["Combat Challenge", "Level 5 Feature"].sort());
+  });
+
   it("resolves theme and path traits from feature ids", () => {
     const theme: Theme = {
       id: "ID_THEME",

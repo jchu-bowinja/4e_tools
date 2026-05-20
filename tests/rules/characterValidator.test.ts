@@ -678,7 +678,7 @@ describe("validateCharacterBuild", () => {
     expect(ok.errors.filter((e) => e.includes("Test Construction Power"))).toEqual([]);
   });
 
-  it("requires subrace, racial ability, and class build option when applicable", () => {
+  it("requires subrace and racial ability when applicable", () => {
     const subraceParentId = "trait_sub_parent";
     const subraceAId = "trait_sub_a";
     const idx: RulesIndex = {
@@ -712,17 +712,7 @@ describe("validateCharacterBuild", () => {
           raw: { ...index.classes[0].raw }
         }
       ],
-      classBuildOptionsByClassId: {
-        class_build: [
-          {
-            id: "opt_a",
-            name: "Option A",
-            parentFeatureId: "cf1",
-            parentFeatureName: "Build",
-            powerIds: []
-          }
-        ]
-      }
+      classFeatureChoiceGroupsByClassId: {}
     };
     const build = {
       ...legalLevel1Base,
@@ -732,7 +722,6 @@ describe("validateCharacterBuild", () => {
     const result = validateCharacterBuild(idx, build);
     expect(result.errors).toContain("Race: Subrace Test Subrace — make a selection.");
     expect(result.errors).toContain("Race: choose a racial ability bonus (+2).");
-    expect(result.errors).toContain("Class: choose a build option.");
   });
 
   it("requires two hybrid classes when characterStyle is hybrid", () => {

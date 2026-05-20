@@ -1,3 +1,7 @@
+import {
+  filterVisibleClassFeatureChoiceGroups,
+  getClassFeatureChoiceGroups
+} from "./classFeatureChoices";
 import type { CharacterBuild, ClassFeature, RulesIndex } from "./models";
 import { characterSupportIds } from "./prereqContext";
 import {
@@ -47,10 +51,19 @@ export function collectCharacterClassFeatureIds(index: RulesIndex, build: Charac
     build.hybridTalentClassFeatureIdA,
     build.hybridTalentClassFeatureIdB,
     ...Object.values(build.hybridSideASelections ?? {}),
-    ...Object.values(build.hybridSideBSelections ?? {}),
-    ...Object.values(build.classSelections ?? {})
+    ...Object.values(build.hybridSideBSelections ?? {})
   ]) {
     if (id?.startsWith("ID_")) add(byId.get(id));
+  }
+
+  const cls = index.classes.find((c) => c.id === build.classId);
+  if (cls) {
+    const rs = build.classSelections ?? {};
+    const groups = getClassFeatureChoiceGroups(index, cls);
+    for (const g of filterVisibleClassFeatureChoiceGroups(groups, rs)) {
+      const picked = rs[g.key]?.trim();
+      if (picked?.startsWith("ID_")) add(byId.get(picked));
+    }
   }
 
   if (build.paragonPathId) {

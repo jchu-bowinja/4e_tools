@@ -106,6 +106,10 @@ describe.skipIf(!existsSync(rulesIndexPath))("generated rules index", () => {
     const data = JSON.parse(raw) as {
       classes: Array<{ id: string; name: string }>;
       classBuildOptionsByClassId?: Record<string, Array<{ id: string; name: string; body?: string | null }>>;
+      classFeatureChoiceGroupsByClassId?: Record<
+        string,
+        Array<{ parentFeatureName: string; options?: Array<{ name: string }> }>
+      >;
     };
     const clericId = data.classes.find((c) => c.name === "Cleric")?.id;
     const paladinId = data.classes.find((c) => c.name === "Paladin")?.id;
@@ -128,10 +132,16 @@ describe.skipIf(!existsSync(rulesIndexPath))("generated rules index", () => {
     expect(artificerOpts.length).toBe(3);
 
     const fighterId = data.classes.find((c) => c.name === "Fighter")?.id;
-    const arena = (data.classBuildOptionsByClassId?.[fighterId!] ?? []).find(
-      (o) => o.name === "Arena Training"
+    const rogueId = data.classes.find((c) => c.name === "Rogue")?.id;
+    const groups = data.classFeatureChoiceGroupsByClassId as
+      | Record<string, Array<{ parentFeatureName: string; options?: Array<{ name: string }> }>>
+      | undefined;
+    const fighterTalents = (groups?.[fighterId!] ?? []).find((g) => g.parentFeatureName === "Fighter Talents");
+    expect(fighterTalents?.options?.some((o) => o.name === "Arena Training")).toBe(true);
+    const roguePair = (groups?.[rogueId!] ?? []).find((g) => g.parentFeatureName === "Class feature");
+    expect(roguePair?.options?.map((o) => o.name).sort()).toEqual(
+      ["Rogue Weapon Talent", "Sharpshooter Talent"].sort()
     );
-    expect(arena?.displayName).toBe("Arena Fighter");
   });
 });
 

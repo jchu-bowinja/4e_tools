@@ -7,6 +7,7 @@ import {
   EquipmentSlot,
   Feat,
   HybridClassDef,
+  ClassFeature,
   Power,
   RacialTrait,
   RulesIndex
@@ -91,7 +92,14 @@ import {
   getRaceTraitBundleSlots,
   resolveDisplayedRacialTraitsForRace
 } from "../../rules/raceSubraces";
-import { classBuildOptionLabel, getClassBuildOptions } from "../../rules/classBuildOptions";
+import {
+  filterVisibleClassFeatureChoiceGroups,
+  formatClassPowerChoiceSelection,
+  getClassFeatureChoiceGroups,
+  parseClassPowerChoiceSelection,
+  pruneHiddenClassFeatureSelections
+} from "../../rules/classFeatureChoices";
+import { getClassTraitRows, getHybridClassTraitRows, type TraitDisplayRow } from "../../rules/supportTraits";
 import { autoGrantedTrainedSkillIds } from "../../rules/grantedSkillsQuery";
 import { computeSkillSheetRows } from "../../rules/skillCalculator";
 import {
@@ -998,12 +1006,14 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   const hybridClassSelectionComplete = isHybridBuild && !!selectedHybridA && !!selectedHybridB;
   const raceSpecific = (selectedRace?.raw?.specific as Record<string, unknown> | undefined) || {};
   const classSpecific = (selectedClass?.raw?.specific as Record<string, unknown> | undefined) || {};
-  const classBuildOptions = useMemo(() => getClassBuildOptions(index, selectedClass), [index, selectedClass]);
-  const selectedClassBuildOption = useMemo(() => {
-    const id = build.classSelections?.buildOptionId || build.classSelections?.buildOption;
-    if (!id) return undefined;
-    return classBuildOptions.find((o) => o.id === id || o.name === id);
-  }, [build.classSelections, classBuildOptions]);
+  const classFeatureChoiceGroups = useMemo(
+    () => getClassFeatureChoiceGroups(index, selectedClass),
+    [index, selectedClass]
+  );
+  const visibleClassFeatureChoiceGroups = useMemo(
+    () => filterVisibleClassFeatureChoiceGroups(classFeatureChoiceGroups, build.classSelections),
+    [classFeatureChoiceGroups, build.classSelections]
+  );
   const autoGrantedSkillIds = useMemo(() => autoGrantedTrainedSkillIds(index, build), [index, build]);
   const autoGrantedSkillIdSet = useMemo(() => new Set(autoGrantedSkillIds), [autoGrantedSkillIds]);
   const expandedBuildJson = useMemo(
@@ -1015,6 +1025,25 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     () => new Map<string, RacialTrait>((index.racialTraits ?? []).map((t) => [t.id, t])),
     [index.racialTraits]
   );
+  const classFeatureById = useMemo(
+    () => new Map<string, ClassFeature>((index.classFeatures ?? []).map((f) => [f.id, f])),
+    [index.classFeatures]
+  );
+  const classTraitRows = useMemo((): TraitDisplayRow[] => {
+    if (isHybridBuild) {
+      if (!hybridClassSelectionComplete) return [];
+      return getHybridClassTraitRows(selectedHybridA, selectedHybridB, index, build.level);
+    }
+    return getClassTraitRows(selectedClass, index, build.level);
+  }, [
+    isHybridBuild,
+    hybridClassSelectionComplete,
+    selectedHybridA,
+    selectedHybridB,
+    selectedClass,
+    index,
+    build.level
+  ]);
   const raceTraitBundleSlots = useMemo(
     () => getRaceTraitBundleSlots(selectedRace, racialTraitById),
     [selectedRace, racialTraitById]
@@ -1965,6 +1994,64 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     setSavedCharacters(loadSavedCharacters());
   }
 
+  function renderClassFeatureTraitList(rows: TraitDisplayRow[]): JSX.Element | null {
+    if (rows.length === 0) return null;
+    return (
+      <div style={{ marginTop: "0.65rem" }}>
+        <h4 style={subsectionTitleStyle}>Class features</h4>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
+          {rows.map((row) => {
+            const feature = classFeatureById.get(row.id);
+            return (
+              <CollapsibleDisclosure
+                key={row.id}
+                style={{
+                  backgroundColor: "var(--surface-1)",
+                  border: "1px solid var(--panel-border)",
+                  borderRadius: "8px",
+                  padding: "0.45rem 0.55rem"
+                }}
+                summary={
+                  <>
+                    {row.name}
+                    {row.shortDescription ? (
+                      <span style={{ fontWeight: 400, color: "var(--text-muted)" }}> — {row.shortDescription}</span>
+                    ) : null}
+                  </>
+                }
+                summaryStyle={{
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  fontSize: "0.88rem",
+                  lineHeight: 1.4
+                }}
+                bodyStyle={{ marginTop: "0.4rem", fontSize: "0.86rem", lineHeight: 1.45 }}
+              >
+                {feature?.source && (
+                  <p style={{ margin: "0 0 0.35rem 0", color: "var(--text-muted)" }}>
+                    <strong>Source:</strong> {feature.source}
+                  </p>
+                )}
+                {!feature && row.id.startsWith("ID_") && (
+                  <p style={{ margin: 0, color: "var(--status-warning)" }}>
+                    This feature is listed on the class but was not found in the loaded rules data ({row.id}).
+                  </p>
+                )}
+                {feature?.body ? (
+                  <RulesRichText
+                    text={feature.body}
+                    paragraphStyle={{ fontSize: "0.86rem", color: "var(--text-secondary)" }}
+                    listItemStyle={{ fontSize: "0.86rem", color: "var(--text-secondary)" }}
+                  />
+                ) : null}
+              </CollapsibleDisclosure>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   function renderPowerCardWithSelections(p: Power, cardKey: string): JSX.Element {
     return (
       <div key={cardKey}>
@@ -2303,25 +2390,39 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 parseRacialTraitIdsFromRace(selectedRace).includes(ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION)) && (
                 <div style={{ marginTop: "0.65rem", ...ui.blockSubsection, backgroundColor: "var(--surface-1)", borderColor: "var(--panel-border)" }}>
                   <h4 style={subsectionTitleStyle}>Race choices</h4>
-                  {raceTraitBundleSlots.map((bundle) => (
-                    <label key={bundle.selectionKey} style={{ display: "block", marginBottom: "0.75rem" }}>
-                      <span style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem", fontSize: "0.85rem" }}>
-                        {bundle.parentTraitName}
-                      </span>
-                      <select
-                        value={build.raceSelections?.[bundle.selectionKey] || ""}
-                        onChange={(e) => commitRaceTraitBundleSelection(bundle.selectionKey, e.target.value)}
-                        style={{ width: "100%", maxWidth: "28rem", padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--panel-border)" }}
-                      >
-                        <option value="">Select…</option>
-                        {bundle.options.map((opt) => (
-                          <option key={opt.id} value={opt.id}>
-                            {opt.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  ))}
+                  {raceTraitBundleSlots.map((bundle) => {
+                    const pickedId = build.raceSelections?.[bundle.selectionKey] || "";
+                    const picked = bundle.options.find((o) => o.id === pickedId);
+                    return (
+                      <label key={bundle.selectionKey} style={{ display: "block", marginBottom: "0.75rem" }}>
+                        <span style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem", fontSize: "0.85rem" }}>
+                          {bundle.parentTraitName}
+                        </span>
+                        <select
+                          value={pickedId}
+                          onChange={(e) => commitRaceTraitBundleSelection(bundle.selectionKey, e.target.value)}
+                          style={{ width: "100%", maxWidth: "28rem", padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--panel-border)" }}
+                        >
+                          <option value="">Select…</option>
+                          {bundle.options.map((opt) => (
+                            <option key={opt.id} value={opt.id}>
+                              {opt.name}
+                            </option>
+                          ))}
+                        </select>
+                        {picked?.shortDescription && (
+                          <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.8rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
+                            {picked.shortDescription}
+                          </p>
+                        )}
+                        {picked?.body && (
+                          <div style={{ marginTop: "0.35rem", fontSize: "0.82rem", color: "var(--text-secondary)" }}>
+                            <RulesRichText text={picked.body} />
+                          </div>
+                        )}
+                      </label>
+                    );
+                  })}
                   {parseRacialTraitIdsFromRace(selectedRace).includes(ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION) && (
                     <label style={{ display: "block", marginBottom: "0.75rem" }}>
                       <span style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem", fontSize: "0.85rem" }}>
@@ -3044,6 +3145,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 <p style={{ margin: "0.65rem 0 0.65rem 0", fontSize: "0.82rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
                   Powers use each hybrid&apos;s <strong>base class</strong> lists (shown below). Pick two different hybrid entries.
                 </p>
+                {hybridClassSelectionComplete && renderClassFeatureTraitList(classTraitRows)}
                 {hybridClassSelectionComplete && classAutoGrantedPowers.length > 0 && (
                   <div
                     style={{
@@ -3067,6 +3169,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 <p style={{ margin: "0.25rem 0 0 0" }}><strong>Key Abilities:</strong> {String(classSpecific["Key Abilities"] || selectedClass.keyAbilities || "-")}</p>
                 <p style={{ margin: "0.25rem 0 0 0" }}><strong>Hit Points at 1st Level:</strong> {String(classSpecific["Hit Points at 1st Level"] || selectedClass.hitPointsAt1 || "-")}</p>
                 <p style={{ margin: "0.25rem 0 0 0" }}><strong>Class Skills:</strong> {String(classSpecific["Class Skills"] || "-")}</p>
+                {renderClassFeatureTraitList(classTraitRows)}
                 {selectedClass.raw.flavor && (
                   <p style={{ margin: "0.5rem 0 0 0" }}>
                     <strong>Flavor:</strong> {String(selectedClass.raw.flavor)}
@@ -3100,71 +3203,109 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     {classAutoGrantedPowers.map((p) => renderPowerCardWithSelections(p, `class-tab-${p.id}`))}
                   </div>
                 )}
-                {classBuildOptions.length > 0 && (
+                {visibleClassFeatureChoiceGroups.length > 0 && (
                   <div style={{ marginTop: "0.85rem", paddingTop: "0.75rem", borderTop: "1px solid var(--panel-border)" }}>
                     <h4 style={subsectionTitleStyle}>Class choices</h4>
-                    <label style={{ display: "block", maxWidth: "28rem" }}>
-                      <span style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem", fontSize: "0.85rem" }}>
-                        Build option
-                      </span>
-                      <select
-                        value={build.classSelections?.buildOptionId || build.classSelections?.buildOption || ""}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          const next = { ...(build.classSelections || {}) };
-                          if (v) {
-                            next.buildOptionId = v;
-                            const picked = classBuildOptions.find((o) => o.id === v);
-                            if (picked) next.buildOption = classBuildOptionLabel(picked);
-                          } else {
-                            delete next.buildOptionId;
-                            delete next.buildOption;
-                          }
-                          const keys = Object.keys(next);
-                          updateBuild({ ...build, classSelections: keys.length ? next : undefined });
-                        }}
-                        style={{ width: "100%", padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--panel-border)" }}
-                      >
-                        <option value="">Select build option…</option>
-                        {classBuildOptions.map((opt) => (
-                          <option key={opt.id} value={opt.id}>
-                            {opt.parentFeatureName
-                              ? `${opt.parentFeatureName}: ${classBuildOptionLabel(opt)}`
-                              : classBuildOptionLabel(opt)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    {selectedClassBuildOption && (
-                      <div style={{ marginTop: "0.55rem" }}>
-                        <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.85rem", color: "var(--text-primary)" }}>
-                          <strong>Selected:</strong> {classBuildOptionLabel(selectedClassBuildOption)}
-                        </p>
-                        {selectedClassBuildOption.shortDescription && (
-                          <p style={{ margin: "0 0 0.4rem 0", fontSize: "0.82rem", color: "var(--text-secondary)" }}>
-                            {selectedClassBuildOption.shortDescription}
-                          </p>
-                        )}
-                        {selectedClassBuildOption.body && (
-                          <div style={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}>
-                            <RulesRichText
-                              text={selectedClassBuildOption.body}
-                              paragraphStyle={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}
-                              listItemStyle={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}
-                            />
-                          </div>
-                        )}
-                        {selectedClassBuildOption.powerIds.length > 0 && (
-                          <div style={{ marginTop: "0.45rem" }}>
-                            <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--text-secondary)" }}>Granted powers</div>
-                            {selectedClassBuildOption.powerIds
-                              .map((pid) => index.powers.find((p) => p.id === pid))
-                              .filter((p): p is Power => !!p)
-                              .map((p) => renderPowerCardWithSelections(p, `class-build-${selectedClassBuildOption.id}-${p.id}`))}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    {visibleClassFeatureChoiceGroups.map((group) => {
+                      const rs = build.classSelections || {};
+                      if (group.kind === "classFeature") {
+                        const pickedId = rs[group.key] || "";
+                        const picked = group.options.find((o) => o.id === pickedId);
+                        return (
+                          <label key={group.key} style={{ display: "block", maxWidth: "28rem", marginBottom: "0.75rem" }}>
+                            <span style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem", fontSize: "0.85rem" }}>
+                              {group.parentFeatureName}
+                            </span>
+                            <select
+                              value={pickedId}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                let next = { ...rs };
+                                if (v) next[group.key] = v;
+                                else delete next[group.key];
+                                next = pruneHiddenClassFeatureSelections(next, classFeatureChoiceGroups);
+                                const keys = Object.keys(next);
+                                updateBuild({ ...build, classSelections: keys.length ? next : undefined });
+                              }}
+                              style={{ width: "100%", padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--panel-border)" }}
+                            >
+                              <option value="">Select…</option>
+                              {group.options.map((opt) => (
+                                <option key={opt.id} value={opt.id}>
+                                  {opt.name}
+                                </option>
+                              ))}
+                            </select>
+                            {picked?.shortDescription && (
+                              <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.8rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
+                                {picked.shortDescription}
+                              </p>
+                            )}
+                            {picked?.body && (
+                              <div style={{ marginTop: "0.35rem", fontSize: "0.82rem", color: "var(--text-secondary)" }}>
+                                <RulesRichText text={picked.body} />
+                              </div>
+                            )}
+                          </label>
+                        );
+                      }
+                      const cantripPicks = parseClassPowerChoiceSelection(rs[group.key]);
+                      const powerById = new Map(index.powers.map((p) => [p.id, p]));
+                      return (
+                        <div key={group.key} style={{ marginBottom: "0.75rem", maxWidth: "28rem" }}>
+                          <span style={{ display: "block", fontWeight: 600, marginBottom: "0.35rem", fontSize: "0.85rem" }}>
+                            {group.parentFeatureName} ({group.pickCount} picks)
+                          </span>
+                          {Array.from({ length: group.pickCount }, (_, slot) => {
+                            const selectedId = cantripPicks[slot] || "";
+                            const usedElsewhere = new Set(
+                              cantripPicks.filter((_, i) => i !== slot)
+                            );
+                            return (
+                              <label key={`${group.key}-${slot}`} style={{ display: "block", marginBottom: "0.35rem" }}>
+                                <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>Pick {slot + 1}</span>
+                                <select
+                                  value={selectedId}
+                                  onChange={(e) => {
+                                    const v = e.target.value;
+                                    const nextPicks = [...cantripPicks];
+                                    while (nextPicks.length < group.pickCount) nextPicks.push("");
+                                    nextPicks[slot] = v;
+                                    const filtered = nextPicks.filter(Boolean);
+                                    let next = { ...rs };
+                                    if (filtered.length) next[group.key] = formatClassPowerChoiceSelection(filtered);
+                                    else delete next[group.key];
+                                    next = pruneHiddenClassFeatureSelections(next, classFeatureChoiceGroups);
+                                    updateBuild({
+                                      ...build,
+                                      classSelections: Object.keys(next).length ? next : undefined
+                                    });
+                                  }}
+                                  style={{
+                                    width: "100%",
+                                    marginTop: "0.2rem",
+                                    padding: "0.4rem",
+                                    borderRadius: "6px",
+                                    border: "1px solid var(--panel-border)"
+                                  }}
+                                >
+                                  <option value="">Select power…</option>
+                                  {group.powerIds.map((pid) => {
+                                    const p = powerById.get(pid);
+                                    if (!p || (usedElsewhere.has(pid) && pid !== selectedId)) return null;
+                                    return (
+                                      <option key={pid} value={pid}>
+                                        {p.name}
+                                      </option>
+                                    );
+                                  })}
+                                </select>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
                 {classSpecific["Role"] && (
@@ -5319,9 +5460,29 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   ) : null}
                 </>
               )}
-              {build.classSelections?.buildOption && (
-                <p style={{ margin: 0, fontSize: "0.88rem" }}><strong>Class Build:</strong> {build.classSelections.buildOption}</p>
-              )}
+              {!isHybridBuild &&
+                visibleClassFeatureChoiceGroups.length > 0 &&
+                (() => {
+                  const rs = build.classSelections || {};
+                  const lines = visibleClassFeatureChoiceGroups
+                    .map((g) => {
+                      if (g.kind === "classFeature") {
+                        const opt = g.options.find((o) => o.id === rs[g.key]);
+                        return opt ? `${g.parentFeatureName}: ${opt.name}` : null;
+                      }
+                      const picks = parseClassPowerChoiceSelection(rs[g.key])
+                        .map((pid) => index.powers.find((p) => p.id === pid)?.name)
+                        .filter(Boolean);
+                      return picks.length ? `${g.parentFeatureName}: ${picks.join(", ")}` : null;
+                    })
+                    .filter(Boolean);
+                  if (lines.length === 0) return null;
+                  return (
+                    <p style={{ margin: 0, fontSize: "0.88rem" }}>
+                      <strong>Class choices:</strong> {lines.join(" · ")}
+                    </p>
+                  );
+                })()}
               <p style={{ margin: 0, fontSize: "0.88rem" }}>
                 <strong {...glossaryTooltipUi.hoverA11y("level")}>Level:</strong> {build.level}
               </p>

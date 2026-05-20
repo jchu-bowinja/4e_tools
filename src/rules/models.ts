@@ -502,6 +502,28 @@ export interface RulesIndex {
       powerIds?: string[];
     }>
   >;
+  /** Level-1 class feature / power choice groups (Rogue Tactics, Fighter Talents, cantrips, …). */
+  classFeatureChoiceGroupsByClassId?: Record<
+    string,
+    Array<{
+      key: string;
+      kind: "classFeature" | "power";
+      parentFeatureId: string;
+      parentFeatureName: string;
+      pickCount: number;
+      powerIds?: string[];
+      visibleWhen?: { groupKey: string; optionId: string };
+      options?: Array<{
+        id: string;
+        name: string;
+        parentFeatureId: string;
+        parentFeatureName: string;
+        shortDescription?: string | null;
+        body?: string | null;
+        powerIds?: string[];
+      }>;
+    }>
+  >;
 }
 
 /** +1 to two different abilities at a milestone (4, 8, 14, 18, 24, 28). Keys are level numbers as strings. */
@@ -574,7 +596,10 @@ export interface CharacterBuild {
    * `racialPower:${traitId}` for a Power select on that racial trait (see `racePowerSelectSelectionKey`).
    */
   raceSelections?: Record<string, string>;
-  /** Class-level selections such as build option picks. */
+  /**
+   * Class-level picks: `classFeature:${parentId}` (feature bundle);
+   * `classPower:${traitId}:${n}` (comma-separated power ids for cantrip slots).
+   */
   classSelections?: Record<string, string>;
   /** Per-power construction picks (`powerId` → group key → chosen racial trait option id). */
   powerSelections?: Record<string, Record<string, string>>;

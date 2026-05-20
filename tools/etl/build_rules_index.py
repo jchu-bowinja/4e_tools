@@ -748,20 +748,266 @@ def enrich_phb_class_build_display_names(
 
 
 def merge_class_build_options_by_class(
-    from_grants: Dict[str, List[Dict[str, Any]]],
+    _from_grants: Dict[str, List[Dict[str, Any]]],
     from_builds: Dict[str, List[Dict[str, Any]]],
 ) -> Dict[str, List[Dict[str, Any]]]:
-    """
-    Prefer PHB talent sub-features when present (Fighter Talents, Warlord Presence, …).
-    Essentials `Build` rows apply only when the class has no level-1 sub-feature bundle.
-    """
-    out: Dict[str, List[Dict[str, Any]]] = dict(from_grants)
-    for class_id, build_opts in from_builds.items():
-        if not build_opts:
+    """Essentials `Build` rows only (PHB feature picks live in `classFeatureChoiceGroupsByClassId`)."""
+    return dict(from_builds)
+
+
+def _class_feature_has_select(
+    feature: Dict[str, Any], select_type: str
+) -> tuple[bool, int]:
+    rules = feature.get("rules") or {}
+    pick = 0
+    found = False
+    for item in rules.get("select") or []:
+        attrs = item.get("attrs") or {}
+        if attrs.get("type") != select_type:
             continue
-        if out.get(class_id):
+        found = True
+        n = parse_int_from_text(attrs.get("number"))
+        pick += n if n is not None and n > 0 else 1
+    return found, pick if found else 0
+
+
+def _class_feature_child_option_row(
+    child: Dict[str, Any],
+    parent_id: str,
+    parent_name: str,
+) -> Dict[str, Any]:
+    cs = child.get("specific") or {}
+    return {
+        "id": child.get("internal_id"),
+        "name": child.get("name"),
+        "parentFeatureId": parent_id,
+        "parentFeatureName": parent_name,
+        "shortDescription": cs.get("Short Description"),
+        "body": child.get("body"),
+        "powerIds": _granted_power_ids_from_feature_any(child),
+    }
+
+
+def _options_from_class_feature_select(
+    parent: Dict[str, Any],
+    features_by_id: Dict[str, Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Resolve `select` type Class Feature options from Category ids or sub-feature list."""
+    parent_id = str(parent.get("internal_id") or "")
+    parent_name = str(parent.get("name") or parent_id)
+    spec = parent.get("specific") or {}
+    sub_ids = _parse_internal_id_list(spec.get("_PARSED_SUB_FEATURES"))
+    if sub_ids:
+        options: List[Dict[str, Any]] = []
+        for sid in sub_ids:
+            child = features_by_id.get(sid)
+            if child:
+                options.append(_class_feature_child_option_row(child, parent_id, parent_name))
+        return options
+    options = []
+    rules = parent.get("rules") or {}
+    for item in rules.get("select") or []:
+        if (item.get("attrs") or {}).get("type") != "Class Feature":
             continue
-        out[class_id] = build_opts
+        cat = str((item.get("attrs") or {}).get("Category") or "")
+        for token in cat.split("|"):
+            tid = token.strip()
+            if not tid.startswith("ID_"):
+                continue
+            child = features_by_id.get(tid)
+            if child:
+                options.append(_class_feature_child_option_row(child, parent_id, parent_name))
+    return options
+
+
+def _power_ids_from_class_feature_power_select(
+    feature: Dict[str, Any],
+    features_by_id: Dict[str, Dict[str, Any]],
+) -> List[str]:
+    rules = feature.get("rules") or {}
+    ids: Set[str] = set()
+    spec = feature.get("specific") or {}
+    for item in rules.get("select") or []:
+        attrs = item.get("attrs") or {}
+        if attrs.get("type") != "Power":
+            continue
+        cat = str(attrs.get("Category") or "").strip()
+        if cat.startswith("ID_") and "_CLASS_FEATURE_" in cat:
+            ref = features_by_id.get(cat)
+            if ref:
+                for pid in _parse_internal_id_list((ref.get("specific") or {}).get("Powers")):
+                    if pid.startswith("ID_FMP_POWER"):
+                        ids.add(pid)
+        if cat.startswith("$$"):
+            continue
+    for pid in _parse_internal_id_list(spec.get("Powers")):
+        if pid.startswith("ID_FMP_POWER"):
+            ids.add(pid)
+    return sorted(ids)
+
+
+def _granted_level1_class_feature_ids(
+    grants_raw: List[Dict[str, Any]],
+    class_id: str,
+    features_by_id: Dict[str, Dict[str, Any]],
+) -> Set[str]:
+    granted: Set[str] = set()
+    for g in grants_raw:
+        sp = g.get("specific") or {}
+        if sp.get("_SupportsID") != class_id:
+            continue
+        for gr in (g.get("rules") or {}).get("grant") or []:
+            attrs = gr.get("attrs") or {}
+            if attrs.get("type") != "Class Feature":
+                continue
+            parent_id = attrs.get("name")
+            if not isinstance(parent_id, str):
+                continue
+            granted.add(parent_id)
+            parent = features_by_id.get(parent_id)
+            if not parent:
+                continue
+            ps = parent.get("specific") or {}
+            for sid in _parse_internal_id_list(ps.get("_PARSED_SUB_FEATURES")):
+                granted.add(sid)
+    return granted
+
+
+def build_class_feature_choice_groups_by_class(
+    grants_raw: List[Dict[str, Any]],
+    features_by_id: Dict[str, Dict[str, Any]],
+    classes_by_id: Dict[str, Dict[str, Any]],
+) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Level-1 class feature choice groups (Rogue Tactics, Fighter Talents, Implement Mastery, cantrips, …).
+    Separate from Essentials `Build` rows in `classBuildOptionsByClassId`.
+    """
+    features_by_name: Dict[str, Dict[str, Any]] = {}
+    for row in features_by_id.values():
+        name = str(row.get("name") or "").strip()
+        if name:
+            features_by_name[name] = row
+
+    out: Dict[str, List[Dict[str, Any]]] = {}
+
+    for class_id, cls in classes_by_id.items():
+        if not class_id.startswith("ID_FMP_CLASS_"):
+            continue
+        groups: List[Dict[str, Any]] = []
+        granted_l1 = _granted_level1_class_feature_ids(grants_raw, class_id, features_by_id)
+
+        for g in grants_raw:
+            sp = g.get("specific") or {}
+            if sp.get("_SupportsID") != class_id:
+                continue
+            for gr in (g.get("rules") or {}).get("grant") or []:
+                attrs = gr.get("attrs") or {}
+                if attrs.get("type") != "Class Feature":
+                    continue
+                parent_id = attrs.get("name")
+                if not isinstance(parent_id, str):
+                    continue
+                parent = features_by_id.get(parent_id)
+                if not parent:
+                    continue
+                ps = parent.get("specific") or {}
+                level = parse_int_from_text(ps.get("Level"))
+                if level not in (None, 1):
+                    continue
+                parent_name = str(parent.get("name") or parent_id)
+
+                has_cf, pick_n = _class_feature_has_select(parent, "Class Feature")
+                options = _options_from_class_feature_select(parent, features_by_id) if has_cf else []
+                if options:
+                    groups.append(
+                        {
+                            "key": f"classFeature:{parent_id}",
+                            "kind": "classFeature",
+                            "parentFeatureId": parent_id,
+                            "parentFeatureName": parent_name,
+                            "pickCount": pick_n or 1,
+                            "options": sorted(
+                                options,
+                                key=lambda r: str(r.get("name") or "").lower(),
+                            ),
+                        }
+                    )
+                    continue
+
+                has_pow, pick_pow = _class_feature_has_select(parent, "Power")
+                power_ids = _power_ids_from_class_feature_power_select(parent, features_by_id)
+                if has_pow and power_ids and pick_pow > 0:
+                    groups.append(
+                        {
+                            "key": f"classPower:{parent_id}",
+                            "kind": "power",
+                            "parentFeatureId": parent_id,
+                            "parentFeatureName": parent_name,
+                            "pickCount": pick_pow,
+                            "powerIds": power_ids,
+                            "options": [],
+                        }
+                    )
+
+        parsed_names = [
+            p.strip()
+            for p in str((cls.get("specific") or {}).get("_PARSED_CLASS_FEATURE") or "").split(",")
+            if p.strip()
+        ]
+        ungranted: List[Dict[str, Any]] = []
+        for name in parsed_names:
+            feat = features_by_name.get(name)
+            if not feat:
+                continue
+            fid = str(feat.get("internal_id") or "")
+            if fid in granted_l1:
+                continue
+            lvl = parse_int_from_text((feat.get("specific") or {}).get("Level"))
+            if lvl not in (None, 1):
+                continue
+            ungranted.append(feat)
+
+        pair_key: Optional[str] = None
+        if len(ungranted) == 2:
+            opts = [
+                _class_feature_child_option_row(f, "", "Class feature") for f in ungranted
+            ]
+            ids = sorted(str(f.get("internal_id") or "") for f in ungranted)
+            pair_key = f"classFeaturePair:{':'.join(ids)}"
+            groups.append(
+                {
+                    "key": pair_key,
+                    "kind": "classFeature",
+                    "parentFeatureId": "",
+                    "parentFeatureName": "Class feature",
+                    "pickCount": 1,
+                    "options": sorted(opts, key=lambda r: str(r.get("name") or "").lower()),
+                }
+            )
+
+        for feat in ungranted:
+            has_cf, pick_n = _class_feature_has_select(feat, "Class Feature")
+            nested = _options_from_class_feature_select(feat, features_by_id) if has_cf else []
+            if len(nested) >= 2:
+                fid = str(feat.get("internal_id") or "")
+                row: Dict[str, Any] = {
+                    "key": f"classFeature:{fid}",
+                    "kind": "classFeature",
+                    "parentFeatureId": fid,
+                    "parentFeatureName": str(feat.get("name") or fid),
+                    "pickCount": pick_n or 1,
+                    "options": sorted(
+                        nested,
+                        key=lambda r: str(r.get("name") or "").lower(),
+                    ),
+                }
+                if pair_key:
+                    row["visibleWhen"] = {"groupKey": pair_key, "optionId": fid}
+                groups.append(row)
+
+        if groups:
+            out[class_id] = groups
+
     return out
 
 
@@ -2203,10 +2449,12 @@ def build_index(input_path: Path, output_dir: Path) -> None:
         str(c["internal_id"]): c for c in classes_raw if c.get("internal_id")
     }
     class_build_options_by_class = merge_class_build_options_by_class(
-        build_class_build_options_by_class(grants_raw, features_by_id),
+        {},
         build_essentials_class_build_options_by_class(classes_raw, builds_raw),
     )
-    enrich_phb_class_build_display_names(class_build_options_by_class, classes_by_id)
+    class_feature_choice_groups_by_class = build_class_feature_choice_groups_by_class(
+        grants_raw, features_by_id, classes_by_id
+    )
 
     known_races = {r.get("name", "") for r in races_raw}
     known_classes = {c.get("name", "").lower() for c in classes_raw}
@@ -2672,6 +2920,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
         "autoGrantedSkillTrainingNamesBySupportId": auto_granted_skill_training_names_by_support,
         "grantedClassFeatureNamesBySupportId": granted_class_feature_names_by_support_id,
         "classBuildOptionsByClassId": class_build_options_by_class,
+        "classFeatureChoiceGroupsByClassId": class_feature_choice_groups_by_class,
     }
 
     (output_dir / "rules_index.json").write_text(

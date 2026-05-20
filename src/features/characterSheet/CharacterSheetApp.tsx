@@ -351,9 +351,19 @@ function traitsSectionTitle(selectionName: string | undefined, fallback: string)
   return name ? `${name} traits` : fallback;
 }
 
+function formatClassFeaturesSectionTitle(selectionName: string | undefined): string {
+  const name = selectionName?.trim();
+  return name ? `${name} Features` : "Class Features";
+}
+
 function traitsEmptyMessage(selectionName: string | undefined, fallback: string): string {
   const name = selectionName?.trim();
   return name ? `No ${name} traits listed.` : fallback;
+}
+
+function formatClassFeaturesEmptyMessage(selectionName: string | undefined): string {
+  const name = selectionName?.trim();
+  return name ? `No ${name} features listed.` : "No class features listed.";
 }
 
 function TraitRowsList({ rows, emptyMessage }: { rows: TraitDisplayRow[]; emptyMessage: string }): JSX.Element {
@@ -1031,9 +1041,9 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   const classTraitRows = useMemo(() => {
     let rows;
     if (sheet.characterStyle === "hybrid" && sheet.hybridClassIdA && sheet.hybridClassIdB) {
-      rows = getHybridClassTraitRows(hybridClassA, hybridClassB, index);
+      rows = getHybridClassTraitRows(hybridClassA, hybridClassB, index, sheet.level);
     } else {
-      rows = getClassTraitRows(derived.cls, index);
+      rows = getClassTraitRows(derived.cls, index, sheet.level);
     }
     const featMods = collectFeatModificationsByClassFeatureId(index, sheet.featIds ?? []);
     return applyFeatModificationsToTraitRows(rows, featMods);
@@ -1067,11 +1077,11 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     () => traitsSectionTitle(derived.race?.name, "Racial traits"),
     [derived.race?.name]
   );
-  const classTraitsSectionTitle = useMemo(() => {
+  const classFeaturesSectionTitle = useMemo(() => {
     if (sheet.characterStyle === "hybrid" && hybridClassA && hybridClassB) {
-      return traitsSectionTitle(`${hybridClassA.name} / ${hybridClassB.name}`, "Class traits");
+      return formatClassFeaturesSectionTitle(`${hybridClassA.name} / ${hybridClassB.name}`);
     }
-    return traitsSectionTitle(derived.cls?.name, "Class traits");
+    return formatClassFeaturesSectionTitle(derived.cls?.name);
   }, [sheet.characterStyle, hybridClassA, hybridClassB, derived.cls?.name]);
   const themeTraitsSectionTitle = useMemo(
     () => traitsSectionTitle(selectedTheme?.name, "Theme traits"),
@@ -2392,14 +2402,13 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 />
               </OverviewCollapsibleSection>
               {showClassTraits && (
-                <OverviewCollapsibleSection title={classTraitsSectionTitle}>
+                <OverviewCollapsibleSection title={classFeaturesSectionTitle}>
                   <TraitRowsList
                     rows={classTraitRows}
-                    emptyMessage={traitsEmptyMessage(
+                    emptyMessage={formatClassFeaturesEmptyMessage(
                       sheet.characterStyle === "hybrid" && hybridClassA && hybridClassB
                         ? `${hybridClassA.name} / ${hybridClassB.name}`
-                        : derived.cls?.name,
-                      "No class traits listed."
+                        : derived.cls?.name
                     )}
                   />
                 </OverviewCollapsibleSection>

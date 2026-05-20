@@ -6,11 +6,28 @@ Two compendium models feed `classBuildOptionsByClassId` in `rules_index.json`:
 
 2. **Essentials `Build` rows** — Classes with a `rules.select` of type `Build` and comma-separated `Build Options` text (Cleric, Paladin, Artificer). Options use **`ID_FMP_BUILD_*`** ids; `name` is already the player label.
 
-Merge rule: grant-based options win when both exist for a class (Fighter keeps talents, not duplicate Build rows).
+Merge rule: Essentials `Build` rows live in `classBuildOptionsByClassId`. PHB level-1 feature picks live in **`classFeatureChoiceGroupsByClassId`** (one UI dropdown per group).
+
+### Choice groups (examples)
+
+| Class | Group | Options |
+|-------|--------|---------|
+| Rogue | Rogue Tactics | Artful Dodger, Brutal Scoundrel, … |
+| Rogue | Class feature | Rogue Weapon Talent **or** Sharpshooter Talent; Sharpshooter adds crossbow/sling sub-pick (shown only when Sharpshooter is selected) |
+| Fighter | Fighter Talents | Arena Training, Battlerager Vigor, … |
+| Fighter | Class feature | Combat Agility **or** Combat Superiority |
+| Wizard | Arcane Implement Mastery | Orb, Staff, Wand, Tome, … |
+| Wizard | Arcanist Cantrips | Pick 4 powers from the cantrip list |
+
+Builder stores picks under `classSelections` keys like `classFeature:ID_FMP_CLASS_FEATURE_547` or `classPower:ID_FMP_CLASS_FEATURE_130` (comma-separated power ids).
+
+Dependent groups use `visibleWhen: { groupKey, optionId }` in the index (e.g. Sharpshooter crossbow/sling only after picking Sharpshooter Talent in the weapon pair). Hidden selections are cleared when the parent pick changes.
+
+Essentials guided builds (`classBuildOptionsByClassId`) remain in the index for later but are **not** shown in the Class tab UI for now.
 
 ## Gaps (no mechanical pick in index)
 
-Some classes have no `Build Options` text and no `Build` select in the merged XML (e.g. Blackguard, Skald, Vampire). The builder does not show a build dropdown for them.
+Some classes have no `Build Options` text and no `Build` select in the merged XML (e.g. Blackguard, Skald, Vampire). Essentials builds are indexed when present but not surfaced in the builder yet.
 
 Run `python tools/etl/list_race_class_selection_gaps.py` to audit racial `rules.select` traits and classes missing indexed build options.
 

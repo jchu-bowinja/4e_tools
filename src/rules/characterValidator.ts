@@ -27,7 +27,11 @@ import {
   powerAllowedForHybridSlot
 } from "./hybridPowerSlots";
 import { resolveRaceAbilityBonusInfo } from "./abilityScores";
-import { getClassBuildOptions } from "./classBuildOptions";
+import {
+  filterVisibleClassFeatureChoiceGroups,
+  getClassFeatureChoiceGroups,
+  parseClassPowerChoiceSelection
+} from "./classFeatureChoices";
 import { countsAsRaceOptions, getRacialTraitRuleSelectSlots } from "./racialTraitRuleSelects";
 import { getRaceExtraTraitIds, getRaceTraitBundleSlots } from "./raceSubraces";
 import { getRaceSecondarySelectSlots, selectableStartingLanguages } from "./raceRuleSelects";
@@ -130,13 +134,39 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
   }
   if (!isHybrid && build.classId) {
     const clsForBuild = index.classes.find((c) => c.id === build.classId);
-    const buildOpts = getClassBuildOptions(index, clsForBuild);
-    if (buildOpts.length > 0) {
-      const picked = build.classSelections?.buildOptionId || build.classSelections?.buildOption;
-      if (!picked) {
-        errors.push("Class: choose a build option.");
-      } else if (!buildOpts.some((o) => o.id === picked || o.name === picked)) {
-        errors.push("Class: choose a valid build option.");
+    const rs = build.classSelections || {};
+    const choiceGroups = getClassFeatureChoiceGroups(index, clsForBuild);
+    for (const group of filterVisibleClassFeatureChoiceGroups(choiceGroups, rs)) {
+      if (group.kind === "classFeature") {
+        const picked = rs[group.key];
+        if (!picked) {
+          errors.push(`Class: ${group.parentFeatureName} — make a selection.`);
+          continue;
+        }
+        if (!group.options.some((o) => o.id === picked)) {
+          errors.push(`Class: ${group.parentFeatureName} — choose a valid option.`);
+        }
+        continue;
+      }
+      const legal = new Set(group.powerIds);
+      const picks = parseClassPowerChoiceSelection(rs[group.key]);
+      if (picks.length < group.pickCount) {
+        errors.push(
+          `Class: ${group.parentFeatureName} — choose ${group.pickCount} power${group.pickCount === 1 ? "" : "s"}.`
+        );
+        continue;
+      }
+      const seen = new Set<string>();
+      for (const pid of picks) {
+        if (!legal.has(pid)) {
+          errors.push(`Class: ${group.parentFeatureName} — invalid power selection.`);
+          break;
+        }
+        if (seen.has(pid)) {
+          errors.push(`Class: ${group.parentFeatureName} — choose different powers.`);
+          break;
+        }
+        seen.add(pid);
       }
     }
   }

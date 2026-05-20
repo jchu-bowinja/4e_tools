@@ -31,7 +31,8 @@ export function validateRulesIndexShape(data: RulesIndex): RulesIndex {
     implements: data.implements ?? [],
     autoGrantedPowerIdsByClassId: data.autoGrantedPowerIdsByClassId ?? {},
     autoGrantedSkillTrainingNamesBySupportId: data.autoGrantedSkillTrainingNamesBySupportId ?? {},
-    classBuildOptionsByClassId: data.classBuildOptionsByClassId ?? {}
+    classBuildOptionsByClassId: data.classBuildOptionsByClassId ?? {},
+    classFeatureChoiceGroupsByClassId: data.classFeatureChoiceGroupsByClassId ?? {}
   };
 }
 

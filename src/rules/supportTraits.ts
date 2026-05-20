@@ -119,6 +119,7 @@ export function resolveTraitDisplayRows(
 
   for (const name of names) {
     const feature = byName.get(name);
+    if (feature && maxLevel != null && !featureIsAvailableAtLevel(feature, maxLevel)) continue;
     const id = feature?.id ?? `name:${name}`;
     if (seen.has(id)) continue;
     seen.add(id);
@@ -132,24 +133,33 @@ export function resolveTraitDisplayRows(
   return rows;
 }
 
-export function getClassTraitRows(cls: ClassDef | undefined, index: RulesIndex): TraitDisplayRow[] {
+export function getClassTraitRows(
+  cls: ClassDef | undefined,
+  index: RulesIndex,
+  characterLevel?: number
+): TraitDisplayRow[] {
   if (!cls) return [];
   const spec = specOf(cls);
   const { byId, byName } = buildClassFeatureLookups(index);
-  return resolveTraitDisplayRows([], parseTraitNamesFromField(spec, "_PARSED_CLASS_FEATURE"), byId, byName);
+  return resolveTraitDisplayRows([], parseTraitNamesFromField(spec, "_PARSED_CLASS_FEATURE"), byId, byName, {
+    maxLevel: characterLevel
+  });
 }
 
 export function getHybridClassTraitRows(
   hybridA: HybridClassDef | undefined,
   hybridB: HybridClassDef | undefined,
-  index: RulesIndex
+  index: RulesIndex,
+  characterLevel?: number
 ): TraitDisplayRow[] {
   const { byId, byName } = buildClassFeatureLookups(index);
   const names = [
     ...parseTraitNamesFromField(specOf(hybridA), "_PARSED_CLASS_FEATURE"),
     ...parseTraitNamesFromField(specOf(hybridB), "_PARSED_CLASS_FEATURE")
   ];
-  return resolveTraitDisplayRows([], names, byId, byName);
+  return resolveTraitDisplayRows([], names, byId, byName, {
+    maxLevel: characterLevel
+  });
 }
 
 export function getThemeTraitRows(
