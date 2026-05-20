@@ -2996,9 +2996,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         {activeTab === "abilities" && (
           <div>
             <h3 style={sectionTitleStyle}>Ability Scores</h3>
-            <p style={{ margin: "0.25rem 0 0.75rem 0", color: "var(--text-muted)", fontSize: "0.9rem", lineHeight: 1.45 }}>
-              Set <strong>base</strong> scores (8–18) using point buy. Modifiers in the table use your <strong>final</strong> score after level-based increases, then racial bonuses—those are what checks and attacks use.
-            </p>
 
             <div
               style={{
@@ -3072,13 +3069,22 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   </p>
                 )}
                 {raceAbilityBonusInfo.chooseOne.length > 0 && (
-                  <label style={{ display: "block", marginTop: raceAbilityBonusInfo.fixed.length > 0 ? "0.35rem" : 0 }}>
+                  <label
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: "0.5rem",
+                      alignItems: "center",
+                      marginTop: raceAbilityBonusInfo.fixed.length > 0 ? "0.35rem" : 0
+                    }}
+                  >
+                    <span style={{ fontWeight: 600, fontSize: "0.88rem", flexShrink: 0 }}>+2</span>
                     <select
                       value={build.racialAbilityChoice || ""}
                       onChange={(e) =>
                         updateBuild({ ...build, racialAbilityChoice: (e.target.value || undefined) as CharacterBuild["racialAbilityChoice"] })
                       }
-                      style={{ width: "100%", maxWidth: "28rem", padding: "0.4rem" }}
+                      style={{ flex: 1, minWidth: "8rem", maxWidth: "28rem", padding: "0.4rem" }}
                     >
                       <option value="">Select ability…</option>
                       {raceAbilityBonusInfo.chooseOne.map((ability) => (
@@ -3091,6 +3097,30 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 )}
               </div>
             )}
+                {(build.level >= 11 || build.level >= 21) && (
+                  <section style={{ ...ui.blockSubsection, backgroundColor: "var(--surface-1)" }}>
+                    {build.level >= 11 && (
+                      <div
+                        style={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: "0.5rem",
+                          alignItems: "center",
+                          marginBottom: build.level >= 21 ? "0.55rem" : 0
+                        }}
+                      >
+                        <span style={{ fontWeight: 700, fontSize: "0.88rem" }}>Paragon Tier</span>
+                        <span style={{ fontSize: "0.84rem", color: "var(--text-secondary)" }}>All ability scores +1</span>
+                      </div>
+                    )}
+                    {build.level >= 21 && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
+                        <span style={{ fontWeight: 700, fontSize: "0.88rem" }}>Epic Tier</span>
+                        <span style={{ fontSize: "0.84rem", color: "var(--text-secondary)" }}>All ability scores +1</span>
+                      </div>
+                    )}
+                  </section>
+                )}
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem", minWidth: 0 }}>
@@ -3160,22 +3190,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   </section>
                 )}
 
-                {(build.level >= 11 || build.level >= 21) && (
-                  <section style={{ ...ui.blockSubsection, backgroundColor: "var(--surface-1)" }}>
-                    {build.level >= 11 && (
-                      <div style={{ marginBottom: build.level >= 21 ? "0.55rem" : 0 }}>
-                        <div style={{ fontWeight: 700, marginBottom: "0.2rem", fontSize: "0.88rem" }}>Paragon Tier</div>
-                        <p style={{ margin: 0, fontSize: "0.84rem", color: "var(--text-secondary)" }}>All ability scores increase by +1 automatically.</p>
-                      </div>
-                    )}
-                    {build.level >= 21 && (
-                      <div>
-                        <div style={{ fontWeight: 700, marginBottom: "0.2rem", fontSize: "0.88rem" }}>Epic Tier</div>
-                        <p style={{ margin: 0, fontSize: "0.84rem", color: "var(--text-secondary)" }}>All ability scores increase by +1 automatically.</p>
-                      </div>
-                    )}
-                  </section>
-                )}
               </div>
             </div>
           </div>
