@@ -125,12 +125,16 @@ import {
 } from "../../rules/featGrantFlags";
 import { pruneStalePowerSelections } from "../../rules/powerSelections";
 import {
+  hybridHasPsionicComponent,
+  hybridPsionicAugmentationBreakpointsForLevel,
   powerPointsForPrintedLevel,
   paragonMulticlassPrimaryAtWillSlotPenalty,
   psionicAugmentationPoolLabel,
+  pruneHybridPsionicAugmentationChoices,
   showPsionicPowerPointSummary,
   summarizePsionicPowerPointAdjustments
 } from "../../rules/psionicPowerPoints";
+import type { HybridPsionicAugmentationChoice } from "../../rules/models";
 import {
   collectFeatProficiencyDisplayRows,
   collectFeatProficiencyGrants
@@ -1634,6 +1638,10 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     () => psionicAugmentationPoolLabel(index, build),
     [index, build]
   );
+  const hybridPsionicAugmentationBreakpoints = useMemo(() => {
+    if (build.characterStyle !== "hybrid" || !hybridHasPsionicComponent(index, build)) return [];
+    return hybridPsionicAugmentationBreakpointsForLevel(build.level);
+  }, [index, build]);
   const themeGrantedPowers = useMemo(() => {
     if (!build.themeId) return [];
     const atk = getPowersForOwnerId(index, build.themeId, build.level, "attack");
@@ -2047,6 +2055,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   function updateBuild(next: CharacterBuild): void {
     let pruned = pruneStalePowerSelections(index, next);
     pruned = pruneParagonMulticlassing(index, pruned);
+    pruned = pruneHybridPsionicAugmentationChoices(pruned);
     const normalized = normalizeCharacterBuild(pruned, index);
     setBuild(normalized);
     saveBuild(normalized);
@@ -4109,6 +4118,69 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                             Paragon multiclassing into a psionic class from a non-psionic class: lose one class at-will
                             slot (in addition to the at-will swap).
                           </p>
+                        )}
+                        {hybridPsionicAugmentationBreakpoints.length > 0 && (
+                          <div style={{ marginTop: "0.4rem" }}>
+                            <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.76rem", color: "var(--text-secondary)" }}>
+                              At each level below, choose power points or one encounter use of an augmentable at-will
+                              (PHB3 hybrid psionic augmentation).
+                            </p>
+                            {hybridPsionicAugmentationBreakpoints.map((bp) => {
+                              const choice =
+                                build.hybridPsionicAugmentationChoices?.[bp] ?? "powerPoints";
+                              const setChoice = (nextChoice: HybridPsionicAugmentationChoice) => {
+                                updateBuild({
+                                  ...build,
+                                  hybridPsionicAugmentationChoices: {
+                                    ...build.hybridPsionicAugmentationChoices,
+                                    [bp]: nextChoice
+                                  }
+                                });
+                              };
+                              return (
+                                <div
+                                  key={bp}
+                                  style={{
+                                    marginBottom: "0.35rem",
+                                    fontSize: "0.78rem",
+                                    color: "var(--text-secondary)"
+                                  }}
+                                >
+                                  <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>
+                                    Level {bp}
+                                  </span>
+                                  {": "}
+                                  <label style={{ marginRight: "0.65rem", cursor: "pointer" }}>
+                                    <input
+                                      type="radio"
+                                      name={`hybrid-psionic-aug-${bp}`}
+                                      checked={choice === "powerPoints"}
+                                      onChange={() => setChoice("powerPoints")}
+                                      style={{ marginRight: "0.25rem" }}
+                                    />
+                                    Power points
+                                  </label>
+                                  <label style={{ cursor: "pointer" }}>
+                                    <input
+                                      type="radio"
+                                      name={`hybrid-psionic-aug-${bp}`}
+                                      checked={choice === "encounter"}
+                                      onChange={() => setChoice("encounter")}
+                                      style={{ marginRight: "0.25rem" }}
+                                    />
+                                    Encounter use
+                                  </label>
+                                </div>
+                              );
+                            })}
+                            {psionicPowerPointSummary.hybridEncounterAugmentationBreakpoints.length > 0 && (
+                              <p style={{ margin: "0.2rem 0 0 0", fontSize: "0.76rem", color: "var(--text-muted)" }}>
+                                Encounter use at levels{" "}
+                                {psionicPowerPointSummary.hybridEncounterAugmentationBreakpoints.join(", ")}: augmentable
+                                at-will usable once per encounter.
+                              </p>
+                            )}
+                          </div>
                         )}
                       </div>
                     )}

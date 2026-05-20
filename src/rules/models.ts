@@ -506,6 +506,10 @@ export type AsiChoices = Partial<Record<string, { first: Ability; second: Abilit
 
 export type CharacterStyle = "standard" | "hybrid";
 
+/** PHB3 hybrid psionic augmentation: power points vs encounter use of augmentable at-will. */
+export type HybridPsionicAugmentationBreakpoint = 7 | 13 | 17 | 23 | 27;
+export type HybridPsionicAugmentationChoice = "powerPoints" | "encounter";
+
 /** Paragon-tier picks from a multiclass class (PHB paragon multiclassing). */
 export interface ParagonMulticlassPowers {
   atWillSwapPowerId?: string;
@@ -535,6 +539,13 @@ export interface CharacterBuild {
   /** Per-group PHB3 picks for hybrid side A (`hybridSelectionGroups[].key` → Class Feature id). */
   hybridSideASelections?: Record<string, string>;
   hybridSideBSelections?: Record<string, string>;
+  /**
+   * PHB3 hybrid psionic augmentation: at 7th, 13th, 17th, 23rd, and 27th, choose power points or
+   * one encounter use of an augmentable at-will per day (default power points when unset).
+   */
+  hybridPsionicAugmentationChoices?: Partial<
+    Record<HybridPsionicAugmentationBreakpoint, HybridPsionicAugmentationChoice>
+  >;
   themeId?: string;
   paragonPathId?: string;
   /** Use PHB paragon multiclassing instead of a paragon path (requires Novice/Acolyte/Adept chain). */

@@ -1,7 +1,21 @@
 import { isAugmentableAtWillPower } from "./featMulticlassSlotSwap";
 import { getFeatMulticlassSlotSwapOffer } from "./featMulticlassSlotSwap";
+import {
+  hybridPsionicEncounterAugmentationBreakpoints,
+  hybridPsionicPowerPointsFromAugmentableAtWills
+} from "./hybridPsionicAugmentation";
 import type { CharacterBuild, HybridClassDef, ParagonPath, Power, RulesIndex } from "./models";
 import { multiclassEntryClassId } from "./paragonMulticlassing";
+
+export {
+  HYBRID_PSIONIC_AUGMENTATION_BREAKPOINTS,
+  hybridPsionicAugmentationBreakpointsForLevel,
+  hybridPsionicBreakpointPowerPointGain,
+  hybridPsionicEncounterAugmentationBreakpoints,
+  hybridPsionicPowerPointsFromAugmentableAtWills,
+  normalizeHybridPsionicAugmentationChoices,
+  pruneHybridPsionicAugmentationChoices
+} from "./hybridPsionicAugmentation";
 
 /**
  * Cumulative power points from the Psionic Augmentation class feature (PHB3 table).
@@ -70,6 +84,8 @@ export interface PsionicPowerPointSummary {
   lines: PsionicPowerPointAdjustmentLine[];
   /** PHB3: non-psionic → psionic paragon MC loses one class at-will slot at 11+. */
   paragonPrimaryAtWillSlotPenalty: number;
+  /** Hybrid: levels where encounter use was chosen instead of power points. */
+  hybridEncounterAugmentationBreakpoints: number[];
 }
 
 export function basePsionicPowerPointsFromLevel(level: number): number {
@@ -110,32 +126,14 @@ export function collectHybridAugmentableAtWillPowers(index: RulesIndex, build: C
   return out;
 }
 
-/**
- * PHB3 hybrid power point option: assumes PP at each augmentation breakpoint (not encounter picks).
- * Gains at 3rd/7th depend on printed level of augmentable at-wills in slots.
- */
-export function hybridPsionicPowerPointsFromAugmentableAtWills(
-  augmentableAtWills: readonly Power[],
-  characterLevel: number
-): number {
-  if (augmentableAtWills.length === 0 || characterLevel < 1) return 0;
-  const minPrinted = Math.min(...augmentableAtWills.map((p) => p.level ?? 1));
-  let total = 0;
-  if (characterLevel >= 1) total += 2;
-  if (characterLevel >= 3) total += minPrinted <= 3 ? 2 : 1;
-  if (characterLevel >= 7) total += minPrinted <= 7 ? 2 : 1;
-  if (characterLevel >= 13) total += 1;
-  if (characterLevel >= 17) total += 2;
-  if (characterLevel >= 21) total += 2;
-  if (characterLevel >= 23) total += 2;
-  if (characterLevel >= 27) total += 2;
-  return total;
-}
-
 export function hybridPsionicBasePowerPoints(index: RulesIndex, build: CharacterBuild): number {
   if (!hybridHasPsionicComponent(index, build)) return 0;
   const atWills = collectHybridAugmentableAtWillPowers(index, build);
-  return hybridPsionicPowerPointsFromAugmentableAtWills(atWills, build.level);
+  return hybridPsionicPowerPointsFromAugmentableAtWills(
+    atWills,
+    build.level,
+    build.hybridPsionicAugmentationChoices
+  );
 }
 
 /** Character uses Psionic Augmentation (single-class psionic or psionic hybrid). */
@@ -162,7 +160,8 @@ export function showPsionicPowerPointSummary(summary: PsionicPowerPointSummary):
   return (
     summary.baseFromClass > 0 ||
     summary.lines.length > 0 ||
-    summary.paragonPrimaryAtWillSlotPenalty > 0
+    summary.paragonPrimaryAtWillSlotPenalty > 0 ||
+    summary.hybridEncounterAugmentationBreakpoints.length > 0
   );
 }
 
@@ -325,11 +324,19 @@ export function summarizePsionicPowerPointAdjustments(
   const totalAdjustments = lines.reduce((sum, l) => sum + l.delta, 0);
   const paragonPrimaryAtWillSlotPenalty = paragonMulticlassPrimaryAtWillSlotPenalty(index, build);
   const baseFromClass = basePsionicPowerPointsForBuild(index, build);
+  const hybridEncounterAugmentationBreakpoints =
+    build.characterStyle === "hybrid" && hybridHasPsionicComponent(index, build)
+      ? hybridPsionicEncounterAugmentationBreakpoints(
+          build.level,
+          build.hybridPsionicAugmentationChoices
+        )
+      : [];
   return {
     baseFromClass,
     totalAdjustments,
     poolTotal: baseFromClass + totalAdjustments,
     lines,
-    paragonPrimaryAtWillSlotPenalty
+    paragonPrimaryAtWillSlotPenalty,
+    hybridEncounterAugmentationBreakpoints
   };
 }

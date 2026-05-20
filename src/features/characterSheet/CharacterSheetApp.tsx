@@ -2553,6 +2553,13 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                       Lose one class at-will slot (non-psionic primary, psionic paragon multiclass).
                     </p>
                   )}
+                  {psionicPowerPointSummary.hybridEncounterAugmentationBreakpoints.length > 0 && (
+                    <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                      Hybrid encounter augmentation at levels{" "}
+                      {psionicPowerPointSummary.hybridEncounterAugmentationBreakpoints.join(", ")} (configure on
+                      builder).
+                    </p>
+                  )}
                 </OverviewCollapsibleSection>
               )}
               {featGrantedTraitRows.length > 0 && (

@@ -91,6 +91,24 @@ describe("hybridPsionicPowerPoints", () => {
     expect(summary.poolTotal).toBe(6);
   });
 
+  it("lowers pool when encounter augmentation is chosen at 7", () => {
+    const build: CharacterBuild = {
+      level: 7,
+      characterStyle: "hybrid",
+      hybridClassIdA: "h_psion",
+      hybridClassIdB: "h_fighter",
+      classPowerSlots: { "hybrid:awA:0": "aw_psion", "hybrid:awB:0": "aw_psion" },
+      hybridPsionicAugmentationChoices: { 7: "encounter" },
+      featIds: [],
+      powerIds: ["aw_psion"],
+      abilityScores: { STR: 10, CON: 10, DEX: 10, INT: 10, WIS: 10, CHA: 10 },
+      trainedSkillIds: []
+    };
+    expect(basePsionicPowerPointsForBuild(index, build)).toBe(4);
+    const summary = summarizePsionicPowerPointAdjustments(index, build);
+    expect(summary.hybridEncounterAugmentationBreakpoints).toEqual([7]);
+  });
+
   it("returns 0 when no augmentable at-wills are slotted", () => {
     const build: CharacterBuild = {
       level: 7,
