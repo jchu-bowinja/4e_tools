@@ -130,6 +130,7 @@ import { STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE } from "../../ui/glossaryTooltip"
 import { useGlossaryTooltip } from "../../ui/useGlossaryTooltip";
 import { SupportPassiveMotionBreakdown } from "../shared/SupportPassiveMotionBreakdown";
 import { AdjustableNumberInput } from "../../ui/AdjustableNumberInput";
+import { BuilderTabCarousel, type BuilderTabCarouselItem } from "../../ui/BuilderTabCarousel";
 import { CollapsibleDisclosure } from "../../ui/CollapsibleDisclosure";
 import { blockSubsectionStyle, disclosureSummaryStyle } from "../../ui/disclosureStyles";
 import { JsonCollapsiblePanel } from "../../ui/JsonCollapsiblePanel";
@@ -1833,6 +1834,26 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     expectedFeatCount
   ]);
 
+  const builderTabItems = useMemo((): BuilderTabCarouselItem<BuilderTab>[] => {
+    const entries: [BuilderTab, string][] = [
+      ["race", "Race"],
+      ["class", "Class"],
+      ["abilities", "Ability Scores"],
+      ["skills", "Skills"],
+      ["feats", "Feats"],
+      ["powers", "Powers"],
+      ["theme", "Theme"],
+      ...(build.level >= 11 ? ([["paragonPath", "Paragon path"]] as [BuilderTab, string][]) : []),
+      ...(build.level >= 21 ? ([["epicDestiny", "Epic destiny"]] as [BuilderTab, string][]) : []),
+      ["equipment", "Equipment"]
+    ];
+    return entries.map(([id, label]) => ({
+      id,
+      label,
+      status: tabStatuses[id]
+    }));
+  }, [build.level, tabStatuses]);
+
   const validationIssueCount = useMemo(() => {
     const featIssueCount = featOptions
       .filter((f) => !f.legal && build.featIds.includes(f.item.id))
@@ -2038,48 +2059,12 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
           </label>
         </div>
       <div style={ui.stickyTabBar}>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.45rem" }}>
-            {[
-              ["race", "Race"],
-              ["class", "Class"],
-              ["abilities", "Ability Scores"],
-              ["skills", "Skills"],
-              ["feats", "Feats"],
-              ["powers", "Powers"],
-              ["theme", "Theme"],
-              ...(build.level >= 11 ? ([["paragonPath", "Paragon path"]] as [BuilderTab, string][]) : []),
-              ...(build.level >= 21 ? ([["epicDestiny", "Epic destiny"]] as [BuilderTab, string][]) : []),
-              ["equipment", "Equipment"]
-            ].map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setActiveTab(id as BuilderTab)}
-                style={{
-                  border: activeTab === id ? "1px solid var(--panel-border-strong)" : "1px solid var(--panel-border)",
-                  background: activeTab === id ? "var(--surface-2)" : "var(--surface-1)",
-                  color: "var(--text-primary)",
-                  textAlign: "left",
-                  borderRadius: "8px",
-                  padding: "0.45rem 0.55rem",
-                  cursor: "pointer",
-                  minWidth: "7.5rem",
-                  boxShadow: activeTab === id ? "inset 0 1px 0 rgba(255,255,255,0.65)" : "none"
-                }}
-              >
-                <div style={{ fontWeight: 600, fontSize: "0.88rem" }}>{label}</div>
-                <div
-                  style={{
-                    fontSize: "0.72rem",
-                    color: tabStatuses[id as BuilderTab] === "complete" ? "var(--status-success)" : "var(--text-muted)",
-                    marginTop: "0.12rem"
-                  }}
-                >
-                  {renderTabStatus(tabStatuses[id as BuilderTab])}
-                </div>
-              </button>
-            ))}
-        </div>
+        <BuilderTabCarousel
+          tabs={builderTabItems}
+          activeTab={activeTab}
+          onSelect={setActiveTab}
+          renderStatus={renderTabStatus}
+        />
       </div>
 
       <div style={ui.builderBody}>

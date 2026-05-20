@@ -2177,7 +2177,175 @@ button.encounter-roster-stat-cards-expand-btn[aria-pressed="true"] .template-jso
   margin-top: 0.04rem;
 }
 
+/* Character builder — sticky step tabs (progressive compress, no overlap carousel) */
+.builder-tab-carousel {
+  --builder-tab-active-min: 7.5rem;
+  --builder-tab-compressed-width: auto;
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+}
+
+.builder-tab-carousel__measure {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  visibility: hidden;
+  pointer-events: none;
+  z-index: -1;
+  width: max-content;
+  height: auto;
+  overflow: visible;
+}
+
+.builder-tab-carousel__track--measure {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  gap: 0.45rem;
+  width: max-content;
+}
+
+.builder-tab-carousel__track {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.45rem;
+  align-items: stretch;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+.builder-tab-carousel__tab {
+  border: 1px solid var(--panel-border);
+  background: var(--surface-1);
+  color: var(--text-primary);
+  text-align: left;
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  cursor: pointer;
+  flex: 0 0 auto;
+  width: max-content;
+  min-width: var(--builder-tab-active-min);
+  box-sizing: border-box;
+  box-shadow: none;
+  overflow: hidden;
+  transition:
+    flex-basis 0.2s ease,
+    width 0.2s ease,
+    max-width 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+/* Beat global `button:hover` / `:active` so highlight stays readable in dark mode */
+button.builder-tab-carousel__tab:hover:not(:disabled),
+button.builder-tab-carousel__tab:focus-visible {
+  background: var(--surface-2);
+  color: var(--text-primary);
+  border-color: var(--panel-border-strong);
+  box-shadow: inset 0 1px 0 var(--inset-section-highlight);
+}
+
+button.builder-tab-carousel__tab:active:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text-primary);
+  transform: none;
+}
+
+button.builder-tab-carousel__tab:focus-visible {
+  outline: 2px solid var(--focus-outline);
+  outline-offset: 2px;
+}
+
+button.builder-tab-carousel__tab--active,
+button.builder-tab-carousel__tab--active:hover:not(:disabled),
+button.builder-tab-carousel__tab--active:focus-visible {
+  background: var(--surface-2);
+  color: var(--text-primary);
+  border-color: var(--panel-border-strong);
+  box-shadow: inset 0 1px 0 var(--inset-section-highlight);
+}
+
+.builder-tab-carousel__label {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+.builder-tab-carousel__status {
+  font-size: 0.72rem;
+  margin-top: 0.12rem;
+  white-space: nowrap;
+}
+
+/* Wide: every tab at natural width */
+.builder-tab-carousel:not(.builder-tab-carousel--compressed) .builder-tab-carousel__track {
+  width: max-content;
+  max-width: 100%;
+}
+
+/* Narrow: inactive tabs compress; active stays full width */
+.builder-tab-carousel--compressed .builder-tab-carousel__tab:not(.builder-tab-carousel__tab--active) {
+  flex: 0 1 var(--builder-tab-compressed-width);
+  width: var(--builder-tab-compressed-width);
+  min-width: 0;
+  max-width: var(--builder-tab-compressed-width);
+}
+
+.builder-tab-carousel--compressed
+  .builder-tab-carousel__tab:not(.builder-tab-carousel__tab--active):not(:hover):not(:focus-visible)
+  .builder-tab-carousel__status {
+  display: none;
+}
+
+.builder-tab-carousel--compressed
+  .builder-tab-carousel__tab:not(.builder-tab-carousel__tab--active):not(:hover):not(:focus-visible)
+  .builder-tab-carousel__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Active tab: always full control */
+.builder-tab-carousel--compressed .builder-tab-carousel__tab--active {
+  flex: 0 0 auto;
+  width: max-content;
+  min-width: var(--builder-tab-active-min);
+  max-width: none;
+  overflow: visible;
+  z-index: 4;
+}
+
+/* Hover / keyboard: reveal full label + status */
+.builder-tab-carousel--compressed .builder-tab-carousel__tab:hover,
+.builder-tab-carousel--compressed .builder-tab-carousel__tab:focus-visible {
+  flex: 0 0 auto;
+  width: max-content;
+  min-width: var(--builder-tab-active-min);
+  max-width: none;
+  overflow: visible;
+  z-index: 5;
+}
+
+.builder-tab-carousel--compressed .builder-tab-carousel__tab:hover .builder-tab-carousel__label,
+.builder-tab-carousel--compressed .builder-tab-carousel__tab:focus-visible .builder-tab-carousel__label {
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.builder-tab-carousel--compressed .builder-tab-carousel__tab:hover .builder-tab-carousel__status,
+.builder-tab-carousel--compressed .builder-tab-carousel__tab:focus-visible .builder-tab-carousel__status {
+  display: block;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .builder-tab-carousel__tab {
+    transition: none;
+  }
+
   *,
   *::before,
   *::after {
