@@ -1,6 +1,6 @@
 import { isAugmentableAtWillPower } from "./featMulticlassSlotSwap";
 import { getFeatMulticlassSlotSwapOffer } from "./featMulticlassSlotSwap";
-import type { CharacterBuild, HybridClassDef, Power, RulesIndex } from "./models";
+import type { CharacterBuild, HybridClassDef, ParagonPath, Power, RulesIndex } from "./models";
 import { multiclassEntryClassId } from "./paragonMulticlassing";
 
 /**
@@ -183,6 +183,63 @@ export function paragonMulticlassPrimaryAtWillSlotPenalty(
   return 1;
 }
 
+/** Compendium class feature: +2 power points at paragon tier (PHB3). */
+export const PARAGON_POWER_POINTS_CLASS_FEATURE_ID = "ID_FMP_CLASS_FEATURE_1818";
+
+function paragonPathGrantEntries(path: ParagonPath): { featureId: string; grantLevel: number }[] {
+  const out: { featureId: string; grantLevel: number }[] = [];
+  const rules = path.raw?.rules as { grant?: unknown } | undefined;
+  const grant = rules?.grant;
+  const rows = Array.isArray(grant) ? grant : grant ? [grant] : [];
+  for (const row of rows) {
+    if (!row || typeof row !== "object") continue;
+    const attrs = (row as { attrs?: Record<string, unknown> }).attrs ?? {};
+    const gtype = String(attrs.type ?? "").toLowerCase();
+    if (gtype !== "class feature") continue;
+    const featureId = String(attrs.name ?? "").trim();
+    if (!featureId.startsWith("ID_")) continue;
+    const grantLevel = Math.max(1, parseInt(String(attrs.Level ?? "11"), 10) || 11);
+    out.push({ featureId, grantLevel });
+  }
+  return out;
+}
+
+/** Selected paragon path grants Paragon Power Points at the character's level. */
+export function paragonPathGrantsParagonPowerPoints(
+  path: ParagonPath | undefined,
+  characterLevel: number
+): boolean {
+  if (!path || characterLevel < 11) return false;
+  if (path.grantedClassFeatureIds?.includes(PARAGON_POWER_POINTS_CLASS_FEATURE_ID)) return true;
+  for (const { featureId, grantLevel } of paragonPathGrantEntries(path)) {
+    if (featureId === PARAGON_POWER_POINTS_CLASS_FEATURE_ID && characterLevel >= grantLevel) {
+      return true;
+    }
+  }
+  for (const sa of path.statAdds ?? []) {
+    const name = String(sa.name ?? "").toLowerCase();
+    if (name.includes("power point")) {
+      const n = parseInt(String(sa.value ?? "").replace(/[^\d-]/g, ""), 10);
+      if (n >= 2) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * +2 at 11+ from paragon tier: class Psionic Augmentation when no path, or path that grants Paragon Power Points.
+ * Excludes paragon multiclassing (uses paragonMulticlassPowerPointBonus instead).
+ */
+export function paragonTierPowerPointBonus(index: RulesIndex, build: CharacterBuild): number {
+  if (build.level < 11 || build.paragonMulticlassing) return 0;
+  if (!buildHasPsionicAugmentationClass(index, build)) return 0;
+  if (build.paragonPathId) {
+    const path = index.paragonPaths.find((p) => p.id === build.paragonPathId);
+    return paragonPathGrantsParagonPowerPoints(path, build.level) ? 2 : 0;
+  }
+  return 2;
+}
+
 /** +2 at 11 when paragon multiclassing into a psionic class (both psionic, or non-psionic → psionic). */
 export function paragonMulticlassPowerPointBonus(index: RulesIndex, build: CharacterBuild): number {
   if (!build.paragonMulticlassing || build.level < 11) return 0;
@@ -244,12 +301,24 @@ export function summarizePsionicPowerPointAdjustments(
 ): PsionicPowerPointSummary {
   const lines: PsionicPowerPointAdjustmentLine[] = [...heroicPsionicSwapPowerPointAdjustments(index, build)];
 
-  const paragonBonus = paragonMulticlassPowerPointBonus(index, build);
-  if (paragonBonus > 0) {
+  const paragonMcBonus = paragonMulticlassPowerPointBonus(index, build);
+  if (paragonMcBonus > 0) {
     lines.push({
       label: "Paragon multiclassing",
-      delta: paragonBonus,
+      delta: paragonMcBonus,
       detail: "Psionic multiclass at 11th level"
+    });
+  }
+
+  const paragonTierBonus = paragonTierPowerPointBonus(index, build);
+  if (paragonTierBonus > 0) {
+    const path = build.paragonPathId
+      ? index.paragonPaths.find((p) => p.id === build.paragonPathId)
+      : undefined;
+    lines.push({
+      label: path?.name ?? "Paragon tier",
+      delta: paragonTierBonus,
+      detail: path ? "Paragon Power Points (path)" : "Paragon Power Points (class)"
     });
   }
 

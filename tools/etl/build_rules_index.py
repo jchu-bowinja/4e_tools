@@ -2301,6 +2301,14 @@ def build_index(input_path: Path, output_dir: Path) -> None:
                         "detail": a,
                     }
                 )
+        path_grants = extract_grants_from_rules(
+            row.get("rules"),
+            class_name_to_id,
+            skill_training_by_id,
+            skill_name_to_id,
+            class_feature_name_lookup,
+            class_feature_id_by_name,
+        )
         paragon_paths.append(
             {
                 "id": row.get("internal_id"),
@@ -2311,6 +2319,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
                 "prereqTokens": parse.tokens,
                 "raw": row,
                 **support_entity_stat_bonuses(row),
+                **path_grants,
             }
         )
 

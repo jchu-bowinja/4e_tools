@@ -298,6 +298,7 @@ export interface Theme extends RulesEntity {
 export interface ParagonPath extends RulesEntity {
   prereqsRaw?: string | null;
   prereqTokens: PrereqToken[];
+  grantedClassFeatureIds?: string[];
   statAdds?: StatAddEntry[];
   nadBonusesFromSpecific?: NadBonusesFromSpecific;
   raw: Record<string, unknown>;

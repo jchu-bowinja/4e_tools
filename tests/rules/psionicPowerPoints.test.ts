@@ -6,6 +6,9 @@ import {
   heroicPsionicSwapPowerPointAdjustments,
   paragonMulticlassPowerPointBonus,
   paragonMulticlassPrimaryAtWillSlotPenalty,
+  paragonPathGrantsParagonPowerPoints,
+  paragonTierPowerPointBonus,
+  PARAGON_POWER_POINTS_CLASS_FEATURE_ID,
   powerPointsForPrintedLevel,
   summarizePsionicPowerPointAdjustments
 } from "../../src/rules/psionicPowerPoints";
@@ -405,6 +408,76 @@ describe("paragonMulticlassPrimaryAtWillSlotPenalty", () => {
         trainedSkillIds: []
       })
     ).toBe(1);
+  });
+});
+
+describe("paragonTierPowerPointBonus", () => {
+  const index: RulesIndex = {
+    classes: [psionicClass],
+    feats: [],
+    powers: [],
+    skills: [],
+    races: [],
+    themes: [],
+    paragonPaths: [
+      {
+        id: "pp_cerulean",
+        name: "Cerulean Adept",
+        slug: "cerulean-adept",
+        prereqTokens: [],
+        grantedClassFeatureIds: [
+          PARAGON_POWER_POINTS_CLASS_FEATURE_ID,
+          "ID_FMP_CLASS_FEATURE_1816"
+        ],
+        raw: {}
+      },
+      {
+        id: "pp_martial",
+        name: "Battle Champion",
+        slug: "battle-champion",
+        prereqTokens: [],
+        grantedClassFeatureIds: ["ID_FMP_CLASS_FEATURE_999"],
+        raw: {}
+      }
+    ],
+    epicDestinies: [],
+    backgrounds: [],
+    rituals: [],
+    items: []
+  };
+
+  const psion11: CharacterBuild = {
+    level: 11,
+    classId: "c_psion",
+    powerIds: [],
+    abilityScores: { STR: 10, CON: 10, DEX: 10, INT: 16, WIS: 10, CHA: 10 },
+    trainedSkillIds: []
+  };
+
+  it("grants +2 at 11 with no paragon path (class paragon tier)", () => {
+    expect(paragonTierPowerPointBonus(index, psion11)).toBe(2);
+    const summary = summarizePsionicPowerPointAdjustments(index, psion11);
+    expect(summary.poolTotal).toBe(basePsionicPowerPointsFromLevel(11) + 2);
+    expect(summary.lines.some((l) => l.detail?.includes("class"))).toBe(true);
+  });
+
+  it("grants +2 when path includes Paragon Power Points", () => {
+    expect(paragonTierPowerPointBonus(index, { ...psion11, paragonPathId: "pp_cerulean" })).toBe(2);
+    expect(paragonPathGrantsParagonPowerPoints(index.paragonPaths[0], 11)).toBe(true);
+  });
+
+  it("does not grant when path lacks Paragon Power Points", () => {
+    expect(paragonTierPowerPointBonus(index, { ...psion11, paragonPathId: "pp_martial" })).toBe(0);
+  });
+
+  it("does not stack with paragon multiclassing", () => {
+    expect(
+      paragonTierPowerPointBonus(index, {
+        ...psion11,
+        paragonMulticlassing: true,
+        featIds: ["mc"]
+      })
+    ).toBe(0);
   });
 });
 
