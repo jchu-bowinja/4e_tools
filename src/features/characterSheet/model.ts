@@ -47,6 +47,8 @@ export interface CharacterSheetResources {
   surgesRemaining: number;
   /** True after Second Wind is used; resets on short or long rest. */
   secondWindUsed?: boolean;
+  /** Psionic augmentation points spent this day; resets on extended rest. */
+  powerPointsSpent?: number;
   deathSaves: number;
   conditions: ActiveCondition[];
 }

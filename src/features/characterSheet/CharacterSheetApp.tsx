@@ -73,6 +73,12 @@ import {
   spendHealingSurgeResources,
   useSecondWindResources
 } from "./healingSurgeActions";
+import {
+  adjustPowerPointsSpent,
+  powerPointsRemaining,
+  powerPointsSpent,
+  refreshPowerPointsOnExtendedRest
+} from "./psionicPowerPointResources";
 import { computeMagicItemCombatBonuses } from "../../rules/magicItemEquipment";
 import {
   computeSheetDerivedData,
@@ -1372,14 +1378,16 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   function applyLongRest(): void {
     updateSheet((prev) => ({
       ...prev,
-      resources: refreshSecondWindOnRest({
-        ...prev.resources,
-        currentHp: derived.maxHp,
-        tempHp: 0,
-        actionPoints: 1,
-        surgesRemaining: derived.healingSurgesPerDay,
-        deathSaves: 0
-      }),
+      resources: refreshPowerPointsOnExtendedRest(
+        refreshSecondWindOnRest({
+          ...prev.resources,
+          currentHp: derived.maxHp,
+          tempHp: 0,
+          actionPoints: 1,
+          surgesRemaining: derived.healingSurgesPerDay,
+          deathSaves: 0
+        })
+      ),
       powers: {
         ...prev.powers,
         expendedPowerIds: []
@@ -2461,6 +2469,85 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.78rem", color: "var(--text-muted)" }}>
                     Total pool: {psionicPowerPointSummary.poolTotal}
                   </p>
+                  {psionicPowerPointSummary.poolTotal > 0 && (
+                    <div
+                      style={{
+                        marginTop: "0.45rem",
+                        display: "flex",
+                        flexWrap: "wrap",
+                        alignItems: "center",
+                        gap: "0.4rem",
+                        fontSize: "0.8rem"
+                      }}
+                    >
+                      <span style={{ color: "var(--text-secondary)" }}>
+                        Remaining:{" "}
+                        <strong style={{ color: "var(--text-primary)" }}>
+                          {powerPointsRemaining(psionicPowerPointSummary.poolTotal, sheet.resources)}
+                        </strong>
+                        {" "}
+                        (spent {powerPointsSpent(sheet.resources)})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateSheet((prev) => ({
+                            ...prev,
+                            resources: adjustPowerPointsSpent(prev.resources, 1, psionicPowerPointSummary.poolTotal)
+                          }))
+                        }
+                        disabled={
+                          powerPointsRemaining(psionicPowerPointSummary.poolTotal, sheet.resources) <= 0
+                        }
+                        style={{
+                          padding: "0.15rem 0.45rem",
+                          fontSize: "0.75rem",
+                          cursor: "pointer"
+                        }}
+                      >
+                        Spend 1
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateSheet((prev) => ({
+                            ...prev,
+                            resources: adjustPowerPointsSpent(prev.resources, 2, psionicPowerPointSummary.poolTotal)
+                          }))
+                        }
+                        disabled={
+                          powerPointsRemaining(psionicPowerPointSummary.poolTotal, sheet.resources) < 2
+                        }
+                        style={{
+                          padding: "0.15rem 0.45rem",
+                          fontSize: "0.75rem",
+                          cursor: "pointer"
+                        }}
+                      >
+                        Spend 2
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateSheet((prev) => ({
+                            ...prev,
+                            resources: adjustPowerPointsSpent(prev.resources, -1, psionicPowerPointSummary.poolTotal)
+                          }))
+                        }
+                        disabled={powerPointsSpent(sheet.resources) <= 0}
+                        style={{
+                          padding: "0.15rem 0.45rem",
+                          fontSize: "0.75rem",
+                          cursor: "pointer"
+                        }}
+                      >
+                        Undo 1
+                      </button>
+                      <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
+                        Refreshes on long rest.
+                      </span>
+                    </div>
+                  )}
                   {psionicPowerPointSummary.paragonPrimaryAtWillSlotPenalty > 0 && (
                     <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.78rem", color: "var(--text-muted)" }}>
                       Lose one class at-will slot (non-psionic primary, psionic paragon multiclass).

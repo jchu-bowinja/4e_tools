@@ -56,6 +56,7 @@ export function normalizeState(input: unknown): CharacterSheetState {
         typeof v.resources?.secondWindUsed === "boolean"
           ? v.resources.secondWindUsed
           : fallback.resources.secondWindUsed ?? false,
+      powerPointsSpent: clampInt(v.resources?.powerPointsSpent, 0, 99, fallback.resources.powerPointsSpent ?? 0),
       deathSaves: clampInt(v.resources?.deathSaves, 0, 3, fallback.resources.deathSaves),
       conditions: normalizeActiveConditions(v.resources?.conditions ?? fallback.resources.conditions)
     },
