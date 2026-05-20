@@ -345,3 +345,26 @@ describe("sheet raceSelections and displayed racial traits", () => {
     expect(withSub).toEqual(["trait_base", "trait_sub_a", "trait_child"]);
   });
 });
+
+describe("sheet classSelections", () => {
+  it("round-trips classSelections through sheetStateFromBuild", () => {
+    const build: CharacterBuild = {
+      name: "Rogue",
+      level: 1,
+      abilityScores: { STR: 10, CON: 10, DEX: 16, INT: 10, WIS: 10, CHA: 10 },
+      trainedSkillIds: [],
+      featIds: [],
+      powerIds: [],
+      classId: "class_fighter",
+      classSelections: {
+        "classFeaturePair:a:b": "class_fighter",
+        "classFeature:tactics": "feat_pick"
+      }
+    };
+    const sheet = sheetStateFromBuild(build, index);
+    expect(sheet.classSelections).toEqual({
+      "classFeaturePair:a:b": "class_fighter",
+      "classFeature:tactics": "feat_pick"
+    });
+  });
+});

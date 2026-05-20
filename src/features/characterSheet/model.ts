@@ -71,10 +71,16 @@ export interface CharacterSheetState {
   raceSelections?: Record<string, string>;
   racialAbilityChoice?: Ability;
   classId?: string;
+  /** Class tab picks (feature bundles, cantrips, …) — aligned with builder `classSelections`. */
+  classSelections?: Record<string, string>;
   /** When set with hybrid class ids, derived stats use hybrid rules (matches builder). */
   characterStyle?: CharacterStyle;
   hybridClassIdA?: string;
   hybridClassIdB?: string;
+  hybridTalentClassFeatureIdA?: string;
+  hybridTalentClassFeatureIdB?: string;
+  hybridSideASelections?: Record<string, string>;
+  hybridSideBSelections?: Record<string, string>;
   themeId?: string;
   paragonPathId?: string;
   paragonMulticlassing?: boolean;

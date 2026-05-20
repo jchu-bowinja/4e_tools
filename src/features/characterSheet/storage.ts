@@ -16,7 +16,7 @@ function clampInt(value: unknown, min: number, max: number, fallback: number): n
 
 const ABILITIES: Ability[] = ["STR", "CON", "DEX", "INT", "WIS", "CHA"];
 
-function normalizeRaceSelections(raw: unknown): Record<string, string> | undefined {
+function normalizeStringRecord(raw: unknown): Record<string, string> | undefined {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
   const out: Record<string, string> = {};
   for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
@@ -25,6 +25,10 @@ function normalizeRaceSelections(raw: unknown): Record<string, string> | undefin
     }
   }
   return Object.keys(out).length > 0 ? out : undefined;
+}
+
+function normalizeRaceSelections(raw: unknown): Record<string, string> | undefined {
+  return normalizeStringRecord(raw);
 }
 
 function normalizeRacialAbilityChoice(raw: unknown): Ability | undefined {
@@ -100,7 +104,18 @@ export function normalizeState(input: unknown): CharacterSheetState {
         : undefined,
     epicDestinyId: typeof v.epicDestinyId === "string" && v.epicDestinyId.trim() ? v.epicDestinyId : undefined,
     raceSelections: normalizeRaceSelections(v.raceSelections),
-    racialAbilityChoice: normalizeRacialAbilityChoice(v.racialAbilityChoice)
+    racialAbilityChoice: normalizeRacialAbilityChoice(v.racialAbilityChoice),
+    classSelections: normalizeStringRecord(v.classSelections),
+    hybridTalentClassFeatureIdA:
+      typeof v.hybridTalentClassFeatureIdA === "string" && v.hybridTalentClassFeatureIdA.trim()
+        ? v.hybridTalentClassFeatureIdA
+        : undefined,
+    hybridTalentClassFeatureIdB:
+      typeof v.hybridTalentClassFeatureIdB === "string" && v.hybridTalentClassFeatureIdB.trim()
+        ? v.hybridTalentClassFeatureIdB
+        : undefined,
+    hybridSideASelections: normalizeStringRecord(v.hybridSideASelections),
+    hybridSideBSelections: normalizeStringRecord(v.hybridSideBSelections)
   };
   return next;
 }

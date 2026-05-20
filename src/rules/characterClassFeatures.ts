@@ -3,7 +3,6 @@ import {
   getClassFeatureChoiceGroups
 } from "./classFeatureChoices";
 import type { CharacterBuild, ClassFeature, RulesIndex } from "./models";
-import { characterSupportIds } from "./prereqContext";
 import {
   buildClassFeatureLookups,
   featureIsAvailableAtLevel,
@@ -15,8 +14,27 @@ import {
   type TraitDisplayRow
 } from "./supportTraits";
 
-/** Class feature ids the character currently has (build options, grants, path features, …). */
-export function collectCharacterClassFeatureIds(index: RulesIndex, build: CharacterBuild): string[] {
+/** Support ids for class/hybrid grants only (excludes race, theme, path, destiny). */
+function classSupportIds(index: RulesIndex, build: CharacterBuild): string[] {
+  const ids: string[] = [];
+  if (build.characterStyle === "hybrid") {
+    const ha = index.hybridClasses?.find((h) => h.id === build.hybridClassIdA);
+    const hb = index.hybridClasses?.find((h) => h.id === build.hybridClassIdB);
+    if (ha?.baseClassId) ids.push(ha.baseClassId);
+    if (hb?.baseClassId) ids.push(hb.baseClassId);
+    if (build.hybridClassIdA) ids.push(build.hybridClassIdA);
+    if (build.hybridClassIdB) ids.push(build.hybridClassIdB);
+  } else if (build.classId) {
+    ids.push(build.classId);
+  }
+  return ids;
+}
+
+/** Class + hybrid feature ids (grants and player picks); excludes path, destiny, theme, and feats. */
+export function collectClassFeatureIdsFromClass(
+  index: RulesIndex,
+  build: CharacterBuild
+): string[] {
   const { byId, byName } = buildClassFeatureLookups(index);
   const ids: string[] = [];
   const seen = new Set<string>();
@@ -34,7 +52,7 @@ export function collectCharacterClassFeatureIds(index: RulesIndex, build: Charac
   };
 
   const grantedNames = index.grantedClassFeatureNamesBySupportId ?? {};
-  for (const sid of characterSupportIds(index, build)) {
+  for (const sid of classSupportIds(index, build)) {
     for (const n of grantedNames[sid] ?? []) {
       addByName(n);
     }
@@ -56,15 +74,45 @@ export function collectCharacterClassFeatureIds(index: RulesIndex, build: Charac
     if (id?.startsWith("ID_")) add(byId.get(id));
   }
 
-  const cls = index.classes.find((c) => c.id === build.classId);
-  if (cls) {
-    const rs = build.classSelections ?? {};
+  const rs = build.classSelections ?? {};
+  const applyClassFeatureChoiceGroups = (classId: string | undefined) => {
+    if (!classId) return;
+    const cls = index.classes.find((c) => c.id === classId);
     const groups = getClassFeatureChoiceGroups(index, cls);
     for (const g of filterVisibleClassFeatureChoiceGroups(groups, rs)) {
       const picked = rs[g.key]?.trim();
       if (picked?.startsWith("ID_")) add(byId.get(picked));
     }
+  };
+  if (build.characterStyle === "hybrid") {
+    const ha = index.hybridClasses?.find((h) => h.id === build.hybridClassIdA);
+    const hb = index.hybridClasses?.find((h) => h.id === build.hybridClassIdB);
+    applyClassFeatureChoiceGroups(ha?.baseClassId);
+    applyClassFeatureChoiceGroups(hb?.baseClassId);
+  } else {
+    applyClassFeatureChoiceGroups(build.classId);
   }
+
+  return ids;
+}
+
+/** Class feature ids the character currently has (build options, grants, path features, …). */
+export function collectCharacterClassFeatureIds(index: RulesIndex, build: CharacterBuild): string[] {
+  const { byId, byName } = buildClassFeatureLookups(index);
+  const ids = collectClassFeatureIdsFromClass(index, build);
+  const seen = new Set(ids);
+
+  const add = (feature: ClassFeature | undefined) => {
+    if (!feature || seen.has(feature.id)) return;
+    if (!featureIsAvailableAtLevel(feature, build.level)) return;
+    seen.add(feature.id);
+    ids.push(feature.id);
+  };
+
+  const addByName = (name: string) => {
+    const f = byName.get(name.trim());
+    if (f) add(f);
+  };
 
   if (build.paragonPathId) {
     const path = index.paragonPaths.find((p) => p.id === build.paragonPathId);
@@ -101,13 +149,13 @@ export function collectCharacterClassFeatureIds(index: RulesIndex, build: Charac
   return ids;
 }
 
-/** Trait rows for class features the build actually has (not the full class parsed list). */
+/** Trait rows for class/hybrid features on the sheet (excludes path, destiny, theme, feats). */
 export function getCharacterClassFeatureTraitRows(
   index: RulesIndex,
   build: CharacterBuild
 ): TraitDisplayRow[] {
   const { byId } = buildClassFeatureLookups(index);
-  return collectCharacterClassFeatureIds(index, build)
+  return collectClassFeatureIdsFromClass(index, build)
     .map((id) => byId.get(id))
     .filter((f): f is ClassFeature => !!f)
     .map((f) => ({

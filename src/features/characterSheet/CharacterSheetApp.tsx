@@ -15,10 +15,9 @@ import {
   applyFeatModificationsToTraitRows,
   collectFeatModificationsByClassFeatureId
 } from "../../rules/featClassFeatureModifications";
+import { getCharacterClassFeatureTraitRows } from "../../rules/characterClassFeatures";
 import {
-  getClassTraitRows,
   getEpicDestinyTraitRows,
-  getHybridClassTraitRows,
   getFeatGrantedTraitRows,
   getParagonTraitRows,
   getThemeTraitRows,
@@ -364,6 +363,26 @@ function traitsEmptyMessage(selectionName: string | undefined, fallback: string)
 function formatClassFeaturesEmptyMessage(selectionName: string | undefined): string {
   const name = selectionName?.trim();
   return name ? `No ${name} features listed.` : "No class features listed.";
+}
+
+function formatParagonFeaturesSectionTitle(selectionName: string | undefined): string {
+  const name = selectionName?.trim();
+  return name ? `${name} Features` : "Paragon Path Features";
+}
+
+function formatParagonFeaturesEmptyMessage(selectionName: string | undefined): string {
+  const name = selectionName?.trim();
+  return name ? `No ${name} features listed.` : "No paragon path features listed.";
+}
+
+function formatEpicDestinyFeaturesSectionTitle(selectionName: string | undefined): string {
+  const name = selectionName?.trim();
+  return name ? `${name} Features` : "Epic Destiny Features";
+}
+
+function formatEpicDestinyFeaturesEmptyMessage(selectionName: string | undefined): string {
+  const name = selectionName?.trim();
+  return name ? `No ${name} features listed.` : "No epic destiny features listed.";
 }
 
 function TraitRowsList({ rows, emptyMessage }: { rows: TraitDisplayRow[]; emptyMessage: string }): JSX.Element {
@@ -1039,24 +1058,11 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     [index.classes, hybridClassB?.baseClassId]
   );
   const classTraitRows = useMemo(() => {
-    let rows;
-    if (sheet.characterStyle === "hybrid" && sheet.hybridClassIdA && sheet.hybridClassIdB) {
-      rows = getHybridClassTraitRows(hybridClassA, hybridClassB, index, sheet.level);
-    } else {
-      rows = getClassTraitRows(derived.cls, index, sheet.level);
-    }
+    const build = toBuildLikeState(sheet, index);
+    const rows = getCharacterClassFeatureTraitRows(index, build);
     const featMods = collectFeatModificationsByClassFeatureId(index, sheet.featIds ?? []);
     return applyFeatModificationsToTraitRows(rows, featMods);
-  }, [
-    sheet.characterStyle,
-    sheet.hybridClassIdA,
-    sheet.hybridClassIdB,
-    sheet.featIds,
-    hybridClassA,
-    hybridClassB,
-    derived.cls,
-    index
-  ]);
+  }, [index, sheet, sheet.featIds]);
   const themeTraitRows = useMemo(
     () => getThemeTraitRows(selectedTheme, index, sheet.level),
     [selectedTheme, index, sheet.level]
@@ -1087,12 +1093,12 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     () => traitsSectionTitle(selectedTheme?.name, "Theme traits"),
     [selectedTheme?.name]
   );
-  const paragonTraitsSectionTitle = useMemo(
-    () => traitsSectionTitle(selectedParagonPath?.name, "Paragon traits"),
+  const paragonFeaturesSectionTitle = useMemo(
+    () => formatParagonFeaturesSectionTitle(selectedParagonPath?.name),
     [selectedParagonPath?.name]
   );
-  const epicDestinyTraitsSectionTitle = useMemo(
-    () => traitsSectionTitle(selectedEpicDestiny?.name, "Epic destiny traits"),
+  const epicDestinyFeaturesSectionTitle = useMemo(
+    () => formatEpicDestinyFeaturesSectionTitle(selectedEpicDestiny?.name),
     [selectedEpicDestiny?.name]
   );
   const featGrantedTraitRows = useMemo(
@@ -2424,18 +2430,18 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             </div>
             <div style={overviewSideColumnStyle}>
               {showParagonTraits && (
-                <OverviewCollapsibleSection title={paragonTraitsSectionTitle}>
+                <OverviewCollapsibleSection title={paragonFeaturesSectionTitle}>
                   <TraitRowsList
                     rows={paragonTraitRows}
-                    emptyMessage={traitsEmptyMessage(selectedParagonPath?.name, "No paragon traits listed.")}
+                    emptyMessage={formatParagonFeaturesEmptyMessage(selectedParagonPath?.name)}
                   />
                 </OverviewCollapsibleSection>
               )}
               {showEpicDestinyTraits && (
-                <OverviewCollapsibleSection title={epicDestinyTraitsSectionTitle}>
+                <OverviewCollapsibleSection title={epicDestinyFeaturesSectionTitle}>
                   <TraitRowsList
                     rows={epicDestinyTraitRows}
-                    emptyMessage={traitsEmptyMessage(selectedEpicDestiny?.name, "No epic destiny traits listed.")}
+                    emptyMessage={formatEpicDestinyFeaturesEmptyMessage(selectedEpicDestiny?.name)}
                   />
                 </OverviewCollapsibleSection>
               )}

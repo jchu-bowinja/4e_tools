@@ -280,9 +280,18 @@ export function sheetStateFromBuild(build: CharacterBuild, index: RulesIndex): C
     raceSelections: normalized.raceSelections ? { ...normalized.raceSelections } : undefined,
     racialAbilityChoice: normalized.racialAbilityChoice,
     classId: normalized.classId,
+    classSelections: normalized.classSelections ? { ...normalized.classSelections } : undefined,
     characterStyle: normalized.characterStyle,
     hybridClassIdA: normalized.hybridClassIdA,
     hybridClassIdB: normalized.hybridClassIdB,
+    hybridTalentClassFeatureIdA: normalized.hybridTalentClassFeatureIdA,
+    hybridTalentClassFeatureIdB: normalized.hybridTalentClassFeatureIdB,
+    hybridSideASelections: normalized.hybridSideASelections
+      ? { ...normalized.hybridSideASelections }
+      : undefined,
+    hybridSideBSelections: normalized.hybridSideBSelections
+      ? { ...normalized.hybridSideBSelections }
+      : undefined,
     themeId: normalized.themeId,
     paragonPathId: normalized.paragonPathId,
     paragonMulticlassing: normalized.paragonMulticlassing,
