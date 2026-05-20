@@ -8,7 +8,8 @@ export const appLoadingShell: CSSProperties = {
   minWidth: "var(--app-min-width, 56rem)",
   boxSizing: "border-box",
   padding: "1.25rem",
-  backgroundColor: NEUTRAL_PAGE_BG,
+  backgroundColor: "var(--app-chrome-bg, " + NEUTRAL_PAGE_BG + ")",
+  color: "var(--app-chrome-fg)",
   fontFamily: "system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
   display: "flex",
   alignItems: "center",
@@ -16,11 +17,11 @@ export const appLoadingShell: CSSProperties = {
 };
 
 export const appLoadingCard: CSSProperties = {
-  backgroundColor: "#ffffff",
-  border: "1px solid #a8b4c7",
-  borderRadius: "12px",
+  backgroundColor: "var(--surface-0)",
+  border: "1px solid var(--panel-border)",
+  borderRadius: "var(--ui-section-radius, 12px)",
   padding: "1.5rem 2rem",
-  boxShadow: "0 1px 4px rgba(15, 23, 42, 0.06)",
-  color: "#1f2937",
+  boxShadow: "var(--ui-panel-shadow, 0 1px 4px rgba(15, 23, 42, 0.06))",
+  color: "var(--app-chrome-muted)",
   fontSize: "0.95rem"
 };

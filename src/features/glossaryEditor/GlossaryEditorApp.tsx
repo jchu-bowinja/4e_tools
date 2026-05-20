@@ -1,28 +1,23 @@
-import { useEffect, useLayoutEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import type { GlossaryTermRow } from "../../data/tooltipGlossary";
 import { displayTextForGlossaryRow, isNumberedRangeAlias, sanitizeGlossaryRows } from "../../data/tooltipGlossary";
 import { saveGlossaryRowsToStorage } from "../../data/glossaryStorage";
+import {
+  contentPanelPaddedStyle,
+  editorFieldLabelStyle,
+  editorFieldSurfaceStyle,
+  editorInsetPreviewStyle,
+  editorPageIntroStyle,
+  editorPageShellStyle,
+  editorStatusBannerStyle,
+  pageTitleStyle
+} from "../../ui/panels";
 import { GlossaryTooltipRichText } from "../builder/RulesRichText";
 
 type Props = {
   rows: GlossaryTermRow[];
   onRowsChange: (rows: GlossaryTermRow[]) => void;
   onResetToBundled: () => void | Promise<void>;
-};
-
-const panel: CSSProperties = {
-  backgroundColor: "var(--surface-1)",
-  border: "1px solid var(--panel-border)",
-  borderRadius: "8px",
-  padding: "0.75rem",
-  boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 1px 2px rgba(20, 14, 8, 0.12)"
-};
-
-const labelStyle: CSSProperties = { display: "block", fontSize: "0.78rem", color: "var(--text-muted)", marginBottom: "0.2rem" };
-const fieldSurface: CSSProperties = {
-  backgroundColor: "var(--surface-0)",
-  border: "1px solid var(--panel-border)",
-  borderRadius: "6px"
 };
 
 const GLOSSARY_SELECTED_TERM_ID_STORAGE_KEY = "glossaryEditor.selectedTermId";
@@ -213,32 +208,19 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
   }
 
   return (
-    <div style={{ maxWidth: 1360, margin: "0 auto", padding: "clamp(0.75rem, 1.5vw, 1.15rem)", color: "var(--text-primary)", boxSizing: "border-box" }}>
-      <h1 style={{ marginTop: 0 }}>Glossary</h1>
-      <p style={{ marginTop: 0, color: "var(--text-muted)", maxWidth: "52rem" }}>
+    <div style={editorPageShellStyle}>
+      <h1 style={pageTitleStyle}>Glossary</h1>
+      <p style={{ ...editorPageIntroStyle, maxWidth: "52rem" }}>
         View and edit terms from <code>generated/glossary_terms.json</code>. Use <strong>Save to browser</strong> to store
         your list locally so tooltips across the app use your copy. <strong>Reset to bundled file</strong> removes the
         stored copy and reloads from the file. Export / import raw JSON to share or back up.
       </p>
 
-      {message && (
-        <div
-          role="status"
-          aria-live="polite"
-          style={{
-            marginBottom: "0.75rem",
-            padding: "0.5rem 0.65rem",
-            borderRadius: "6px",
-            background: "linear-gradient(180deg, var(--surface-1) 0%, var(--surface-2) 100%)",
-            border: "1px solid var(--panel-border)",
-            color: "var(--text-muted)",
-            fontSize: "0.9rem",
-            boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.16)"
-          }}
-        >
+      {message ? (
+        <div role="status" aria-live="polite" style={{ ...editorStatusBannerStyle, color: "var(--text-muted)" }}>
           {message}
         </div>
-      )}
+      ) : null}
 
       <div style={{ display: "flex", gap: "1rem", marginBottom: "0.75rem", flexWrap: "wrap" }}>
         <button type="button" onClick={handleNew}>
@@ -275,14 +257,24 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
       </div>
 
       <div style={{ display: "flex", gap: "1rem", alignItems: "stretch", flexWrap: "wrap" }}>
-        <div style={{ ...panel, width: 300, minWidth: 220, maxHeight: "70vh", display: "flex", flexDirection: "column" }}>
-          <label style={labelStyle}>
+        <div
+          style={{
+            ...contentPanelPaddedStyle,
+            backgroundColor: "var(--surface-1)",
+            width: 300,
+            minWidth: 220,
+            maxHeight: "70vh",
+            display: "flex",
+            flexDirection: "column"
+          }}
+        >
+          <label style={editorFieldLabelStyle}>
             Search
             <input
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              style={{ ...fieldSurface, width: "100%", boxSizing: "border-box", marginTop: "0.15rem" }}
+              style={{ ...editorFieldSurfaceStyle, width: "100%", boxSizing: "border-box", marginTop: "0.15rem" }}
             />
           </label>
           <div style={{ marginTop: "0.5rem", overflow: "auto", flex: 1, fontSize: "0.9rem" }}>
@@ -297,19 +289,7 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
                       <button
                         type="button"
                         onClick={() => setSelectedIndex(index)}
-                        style={{
-                          width: "100%",
-                          textAlign: "left",
-                          padding: "0.4rem 0.5rem",
-                          borderRadius: "6px",
-                          border: active ? "1px solid var(--panel-border-strong)" : "1px solid transparent",
-                          background: active
-                            ? "linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 88%, #ffffff 12%) 0%, var(--surface-2) 100%)"
-                            : "transparent",
-                          color: "var(--text-primary)",
-                          cursor: "pointer",
-                          boxShadow: active ? "inset 0 1px 0 rgba(255, 255, 255, 0.16)" : "none"
-                        }}
+                        className={active ? "editor-term-row editor-term-row--selected" : "editor-term-row"}
                       >
                         <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>{row.name || "(no name)"}</div>
                       </button>
@@ -321,98 +301,98 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
           </div>
         </div>
 
-        <div style={{ ...panel, flex: 1, minWidth: 280 }}>
+        <div style={{ ...contentPanelPaddedStyle, backgroundColor: "var(--surface-1)", flex: 1, minWidth: 280 }}>
           {!selected ? (
             <div style={{ color: "var(--text-muted)" }}>Select a term, or create a new one.</div>
           ) : (
             <div style={{ display: "grid", gap: "0.65rem" }}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "0.65rem" }}>
                 <label>
-                  <span style={labelStyle}>Name</span>
+                  <span style={editorFieldLabelStyle}>Name</span>
                   <input
                     type="text"
                     value={String(selected.name ?? "")}
                     onChange={(e) => patchSelected({ name: e.target.value })}
-                    style={{ ...fieldSurface, width: "100%", boxSizing: "border-box" }}
+                    style={{ ...editorFieldSurfaceStyle, width: "100%", boxSizing: "border-box" }}
                   />
                 </label>
                 <label>
-                  <span style={labelStyle}>ID</span>
+                  <span style={editorFieldLabelStyle}>ID</span>
                   <input
                     type="text"
                     value={String(selected.id ?? "")}
                     onChange={(e) => patchSelected({ id: e.target.value })}
-                    style={{ ...fieldSurface, width: "100%", boxSizing: "border-box" }}
+                    style={{ ...editorFieldSurfaceStyle, width: "100%", boxSizing: "border-box" }}
                   />
                 </label>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "0.65rem" }}>
                 <label>
-                  <span style={labelStyle}>Category</span>
+                  <span style={editorFieldLabelStyle}>Category</span>
                   <input
                     type="text"
                     value={String(selected.category ?? "")}
                     onChange={(e) => patchSelected({ category: e.target.value || null })}
-                    style={{ ...fieldSurface, width: "100%", boxSizing: "border-box" }}
+                    style={{ ...editorFieldSurfaceStyle, width: "100%", boxSizing: "border-box" }}
                   />
                 </label>
                 <label>
-                  <span style={labelStyle}>Type</span>
+                  <span style={editorFieldLabelStyle}>Type</span>
                   <input
                     type="text"
                     value={String(selected.type ?? "")}
                     onChange={(e) => patchSelected({ type: e.target.value || null })}
-                    style={{ ...fieldSurface, width: "100%", boxSizing: "border-box" }}
+                    style={{ ...editorFieldSurfaceStyle, width: "100%", boxSizing: "border-box" }}
                   />
                 </label>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "0.65rem" }}>
                 <label>
-                  <span style={labelStyle}>Source book</span>
+                  <span style={editorFieldLabelStyle}>Source book</span>
                   <input
                     type="text"
                     value={String(selected.sourceBook ?? "")}
                     onChange={(e) => patchSelected({ sourceBook: e.target.value || null })}
-                    style={{ ...fieldSurface, width: "100%", boxSizing: "border-box" }}
+                    style={{ ...editorFieldSurfaceStyle, width: "100%", boxSizing: "border-box" }}
                   />
                 </label>
                 <label>
-                  <span style={labelStyle}>Published in</span>
+                  <span style={editorFieldLabelStyle}>Published in</span>
                   <input
                     type="text"
                     value={String(selected.publishedIn ?? "")}
                     onChange={(e) => patchSelected({ publishedIn: e.target.value || null })}
-                    style={{ ...fieldSurface, width: "100%", boxSizing: "border-box" }}
+                    style={{ ...editorFieldSurfaceStyle, width: "100%", boxSizing: "border-box" }}
                   />
                 </label>
               </div>
               <label>
-                <span style={labelStyle}>Aliases (one per line; optional)</span>
+                <span style={editorFieldLabelStyle}>Aliases (one per line; optional)</span>
                 <textarea
                   value={aliasesDraft}
                   onChange={(e) => setAliasesDraft(e.target.value)}
                   onBlur={() => setAliasesFromText(aliasesDraft)}
                   rows={4}
-                  style={{ ...fieldSurface, width: "100%", boxSizing: "border-box", fontFamily: "inherit", resize: "vertical" }}
+                  style={{ ...editorFieldSurfaceStyle, width: "100%", boxSizing: "border-box", fontFamily: "inherit", resize: "vertical" }}
                 />
               </label>
               <label>
-                <span style={labelStyle}>Definition (plain text; preferred for tooltips)</span>
+                <span style={editorFieldLabelStyle}>Definition (plain text; preferred for tooltips)</span>
                 <textarea
                   value={String(selected.definition ?? "")}
                   onChange={(e) => patchSelected({ definition: e.target.value || null })}
                   rows={6}
-                  style={{ ...fieldSurface, width: "100%", boxSizing: "border-box", fontFamily: "inherit", resize: "vertical" }}
+                  style={{ ...editorFieldSurfaceStyle, width: "100%", boxSizing: "border-box", fontFamily: "inherit", resize: "vertical" }}
                 />
               </label>
               <label>
-                <span style={labelStyle}>HTML (optional; used if definition is empty)</span>
+                <span style={editorFieldLabelStyle}>HTML (optional; used if definition is empty)</span>
                 <textarea
                   value={String(selected.html ?? "")}
                   onChange={(e) => patchSelected({ html: e.target.value ? e.target.value : null })}
                   rows={5}
                   style={{
-                    ...fieldSurface,
+                    ...editorFieldSurfaceStyle,
                     width: "100%",
                     boxSizing: "border-box",
                     fontFamily: "monospace",
@@ -421,17 +401,8 @@ export function GlossaryEditorApp({ rows, onRowsChange, onResetToBundled }: Prop
                   }}
                 />
               </label>
-              <div
-                style={{
-                  padding: "0.55rem 0.65rem",
-                  background: "linear-gradient(180deg, var(--surface-0) 0%, var(--surface-1) 100%)",
-                  border: "1px solid var(--panel-border)",
-                  borderRadius: "6px",
-                  fontSize: "0.88rem",
-                  boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.14)"
-                }}
-              >
-                <div style={{ ...labelStyle, marginBottom: "0.35rem" }}>Tooltip preview (plain text)</div>
+              <div style={editorInsetPreviewStyle}>
+                <div style={{ ...editorFieldLabelStyle, marginBottom: "0.35rem" }}>Tooltip preview (plain text)</div>
                 {glossaryTooltipPreviewText ? (
                   <GlossaryTooltipRichText text={glossaryTooltipPreviewText} />
                 ) : (

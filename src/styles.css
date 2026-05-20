@@ -39,6 +39,7 @@
   --link-color: #5f3b16;
   --link-color-hover: #4b2e10;
   --focus-outline: #7a4b1a;
+  --tooltip-panel-shadow: 0 8px 24px rgba(45, 34, 16, 0.2);
   --button-border: var(--panel-border);
   --button-background: var(--surface-0);
   --button-foreground: var(--text-primary);
@@ -107,7 +108,7 @@
   --app-header-border: #d1d5db;
   --app-chrome-fg: #111827;
   --app-chrome-muted: #3a3a42;
-  --app-error-fg: crimson;
+  --app-error-fg: var(--status-danger);
 }
 
 :root[data-theme="dark"] {
@@ -217,6 +218,170 @@ a:focus-visible,
 [tabindex]:focus-visible {
   outline: 2px solid var(--focus-outline);
   outline-offset: 2px;
+}
+
+/* Segmented toggle (sheet tabs, power grouping, monster pane) — use SegmentedControl.tsx */
+.segmented-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.segmented-control--pill {
+  gap: 0.4rem;
+}
+
+.segmented-control--joined {
+  gap: 0;
+  border-radius: 0.25rem;
+  overflow: hidden;
+  border: 1px solid var(--panel-border);
+}
+
+button.segmented-control__option {
+  box-shadow: none;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  line-height: 1.2;
+  touch-action: manipulation;
+}
+
+.segmented-control--tab button.segmented-control__option {
+  padding: 0.35rem 0.75rem;
+  border-radius: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.segmented-control--compact button.segmented-control__option {
+  padding: 0.3rem 0.65rem;
+  border-radius: 0.3rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.segmented-control--inline button.segmented-control__option {
+  padding: 0.22rem 0.5rem;
+  border-radius: 0;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.segmented-control--joined button.segmented-control__option {
+  border: none;
+}
+
+.segmented-control--joined button.segmented-control__option:not(:last-child) {
+  border-right: 1px solid var(--panel-border);
+}
+
+.segmented-control--pill button.segmented-control__option:not([aria-pressed="true"]):not([aria-selected="true"]) {
+  border: 1px solid var(--panel-border);
+  background: var(--surface-0);
+  color: var(--text-primary);
+}
+
+.segmented-control--pill button.segmented-control__option[aria-pressed="true"],
+.segmented-control--pill button.segmented-control__option[aria-selected="true"] {
+  border: 1px solid var(--surface-3);
+  background: var(--surface-3);
+  color: var(--surface-0);
+  font-weight: 700;
+}
+
+.segmented-control--joined button.segmented-control__option:not([aria-pressed="true"]):not([aria-selected="true"]) {
+  background: var(--surface-0);
+  color: var(--text-primary);
+}
+
+.segmented-control--joined button.segmented-control__option[aria-pressed="true"],
+.segmented-control--joined button.segmented-control__option[aria-selected="true"] {
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+button.segmented-control__option:hover:not(:disabled):not([aria-pressed="true"]):not([aria-selected="true"]) {
+  background: var(--control-hover-bg);
+  border-color: var(--panel-border-strong);
+}
+
+button.segmented-control__option[aria-pressed="true"]:hover:not(:disabled),
+button.segmented-control__option[aria-selected="true"]:hover:not(:disabled) {
+  transform: none;
+}
+
+.segmented-control--pill button.segmented-control__option[aria-pressed="true"]:hover:not(:disabled),
+.segmented-control--pill button.segmented-control__option[aria-selected="true"]:hover:not(:disabled) {
+  background: var(--surface-3);
+  color: var(--surface-0);
+  border-color: var(--surface-3);
+}
+
+.segmented-control--joined button.segmented-control__option[aria-pressed="true"]:hover:not(:disabled),
+.segmented-control--joined button.segmented-control__option[aria-selected="true"]:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+button.segmented-control__option:active:not(:disabled) {
+  transform: none;
+}
+
+button.segmented-control__option:focus-visible {
+  z-index: 1;
+  position: relative;
+}
+
+/* Glossary / Resource editor list rows */
+button.editor-list-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-bottom: 1px solid var(--surface-2);
+  padding: 0.55rem 0.75rem;
+  background: var(--surface-0);
+  color: var(--text-primary);
+  border-radius: 0;
+  box-shadow: none;
+  font-weight: 600;
+}
+
+button.editor-list-row:hover:not(:disabled) {
+  background: var(--control-hover-bg);
+}
+
+button.editor-list-row--selected {
+  background: var(--surface-2);
+}
+
+button.editor-list-row--selected:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+button.editor-term-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.4rem 0.5rem;
+  border-radius: var(--control-radius, 6px);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-primary);
+  box-shadow: none;
+  font-weight: 600;
+}
+
+button.editor-term-row:hover:not(:disabled) {
+  background: var(--control-hover-bg);
+}
+
+button.editor-term-row--selected {
+  border-color: var(--panel-border-strong);
+  background: var(--surface-2);
 }
 
 input,
@@ -486,6 +651,7 @@ textarea:hover {
   --link-color: #f1c38d;
   --link-color-hover: #ffd8aa;
   --focus-outline: #e4b478;
+  --tooltip-panel-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
   --inset-section-bg: #1b140d;
   --inset-section-border: #8d6f47;
   --inset-section-highlight: rgba(255, 255, 255, 0.18);
@@ -672,6 +838,35 @@ textarea:hover {
 
 .live-sheet-collapsible > :not(summary) {
   margin-top: 0.35rem;
+}
+
+/* Builder sidebar: Character row toggles entire sidebar (not just identity fields) */
+button.builder-sidebar-collapse-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+}
+
+button.builder-sidebar-collapse-toggle:focus-visible {
+  outline: 2px solid var(--panel-border);
+  outline-offset: 2px;
+}
+
+button.builder-sidebar-collapse-toggle .template-json-collapsible-arrow {
+  transform: rotate(90deg);
+}
+
+button.builder-sidebar-collapse-toggle[aria-expanded="false"] .template-json-collapsible-arrow {
+  transform: rotate(0deg);
 }
 
 .character-sheet-overview-row--page-break {

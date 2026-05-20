@@ -108,17 +108,8 @@ export default function App(): JSX.Element {
   }
   if (!index) {
     return (
-      <div style={{ ...appLoadingShell, backgroundColor: "var(--app-chrome-bg)", color: "var(--app-chrome-fg)" }}>
-        <div
-          role="status"
-          aria-live="polite"
-          style={{
-            ...appLoadingCard,
-            backgroundColor: "var(--surface-0)",
-            borderColor: "var(--panel-border)",
-            color: "var(--app-chrome-muted)"
-          }}
-        >
+      <div style={appLoadingShell}>
+        <div role="status" aria-live="polite" style={appLoadingCard}>
           Loading rules index…
         </div>
       </div>

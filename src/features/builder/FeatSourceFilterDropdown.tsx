@@ -52,7 +52,7 @@ const triggerStyle: CSSProperties = {
   boxSizing: "border-box"
 };
 
-const panelStyle: CSSProperties = {
+const dropdownPanelStyle: CSSProperties = {
   position: "absolute",
   zIndex: 20,
   top: "calc(100% + 0.15rem)",
@@ -162,7 +162,7 @@ export function FeatSourceFilterDropdown({
           <summary style={triggerStyle} aria-label={`Source: ${summary}`}>
             {summary}
           </summary>
-          <div style={panelStyle} role="group" aria-label="Source filter">
+          <div style={dropdownPanelStyle} role="group" aria-label="Source filter">
             <div
               style={{
                 display: "flex",

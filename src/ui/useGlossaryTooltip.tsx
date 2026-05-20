@@ -1,17 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import type { FocusEvent, MouseEvent } from "react";
-import { positionFixedTooltip } from "./glossaryTooltipPosition";
-import {
-  GLOSSARY_TOOLTIP_CLOSE_DELAY_MS,
-  GLOSSARY_TOOLTIP_OPEN_DELAY_MS,
-  STANDARD_GLOSSARY_TOOLTIP_LAYOUT
-} from "./glossaryTooltip";
+import type { HoverPanelPosition } from "./useDelayedHoverPanel";
+import { useDelayedHoverPanel } from "./useDelayedHoverPanel";
 
-export type GlossaryHoverPanelPosition = {
-  top: number;
-  left: number;
-  transform?: "translateY(-100%)";
-};
+export type GlossaryHoverPanelPosition = HoverPanelPosition;
 
 /**
  * Shared floating glossary panel: delayed open, delayed close, Escape to dismiss.
@@ -38,86 +30,29 @@ export function useGlossaryTooltip(options: {
   };
 } {
   const { tooltipId, resetDeps = [] } = options;
-  const [showPanel, setShowPanel] = useState(false);
   const [hoverKey, setHoverKey] = useState<string | null>(null);
-  const [panelPos, setPanelPos] = useState<GlossaryHoverPanelPosition | null>(null);
-  const openTimerRef = useRef<number | null>(null);
-  const closeTimerRef = useRef<number | null>(null);
-
-  const cancelCloseTimer = useCallback((): void => {
-    if (closeTimerRef.current != null) {
-      window.clearTimeout(closeTimerRef.current);
-      closeTimerRef.current = null;
-    }
-  }, []);
-
-  const hideNow = useCallback((): void => {
-    cancelCloseTimer();
-    if (openTimerRef.current != null) {
-      window.clearTimeout(openTimerRef.current);
-      openTimerRef.current = null;
-    }
-    setShowPanel(false);
-    setHoverKey(null);
-    setPanelPos(null);
-  }, [cancelCloseTimer]);
-
-  useEffect(() => {
-    return () => {
-      if (openTimerRef.current != null) window.clearTimeout(openTimerRef.current);
-      if (closeTimerRef.current != null) window.clearTimeout(closeTimerRef.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    function onWindowKeyDown(event: KeyboardEvent): void {
-      if (event.key !== "Escape") return;
-      hideNow();
-    }
-    window.addEventListener("keydown", onWindowKeyDown);
-    return () => window.removeEventListener("keydown", onWindowKeyDown);
-  }, [hideNow]);
-
-  useEffect(() => {
-    hideNow();
-  }, resetDeps);
+  const panel = useDelayedHoverPanel({ resetDeps });
 
   const startHover = useCallback(
     (event: MouseEvent<HTMLElement> | FocusEvent<HTMLElement>, key: string): void => {
-      cancelCloseTimer();
-      const rect = event.currentTarget.getBoundingClientRect();
-      setPanelPos(positionFixedTooltip(rect, STANDARD_GLOSSARY_TOOLTIP_LAYOUT));
-      const switchingHoverTarget = showPanel && hoverKey !== null && hoverKey !== key;
+      const switchingHoverTarget = panel.showPanel && hoverKey !== null && hoverKey !== key;
       if (switchingHoverTarget) {
-        setShowPanel(false);
+        panel.hideNow();
       }
       setHoverKey(key);
-      if (openTimerRef.current != null) {
-        window.clearTimeout(openTimerRef.current);
-      }
-      if (event.type === "focus") {
-        setShowPanel(true);
-        openTimerRef.current = null;
-        return;
-      }
-      openTimerRef.current = window.setTimeout(() => {
-        setShowPanel(true);
-        openTimerRef.current = null;
-      }, GLOSSARY_TOOLTIP_OPEN_DELAY_MS);
+      panel.startHover(event);
     },
-    [cancelCloseTimer, hoverKey, showPanel]
+    [hoverKey, panel]
   );
 
   const leaveHover = useCallback((): void => {
-    cancelCloseTimer();
-    closeTimerRef.current = window.setTimeout(() => {
-      hideNow();
-    }, GLOSSARY_TOOLTIP_CLOSE_DELAY_MS);
-  }, [cancelCloseTimer, hideNow]);
+    setHoverKey(null);
+    panel.leaveHover();
+  }, [panel]);
 
   const hoverA11y = useCallback(
     (key: string) => {
-      const active = showPanel && hoverKey === key;
+      const active = panel.showPanel && hoverKey === key;
       return {
         onMouseEnter: (event: MouseEvent<HTMLElement>) => startHover(event, key),
         onMouseLeave: leaveHover,
@@ -127,17 +62,16 @@ export function useGlossaryTooltip(options: {
         "aria-describedby": active ? tooltipId : undefined
       };
     },
-    [hoverKey, leaveHover, showPanel, startHover, tooltipId]
+    [hoverKey, leaveHover, panel.showPanel, startHover, tooltipId]
   );
 
   return {
-    showPanel,
+    showPanel: panel.showPanel,
     hoverKey,
-    panelPos,
+    panelPos: panel.panelPos,
     startHover,
     leaveHover,
-    /** When the cursor moves onto the floating panel, cancel the scheduled hide. */
-    cancelPendingClose: cancelCloseTimer,
+    cancelPendingClose: panel.cancelPendingClose,
     hoverA11y
   };
 }

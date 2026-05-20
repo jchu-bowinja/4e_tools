@@ -159,7 +159,11 @@ import type { EquipmentPriceSlot } from "../../rules/equipmentItemPrice";
 import { summarizeImplementAttack, summarizeMainWeaponAttack } from "../../rules/weaponAttack";
 import { BuilderSidebarItemsPanel } from "./BuilderSidebarItemsPanel";
 import { EquipmentTab, type EquipmentEditorSlot } from "./EquipmentTab";
-import { LiveSheetCollapsibleSection } from "./LiveSheetCollapsibleSection";
+import {
+  LiveSheetCollapsibleSection,
+  liveSheetSectionBodyStyle,
+  liveSheetSummaryStyle
+} from "./LiveSheetCollapsibleSection";
 import { GlossaryTooltipRichText, RulesRichText } from "./RulesRichText";
 import { CharacterPowerCard, powerCardUsageBucketFromLabel } from "../../ui/powerCard";
 import { NEUTRAL_PAGE_BG } from "../../ui/tokens";
@@ -168,8 +172,9 @@ import { useGlossaryTooltip } from "../../ui/useGlossaryTooltip";
 import { SupportPassiveMotionBreakdown } from "../shared/SupportPassiveMotionBreakdown";
 import { AdjustableNumberInput } from "../../ui/AdjustableNumberInput";
 import { BuilderTabCarousel, type BuilderTabCarouselItem } from "../../ui/BuilderTabCarousel";
-import { CollapsibleDisclosure } from "../../ui/CollapsibleDisclosure";
+import { CollapsibleDisclosure, CollapsibleDisclosureArrow } from "../../ui/CollapsibleDisclosure";
 import { blockSubsectionStyle, disclosureSummaryStyle } from "../../ui/disclosureStyles";
+import { builderSectionTitleStyle, pageTitleStyle } from "../../ui/panels";
 import { JsonCollapsiblePanel } from "../../ui/JsonCollapsiblePanel";
 import { resolveUiGlossaryHoverPlainText, termHasPowerKeywordTooltipBody } from "../../data/glossaryHoverResolve";
 import {
@@ -358,7 +363,6 @@ function renderPowerCard(
         }
         return (
           <span
-            title={hasHoverHandlers ? undefined : tooltip ?? undefined}
             onMouseEnter={hasHoverHandlers ? (event) => options?.onKeywordMouseEnter?.(event, keyword) : undefined}
             onMouseLeave={hasHoverHandlers ? options?.onKeywordMouseLeave : undefined}
             onFocus={hasHoverHandlers ? (event) => options?.onKeywordMouseEnter?.(event, keyword) : undefined}
@@ -757,15 +761,6 @@ const ui = {
   }
 };
 
-const pageTitleStyle: CSSProperties = {
-  margin: 0,
-  fontSize: "1.05rem",
-  fontWeight: 700,
-  letterSpacing: "0.04em",
-  textTransform: "uppercase",
-  color: "var(--text-primary)"
-};
-
 const pageHeaderRowStyle: CSSProperties = {
   display: "flex",
   flexWrap: "wrap",
@@ -798,15 +793,6 @@ const savedCharacterPickerDialogStyle: CSSProperties = {
 };
 
 type SavedCharacterPickerAction = "load" | "delete";
-
-const sectionTitleStyle: CSSProperties = {
-  margin: "0 0 0.6rem 0",
-  fontSize: "0.9rem",
-  fontWeight: 700,
-  letterSpacing: "0.08em",
-  textTransform: "uppercase",
-  color: "var(--text-primary)"
-};
 
 const subsectionTitleStyle: CSSProperties = {
   margin: "0 0 0.45rem 0",
@@ -1118,6 +1104,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   const [paragonSearch, setParagonSearch] = useState("");
   const [epicSearch, setEpicSearch] = useState("");
   const [useSingleColumnLayout, setUseSingleColumnLayout] = useState(() => window.innerWidth <= 1380);
+  const [builderSidebarCollapsed, setBuilderSidebarCollapsed] = useState(false);
   const glossaryTooltipUi = useGlossaryTooltip({ tooltipId: BUILDER_GLOSSARY_TOOLTIP_ID });
   const glossaryTermLookupCacheRef = useRef<Map<string, boolean>>(new Map());
   const rulesById = useMemo(() => buildRulesIdLookup(index), [index]);
@@ -2346,7 +2333,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         >
         {activeTab === "race" && (
           <>
-            <h3 style={sectionTitleStyle}>Race</h3>
+            <h3 style={builderSectionTitleStyle}>Race</h3>
             <select
               value={build.raceId || ""}
               onChange={(e) => {
@@ -2684,7 +2671,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
 
         {activeTab === "class" && (
           <div>
-            <h3 style={sectionTitleStyle}>Class</h3>
+            <h3 style={builderSectionTitleStyle}>Class</h3>
             <div style={{ marginBottom: "0.65rem", display: "flex", gap: "1rem", flexWrap: "wrap", alignItems: "center" }}>
               <label style={{ fontSize: "0.88rem", cursor: "pointer", display: "flex", gap: "0.35rem", alignItems: "center" }}>
                 <input
@@ -3173,7 +3160,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
 
         {activeTab === "abilities" && (
           <div>
-            <h3 style={sectionTitleStyle}>Ability Scores</h3>
+            <h3 style={builderSectionTitleStyle}>Ability Scores</h3>
 
             <div
               style={{
@@ -3218,7 +3205,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                       fractionLeading={pointBuy.total}
                       fractionLeadingStyle={{
                         color:
-                          pointBuy.total === pointBuy.budget ? "var(--status-success)" : "crimson"
+                          pointBuy.total === pointBuy.budget ? "var(--status-success)" : "var(--status-danger)"
                       }}
                       value={pointBuy.budget}
                       onChange={(next) => updateBuild({ ...build, pointBuyBudget: next })}
@@ -3226,7 +3213,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     />
                   </div>
                   {pointBuy.invalidScores.length > 0 && (
-                    <p style={{ color: "crimson", margin: "0.5rem 0 0 0", fontSize: "0.82rem", lineHeight: 1.35 }}>
+                    <p style={{ color: "var(--status-danger)", margin: "0.5rem 0 0 0", fontSize: "0.82rem", lineHeight: 1.35 }}>
                       Each score must be 8–18: {pointBuy.invalidScores.join(", ")}
                     </p>
                   )}
@@ -3375,7 +3362,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
 
         {activeTab === "skills" && (
           <div>
-            <h3 style={sectionTitleStyle}>Skills</h3>
+            <h3 style={builderSectionTitleStyle}>Skills</h3>
             <p style={{ margin: "0.25rem 0 0.65rem 0", color: "var(--text-muted)", fontSize: "0.9rem", lineHeight: 1.45 }}>
               All skills are listed. You can only <strong>train</strong> skills from your class list (checkbox enabled). Other skills are shown for reference.
             </p>
@@ -3478,7 +3465,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
 
         {activeTab === "feats" && (
           <div>
-            <h3 style={sectionTitleStyle}>Feats</h3>
+            <h3 style={builderSectionTitleStyle}>Feats</h3>
             <div
               style={{
                 display: "flex",
@@ -3724,7 +3711,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                       lineHeight: 1.1,
                       padding: "0.16rem 0.4rem",
                       borderRadius: "999px",
-                      border: "1px solid #f3c6c6",
+                      border: "1px solid var(--status-danger)",
                       backgroundColor: "var(--surface-0)",
                       color: "var(--status-danger)",
                       cursor: "pointer",
@@ -3824,7 +3811,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
 
         {activeTab === "powers" && (
           <div>
-            <h3 style={sectionTitleStyle}>Power Selection</h3>
+            <h3 style={builderSectionTitleStyle}>Power Selection</h3>
             <p style={{ margin: "0.25rem 0 0.65rem 0", fontSize: "0.85rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
               Each <strong>class</strong> slot is a separate choice. The list for a slot only includes <strong>class</strong> powers whose{" "}
               <strong>printed level</strong> is at most that slot&apos;s gain level (for example, the 3rd-level encounter slot only lists encounter
@@ -4526,7 +4513,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
 
         {activeTab === "theme" && (
           <div>
-            <h3 style={sectionTitleStyle}>Theme</h3>
+            <h3 style={builderSectionTitleStyle}>Theme</h3>
             <p style={{ margin: "0.25rem 0 0.75rem 0", color: "var(--text-muted)", fontSize: "0.88rem", lineHeight: 1.45 }}>
               Themes are optional packages with prerequisites.
             </p>
@@ -4642,7 +4629,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
 
         {activeTab === "paragonPath" && build.level >= 11 && (
           <div>
-            <h3 style={sectionTitleStyle}>Paragon path</h3>
+            <h3 style={builderSectionTitleStyle}>Paragon path</h3>
             <p style={{ margin: "0.25rem 0 0.75rem 0", color: "var(--text-muted)", fontSize: "0.88rem", lineHeight: 1.45 }}>
               Paragon paths require <strong>level 11+</strong>. Dropping level clears a path that is no longer legal.
             </p>
@@ -4949,7 +4936,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
 
         {activeTab === "epicDestiny" && build.level >= 21 && (
           <div>
-            <h3 style={sectionTitleStyle}>Epic destiny</h3>
+            <h3 style={builderSectionTitleStyle}>Epic destiny</h3>
             <p style={{ margin: "0.25rem 0 0.75rem 0", color: "var(--text-muted)", fontSize: "0.88rem", lineHeight: 1.45 }}>
               Epic destinies require <strong>level 21+</strong>. Dropping level clears a destiny that is no longer legal.
             </p>
@@ -5220,17 +5207,48 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
           </LiveSheetCollapsibleSection>
         </div>
 
-        <div
-          style={{
-            ...ui.sidebarPanel,
-            ...ui.sidebarColumn,
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.5rem"
-          }}
-        >
-          <h3 style={{ ...sectionTitleStyle, margin: 0 }}>Live Character Sheet</h3>
-          <LiveSheetCollapsibleSection title="Character">
+        {builderSidebarCollapsed ? (
+          <div
+            style={{
+              ...ui.sidebarPanel,
+              ...ui.sidebarColumn,
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.5rem"
+            }}
+          >
+            <button
+              type="button"
+              className="builder-sidebar-collapse-toggle"
+              aria-expanded={false}
+              aria-label="Expand character sheet sidebar"
+              onClick={() => setBuilderSidebarCollapsed(false)}
+            >
+              <CollapsibleDisclosureArrow />
+              <span style={liveSheetSummaryStyle}>Character</span>
+            </button>
+          </div>
+        ) : (
+          <div
+            style={{
+              ...ui.sidebarPanel,
+              ...ui.sidebarColumn,
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.5rem"
+            }}
+          >
+          <button
+            type="button"
+            className="builder-sidebar-collapse-toggle"
+            aria-expanded
+            aria-label="Collapse character sheet sidebar"
+            onClick={() => setBuilderSidebarCollapsed(true)}
+          >
+            <CollapsibleDisclosureArrow />
+            <span style={liveSheetSummaryStyle}>Character</span>
+          </button>
+          <div style={liveSheetSectionBodyStyle}>
               <p style={{ margin: 0, fontSize: "0.88rem" }}>
                 <strong {...glossaryTooltipUi.hoverA11y("race")}>Race:</strong> {selectedRace?.name || "None"}
               </p>
@@ -5333,7 +5351,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   )}
                 </CollapsibleDisclosure>
               )}
-          </LiveSheetCollapsibleSection>
+          </div>
 
           <LiveSheetCollapsibleSection title="Combat Stats">
             <div style={{ display: "grid", gap: "0.35rem", minWidth: 0 }}>
@@ -5539,7 +5557,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             onEquipItem={(itemId, slot) => updateBuild(equipInventoryItemOnBuild(build, itemId, slot, index))}
             onUnequipItem={(itemId, slot) => updateBuild(unequipInventoryItemOnBuild(build, itemId, slot))}
           />
-          </div>
 
           {glossaryTooltipUi.showPanel && glossaryTooltipUi.hoverKey && glossaryTooltipUi.panelPos && (
             <div
@@ -5559,7 +5576,9 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             </div>
           )}
         </div>
+        )}
       </div>
+    </div>
     </div>
     </div>
   );

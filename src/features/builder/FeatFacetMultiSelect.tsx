@@ -46,7 +46,7 @@ const triggerStyle: CSSProperties = {
   boxSizing: "border-box"
 };
 
-const panelStyle: CSSProperties = {
+const dropdownPanelStyle: CSSProperties = {
   position: "absolute",
   zIndex: 20,
   top: "calc(100% + 0.15rem)",
@@ -134,7 +134,7 @@ export function FeatFacetMultiSelect<T extends string>({
           <summary style={triggerStyle} aria-label={`${label}: ${summary}`}>
             {summary}
           </summary>
-          <div style={panelStyle} role="group" aria-label={label}>
+          <div style={dropdownPanelStyle} role="group" aria-label={label}>
             {options.map((opt) => {
               const checked = selected.includes(opt.value);
               return (

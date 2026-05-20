@@ -46,6 +46,8 @@ import {
   motionUnifiedRowValues
 } from "../../rules/statScoreBreakdown";
 import { CollapsibleDisclosure } from "../../ui/CollapsibleDisclosure";
+import { contentPanelPaddedStyle, flowSubsectionStyle, pageTitleStyle, sectionTitleStyle } from "../../ui/panels";
+import { SegmentedControl } from "../../ui/SegmentedControl";
 import { SKILL_BREAKDOWN_COLUMNS } from "../../ui/scoreBreakdownColumns";
 import {
   formatSkillBreakdownComponent,
@@ -111,9 +113,9 @@ import {
 } from "./sheetEquipment";
 import { loadCharacterSheetState, saveCharacterSheetState } from "./storage";
 import { resolveUiGlossaryHoverPlainText, termHasPowerKeywordTooltipBody } from "../../data/glossaryHoverResolve";
-import { positionFixedTooltip } from "../../ui/glossaryTooltipPosition";
-import { GLOSSARY_TOOLTIP_OPEN_DELAY_MS, STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE } from "../../ui/glossaryTooltip";
+import { FloatingHoverPanel } from "../../ui/FloatingHoverPanel";
 import { useGlossaryTooltip } from "../../ui/useGlossaryTooltip";
+import { useDelayedHoverPanel } from "../../ui/useDelayedHoverPanel";
 import { AdjustableNumberInput } from "../../ui/AdjustableNumberInput";
 import { JsonCollapsiblePanel } from "../../ui/JsonCollapsiblePanel";
 import { summarizeImplementAttack, summarizeMainWeaponAttack } from "../../rules/weaponAttack";
@@ -123,14 +125,6 @@ type SheetTab = "overview" | "equipment";
 const tabLabel: Record<SheetTab, string> = {
   overview: "Character",
   equipment: "Equipment"
-};
-
-const panelStyle: CSSProperties = {
-  backgroundColor: "var(--surface-0)",
-  border: "1px solid var(--panel-border)",
-  borderRadius: "var(--ui-panel-radius, 0.35rem)",
-  padding: "0.55rem",
-  boxShadow: "var(--ui-panel-shadow, 0 1px 2px rgba(40, 30, 10, 0.08))"
 };
 
 /** Overview center column (traits + feats; row 2: HP/resources); wide enough for the rest strip without its own scrollbar. */
@@ -162,14 +156,6 @@ const overviewThreeColumnGridStyle: CSSProperties = {
   alignItems: "stretch",
   minWidth: 0,
   width: "100%"
-};
-
-const sectionTitleStyle: CSSProperties = {
-  margin: 0,
-  fontSize: "0.9rem",
-  letterSpacing: "0.08em",
-  textTransform: "uppercase",
-  color: "var(--text-primary)"
 };
 
 const overviewCollapsiblePanelStyle: CSSProperties = {
@@ -929,21 +915,15 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   const [customConditionText, setCustomConditionText] = useState("");
   const [selectedDurationPreset, setSelectedDurationPreset] = useState<ConditionDurationPresetKey>("");
   const [conditionDurationRounds, setConditionDurationRounds] = useState(1);
-  const [showRaceHoverInfo, setShowRaceHoverInfo] = useState(false);
-  const [raceHoverPanelPos, setRaceHoverPanelPos] = useState<{
-    top: number;
-    left: number;
-    transform?: "translateY(-100%)";
-  } | null>(null);
-  const [showClassHoverInfo, setShowClassHoverInfo] = useState(false);
-  const [classHoverPanelPos, setClassHoverPanelPos] = useState<{
-    top: number;
-    left: number;
-    transform?: "translateY(-100%)";
-  } | null>(null);
   const glossaryTooltipUi = useGlossaryTooltip({ tooltipId: CHARACTER_SHEET_GLOSSARY_TOOLTIP_ID });
-  const raceHoverTimerRef = useRef<number | null>(null);
-  const classHoverTimerRef = useRef<number | null>(null);
+  const raceInfoHover = useDelayedHoverPanel({
+    layout: { panelWidth: 360, maxHeightVh: 52 },
+    resetDeps: [sheet.raceId]
+  });
+  const classInfoHover = useDelayedHoverPanel({
+    layout: { panelWidth: 380, maxHeightVh: 52 },
+    resetDeps: [sheet.classId, sheet.characterStyle, sheet.hybridClassIdA, sheet.hybridClassIdB]
+  });
   const glossaryTermLookupCacheRef = useRef<Map<string, boolean>>(new Map());
 
   const derived = useMemo(() => computeSheetDerivedData(sheet, index), [sheet, index]);
@@ -1235,27 +1215,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   }, [sheet]);
 
   useEffect(() => {
-    return () => {
-      if (raceHoverTimerRef.current != null) {
-        window.clearTimeout(raceHoverTimerRef.current);
-      }
-      if (classHoverTimerRef.current != null) {
-        window.clearTimeout(classHoverTimerRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
     glossaryTermLookupCacheRef.current.clear();
   }, [tooltipGlossary, index]);
-
-  useEffect(() => {
-    setShowRaceHoverInfo(false);
-  }, [sheet.raceId]);
-
-  useEffect(() => {
-    setShowClassHoverInfo(false);
-  }, [sheet.classId]);
 
   function glossaryContent(key: GlossaryKey): JSX.Element {
     const resolved = resolveUiGlossaryHoverPlainText(
@@ -2219,50 +2180,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     );
   }
 
-  function startRaceHoverInfoTimer(event: ReactMouseEvent<HTMLElement>): void {
-    if (!derived.race) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    setRaceHoverPanelPos(positionFixedTooltip(rect, { panelWidth: 360, maxHeightVh: 52 }));
-    if (raceHoverTimerRef.current != null) {
-      window.clearTimeout(raceHoverTimerRef.current);
-    }
-    raceHoverTimerRef.current = window.setTimeout(() => {
-      setShowRaceHoverInfo(true);
-      raceHoverTimerRef.current = null;
-    }, GLOSSARY_TOOLTIP_OPEN_DELAY_MS);
-  }
-
-  function stopRaceHoverInfoTimerAndHide(): void {
-    if (raceHoverTimerRef.current != null) {
-      window.clearTimeout(raceHoverTimerRef.current);
-      raceHoverTimerRef.current = null;
-    }
-    setShowRaceHoverInfo(false);
-    setRaceHoverPanelPos(null);
-  }
-
-  function startClassHoverInfoTimer(event: ReactMouseEvent<HTMLElement>): void {
-    if (!derived.cls) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    setClassHoverPanelPos(positionFixedTooltip(rect, { panelWidth: 380, maxHeightVh: 52 }));
-    if (classHoverTimerRef.current != null) {
-      window.clearTimeout(classHoverTimerRef.current);
-    }
-    classHoverTimerRef.current = window.setTimeout(() => {
-      setShowClassHoverInfo(true);
-      classHoverTimerRef.current = null;
-    }, GLOSSARY_TOOLTIP_OPEN_DELAY_MS);
-  }
-
-  function stopClassHoverInfoTimerAndHide(): void {
-    if (classHoverTimerRef.current != null) {
-      window.clearTimeout(classHoverTimerRef.current);
-      classHoverTimerRef.current = null;
-    }
-    setShowClassHoverInfo(false);
-    setClassHoverPanelPos(null);
-  }
-
   return (
     <div
       style={{
@@ -2276,36 +2193,20 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         color: "var(--character-sheet-foreground)"
       }}
     >
-      <div style={{ marginBottom: "0.25rem", fontSize: "1.05rem", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--text-primary)" }}>
-        D&D 4e Character Sheet
-      </div>
-      <div style={{ display: "flex", gap: "0.4rem", marginBottom: "0.5rem", flexWrap: "wrap" }}>
-        {(Object.keys(tabLabel) as SheetTab[]).map((key) => (
-          <button
-            key={key}
-            type="button"
-            disabled={tab === key}
-            onClick={() => setTab(key)}
-            style={{
-              padding: "0.35rem 0.75rem",
-              borderRadius: "0.3rem",
-              border: tab === key ? "1px solid var(--surface-3)" : "1px solid var(--panel-border)",
-              backgroundColor: tab === key ? "var(--surface-3)" : "var(--surface-0)",
-              color: tab === key ? "var(--surface-0)" : "var(--text-primary)",
-              fontWeight: 700,
-              letterSpacing: "0.03em",
-              textTransform: "uppercase",
-              fontSize: "0.78rem",
-              cursor: tab === key ? "default" : "pointer"
-            }}
-          >
-            {tabLabel[key]}
-          </button>
-        ))}
-      </div>
+      <h1 style={{ ...pageTitleStyle, marginBottom: "0.25rem" }}>D&amp;D 4e Character Sheet</h1>
+      <SegmentedControl
+        role="tablist"
+        ariaLabel="Character sheet views"
+        options={(Object.keys(tabLabel) as SheetTab[]).map((key) => ({ value: key, label: tabLabel[key] }))}
+        value={tab}
+        onChange={setTab}
+        variant="pill"
+        size="tab"
+        style={{ marginBottom: "0.5rem" }}
+      />
 
       {tab === "overview" && (
-        <div style={{ ...panelStyle, display: "grid", gap: "0.5rem", gridTemplateColumns: "repeat(12, minmax(0, 1fr))", minWidth: 0 }}>
+        <div style={{ ...contentPanelPaddedStyle, display: "grid", gap: "0.5rem", gridTemplateColumns: "repeat(12, minmax(0, 1fr))", minWidth: 0 }}>
           <div style={{ gridColumn: "1 / -1", display: "flex", flexWrap: "wrap", gap: "0.4rem", alignItems: "center" }}>
             <select value={selectedSavedCharacterId} onChange={(e) => setSelectedSavedCharacterId(e.target.value)}>
               <option value="">Load saved Builder character...</option>
@@ -2347,13 +2248,13 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 }
                 paragonMulticlassLabel={paragonMulticlassLabel}
                 epicDestinyName={sheet.epicDestinyId ? (selectedEpicDestiny?.name ?? sheet.epicDestinyId) : undefined}
-                onRaceLabelMouseEnter={derived.race ? startRaceHoverInfoTimer : undefined}
-                onRaceLabelMouseLeave={derived.race ? stopRaceHoverInfoTimerAndHide : undefined}
+                onRaceLabelMouseEnter={derived.race ? raceInfoHover.startHover : undefined}
+                onRaceLabelMouseLeave={derived.race ? raceInfoHover.leaveHover : undefined}
                 onClassLabelMouseEnter={
-                  derived.cls || (hybridClassA && hybridClassB) ? startClassHoverInfoTimer : undefined
+                  derived.cls || (hybridClassA && hybridClassB) ? classInfoHover.startHover : undefined
                 }
                 onClassLabelMouseLeave={
-                  derived.cls || (hybridClassA && hybridClassB) ? stopClassHoverInfoTimerAndHide : undefined
+                  derived.cls || (hybridClassA && hybridClassB) ? classInfoHover.leaveHover : undefined
                 }
                 onLevelLabelMouseEnter={(event) => glossaryTooltipUi.startHover(event, "level")}
                 onLevelLabelMouseLeave={glossaryTooltipUi.leaveHover}
@@ -2655,40 +2556,33 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               {renderConditionsPanel()}
             </div>
             </div>
-          <div style={{ ...panelStyle, gridColumn: "1 / -1", display: "flex", flexWrap: "wrap", gap: "0.4rem", alignItems: "center" }}>
+          <div
+            style={{
+              ...flowSubsectionStyle,
+              gridColumn: "1 / -1",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "0.4rem",
+              alignItems: "center"
+            }}
+          >
             <span style={{ fontSize: "0.78rem", fontWeight: 700, letterSpacing: "0.03em", textTransform: "uppercase", color: "var(--text-secondary)" }}>
               Group powers by
             </span>
-            {(
-              [
-                { key: "usage" as const, label: "Usage" },
-                { key: "actionType" as const, label: "Action type" }
-              ] as const
-            ).map(({ key, label }) => (
-              <button
-                key={key}
-                type="button"
-                disabled={powerGroupBy === key}
-                onClick={() => setPowerGroupBy(key)}
-                style={{
-                  padding: "0.3rem 0.65rem",
-                  borderRadius: "0.3rem",
-                  border: powerGroupBy === key ? "1px solid var(--surface-3)" : "1px solid var(--panel-border)",
-                  backgroundColor: powerGroupBy === key ? "var(--surface-3)" : "var(--surface-0)",
-                  color: powerGroupBy === key ? "var(--surface-0)" : "var(--text-primary)",
-                  fontWeight: 700,
-                  letterSpacing: "0.03em",
-                  textTransform: "uppercase",
-                  fontSize: "0.76rem",
-                  cursor: powerGroupBy === key ? "default" : "pointer"
-                }}
-              >
-                {label}
-              </button>
-            ))}
+            <SegmentedControl
+              ariaLabel="Group powers by"
+              options={[
+                { value: "usage", label: "Usage" },
+                { value: "actionType", label: "Action type" }
+              ]}
+              value={powerGroupBy}
+              onChange={setPowerGroupBy}
+              variant="pill"
+              size="compact"
+            />
           </div>
           {powerDisplaySections.map((section) => (
-            <div key={section.key} style={{ ...panelStyle, gridColumn: "1 / -1" }}>
+            <div key={section.key} style={{ ...flowSubsectionStyle, gridColumn: "1 / -1" }}>
                 {section.sectionKind === "usage" && section.usageBucket ? (
                   <div
                     onMouseEnter={(event) => glossaryTooltipUi.startHover(event, `powerUsage:${section.usageBucket}`)}
@@ -2828,105 +2722,93 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                 })()}
             </div>
           ))}
-          {showRaceHoverInfo && derived.race && raceHoverPanelPos && (
-            <div
-              style={{
-                position: "fixed",
-                top: raceHoverPanelPos.top,
-                left: raceHoverPanelPos.left,
-                transform: raceHoverPanelPos.transform ?? "none",
-                width: "360px",
-                maxHeight: "52vh",
-                overflow: "auto",
-                border: "1px solid var(--panel-border)",
-                backgroundColor: "var(--surface-0)",
-                borderRadius: "0.35rem",
-                padding: "0.45rem 0.5rem",
-                color: "var(--text-primary)",
-                textTransform: "none",
-                letterSpacing: "normal",
-                fontWeight: 500,
-                fontSize: "0.76rem",
-                lineHeight: 1.35,
-                zIndex: 1000,
-                boxShadow: "0 8px 24px rgba(45, 34, 16, 0.2)"
-              }}
-            >
-              <div><strong>Race:</strong> {derived.race.name}</div>
-              <div><strong>Speed:</strong> {derived.race.speed ?? "-"}</div>
-              <div><strong>Size:</strong> {derived.race.size ?? "-"}</div>
-              <div><strong>Abilities:</strong> {derived.race.abilitySummary ?? "-"}</div>
-              <div><strong>Languages:</strong> {derived.race.languages ?? "-"}</div>
-              {typeof derived.race.raw?.body === "string" && derived.race.raw.body.trim() && (
-                <div style={{ marginTop: "0.3rem" }}>
-                  <RulesRichText
-                    text={derived.race.raw.body}
-                    paragraphStyle={{ margin: "0 0 0.25rem 0", fontSize: "0.76rem", color: "var(--text-primary)" }}
-                    listItemStyle={{ fontSize: "0.76rem", color: "var(--text-primary)" }}
-                  />
+          <FloatingHoverPanel
+            show={raceInfoHover.showPanel}
+            position={raceInfoHover.panelPos}
+            widthPx={360}
+            onMouseEnter={raceInfoHover.cancelPendingClose}
+            onMouseLeave={raceInfoHover.leaveHover}
+          >
+            {derived.race ? (
+              <>
+                <div>
+                  <strong>Race:</strong> {derived.race.name}
                 </div>
-              )}
-            </div>
-          )}
-          {showClassHoverInfo && derived.cls && classHoverPanelPos && (
-            <div
-              style={{
-                position: "fixed",
-                top: classHoverPanelPos.top,
-                left: classHoverPanelPos.left,
-                transform: classHoverPanelPos.transform ?? "none",
-                width: "380px",
-                maxHeight: "52vh",
-                overflow: "auto",
-                border: "1px solid var(--panel-border)",
-                backgroundColor: "var(--surface-0)",
-                borderRadius: "0.35rem",
-                padding: "0.45rem 0.5rem",
-                color: "var(--text-primary)",
-                textTransform: "none",
-                letterSpacing: "normal",
-                fontWeight: 500,
-                fontSize: "0.76rem",
-                lineHeight: 1.35,
-                zIndex: 1000,
-                boxShadow: "0 8px 24px rgba(45, 34, 16, 0.2)"
-              }}
-            >
-              <div><strong>Class:</strong> {derived.cls.name}</div>
-              <div><strong>Role:</strong> {derived.cls.role ?? "-"}</div>
-              <div><strong>Power Source:</strong> {derived.cls.powerSource ?? "-"}</div>
-              <div><strong>Key Abilities:</strong> {derived.cls.keyAbilities ?? "-"}</div>
-              <div><strong>HP at 1:</strong> {derived.cls.hitPointsAt1 ?? "-"}</div>
-              <div><strong>HP per Level:</strong> {derived.cls.hitPointsPerLevel ?? "-"}</div>
-              <div><strong>Healing Surges:</strong> {derived.cls.healingSurgesBase ?? "-"}</div>
-              {typeof derived.cls.raw?.body === "string" && derived.cls.raw.body.trim() && (
-                <div style={{ marginTop: "0.3rem" }}>
-                  <RulesRichText
-                    text={derived.cls.raw.body}
-                    paragraphStyle={{ margin: "0 0 0.25rem 0", fontSize: "0.76rem", color: "var(--text-primary)" }}
-                    listItemStyle={{ fontSize: "0.76rem", color: "var(--text-primary)" }}
-                  />
+                <div>
+                  <strong>Speed:</strong> {derived.race.speed ?? "-"}
                 </div>
-              )}
-            </div>
-          )}
-          {glossaryTooltipUi.showPanel && glossaryTooltipUi.hoverKey && glossaryTooltipUi.panelPos && (
-            <div
-              id={CHARACTER_SHEET_GLOSSARY_TOOLTIP_ID}
-              role="tooltip"
-              onMouseEnter={glossaryTooltipUi.cancelPendingClose}
-              onMouseLeave={glossaryTooltipUi.leaveHover}
-              style={{
-                position: "fixed",
-                top: glossaryTooltipUi.panelPos.top,
-                left: glossaryTooltipUi.panelPos.left,
-                transform: glossaryTooltipUi.panelPos.transform ?? "none",
-                ...STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE
-              }}
-            >
-              {glossaryContent(glossaryTooltipUi.hoverKey as GlossaryKey)}
-            </div>
-          )}
+                <div>
+                  <strong>Size:</strong> {derived.race.size ?? "-"}
+                </div>
+                <div>
+                  <strong>Abilities:</strong> {derived.race.abilitySummary ?? "-"}
+                </div>
+                <div>
+                  <strong>Languages:</strong> {derived.race.languages ?? "-"}
+                </div>
+                {typeof derived.race.raw?.body === "string" && derived.race.raw.body.trim() ? (
+                  <div style={{ marginTop: "0.3rem" }}>
+                    <RulesRichText
+                      text={derived.race.raw.body}
+                      paragraphStyle={{ margin: "0 0 0.25rem 0", fontSize: "0.76rem", color: "var(--text-primary)" }}
+                      listItemStyle={{ fontSize: "0.76rem", color: "var(--text-primary)" }}
+                    />
+                  </div>
+                ) : null}
+              </>
+            ) : null}
+          </FloatingHoverPanel>
+          <FloatingHoverPanel
+            show={classInfoHover.showPanel}
+            position={classInfoHover.panelPos}
+            widthPx={380}
+            onMouseEnter={classInfoHover.cancelPendingClose}
+            onMouseLeave={classInfoHover.leaveHover}
+          >
+            {derived.cls ? (
+              <>
+                <div>
+                  <strong>Class:</strong> {derived.cls.name}
+                </div>
+                <div>
+                  <strong>Role:</strong> {derived.cls.role ?? "-"}
+                </div>
+                <div>
+                  <strong>Power Source:</strong> {derived.cls.powerSource ?? "-"}
+                </div>
+                <div>
+                  <strong>Key Abilities:</strong> {derived.cls.keyAbilities ?? "-"}
+                </div>
+                <div>
+                  <strong>HP at 1:</strong> {derived.cls.hitPointsAt1 ?? "-"}
+                </div>
+                <div>
+                  <strong>HP per Level:</strong> {derived.cls.hitPointsPerLevel ?? "-"}
+                </div>
+                <div>
+                  <strong>Healing Surges:</strong> {derived.cls.healingSurgesBase ?? "-"}
+                </div>
+                {typeof derived.cls.raw?.body === "string" && derived.cls.raw.body.trim() ? (
+                  <div style={{ marginTop: "0.3rem" }}>
+                    <RulesRichText
+                      text={derived.cls.raw.body}
+                      paragraphStyle={{ margin: "0 0 0.25rem 0", fontSize: "0.76rem", color: "var(--text-primary)" }}
+                      listItemStyle={{ fontSize: "0.76rem", color: "var(--text-primary)" }}
+                    />
+                  </div>
+                ) : null}
+              </>
+            ) : null}
+          </FloatingHoverPanel>
+          <FloatingHoverPanel
+            show={glossaryTooltipUi.showPanel && glossaryTooltipUi.hoverKey != null}
+            position={glossaryTooltipUi.panelPos}
+            id={CHARACTER_SHEET_GLOSSARY_TOOLTIP_ID}
+            onMouseEnter={glossaryTooltipUi.cancelPendingClose}
+            onMouseLeave={glossaryTooltipUi.leaveHover}
+          >
+            {glossaryTooltipUi.hoverKey ? glossaryContent(glossaryTooltipUi.hoverKey as GlossaryKey) : null}
+          </FloatingHoverPanel>
         </div>
       )}
 
@@ -2944,7 +2826,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               updateSheet((prev) => updateSheetEquipmentFromBuild(prev, index, () => next))
             }
           />
-          <div style={panelStyle}>
+          <div style={contentPanelPaddedStyle}>
             <div style={{ fontWeight: 700, marginBottom: "0.5rem" }}>Equipped</div>
             <CharacterEquippedSlotsPanel
               inventory={sheet.inventory}
@@ -2955,7 +2837,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               onUnequipItem={unequipInventoryItem}
             />
           </div>
-          <div style={panelStyle}>
+          <div style={contentPanelPaddedStyle}>
             <div style={{ fontWeight: 700, marginBottom: "0.5rem" }}>
               {inventoryItems.length > 0 ? `Items (${inventoryItems.length})` : "Items"}
             </div>

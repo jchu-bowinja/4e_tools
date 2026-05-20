@@ -1,15 +1,5 @@
-import type { CSSProperties, RefObject } from "react";
-
-const searchInputStyle: CSSProperties = {
-  minWidth: 260,
-  border: "1px solid var(--panel-border)",
-  borderRadius: "0.28rem",
-  padding: "0.22rem 0.3rem",
-  backgroundColor: "var(--surface-0)",
-  color: "var(--text-primary)"
-};
-
-const metaSecondary: CSSProperties = { fontSize: "0.78rem", color: "var(--text-secondary)" };
+import type { RefObject } from "react";
+import { JsonEditorBody } from "../../ui/JsonEditorBody";
 
 export function MonsterJsonEditorPanel({
   value,
@@ -38,67 +28,25 @@ export function MonsterJsonEditorPanel({
   onSearchNext: () => void;
   searchNavDisabled: boolean;
   onCopy: () => void;
-  /** Use flex growth in the center column instead of a fixed tall textarea. */
   fillColumn?: boolean;
 }): JSX.Element {
   return (
-    <div
-      style={
-        fillColumn
-          ? { display: "flex", flexDirection: "column", minHeight: 0, flex: 1, gap: "0.5rem" }
-          : { marginTop: "0.5rem" }
-      }
-    >
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", alignItems: "center", flexShrink: 0 }}>
-        <input
-          value={searchInput}
-          onChange={(event) => onSearchInputChange(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key !== "Enter") return;
-            event.preventDefault();
-            onSearchEnter();
-          }}
-          placeholder="Search JSON..."
-          aria-label="Search JSON"
-          style={searchInputStyle}
-        />
-        <button type="button" disabled={searchNavDisabled} onClick={onSearchPrevious}>
-          Previous
-        </button>
-        <button type="button" disabled={searchNavDisabled} onClick={onSearchNext}>
-          Next
-        </button>
-        <span style={metaSecondary}>{searchStatusText}</span>
-        <button type="button" onClick={onCopy} style={{ marginLeft: "auto" }}>
-          Copy Contents
-        </button>
-      </div>
-      <textarea
-        ref={textareaRef}
-        value={value}
-        readOnly={readOnly}
-        onChange={onChange ? (event) => onChange(event.target.value) : undefined}
-        spellCheck={false}
-        aria-label="Monster JSON"
-        style={{
-          margin: fillColumn ? 0 : "0.55rem 0 0 0",
-          padding: "0.55rem",
-          borderRadius: "0.32rem",
-          border: "1px solid var(--panel-border)",
-          backgroundColor: "var(--surface-1)",
-          color: "var(--text-primary)",
-          overflow: "auto",
-          height: fillColumn ? undefined : "44rem",
-          minHeight: fillColumn ? "12rem" : "12rem",
-          flex: fillColumn ? 1 : undefined,
-          width: "100%",
-          boxSizing: "border-box",
-          resize: fillColumn ? "none" : "vertical",
-          fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
-          fontSize: "0.76rem",
-          lineHeight: 1.35
-        }}
-      />
-    </div>
+    <JsonEditorBody
+      value={value}
+      readOnly={readOnly}
+      onChange={onChange}
+      textareaRef={textareaRef}
+      textareaAriaLabel="Monster JSON"
+      searchInput={searchInput}
+      onSearchInputChange={onSearchInputChange}
+      onSearchEnter={onSearchEnter}
+      searchStatusText={searchStatusText}
+      onSearchPrevious={onSearchPrevious}
+      onSearchNext={onSearchNext}
+      searchNavDisabled={searchNavDisabled}
+      onCopy={onCopy}
+      fillColumn={fillColumn}
+      toolbarGap="0.35rem"
+    />
   );
 }

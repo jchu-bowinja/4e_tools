@@ -9,6 +9,11 @@ export const STANDARD_GLOSSARY_TOOLTIP_LAYOUT = {
   maxHeightVh: 50
 } as const;
 
+export type GlossaryTooltipLayout = {
+  panelWidth: number;
+  maxHeightVh: number;
+};
+
 export const STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE: CSSProperties = {
   width: "340px",
   maxHeight: "50vh",
@@ -24,7 +29,7 @@ export const STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE: CSSProperties = {
   fontSize: "0.76rem",
   lineHeight: 1.35,
   zIndex: 1000,
-  boxShadow: "0 8px 24px rgba(45, 34, 16, 0.2)",
+  boxShadow: "var(--tooltip-panel-shadow, 0 8px 24px rgba(45, 34, 16, 0.2))",
   display: "grid",
   gap: "0.2rem"
 };

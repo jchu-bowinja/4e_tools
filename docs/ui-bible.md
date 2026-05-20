@@ -81,6 +81,29 @@ State visuals should be consistent across buttons, fields, toggles, and list row
 - Primary actions should be visually prominent but not oversized relative to context.
 - Destructive actions must be explicit in both label and styling.
 
+#### Segmented controls (tabs and toggles)
+
+Use `SegmentedControl` from `src/ui/SegmentedControl.tsx` with styles in `src/styles.css` for any **single-choice** control rendered as a row of buttons (character sheet tabs, “group by” toggles, monster viewer tabs, stat block / JSON pane).
+
+- **`variant="pill"`** — separate bordered segments with gap (main navigation tabs, sheet “group powers by”).
+- **`variant="joined"`** — one outer border, flush segments (compact in-panel toggles such as Stat block / JSON).
+- **`role="tablist"`** — top-level view switchers; options use `aria-selected`, not `disabled`, on the active tab.
+- **`role="group"`** (default) — in-panel toggles; options use `aria-pressed`.
+- **Do not** disable the selected segment to show selection, and **do not** hand-roll per-page pill button styles.
+- Builder step tabs remain `BuilderTabCarousel` (compressed sticky carousel — different interaction).
+
+#### Floating hover panels (glossary and rich info)
+
+- Use `useDelayedHoverPanel` + `FloatingHoverPanel` for delayed open/close panels (glossary tooltips, race/class summary on character sheet identity labels).
+- Panel chrome comes from `STANDARD_GLOSSARY_TOOLTIP_PANEL_STYLE` in `src/ui/glossaryTooltip.ts` (`--tooltip-panel-shadow` token in `styles.css`).
+- Glossary tooltips use `useGlossaryTooltip` (wraps `useDelayedHoverPanel` with keyed content). **Do not** add native `title` on elements that also show glossary or custom hover panels.
+
+#### Editor subapplications (Glossary, Resource Editor)
+
+- Page shell: `editorPageShellStyle`, titles: `pageTitleStyle` from `src/ui/panels.ts`.
+- List panels: `contentPanelStyle` / `contentPanelPaddedStyle`; list rows: `.editor-list-row` / `.editor-term-row` in `styles.css`.
+- Avoid inset gradients and hardcoded light-only shadows on editor chrome.
+
 ### Inputs and Form Controls
 
 - Keep label placement and helper/error text behavior consistent.
@@ -135,7 +158,7 @@ State visuals should be consistent across buttons, fields, toggles, and list row
 - Builder page header: the `h1` title and persistence actions (export, save/load, reset, import JSON) share one flex row (`pageHeaderRowStyle`); actions wrap and align to the end on wide viewports. Character name and level stay on the row below (`ui.chromeFields`).
 - Builder sticky step tabs (`BuilderTabCarousel` in `src/ui/BuilderTabCarousel.tsx`, styles in `src/styles.css`): Race / Class / Ability Scores / … stay on one row. **Wide:** each tab at natural width with `0.45rem` gaps. **Narrow:** inactive tabs compress evenly (`--builder-tab-compressed-width` from JS) with ellipsis; the **open** tab always shows full label + status; `**:hover`** / `**:focus-visible**` on any tab expands it to full width. No overlap carousel. Do not wrap to a second line.
 - Builder sidebar: `ui.sidebarPanel` supplies the section border; `LiveSheetCollapsibleSection` body is layout-only (no second border). Stack sections with flex `gap` on the panel, not an extra inner grid wrapper.
-- Character sheet overview: one `panelStyle` tab shell; character identity uses `CharacterIdentityField` / `CharacterIdentitySection` (`dl`/`dt`/`dd`, class `.character-sheet-identity` in CSS)—no nested bordered boxes per field; glossary and race/class hover on **labels** only; overview rows are direct grid children (no `character-sheet-overview-rows` wrapper); collapsible body spacing via `.character-sheet-overview-collapsible > :not(summary)` in CSS.
+- Character sheet overview: one `contentPanelPaddedStyle` tab shell (`src/ui/panels.ts`); character identity uses `CharacterIdentityField` / `CharacterIdentitySection` (`dl`/`dt`/`dd`, class `.character-sheet-identity` in CSS)—no nested bordered boxes per field; glossary and race/class hover on **labels** only; overview rows are direct grid children (no `character-sheet-overview-rows` wrapper); collapsible body spacing via `.character-sheet-overview-collapsible > :not(summary)` in CSS.
 - Power display: character builder and character sheet use `**CharacterPowerCard`** (`src/ui/powerCard/`) with `buildCharacterPowerCardViewModel`; pass `renderLineText`, `renderKeyword`, and `renderBody` for glossary/rich text. Monster editor keeps its own card body but shares shell/accent helpers (`monsterPowerCardShellStyle`, action bucket accents) from the same module.
 - Character sheet HP / conditions: overview center column uses one grid per row (vitals row 1: four columns; row 2: death saves + healing surges). Healing surges cell is a single bordered grid (label + flex row for input, button column, hint); do not nest a second grid around the label. Spend Surge / Second Wind stack in a flex column on that row. Conditions panel applies `gap` on the outer bordered grid only—toolbar rows are direct children, not wrapped in an extra pass-through grid.
 
@@ -367,14 +390,16 @@ Use this checklist before merging UI/style/look-and-feel work:
 - Layout works across intended viewport sizes without hiding critical actions.
 - Loading, empty, and error states are handled and visually consistent.
 - Accessibility basics are met (keyboard navigation, focus visibility, readable contrast).
+- Light and dark theme: text, backgrounds, borders, and state highlights checked in both themes; semantic tokens (`--status-*`, `--surface-*`) used instead of fixed hex.
 - Any local subapplication variation is documented and intentionally scoped.
 - Obvious one-off styles were avoided or justified with a clear reason.
 - Glossary or rules hover tooltips are not attached to raw value inputs; they use labels or explicit help text instead.
 - Expand/collapse sections use `CollapsibleDisclosure` (or `CollapsibleDisclosureArrow` for non-details toggles), not ad-hoc arrows or placeholders.
+- Single-choice tab/toggle rows use `SegmentedControl` (`pill` or `joined`), not disabled buttons or one-off inline styles.
 - Data tables use the shared fill + scroll contract (`TableScrollport` / `ScoreBreakdownTable`, or thin wrappers) — not one-off layouts without horizontal scroll.
 - Table scrollports use `width: 100%` of their panel; flexible label/name columns grow with `1fr` when space allows.
 - Narrow panels show horizontal scroll on the table scrollport before columns crush or overlap (no `overflow: hidden` on table roots).
-- Character sheet score tables use shared `scoreTableCells` styling; variable-width names use measured label width (`--skill-name-block-width` or `--stat-label-min-width`).
+- Character sheet score tables use shared `scoreTableCells` styling; variable-width names use measured label width (`--score-breakdown-label-width`).
 - Score breakdown tables keep **bonus/total** and **row name** readable; short labels use the same name column width as the longest label in that table.
 - Prioritize/compact stat tables use `.score-breakdown-table__sync-grid` (subgrid), not independent per-row column sizing.
 - Table scrollport uses `min-width: 0`; inner grid/rows use `min-width: max-content`.

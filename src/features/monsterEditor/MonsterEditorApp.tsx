@@ -17,6 +17,13 @@ import { useGlossaryTooltip } from "../../ui/useGlossaryTooltip";
 import { resolveMonsterGlossaryHoverSections, resolveMonsterStyleTooltip } from "./monsterTooltipResolve";
 import { GlossaryTooltipRichText } from "../builder/RulesRichText";
 import { CollapsibleDisclosure, CollapsibleDisclosureArrow } from "../../ui/CollapsibleDisclosure";
+import {
+  contentPanelStyle,
+  flowSubsectionStyle,
+  pageTitleWithBottomGapStyle,
+  sectionTitleStyle
+} from "../../ui/panels";
+import { SegmentedControl } from "../../ui/SegmentedControl";
 import { MonsterDataQualityAlerts } from "./MonsterDataQualityAlerts";
 import { MonsterJsonEditorPanel } from "./MonsterJsonEditorPanel";
 import { monsterPowerCardShellStyle, type MonsterPowerActionBucket } from "../../ui/powerCard";
@@ -144,24 +151,8 @@ import {
 /** Turn on to show DMG-style roster generator above the encounter list (`EncounterGeneratorPanel`). */
 const SHOW_ENCOUNTER_BUILDER_PANEL = false;
 
-/** Matches CharacterSheetApp: panels, section titles, labels, and body scale. */
-const panelStyle: CSSProperties = {
-  backgroundColor: "var(--surface-0)",
-  border: "1px solid var(--panel-border)",
-  borderRadius: "var(--ui-panel-radius, 0.35rem)",
-  boxShadow: "var(--ui-panel-shadow, 0 1px 2px rgba(40, 30, 10, 0.08))"
-};
-
 const sheetPanel: CSSProperties = {
-  ...panelStyle
-};
-
-const sectionTitleStyle: CSSProperties = {
-  margin: 0,
-  fontSize: "0.9rem",
-  letterSpacing: "0.08em",
-  textTransform: "uppercase",
-  color: "var(--text-primary)"
+  ...contentPanelStyle
 };
 
 const microLabelStyle: CSSProperties = {
@@ -170,16 +161,6 @@ const microLabelStyle: CSSProperties = {
   textTransform: "uppercase",
   letterSpacing: "0.06em",
   fontWeight: 700
-};
-
-const pageTitleStyle: CSSProperties = {
-  marginTop: 0,
-  marginBottom: "0.35rem",
-  fontSize: "1.05rem",
-  fontWeight: 700,
-  letterSpacing: "0.04em",
-  textTransform: "uppercase",
-  color: "var(--text-primary)"
 };
 
 const bodyPrimary: CSSProperties = { fontSize: "0.8rem", color: "var(--text-primary)" };
@@ -587,30 +568,13 @@ const centerMetaLineStyle: CSSProperties = {
 
 /** Bordered subsection for template viewer (standalone column shell). */
 const centerSubsectionPanelStyle: CSSProperties = {
-  ...panelStyle,
+  ...contentPanelStyle,
   padding: "0.6rem 0.65rem",
   marginBottom: "0.65rem"
 };
 
 /** Flow subsection inside the monster sheet column — no second panel border (column uses sheetPanel). */
 type MonsterCenterPane = "sheet" | "json";
-
-const monsterCenterPaneToggleBtnStyle = (active: boolean): CSSProperties => ({
-  padding: "0.22rem 0.5rem",
-  fontSize: "0.8125rem",
-  lineHeight: 1.2,
-  borderRadius: "0.25rem",
-  border: "1px solid var(--panel-border)",
-  backgroundColor: active ? "var(--surface-2)" : "var(--surface-0)",
-  color: "var(--text-primary)",
-  fontWeight: active ? 600 : 400,
-  cursor: "pointer"
-});
-
-const centerFlowSubsectionStyle: CSSProperties = {
-  marginBottom: "0.65rem",
-  minWidth: 0
-};
 
 /** Inset strip inside the monster index sheet column (template preview + level tweak). */
 const monsterSheetTemplateToolbarInsetStyle: CSSProperties = {
@@ -1486,7 +1450,7 @@ function MonsterPowersPanels({
               background: "transparent"
             }
           : {
-              ...panelStyle,
+              ...contentPanelStyle,
               borderColor: "var(--panel-border-strong)",
               padding: "0.6rem 0.65rem",
               marginBottom: "0.65rem"
@@ -4452,50 +4416,23 @@ export function MonsterEditorApp({
         borderRadius: "0.45rem"
       }}
     >
-      <h1 style={pageTitleStyle}>Monster Sheet</h1>
+      <h1 style={pageTitleWithBottomGapStyle}>Monster Sheet</h1>
 
-      <div
+      <SegmentedControl
         role="tablist"
-        aria-label="Viewer"
-        style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginBottom: "0.5rem", alignItems: "center" }}
-      >
-        <button
-          type="button"
-          role="tab"
-          aria-selected={viewerTab === "monsters"}
-          onClick={() => setViewerTab("monsters")}
-          disabled={viewerTab === "monsters"}
-        >
-          Monsters
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={viewerTab === "createMonster"}
-          onClick={() => setViewerTab("createMonster")}
-          disabled={viewerTab === "createMonster"}
-        >
-          Create Monster
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={viewerTab === "templates"}
-          onClick={() => setViewerTab("templates")}
-          disabled={viewerTab === "templates"}
-        >
-          Monster Templates
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={viewerTab === "createTemplate"}
-          onClick={() => setViewerTab("createTemplate")}
-          disabled={viewerTab === "createTemplate"}
-        >
-          Create template
-        </button>
-      </div>
+        ariaLabel="Viewer"
+        options={[
+          { value: "monsters", label: "Monsters" },
+          { value: "createMonster", label: "Create Monster" },
+          { value: "templates", label: "Monster Templates" },
+          { value: "createTemplate", label: "Create template" }
+        ]}
+        value={viewerTab}
+        onChange={setViewerTab}
+        variant="pill"
+        size="tab"
+        style={{ marginBottom: "0.5rem" }}
+      />
 
       {viewerTab === "monsters" || viewerTab === "templates" || viewerTab === "createTemplate" ? (
         <p style={{ marginTop: 0, marginBottom: "0.5rem", color: "var(--text-muted)", fontSize: "0.8rem" }}>
@@ -4541,7 +4478,7 @@ export function MonsterEditorApp({
       {viewerTab === "monsters" ? (
         <div
           style={{
-            ...panelStyle,
+            ...contentPanelStyle,
             marginBottom: "0.75rem",
             padding: "0.65rem 0.75rem",
             display: "flex",
@@ -5333,7 +5270,7 @@ export function MonsterEditorApp({
       {viewerTab === "monsters" ? (
         <div
           style={{
-            ...panelStyle,
+            ...contentPanelStyle,
             marginBottom: "1rem",
             padding: "0.65rem 0.75rem",
             display: "flex",
@@ -5905,33 +5842,17 @@ export function MonsterEditorApp({
                 ) : null}
                 {viewerTab === "monsters" ? (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", alignItems: "center", flexShrink: 0 }}>
-                    <div
-                      role="group"
-                      aria-label="Center column view"
-                      style={{ display: "flex", borderRadius: "0.25rem", overflow: "hidden", border: "1px solid var(--panel-border)" }}
-                    >
-                      <button
-                        type="button"
-                        aria-pressed={monsterCenterPane === "sheet"}
-                        onClick={() => setMonsterCenterPane("sheet")}
-                        style={{
-                          ...monsterCenterPaneToggleBtnStyle(monsterCenterPane === "sheet"),
-                          borderRadius: 0,
-                          border: "none",
-                          borderRight: "1px solid var(--panel-border)"
-                        }}
-                      >
-                        Stat block
-                      </button>
-                      <button
-                        type="button"
-                        aria-pressed={monsterCenterPane === "json"}
-                        onClick={() => setMonsterCenterPane("json")}
-                        style={{ ...monsterCenterPaneToggleBtnStyle(monsterCenterPane === "json"), borderRadius: 0, border: "none" }}
-                      >
-                        JSON
-                      </button>
-                    </div>
+                    <SegmentedControl
+                      ariaLabel="Center column view"
+                      options={[
+                        { value: "sheet", label: "Stat block" },
+                        { value: "json", label: "JSON" }
+                      ]}
+                      value={monsterCenterPane}
+                      onChange={setMonsterCenterPane}
+                      variant="joined"
+                      size="inline"
+                    />
                     <button
                       type="button"
                       disabled={!formatMonster || !selectedId || !encounterStore.activeEncounterId}
@@ -6022,7 +5943,7 @@ export function MonsterEditorApp({
               <>
               {viewerTab === "monsters" && templatePreviewDescriptions.length > 0
                 ? templatePreviewDescriptions.map(({ key, templateName, description }) => (
-                    <div key={key} style={centerFlowSubsectionStyle}>
+                    <div key={key} style={flowSubsectionStyle}>
                       <h3 style={sectionTitleStyle}>{templateName}</h3>
                       <div style={{ ...richTextBodyPrimary.paragraphStyle, whiteSpace: "pre-wrap" }}>
                         {renderGlossaryAwareText(
@@ -6038,7 +5959,7 @@ export function MonsterEditorApp({
                   ))
                 : null}
               {isRenderableCardValue(viewMonster.tactics) ? (
-                <div style={centerFlowSubsectionStyle}>
+                <div style={flowSubsectionStyle}>
                   <h3 style={sectionTitleStyle}>Tactics</h3>
                   <div style={{ ...richTextBodyPrimary.paragraphStyle, whiteSpace: "pre-wrap" }}>
                     {renderGlossaryAwareText(
@@ -6169,7 +6090,7 @@ export function MonsterEditorApp({
                     ) : null}
 
               {Array.isArray(viewMonster.sourceBooks) && viewMonster.sourceBooks.length > 0 ? (
-                <div style={centerFlowSubsectionStyle}>
+                <div style={flowSubsectionStyle}>
                   <h3 style={sectionTitleStyle}>Sources</h3>
                   <div
                     style={{
@@ -6687,7 +6608,7 @@ export function MonsterEditorApp({
       </div>
 
       {viewerTab !== "monsters" ? (
-      <div style={{ marginTop: "0.85rem", ...panelStyle, padding: "0.55rem" }}>
+      <div style={{ marginTop: "0.85rem", ...contentPanelStyle, padding: "0.55rem" }}>
         <CollapsibleDisclosure
           open
           summaryStyle={jsonSummaryStyle}
@@ -6762,7 +6683,7 @@ export function MonsterEditorApp({
       ) : null}
 
       {viewerTab === "monsters" && monsterTemplatePreviewIdxs.length > 0 && templateRows[monsterTemplatePreviewIdxs[0]] ? (
-        <div style={{ marginTop: "0.85rem", ...panelStyle, padding: "0.55rem" }}>
+        <div style={{ marginTop: "0.85rem", ...contentPanelStyle, padding: "0.55rem" }}>
           <CollapsibleDisclosure open={false} summaryStyle={jsonSummaryStyle} summary="Template JSON">
             <MonsterJsonEditorPanel
               value={templatePreviewJsonText}

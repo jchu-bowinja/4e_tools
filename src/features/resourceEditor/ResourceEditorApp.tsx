@@ -1,6 +1,15 @@
 import { useMemo, useState } from "react";
 import type { RulesIndex } from "../../rules/models";
 import {
+  contentPanelPaddedStyle,
+  contentPanelStyle,
+  editorPageIntroStyle,
+  editorPageShellStyle,
+  editorPanelHeaderStyle,
+  editorStatusBannerStyle,
+  pageTitleStyle
+} from "../../ui/panels";
+import {
   EDITABLE_RESOURCE_COLLECTIONS,
   emptyResourceEditorOverlay,
   normalizeResourceEditorOverlay,
@@ -381,9 +390,9 @@ export function ResourceEditorApp({ index, overlay, onSaveOverlay, onResetOverla
   const collectionOverlay = normalizedOverlay.collections[collection] ?? { upserts: {}, deletes: [] };
 
   return (
-    <div style={{ maxWidth: 1360, margin: "0 auto", padding: "clamp(0.75rem, 1.5vw, 1.15rem)", color: "var(--text-primary)", boxSizing: "border-box" }}>
-      <h1 style={{ marginTop: 0 }}>Resource Editor</h1>
-      <p style={{ marginTop: 0, color: "var(--text-muted)" }}>
+    <div style={editorPageShellStyle}>
+      <h1 style={pageTitleStyle}>Resource Editor</h1>
+      <p style={editorPageIntroStyle}>
         Local prototype mode: edits are stored in browser storage and layered over generated rules data.
       </p>
 
@@ -448,18 +457,18 @@ export function ResourceEditorApp({ index, overlay, onSaveOverlay, onResetOverla
       <div
         role="status"
         aria-live="polite"
-        style={{ marginBottom: "0.75rem", color: message.includes("must") ? "var(--status-danger)" : "var(--text-secondary)" }}
+        style={{
+          ...editorStatusBannerStyle,
+          color: message.includes("must") ? "var(--status-danger)" : "var(--text-secondary)"
+        }}
       >
         {message || "Select an item or create a new draft."}
       </div>
       {referentialWarnings.length > 0 && (
         <div
           style={{
-            marginBottom: "0.75rem",
-            border: "1px solid var(--status-warning)",
-            backgroundColor: "var(--surface-0)",
-            borderRadius: 8,
-            padding: "0.6rem 0.75rem"
+            ...editorStatusBannerStyle,
+            borderColor: "var(--status-warning)"
           }}
         >
           <strong style={{ fontSize: "0.85rem", color: "var(--status-warning)" }}>Editor warnings</strong>
@@ -472,8 +481,8 @@ export function ResourceEditorApp({ index, overlay, onSaveOverlay, onResetOverla
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "1rem", minHeight: "60vh" }}>
-        <div style={{ border: "1px solid var(--panel-border)", borderRadius: 8, backgroundColor: "var(--surface-0)", overflow: "hidden" }}>
-          <div style={{ padding: "0.5rem 0.75rem", borderBottom: "1px solid var(--panel-border)", fontWeight: 600 }}>
+        <div style={{ ...contentPanelStyle, overflow: "hidden" }}>
+          <div style={editorPanelHeaderStyle}>
             {LABELS[collection]} ({filteredItems.length})
           </div>
           <div style={{ maxHeight: "60vh", overflow: "auto" }}>
@@ -487,17 +496,8 @@ export function ResourceEditorApp({ index, overlay, onSaveOverlay, onResetOverla
                   key={id}
                   type="button"
                   onClick={() => selectExisting(id)}
-                  style={{
-                    display: "block",
-                    width: "100%",
-                    textAlign: "left",
-                    border: "none",
-                    borderBottom: "1px solid var(--surface-2)",
-                    padding: "0.55rem 0.75rem",
-                    background: selectedId === id ? "var(--surface-2)" : "var(--surface-0)",
-                    cursor: "pointer",
-                    opacity: isDeleted ? 0.55 : 1
-                  }}
+                  className={selectedId === id ? "editor-list-row editor-list-row--selected" : "editor-list-row"}
+                  style={{ opacity: isDeleted ? 0.55 : 1 }}
                 >
                   <div style={{ fontWeight: 600 }}>{name}</div>
                   <div style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>{id}</div>
@@ -508,7 +508,7 @@ export function ResourceEditorApp({ index, overlay, onSaveOverlay, onResetOverla
           </div>
         </div>
 
-        <div style={{ border: "1px solid var(--panel-border)", borderRadius: 8, backgroundColor: "var(--surface-0)", padding: "0.75rem" }}>
+        <div style={contentPanelPaddedStyle}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
             <strong>Structured Editor + JSON Draft</strong>
             <span style={{ fontSize: "0.8rem", color: "var(--text-subtle)" }}>
@@ -535,10 +535,12 @@ export function ResourceEditorApp({ index, overlay, onSaveOverlay, onResetOverla
               width: "100%",
               minHeight: "42vh",
               boxSizing: "border-box",
-              fontFamily: "Consolas, monospace",
+              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
               fontSize: "0.85rem",
-              borderRadius: 6,
+              borderRadius: "var(--control-radius, 6px)",
               border: "1px solid var(--panel-border)",
+              backgroundColor: "var(--surface-1)",
+              color: "var(--text-primary)",
               padding: "0.75rem"
             }}
           />
