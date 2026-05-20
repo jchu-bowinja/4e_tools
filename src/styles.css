@@ -762,19 +762,11 @@ button.encounter-roster-stat-cards-expand-btn[aria-pressed="true"] .template-jso
   display: none;
 }
 
-/* Monster editor center sheet: same stat block, scroll inside column (scrollbar hidden) */
+/* Monster editor center sheet: same stat block, scroll inside column */
 .monster-stat-block-card.monster-stat-block-card--sheet {
   max-height: min(78vh, 42rem);
   overflow-x: hidden;
   overflow-y: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.monster-stat-block-card.monster-stat-block-card--sheet::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-  display: none;
 }
 
 /* Monster template viewer: same stat block shell as creatures, no inner scroll cap */

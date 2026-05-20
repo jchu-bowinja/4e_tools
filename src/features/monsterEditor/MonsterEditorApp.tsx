@@ -581,64 +581,7 @@ const centerMetaLineStyle: CSSProperties = {
   color: "var(--text-secondary)"
 };
 
-const centerBulletStyle: CSSProperties = {
-  color: "var(--text-muted)",
-  padding: "0 0.12rem",
-  fontWeight: 400,
-  userSelect: "none"
-};
-
-/** Monster sheet quick stats: three columns (identity / defenses / resources). */
-const centerQuickStatsThreeColumnsStyle: CSSProperties = {
-  marginTop: "0.5rem",
-  display: "grid",
-  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-  columnGap: "1rem",
-  alignItems: "start",
-  fontSize: "0.8125rem",
-  lineHeight: 1.45,
-  color: "var(--text-primary)"
-};
-
-const centerQuickStatsColumnGridStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "minmax(6.5rem, auto) minmax(0, 1fr)",
-  columnGap: "0.75rem",
-  rowGap: "0.35rem",
-  alignItems: "baseline"
-};
-
-const centerQuickStatValueStyle: CSSProperties = {
-  fontVariantNumeric: "tabular-nums",
-  fontWeight: 600,
-  color: "var(--text-primary)"
-};
-
-const centerStatFlowSectionStyle: CSSProperties = {
-  marginTop: "0.6rem",
-  display: "grid",
-  gap: "0.42rem",
-  fontSize: "0.8125rem",
-  lineHeight: 1.5,
-  color: "var(--text-primary)"
-};
-
-const centerFlowLineStyle: CSSProperties = {
-  fontSize: "0.8125rem",
-  lineHeight: 1.5,
-  color: "var(--text-primary)"
-};
-
-const centerFlowLabelStrongStyle: CSSProperties = {
-  fontWeight: 700,
-  fontSize: "0.7rem",
-  letterSpacing: "0.05em",
-  textTransform: "uppercase",
-  color: "var(--text-muted)",
-  marginRight: "0.4rem"
-};
-
-/** Inline stat subsections (Tactics, Auras, Traits, Items, etc.). */
+/** Inline stat subsections (Tactics, Sources, etc.). */
 const centerSubsectionPanelStyle: CSSProperties = {
   ...panelStyle,
   padding: "0.6rem 0.65rem",
@@ -872,6 +815,80 @@ function includeUnlessZeroNumeric(formatted: string): boolean {
   return true;
 }
 
+function formatMonsterRegeneration(monster: MonsterEntryFile, otherNumbers: Record<string, unknown>): string {
+  const top = monster.regeneration;
+  if (top !== undefined && top !== null && String(top).trim() !== "") {
+    return formatValue(top as string | number | boolean | undefined | null);
+  }
+  return pickFromStatBlock(otherNumbers, ["regeneration"]);
+}
+
+function renderStatBlockTraitSection({
+  statBlockKeyPrefix,
+  sectionKind,
+  sectionTitle,
+  items,
+  stripeOffset,
+  startGlossaryHover,
+  leaveGlossaryHover,
+  shouldHighlightGlossaryTerm
+}: {
+  statBlockKeyPrefix: string;
+  sectionKind: "aura" | "trait";
+  sectionTitle: string;
+  items: Array<{ idx: number; trait: MonsterTrait }>;
+  stripeOffset: number;
+  startGlossaryHover: (event: ReactMouseEvent<HTMLElement>, key: MonsterGlossaryHoverKey) => void;
+  leaveGlossaryHover: () => void;
+  shouldHighlightGlossaryTerm: (term: string) => boolean;
+}): JSX.Element | null {
+  if (items.length === 0) return null;
+  return (
+    <>
+      <div className="monster-stat-block-section-head">{sectionTitle}</div>
+      <div className="monster-stat-block-traits">
+        {items.map(({ idx, trait }, displayIdx) => {
+          const traitNameRaw = String(trait.name ?? "").trim();
+          const traitName = traitNameRaw || (sectionKind === "aura" ? "Aura" : "Trait");
+          const traitBadges = renderTraitMetaBadges(trait);
+          const stripe = stripeOffset + displayIdx;
+          return (
+            <div
+              key={`${statBlockKeyPrefix}-${sectionKind}-${idx}`}
+              className="monster-stat-block-trait-row"
+              data-stripe={stripe % 2 === 0 ? "even" : "odd"}
+            >
+              <div className="monster-stat-block-trait-title">
+                <strong>{traitName}</strong>
+                {traitBadges.length > 0
+                  ? traitBadges.map((badge) => (
+                      <span
+                        key={`${statBlockKeyPrefix}-${sectionKind}-${idx}-b-${badge}`}
+                        className="monster-stat-block-trait-badge"
+                      >
+                        {badge}
+                      </span>
+                    ))
+                  : null}
+              </div>
+              <div className="monster-stat-block-trait-body">
+                {renderGlossaryAwareText(
+                  formatTraitBodyTextWithRange(trait),
+                  commonDescriptiveGlossaryPhrases,
+                  startGlossaryHover,
+                  leaveGlossaryHover,
+                  `${statBlockKeyPrefix}-${sectionKind}-${idx}`,
+                  shouldHighlightGlossaryTerm
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
 function splitFailedEscapeAttemptSections(text: string): { mainText: string; failedEscapeTexts: string[] } {
   const raw = String(text || "").trim();
   if (!raw) return { mainText: "", failedEscapeTexts: [] };
@@ -966,25 +983,6 @@ function renderStatValue(
     );
   }
   return <span style={statValueStrong}>{formatValue(value as string | number | boolean | undefined | null)}</span>;
-}
-
-function sectionChildKeys(section: unknown): string[] {
-  if (!section || typeof section !== "object") return [];
-  const maybeChildren = (section as { children?: Record<string, unknown> }).children;
-  if (!maybeChildren || typeof maybeChildren !== "object") return [];
-  return Object.keys(maybeChildren);
-}
-
-function sectionObject(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-  return value as Record<string, unknown>;
-}
-
-function sectionArrayOfObjects(value: unknown): Record<string, unknown>[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((entry) => sectionObject(entry))
-    .filter((entry) => Object.keys(entry).length > 0);
 }
 
 function weaknessLine(value: Record<string, unknown>): string {
@@ -1963,12 +1961,11 @@ function MonsterStatBlockCard({
   const senseLine = senseEntries.join(", ");
   const typeLine = formatMonsterCreatureTypeLine(monster) || "—";
   const auraSignatures = new Set((monster.auras ?? []).map(traitSignature));
-  const traitEntries: Array<{ kind: "aura" | "trait"; idx: number; trait: MonsterTrait }> = [];
-  (monster.auras ?? []).forEach((trait, idx) => traitEntries.push({ kind: "aura", idx, trait }));
-  (monster.traits ?? []).forEach((trait, idx) => {
-    if (auraSignatures.has(traitSignature(trait))) return;
-    traitEntries.push({ kind: "trait", idx, trait });
-  });
+  const auraItems = (monster.auras ?? []).map((trait, idx) => ({ idx, trait }));
+  const traitItems = (monster.traits ?? [])
+    .map((trait, idx) => ({ idx, trait }))
+    .filter(({ trait }) => !auraSignatures.has(traitSignature(trait)));
+  const regeneration = formatMonsterRegeneration(monster, on);
   const abilityScoresRaw = monster.stats?.abilityScores as Record<string, unknown> | undefined;
   const ABBR_ORDER = ["STR", "DEX", "WIS", "CON", "INT", "CHA"] as const;
   const abilityCells: Array<{ abbrev: string; score: number; mod: number } | null> = ABBR_ORDER.map((abbrev) => {
@@ -2253,7 +2250,9 @@ function MonsterStatBlockCard({
             </div>
           </div>
         ) : null}
-        {includeUnlessZeroNumeric(saves) || includeUnlessZeroNumeric(actionPts) ? (
+        {includeUnlessZeroNumeric(saves) ||
+        includeUnlessZeroNumeric(actionPts) ||
+        includeUnlessZeroNumeric(regeneration) ? (
           <div className="monster-stat-block-vitals__row monster-stat-block-vitals__row--full">
             {includeUnlessZeroNumeric(saves) ? (
               <>
@@ -2263,7 +2262,10 @@ function MonsterStatBlockCard({
                 {formatLeadingPlusIfPositive(saves)}
               </>
             ) : null}
-            {includeUnlessZeroNumeric(saves) && includeUnlessZeroNumeric(actionPts) ? "; " : null}
+            {includeUnlessZeroNumeric(saves) &&
+            (includeUnlessZeroNumeric(actionPts) || includeUnlessZeroNumeric(regeneration))
+              ? "; "
+              : null}
             {includeUnlessZeroNumeric(actionPts) ? (
               <>
                 <span {...glossaryTooltipUi.hoverA11y("glossaryTerm:Action Points")} className="monster-stat-block-gloss">
@@ -2272,50 +2274,39 @@ function MonsterStatBlockCard({
                 {actionPts}
               </>
             ) : null}
+            {includeUnlessZeroNumeric(actionPts) && includeUnlessZeroNumeric(regeneration) ? "; " : null}
+            {includeUnlessZeroNumeric(regeneration) ? (
+              <>
+                <span {...glossaryTooltipUi.hoverA11y("glossaryTerm:Regeneration")} className="monster-stat-block-gloss">
+                  Regeneration
+                </span>{" "}
+                {regeneration}
+              </>
+            ) : null}
           </div>
         ) : null}
       </div>
 
-      {traitEntries.length > 0 ? (
-        <>
-          <div className="monster-stat-block-section-head">Traits</div>
-          <div className="monster-stat-block-traits">
-            {traitEntries.map(({ kind, idx, trait }, stripe) => {
-              const traitNameRaw = String(trait.name ?? "").trim();
-              const traitName = traitNameRaw || (kind === "aura" ? "Aura" : "Trait");
-              const traitBadges = renderTraitMetaBadges(trait);
-              return (
-                <div
-                  key={`${statBlockKeyPrefix}-${kind}-${idx}`}
-                  className="monster-stat-block-trait-row"
-                  data-stripe={stripe % 2 === 0 ? "even" : "odd"}
-                >
-                  <div className="monster-stat-block-trait-title">
-                    <strong>{traitName}</strong>
-                    {traitBadges.length > 0
-                      ? traitBadges.map((badge) => (
-                          <span key={`${statBlockKeyPrefix}-${kind}-${idx}-b-${badge}`} className="monster-stat-block-trait-badge">
-                            {badge}
-                          </span>
-                        ))
-                      : null}
-                  </div>
-                  <div className="monster-stat-block-trait-body">
-                    {renderGlossaryAwareText(
-                      formatTraitBodyTextWithRange(trait),
-                      commonDescriptiveGlossaryPhrases,
-                      startGlossaryHover,
-                      leaveGlossaryHover,
-                      `${statBlockKeyPrefix}-${kind}-${idx}`,
-                      shouldHighlightGlossaryTerm
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </>
-      ) : null}
+      {renderStatBlockTraitSection({
+        statBlockKeyPrefix,
+        sectionKind: "aura",
+        sectionTitle: "Auras",
+        items: auraItems,
+        stripeOffset: 0,
+        startGlossaryHover,
+        leaveGlossaryHover,
+        shouldHighlightGlossaryTerm
+      })}
+      {renderStatBlockTraitSection({
+        statBlockKeyPrefix,
+        sectionKind: "trait",
+        sectionTitle: "Traits",
+        items: traitItems,
+        stripeOffset: auraItems.length,
+        startGlossaryHover,
+        leaveGlossaryHover,
+        shouldHighlightGlossaryTerm
+      })}
 
       <MonsterPowersPanels
         powers={monster.powers ?? []}
@@ -4526,7 +4517,7 @@ export function MonsterEditorApp({
                 padding: "0.22rem 0.3rem"
               }}
             >
-              <option value="both">-</option>
+              <option value="both">All</option>
               <option value="leader">Leader</option>
               <option value="notLeader">Not leader</option>
             </select>
@@ -6354,14 +6345,17 @@ export function MonsterEditorApp({
       </div>
 
       <div style={{ marginTop: "0.85rem", ...panelStyle, padding: "0.55rem" }}>
-        <details>
-          <summary style={jsonSummaryStyle}>
-            {viewerTab === "createTemplate"
+        <CollapsibleDisclosure
+          open={viewerTab !== "monsters"}
+          summaryStyle={jsonSummaryStyle}
+          summary={
+            viewerTab === "createTemplate"
               ? "Template draft (JSON)"
               : viewerTab === "createMonster"
                 ? "Monster draft (JSON)"
-                : "JSON"}
-          </summary>
+                : "JSON"
+          }
+        >
           <div style={{ marginTop: "0.5rem", display: "flex", flexWrap: "wrap", gap: "0.35rem", alignItems: "center" }}>
             <input
               value={jsonSearchInput}
@@ -6464,10 +6458,14 @@ export function MonsterEditorApp({
               lineHeight: 1.35
             }}
           />
-        </details>
+        </CollapsibleDisclosure>
         {viewerTab === "monsters" && monsterTemplatePreviewIdxs.length > 0 && templateRows[monsterTemplatePreviewIdxs[0]] ? (
-          <details style={{ marginTop: "0.65rem" }}>
-            <summary style={jsonSummaryStyle}>Template JSON</summary>
+          <CollapsibleDisclosure
+            open={false}
+            style={{ marginTop: "0.65rem" }}
+            summaryStyle={jsonSummaryStyle}
+            summary="Template JSON"
+          >
             <div style={{ marginTop: "0.5rem", display: "flex", flexWrap: "wrap", gap: "0.35rem", alignItems: "center" }}>
               <input
                 value={templateJsonSearchInput}
@@ -6564,7 +6562,7 @@ export function MonsterEditorApp({
                 lineHeight: 1.35
               }}
             />
-          </details>
+          </CollapsibleDisclosure>
         ) : null}
       </div>
 
