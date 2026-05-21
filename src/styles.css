@@ -763,6 +763,39 @@ textarea:hover {
   margin-top: 0.25rem;
 }
 
+/* Section titles — inset band separates stacked overview blocks */
+.character-sheet-section-head {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0.38rem 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  background: var(--inset-section-bg, var(--surface-1));
+  border: 1px solid var(--inset-section-border, var(--panel-border));
+  border-radius: var(--ui-section-radius, 0.5rem);
+  box-shadow: inset 0 1px 0 var(--inset-section-highlight);
+}
+
+.character-sheet-overview-collapsible > summary.character-sheet-section-head {
+  cursor: pointer;
+}
+
+.character-sheet-overview-collapsible > summary.character-sheet-section-head:hover {
+  background: var(--surface-2, var(--inset-section-bg));
+}
+
+.character-sheet-overview-collapsible > summary.character-sheet-section-head:focus-visible {
+  outline: 2px solid var(--focus-outline);
+  outline-offset: 2px;
+}
+
+.character-sheet-power-section-head {
+  margin-bottom: 0.35rem;
+}
+
 /* Character identity block (overview left column) */
 .character-sheet-identity {
   display: grid;

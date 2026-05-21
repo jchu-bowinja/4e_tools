@@ -51,8 +51,7 @@ import {
   contentPanelPaddedStyle,
   flowSubsectionStyle,
   pageTitleStyle,
-  rulesPageShellStyle,
-  sectionTitleStyle
+  rulesPageShellStyle
 } from "../../ui/panels";
 import { HybridClassHoverDetail } from "../../ui/HybridClassDetailPanel";
 import { SegmentedControl } from "../../ui/SegmentedControl";
@@ -171,11 +170,8 @@ const overviewCollapsiblePanelStyle: CSSProperties = {
   minWidth: 0
 };
 
-const overviewCollapsibleSummaryStyle: CSSProperties = {
-  ...sectionTitleStyle,
-  cursor: "pointer",
-  color: "var(--text-primary)"
-};
+const overviewCollapsibleSummaryClassName =
+  "template-json-collapsible-summary character-sheet-section-head";
 
 type CharacterIdentityFieldProps = {
   label: ReactNode;
@@ -459,7 +455,7 @@ function OverviewCollapsibleSection({
       className="template-json-collapsible character-sheet-overview-collapsible"
       open={defaultOpen}
       style={{ ...overviewCollapsiblePanelStyle, ...shellStyle }}
-      summaryStyle={overviewCollapsibleSummaryStyle}
+      summaryClassName={overviewCollapsibleSummaryClassName}
       summary={title}
       summaryTabIndex={titleTabIndex}
       onSummaryMouseEnter={onTitleMouseEnter}
@@ -2001,9 +1997,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
 
     return (
       <div style={{ border: "1px solid var(--panel-border)", borderRadius: "0.35rem", backgroundColor: "var(--surface-1)", padding: "0.4rem", display: "grid", gap: "0.25rem", alignContent: "start" }}>
-        <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700 }}>
-          Conditions
-        </div>
+        <div className="character-sheet-section-head">Conditions</div>
         <div
           style={{
             display: "grid",
@@ -2698,33 +2692,27 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             <div key={section.key} style={{ ...flowSubsectionStyle, gridColumn: "1 / -1" }}>
                 {section.sectionKind === "usage" && section.usageBucket ? (
                   <div
+                    className="character-sheet-section-head character-sheet-power-section-head"
                     onMouseEnter={(event) => glossaryTooltipUi.startHover(event, `powerUsage:${section.usageBucket}`)}
                     onMouseLeave={glossaryTooltipUi.leaveHover}
                     onFocus={(event) => glossaryTooltipUi.startHover(event, `powerUsage:${section.usageBucket}`)}
                     onBlur={glossaryTooltipUi.leaveHover}
                     tabIndex={0}
                     style={{
-                      fontWeight: 700,
-                      marginBottom: "0.35rem",
-                      borderLeft: `5px solid ${powerCardUsageAccentBarColor(section.usageBucket)}`,
-                      paddingLeft: "0.45rem",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      color: "var(--text-primary)"
+                      borderLeftWidth: "5px",
+                      borderLeftStyle: "solid",
+                      borderLeftColor: powerCardUsageAccentBarColor(section.usageBucket)
                     }}
                   >
                     {section.title}
                   </div>
                 ) : (
                   <div
+                    className="character-sheet-section-head character-sheet-power-section-head"
                     style={{
-                      fontWeight: 700,
-                      marginBottom: "0.35rem",
-                      borderLeft: "5px solid var(--panel-border)",
-                      paddingLeft: "0.45rem",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      color: "var(--text-primary)"
+                      borderLeftWidth: "5px",
+                      borderLeftStyle: "solid",
+                      borderLeftColor: "var(--panel-border)"
                     }}
                   >
                     {section.title}
@@ -2970,7 +2958,9 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             }
           />
           <div style={contentPanelPaddedStyle}>
-            <div style={{ fontWeight: 700, marginBottom: "0.5rem" }}>Equipped</div>
+            <div className="character-sheet-section-head" style={{ marginBottom: "0.5rem" }}>
+              Equipped
+            </div>
             <CharacterEquippedSlotsPanel
               inventory={sheet.inventory}
               equippedSlots={sheet.equipment}
@@ -2981,7 +2971,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             />
           </div>
           <div style={contentPanelPaddedStyle}>
-            <div style={{ fontWeight: 700, marginBottom: "0.5rem" }}>
+            <div className="character-sheet-section-head" style={{ marginBottom: "0.5rem" }}>
               {inventoryItems.length > 0 ? `Items (${inventoryItems.length})` : "Items"}
             </div>
             <CharacterInventoryList
