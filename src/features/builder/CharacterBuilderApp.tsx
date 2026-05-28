@@ -341,6 +341,7 @@ function renderPowerCard(
   power: Power,
   options?: {
     key?: string;
+    rulesIndex?: RulesIndex;
     keywordTooltip?: (keyword: string) => string | null;
     onKeywordMouseEnter?: (event: React.MouseEvent<HTMLElement> | React.FocusEvent<HTMLElement>, keyword: string) => void;
     onKeywordMouseLeave?: () => void;
@@ -362,7 +363,7 @@ function renderPowerCard(
       key={options?.key || power.id}
       power={power}
       featMods={featMods}
-      rulesIndex={index}
+      rulesIndex={options?.rulesIndex}
       variant="builder"
       renderUsageInHeader={(usageLabel) =>
         usageBucketForGlossary && options?.glossaryHover ? (
@@ -2070,6 +2071,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       <div key={cardKey}>
         {renderPowerCard(cardPower, {
           key: `${cardKey}-card`,
+          rulesIndex: index,
           keywordTooltip: powerKeywordTooltip,
           onKeywordMouseEnter: (event, keyword) => glossaryTooltipUi.startHover(event, `powerKeyword:${keyword}`),
           onKeywordMouseLeave: glossaryTooltipUi.leaveHover,
@@ -2614,6 +2616,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                               return p
                                 ? renderPowerCard(p, {
                                     key: `race-tab-${g.traitId}-${p.id}`,
+                                    rulesIndex: index,
                                     keywordTooltip: powerKeywordTooltip,
                                     onKeywordMouseEnter: (event, keyword) =>
                                       glossaryTooltipUi.startHover(event, `powerKeyword:${keyword}`),
