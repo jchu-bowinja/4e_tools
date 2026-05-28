@@ -261,9 +261,15 @@ export function appendFeatProficiencyPhrasesToWeaponLine(
   featGrants: ProficiencyGrant[]
 ): string {
   const extra: string[] = [];
+  const baseLower = baseLine.toLowerCase();
   for (const g of featGrants) {
     if (g.kind === "weaponCategory" || g.kind === "weaponGroup") {
       extra.push(g.value);
+    } else if (g.kind === "weaponName") {
+      const phrase = (g.label || g.value).trim();
+      if (!phrase) continue;
+      if (baseLower.includes(phrase.toLowerCase())) continue;
+      extra.push(phrase);
     }
   }
   if (!extra.length) return baseLine;

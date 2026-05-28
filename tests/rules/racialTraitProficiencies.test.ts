@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { computeCharacterProficiencyDisplayLines } from "../../src/rules/characterProficiencyDisplay";
 import {
   collectCharacterProficiencyGrants,
   collectRacialProficiencyDisplayRows,
@@ -90,6 +91,15 @@ describe("collectRacialProficiencyGrantsFromBuild", () => {
   it("makes fighter proficient with warhammer via racial grant", () => {
     const grants = collectCharacterProficiencyGrants(index, build);
     expect(isProficientWithWeaponIncludingFeats(warhammer, "Simple melee", grants)).toBe(true);
+  });
+
+  it("includes named-weapon racial grants on combined proficiency display lines", () => {
+    const lines = computeCharacterProficiencyDisplayLines(
+      { isHybrid: false, classSpecific: { "Weapon Proficiencies": "Simple melee" } },
+      build,
+      collectCharacterProficiencyGrants(index, build)
+    );
+    expect(lines.weaponLine).toMatch(/warhammer/i);
   });
 
   it("lists racial traits in display rows", () => {

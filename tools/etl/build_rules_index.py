@@ -755,6 +755,92 @@ def merge_class_build_options_by_class(
     return dict(from_builds)
 
 
+def _level_gated_class_feature_selects(
+    feature: Dict[str, Any],
+) -> List[Tuple[int, int]]:
+    """(min_level, pick_count) rows from `rules.select` type Class Feature."""
+    out: List[Tuple[int, int]] = []
+    rules = feature.get("rules") or {}
+    for item in rules.get("select") or []:
+        attrs = item.get("attrs") or {}
+        if attrs.get("type") != "Class Feature":
+            continue
+        min_level = parse_int_from_text(attrs.get("Level")) or 1
+        pick_count = parse_int_from_text(attrs.get("number")) or 1
+        out.append((min_level, pick_count))
+    return out
+
+
+def _supplement_mapped_optional_class_feature_groups(
+    class_id: str,
+    groups: List[Dict[str, Any]],
+    features_by_name: Dict[str, Dict[str, Any]],
+    features_by_id: Dict[str, Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    mapped = OPTIONAL_CLASS_FEATURE_NAMES_BY_CLASS_ID.get(class_id)
+    if not mapped:
+        return groups
+    existing_keys = {str(g.get("key") or "") for g in groups}
+    out = list(groups)
+    for feature_name in mapped:
+        feature = features_by_name.get(feature_name)
+        if not feature:
+            continue
+        fid = str(feature.get("internal_id") or "")
+        if not fid:
+            continue
+        feat_name = str(feature.get("name") or fid)
+        opt_key = f"classFeatureOptional:{fid}"
+        if opt_key not in existing_keys:
+            out.append(
+                {
+                    "key": opt_key,
+                    "kind": "classFeature",
+                    "parentFeatureId": fid,
+                    "parentFeatureName": feat_name,
+                    "pickCount": 1,
+                    "optional": True,
+                    "options": [
+                        {
+                            "id": "__none__",
+                            "name": f"No {feat_name}",
+                            "parentFeatureId": fid,
+                            "parentFeatureName": feat_name,
+                            "shortDescription": None,
+                            "body": None,
+                            "powerIds": [],
+                        },
+                        _class_feature_child_option_row(feature, fid, feat_name),
+                    ],
+                }
+            )
+            existing_keys.add(opt_key)
+        nested = _options_from_class_feature_select(feature, features_by_id)
+        if len(nested) < 2:
+            continue
+        for min_level, pick_count in _level_gated_class_feature_selects(feature):
+            pick_key = f"classFeature:{fid}" if min_level <= 1 else f"classFeature:{fid}:{min_level}"
+            if pick_key in existing_keys:
+                continue
+            out.append(
+                {
+                    "key": pick_key,
+                    "kind": "classFeature",
+                    "parentFeatureId": fid,
+                    "parentFeatureName": feat_name if min_level <= 1 else f"{feat_name} (level {min_level})",
+                    "pickCount": pick_count,
+                    "minLevel": min_level,
+                    "visibleWhen": {"groupKey": opt_key, "optionId": fid},
+                    "options": sorted(
+                        nested,
+                        key=lambda r: str(r.get("name") or "").lower(),
+                    ),
+                }
+            )
+            existing_keys.add(pick_key)
+    return out
+
+
 def _class_feature_has_select(
     feature: Dict[str, Any], select_type: str
 ) -> tuple[bool, int]:
@@ -836,6 +922,11 @@ WIZARD_MAGE_CANTRIP_POWER_NAMES: Tuple[str, ...] = (
 MAGE_CANTRIPS_FEATURE_IDS: frozenset = frozenset(
     {"ID_FMP_CLASS_FEATURE_2870", "ID_FMP_CLASS_FEATURE_130"}
 )
+
+# Optional class features not listed on `_PARSED_CLASS_FEATURE` (HotF Signs of Influence on bard).
+OPTIONAL_CLASS_FEATURE_NAMES_BY_CLASS_ID: Dict[str, List[str]] = {
+    "ID_FMP_CLASS_104": ["Signs of Influence"],
+}
 
 
 def _wizard_mage_cantrip_power_ids(powers_by_name: Dict[str, Dict[str, Any]]) -> Set[str]:
@@ -1293,6 +1384,9 @@ def build_class_feature_choice_groups_by_class(
                     row["visibleWhen"] = {"groupKey": pair_key, "optionId": fid}
                 groups.append(row)
 
+        groups = _supplement_mapped_optional_class_feature_groups(
+            class_id, groups, features_by_name, features_by_id
+        )
         if groups:
             out[class_id] = groups
 

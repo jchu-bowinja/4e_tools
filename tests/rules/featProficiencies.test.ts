@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  appendFeatProficiencyPhrasesToWeaponLine,
   collectFeatProficiencyGrants,
   isProficientWithWeaponIncludingFeats,
   weaponMatchesProficiencyGrant
@@ -34,6 +35,19 @@ describe("featProficiencies", () => {
   it("collects grants from selected feats", () => {
     const grants = collectFeatProficiencyGrants(index, ["F1", "F2"]);
     expect(grants).toHaveLength(3);
+  });
+
+  it("appends named-weapon grants to the weapon proficiency line", () => {
+    expect(
+      appendFeatProficiencyPhrasesToWeaponLine("Simple melee, military melee", [
+        { kind: "weaponName", value: "longsword", label: "Longsword" }
+      ])
+    ).toBe("Simple melee, military melee, Longsword");
+    expect(
+      appendFeatProficiencyPhrasesToWeaponLine("Simple melee, longsword", [
+        { kind: "weaponName", value: "longsword", label: "Longsword" }
+      ])
+    ).toBe("Simple melee, longsword");
   });
 
   it("matches weapon group grants", () => {

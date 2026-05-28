@@ -511,6 +511,8 @@ export interface RulesIndex {
       parentFeatureId: string;
       parentFeatureName: string;
       pickCount: number;
+      minLevel?: number;
+      optional?: boolean;
       powerIds?: string[];
       visibleWhen?: { groupKey: string; optionId: string };
       options?: Array<{

@@ -539,7 +539,11 @@ export function getClassFeatureChoiceGroups(
         body: o.body ?? null,
         powerIds: (o.powerIds ?? []).map((p) => String(p))
       })),
-      optional: Boolean((g as { optional?: boolean }).optional)
+      optional: Boolean((g as { optional?: boolean }).optional),
+      minLevel:
+        (g as { minLevel?: number }).minLevel != null
+          ? Math.max(1, Number((g as { minLevel?: number }).minLevel) || 1)
+          : undefined
     } satisfies ClassFeatureChoiceGroup;
   });
 
