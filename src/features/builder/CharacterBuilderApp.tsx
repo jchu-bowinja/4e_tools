@@ -44,7 +44,12 @@ import {
   upcomingClassPowerSlotMilestones
 } from "../../rules/classPowerSlots";
 import { getClassPowersForLevelRange, validateCharacterBuild } from "../../rules/characterValidator";
-import { getDilettanteCandidatePowers, getPowersForOwnerId } from "../../rules/classPowersQuery";
+import { getPowersForOwnerId } from "../../rules/classPowersQuery";
+import {
+  dilettanteRacePowerGroupsForBuild,
+  getDilettanteCandidatePowersForBuild,
+  resolveDilettanteDisplayPower
+} from "../../rules/dilettantePower";
 import {
   autoGrantedClassPowers,
   bonusClassAtWillSlotFromRaceBuild,
@@ -1519,10 +1524,14 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     }
     return getClassPowersForLevelRange(index, build.classId, build.level, "utility");
   }, [index, build.classId, build.level, isHybridBuild, hybridBaseClassAId, hybridBaseClassBId]);
-  const dilettanteCandidatePowers = useMemo(() => {
-    const cid = hybridBaseClassAId || build.classId;
-    return getDilettanteCandidatePowers(index, cid, isHybridBuild ? hybridBaseClassBId : undefined);
-  }, [index, build.classId, hybridBaseClassAId, hybridBaseClassBId, isHybridBuild]);
+  const dilettanteCandidatePowers = useMemo(
+    () => getDilettanteCandidatePowersForBuild(index, build),
+    [index, build.characterStyle, build.classId, build.hybridClassIdA, build.hybridClassIdB]
+  );
+  const dilettantePowerGroups = useMemo(
+    () => dilettanteRacePowerGroupsForBuild(index, build),
+    [index, build.raceId, build.raceSelections]
+  );
   const paragonPathGrantedPowers = useMemo(() => {
     if (!build.paragonPathId || build.level < 11) return [];
     const atk = getPowersForOwnerId(index, build.paragonPathId, build.level, "attack");
@@ -2053,10 +2062,11 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     );
   }
 
-  function renderPowerCardWithSelections(p: Power, cardKey: string): JSX.Element {
+  function renderPowerCardWithSelections(p: Power, cardKey: string, displayPower?: Power): JSX.Element {
+    const cardPower = displayPower ?? p;
     return (
       <div key={cardKey}>
-        {renderPowerCard(p, {
+        {renderPowerCard(cardPower, {
           key: `${cardKey}-card`,
           keywordTooltip: powerKeywordTooltip,
           onKeywordMouseEnter: (event, keyword) => glossaryTooltipUi.startHover(event, `powerKeyword:${keyword}`),
@@ -2384,7 +2394,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 raceAbilityBonusInfo.fixed.length > 0 ||
                 raceSecondarySlots.length > 0 ||
                 racialTraitRuleSelectSlotsRaceTab.length > 0 ||
-                racePowerGroups.some((g) => g.choiceOnly)) && (
+                racePowerGroups.some((g) => g.choiceOnly && !g.dilettantePick)) && (
                 <div style={{ marginTop: "0.65rem", ...ui.blockSubsection, backgroundColor: "var(--surface-1)", borderColor: "var(--panel-border)" }}>
                   <h4 style={subsectionTitleStyle}>Race choices</h4>
                   {raceTraitBundleSlots.map((bundle) => {
@@ -2421,7 +2431,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     );
                   })}
                   {racePowerGroups
-                    .filter((g) => g.choiceOnly)
+                    .filter((g) => g.choiceOnly && !g.dilettantePick)
                     .map((g) => {
                       const selectedPowId = build.raceSelections?.[racePowerSelectSelectionKey(g.traitId)] || "";
                       const optionPowers = g.dilettantePick
@@ -2585,75 +2595,39 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     </div>
                   </div>
                 )}
-                {racePowerGroups.some((g) => g.powerIds.length > 0 || g.dilettantePick) && (
+                {racePowerGroups.some((g) => g.powerIds.length > 0) && (
                   <div style={{ marginTop: "0.8rem" }}>
                     <h4 style={subsectionTitleStyle}>Granted powers</h4>
                     {racePowerGroups
-                      .filter((g) => g.powerIds.length > 0 || g.dilettantePick)
-                      .map((g) => {
-                        const pickKey = racePowerSelectSelectionKey(g.traitId);
-                        const selectedPowId = build.raceSelections?.[pickKey] || "";
-                        const optionPowers = g.dilettantePick
-                          ? dilettanteCandidatePowers
-                          : g.powerIds
-                              .map((pid) => index.powers.find((p) => p.id === pid))
-                              .filter((p): p is Power => !!p);
-                        return (
-                          <div key={`race-powers-${g.traitId}`} style={{ marginBottom: "0.55rem" }}>
-                            <p style={{ margin: "0 0 0.25rem 0", fontSize: "0.84rem", color: "var(--text-secondary)" }}>
-                              <strong>{g.traitName}</strong>
-                              {g.choiceOnly && g.dilettantePick
-                                ? " — Dilettante: choose a 1st-level at-will attack from another class (you use it as an encounter power)."
-                                : g.choiceOnly
-                                  ? " — choose one racial power below."
-                                  : ""}
-                            </p>
-                            {g.dilettantePick && !classIdForDilettante ? (
-                              <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.82rem", color: "var(--status-warning)" }}>
-                                Choose a standard class or two hybrid classes on the Class tab to load powers from other classes.
-                              </p>
-                            ) : null}
-                            <div>
-                              {g.choiceOnly ? (
-                                selectedPowId ? (
-                                  (() => {
-                                    const p = index.powers.find((x) => x.id === selectedPowId);
-                                    return p ? (
-                                      renderPowerCard(p, {
-                                        key: `race-tab-${g.traitId}-${p.id}`,
-                                        keywordTooltip: powerKeywordTooltip,
-                                        onKeywordMouseEnter: (event, keyword) => glossaryTooltipUi.startHover(event, `powerKeyword:${keyword}`),
-                                        onKeywordMouseLeave: glossaryTooltipUi.leaveHover,
-                                        glossaryHover: { start: glossaryTooltipUi.startHover, leave: glossaryTooltipUi.leaveHover },
-                                        renderRuleText: renderPowerGlossaryRuleText,
-                                        featModsByPowerId
-                                      })
-                                    ) : (
-                                      <p style={{ margin: 0, fontSize: "0.82rem", color: "var(--status-warning)" }}>
-                                        Stored power id is unknown in the index.
-                                      </p>
-                                    );
-                                  })()
-                                ) : (
-                                  <p style={{ margin: 0, fontSize: "0.82rem", color: "var(--text-muted)" }}>Pick a power in Race choices.</p>
-                                )
-                              ) : (
-                                optionPowers.map((p) =>
-                                  renderPowerCard(p, {
+                      .filter((g) => g.powerIds.length > 0)
+                      .map((g) => (
+                        <div key={`race-powers-${g.traitId}`} style={{ marginBottom: "0.55rem" }}>
+                          <p style={{ margin: "0 0 0.25rem 0", fontSize: "0.84rem", color: "var(--text-secondary)" }}>
+                            <strong>{g.traitName}</strong>
+                          </p>
+                          <div>
+                            {g.powerIds.map((pid) => {
+                              const p = index.powers.find((x) => x.id === pid);
+                              return p
+                                ? renderPowerCard(p, {
                                     key: `race-tab-${g.traitId}-${p.id}`,
                                     keywordTooltip: powerKeywordTooltip,
-                                    onKeywordMouseEnter: (event, keyword) => glossaryTooltipUi.startHover(event, `powerKeyword:${keyword}`),
+                                    onKeywordMouseEnter: (event, keyword) =>
+                                      glossaryTooltipUi.startHover(event, `powerKeyword:${keyword}`),
                                     onKeywordMouseLeave: glossaryTooltipUi.leaveHover,
                                     glossaryHover: { start: glossaryTooltipUi.startHover, leave: glossaryTooltipUi.leaveHover },
                                     renderRuleText: renderPowerGlossaryRuleText,
                                     featModsByPowerId
                                   })
-                                )
-                              )}
-                            </div>
+                                : (
+                                  <p key={pid} style={{ margin: 0, fontSize: "0.82rem", color: "var(--status-warning)" }}>
+                                    Stored power id is unknown in the index.
+                                  </p>
+                                );
+                            })}
                           </div>
-                        );
-                      })}
+                        </div>
+                      ))}
                   </div>
                 )}
                 {selectedRace.raw.flavor && (
@@ -3924,7 +3898,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 {upcomingPowerSlotMilestones.map((m) => `${m.label} at level ${m.atLevel}`).join("; ")}.
               </p>
             )}
-            {(racePowerGroups.some((g) => g.powerIds.length > 0 || g.dilettantePick) ||
+            {(racePowerGroups.some((g) => g.powerIds.length > 0) ||
+              dilettantePowerGroups.length > 0 ||
               classAutoGrantedPowers.length > 0 ||
               featGrantedPowers.length > 0 ||
               featPowerReplaceRows.length > 0 ||
@@ -3936,97 +3911,22 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               paragonMcGrantedPowers.length > 0 ||
               epicDestinyGrantedPowers.length > 0) && (
               <section style={{ marginBottom: "1.1rem", padding: "0.65rem 0.75rem", backgroundColor: "var(--surface-1)", borderRadius: "8px", border: "1px solid var(--panel-border)" }}>
-                {racePowerGroups.some((g) => g.powerIds.length > 0 || g.dilettantePick) && (
+                {racePowerGroups.some((g) => g.powerIds.length > 0) && (
                   <div style={{ marginBottom: "0.65rem" }}>
                     <div>
                       {racePowerGroups
-                        .filter((g) => g.powerIds.length > 0 || g.dilettantePick)
-                        .map((g) => {
-                          const pickKey = racePowerSelectSelectionKey(g.traitId);
-                          const selectedPowId = build.raceSelections?.[pickKey] || "";
-                          const optionPowers = g.dilettantePick
-                            ? filterPowersByQuery(dilettanteCandidatePowers, powerSearch)
-                            : g.powerIds
-                                .map((pid) => index.powers.find((p) => p.id === pid))
-                                .filter((p): p is Power => !!p);
-                          let selectOptions = optionPowers;
-                          if (selectedPowId && !selectOptions.some((p) => p.id === selectedPowId)) {
-                            const orphan = index.powers.find((p) => p.id === selectedPowId);
-                            if (orphan) selectOptions = [orphan, ...selectOptions];
-                          }
-                          return (
-                            <div key={g.traitId} style={{ marginBottom: "0.35rem" }}>
-                              <span style={{ fontWeight: 600, fontSize: "0.82rem", color: "var(--text-primary)" }}>{g.traitName}</span>
-                              {g.choiceOnly && g.dilettantePick ? (
-                                <span style={{ color: "var(--text-muted)", fontSize: "0.78rem" }}>
-                                  {" "}
-                                  — Dilettante (1st at-will from another class; search above filters this list):
-                                </span>
-                              ) : g.choiceOnly ? (
-                                <span style={{ color: "var(--text-muted)", fontSize: "0.78rem" }}> — pick one (same as Race tab):</span>
-                              ) : null}
-                              {g.dilettantePick && !classIdForDilettante ? (
-                                <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.78rem", color: "var(--status-warning)" }}>
-                                  Choose a standard class or hybrid classes on the Class tab to load other classes&apos; at-will powers.
-                                </p>
-                              ) : null}
-                              {g.choiceOnly && (
-                                <label style={{ display: "block", maxWidth: "28rem", marginTop: "0.35rem" }}>
-                                  <select
-                                    value={selectedPowId}
-                                    disabled={g.dilettantePick && !classIdForDilettante}
-                                    onChange={(e) => commitRacePowerSelection(g.traitId, e.target.value)}
-                                    style={{
-                                      width: "100%",
-                                      padding: "0.35rem",
-                                      borderRadius: "6px",
-                                      border: "1px solid var(--panel-border)",
-                                      boxSizing: "border-box",
-                                      fontSize: "0.82rem"
-                                    }}
-                                  >
-                                    <option value="">— Choose racial power —</option>
-                                    {selectOptions.map((p) => {
-                                      const clsName = index.classes.find((c) => c.id === p.classId)?.name || "";
-                                      return (
-                                        <option key={p.id} value={p.id}>
-                                          {clsName ? `${clsName}: ` : ""}
-                                          {p.name}
-                                        </option>
-                                      );
-                                    })}
-                                  </select>
-                                </label>
-                              )}
-                              {g.choiceOnly && g.dilettantePick && build.classId && selectOptions.length === 0 && powerSearch.trim() ? (
-                                <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.76rem", color: "var(--status-warning)" }}>
-                                  No powers match this filter; clear search to see the full Dilettante list.
-                                </p>
-                              ) : null}
-                              <div style={{ marginTop: "0.2rem" }}>
-                                {g.choiceOnly ? (
-                                  selectedPowId ? (
-                                    (() => {
-                                      const p = index.powers.find((x) => x.id === selectedPowId);
-                                      return p ? (
-                                        renderPowerCardWithSelections(p, `race-${g.traitId}-${p.id}`)
-                                      ) : (
-                                        <div key={selectedPowId}>{selectedPowId}</div>
-                                      );
-                                    })()
-                                  ) : (
-                                    <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>No racial power chosen yet.</span>
-                                  )
-                                ) : (
-                                  g.powerIds.map((pid) => {
-                                    const p = index.powers.find((x) => x.id === pid);
-                                    return p ? renderPowerCardWithSelections(p, `race-${g.traitId}-${p.id}`) : <div key={pid}>{pid}</div>;
-                                  })
-                                )}
-                              </div>
+                        .filter((g) => g.powerIds.length > 0)
+                        .map((g) => (
+                          <div key={g.traitId} style={{ marginBottom: "0.35rem" }}>
+                            <span style={{ fontWeight: 600, fontSize: "0.82rem", color: "var(--text-primary)" }}>{g.traitName}</span>
+                            <div style={{ marginTop: "0.2rem" }}>
+                              {g.powerIds.map((pid) => {
+                                const p = index.powers.find((x) => x.id === pid);
+                                return p ? renderPowerCardWithSelections(p, `race-${g.traitId}-${p.id}`) : <div key={pid}>{pid}</div>;
+                              })}
                             </div>
-                          );
-                        })}
+                          </div>
+                        ))}
                     </div>
                   </div>
                 )}
@@ -4364,6 +4264,85 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     }}
                   />
                 </label>
+                {dilettantePowerGroups.length > 0 && (
+                  <>
+                    <h4
+                      style={{
+                        ...subsectionTitleStyle,
+                        marginBottom: "0.5rem",
+                        borderBottom: "1px solid var(--panel-border)",
+                        paddingBottom: "0.25rem"
+                      }}
+                    >
+                      Dilettante
+                    </h4>
+                    {dilettantePowerGroups.map((g) => {
+                      const selectedPowId = build.raceSelections?.[racePowerSelectSelectionKey(g.traitId)] || "";
+                      let candidates = filterPowersByQuery(dilettanteCandidatePowers, powerSearch);
+                      if (selectedPowId && !candidates.some((p) => p.id === selectedPowId)) {
+                        const orphan = index.powers.find((p) => p.id === selectedPowId);
+                        if (orphan) candidates = [orphan, ...candidates];
+                      }
+                      const selPow = selectedPowId
+                        ? resolveDilettanteDisplayPower(index, build, selectedPowId)
+                        : undefined;
+                      return (
+                        <section key={`dilettante-${g.traitId}`} style={{ marginBottom: "1rem" }}>
+                          <div style={{ ...ui.blockSubsection, backgroundColor: "var(--surface-1)", padding: "0.65rem 0.75rem" }}>
+                            <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.35rem", color: "var(--text-primary)" }}>
+                              {g.traitName} (Dilettante)
+                            </label>
+                            <p style={{ margin: "0 0 0.45rem 0", fontSize: "0.78rem", color: "var(--text-muted)", lineHeight: 1.4 }}>
+                              Choose a 1st-level at-will attack power from another class. You use it as an encounter power
+                              (once per encounter).
+                            </p>
+                            {!classIdForDilettante ? (
+                              <p style={{ margin: 0, fontSize: "0.78rem", color: "var(--status-warning)" }}>
+                                Choose a standard class or hybrid classes on the Class tab to load other classes&apos; at-will powers.
+                              </p>
+                            ) : candidates.length === 0 ? (
+                              <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.86rem" }}>
+                                {powerSearch.trim()
+                                  ? "No powers match this filter; clear search to see the full Dilettante list."
+                                  : "No eligible at-will attack powers from other classes in the loaded rules data."}
+                              </p>
+                            ) : (
+                              <select
+                                value={selectedPowId}
+                                disabled={!classIdForDilettante}
+                                onChange={(e) => commitRacePowerSelection(g.traitId, e.target.value)}
+                                style={{
+                                  width: "100%",
+                                  maxWidth: "28rem",
+                                  padding: "0.4rem",
+                                  borderRadius: "6px",
+                                  border: "1px solid var(--panel-border)",
+                                  boxSizing: "border-box"
+                                }}
+                              >
+                                <option value="">— Choose power —</option>
+                                {candidates.map((power) => {
+                                  const clsName = index.classes.find((c) => c.id === power.classId)?.name || "";
+                                  return (
+                                    <option key={power.id} value={power.id}>
+                                      {clsName ? `${clsName}: ` : ""}
+                                      {power.name}
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                            )}
+                            {selPow ? (
+                              <div style={{ marginTop: "0.45rem" }}>
+                                {renderPowerCardWithSelections(selPow, `dilettante-${g.traitId}-${selPow.id}`, selPow)}
+                              </div>
+                            ) : null}
+                          </div>
+                        </section>
+                      );
+                    })}
+                  </>
+                )}
                 {powerSlotDefs.map((def, idx) => {
                   const showBucketHeader = idx === 0 || powerSlotDefs[idx - 1].bucket !== def.bucket;
                   const slotsMap = build.classPowerSlots || {};

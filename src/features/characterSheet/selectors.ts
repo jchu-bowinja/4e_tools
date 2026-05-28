@@ -1,4 +1,5 @@
 import { attackPowerBucketFromUsage } from "../../rules/classPowerSlots";
+import { collectDilettantePowersForBuild } from "../../rules/dilettantePower";
 import { getPowersForOwnerId } from "../../rules/classPowersQuery";
 import { collectParagonMulticlassPowerIds } from "../../rules/paragonMulticlassing";
 import {
@@ -235,6 +236,14 @@ export function groupCombatPowers(state: CharacterSheetState, index: RulesIndex)
   const featGranted = collectFeatGrantedPowersForBuild(index, {
     featIds: state.featIds ?? []
   }).flatMap((row) => row.powers);
+  const dilettanteGranted = collectDilettantePowersForBuild(index, {
+    raceId: state.raceId,
+    raceSelections: state.raceSelections,
+    characterStyle: state.characterStyle,
+    classId: state.classId,
+    hybridClassIdA: state.hybridClassIdA,
+    hybridClassIdB: state.hybridClassIdB
+  });
   const paragonMcIds = collectParagonMulticlassPowerIds({
     level: state.level,
     paragonMulticlassing: state.paragonMulticlassing,
@@ -247,6 +256,7 @@ export function groupCombatPowers(state: CharacterSheetState, index: RulesIndex)
     ...selected,
     ...autoClass,
     ...raceGranted,
+    ...dilettanteGranted,
     ...themeGranted,
     ...paragonGranted,
     ...paragonMcGranted,

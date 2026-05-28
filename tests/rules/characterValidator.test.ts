@@ -289,7 +289,9 @@ describe("validateCharacterBuild", () => {
     };
     const base = { ...legalLevel1Base, raceId: "race_he" };
     const missing = validateCharacterBuild(indexDil, base);
-    expect(missing.errors.some((e) => e.includes("Dilettante") && e.includes("at-will"))).toBe(true);
+    expect(missing.errors.some((e) => e.includes("Powers:") && e.includes("Dilettante") && e.includes("encounter"))).toBe(
+      true
+    );
 
     const ok = validateCharacterBuild(indexDil, {
       ...base,

@@ -8,7 +8,11 @@ import {
 } from "./advancement";
 import { CharacterBuild, ClassDef, HybridClassDef, Power, RulesIndex, Skill } from "./models";
 import { buildClassPowerSlotDefinitions, attackPowerSlotKindFromUsage, powerPrintedLevelEligibleForSlot } from "./classPowerSlots";
-import { getClassPowersForLevelRange, getDilettanteCandidatePowers } from "./classPowersQuery";
+import { getClassPowersForLevelRange } from "./classPowersQuery";
+import {
+  getDilettanteCandidatePowersForBuild,
+  resolveDilettantePowerPick
+} from "./dilettantePower";
 import { evaluatePrereqs, hybridBaseClassNames } from "./prereqEvaluator";
 import {
   bonusClassAtWillSlotFromRaceBuild,
@@ -245,24 +249,21 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
         if (g.dilettantePick) {
           if (!classIdForDilettante) {
             errors.push(
-              `Race: ${g.traitName} — choose a class on the Class tab to pick a Dilettante power from another class's at-will list.`
+              `Powers: ${g.traitName} — choose a class on the Class tab to pick a Dilettante power from another class's at-will list.`
             );
             continue;
           }
-          const legal = getDilettanteCandidatePowers(
-            index,
-            classIdForDilettante,
-            isHybrid ? hybridB?.baseClassId ?? undefined : undefined
-          );
+          const legal = getDilettanteCandidatePowersForBuild(index, build);
           const legalIds = new Set(legal.map((p) => p.id));
-          if (!pickedPower) {
+          const dilettantePick = resolveDilettantePowerPick(build, g.traitId);
+          if (!dilettantePick) {
             errors.push(
-              `Race: ${g.traitName} — choose a 1st-level at-will attack power from a class other than yours (Dilettante).`
+              `Powers: ${g.traitName} — choose a 1st-level at-will attack power from a class other than yours (used as an encounter power).`
             );
             continue;
           }
-          if (!legalIds.has(pickedPower)) {
-            errors.push(`Race: ${g.traitName} — selected power is not a legal Dilettante choice for your class.`);
+          if (!legalIds.has(dilettantePick)) {
+            errors.push(`Powers: ${g.traitName} — selected power is not a legal Dilettante choice for your class.`);
           }
           continue;
         }
