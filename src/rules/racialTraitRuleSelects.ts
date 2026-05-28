@@ -1,4 +1,4 @@
-import type { ClassDef, Race, RacialTrait, RulesIndex } from "./models";
+import type { CharacterBuild, ClassDef, Race, RacialTrait, RulesIndex } from "./models";
 import { getRaceExtraTraitIds } from "./raceSubraces";
 import { parseRacialTraitIdsFromRace } from "./racialTraits";
 
@@ -90,6 +90,70 @@ function collectTraitIdsForRuleSelectScan(
  * Trait-level `rules.select` slots (skill training, bonus feat, revenant past life).
  * Race-level language/skill bonus picks stay in `getRaceSecondarySelectSlots`.
  */
+export function countRacialTraitRuleSelectSlotsByKind(
+  slots: RacialTraitRuleSelectSlot[],
+  kind: RacialTraitRuleSelectKind
+): number {
+  return slots.filter((s) => s.kind === kind).length;
+}
+
+function classDefForRacialRuleSelects(
+  index: Pick<RulesIndex, "classes">,
+  build: Pick<CharacterBuild, "classId" | "characterStyle">
+): ClassDef | undefined {
+  if (build.characterStyle === "hybrid") return undefined;
+  return index.classes?.find((c) => c.id === build.classId);
+}
+
+/** Bonus feat picks granted by racial traits (e.g. Human Bonus Feat); chosen on the Feats tab. */
+export function resolveRacialFeatSlotCountForBuild(
+  index: Pick<RulesIndex, "races" | "racialTraits" | "classes">,
+  build: Pick<CharacterBuild, "raceId" | "raceSelections" | "classId" | "characterStyle">
+): number {
+  const race = index.races?.find((r) => r.id === build.raceId);
+  if (!race) return 0;
+  const traitsById = new Map((index.racialTraits ?? []).map((t) => [t.id, t]));
+  const slots = getRacialTraitRuleSelectSlots(
+    race,
+    traitsById,
+    build.raceSelections,
+    classDefForRacialRuleSelects(index, build),
+    index.races
+  );
+  return countRacialTraitRuleSelectSlotsByKind(slots, "feat");
+}
+
+/** Bonus trained-skill picks from racial traits (e.g. Human Bonus Skill); chosen on the Skills tab. */
+export function resolveRacialSkillTrainingSlotCountForBuild(
+  index: Pick<RulesIndex, "races" | "racialTraits" | "classes">,
+  build: Pick<CharacterBuild, "raceId" | "raceSelections" | "classId" | "characterStyle">
+): number {
+  const race = index.races?.find((r) => r.id === build.raceId);
+  if (!race) return 0;
+  const traitsById = new Map((index.racialTraits ?? []).map((t) => [t.id, t]));
+  const slots = getRacialTraitRuleSelectSlots(
+    race,
+    traitsById,
+    build.raceSelections,
+    classDefForRacialRuleSelects(index, build),
+    index.races
+  );
+  return countRacialTraitRuleSelectSlotsByKind(slots, "skillTraining");
+}
+
+/** Race tab: subrace / past life only — feat and skill picks use Feats / Skills tabs. */
+export function getRacialTraitRuleSelectSlotsForRaceTab(
+  race: Race | undefined,
+  traitsById: Map<string, RacialTrait>,
+  raceSelections: Record<string, string> | undefined,
+  classDef: ClassDef | undefined,
+  races?: Race[]
+): RacialTraitRuleSelectSlot[] {
+  return getRacialTraitRuleSelectSlots(race, traitsById, raceSelections, classDef, races).filter(
+    (s) => s.kind === "countsAsRace"
+  );
+}
+
 export function getRacialTraitRuleSelectSlots(
   race: Race | undefined,
   traitsById: Map<string, RacialTrait>,

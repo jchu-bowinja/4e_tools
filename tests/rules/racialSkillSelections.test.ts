@@ -122,8 +122,8 @@ describe("integration with grantedSkillsQuery and derived stats", () => {
     }
   };
 
-  it("auto-grants racial skill training without duplicating manual picks", () => {
-    expect(autoGrantedTrainedSkillIds(index, build)).toContain("SK_ARC");
+  it("includes racial skill training from Skills tab picks without auto-grant", () => {
+    expect(autoGrantedTrainedSkillIds(index, build)).not.toContain("SK_ARC");
     const withManual: CharacterBuild = { ...build, trainedSkillIds: ["SK_ARC", "SK_STEALTH"] };
     expect(effectiveTrainedSkillIdsForBuild(index, withManual).sort()).toEqual(["SK_ARC", "SK_STEALTH"]);
     expect(effectiveTrainedSkillIdSet(index, withManual).has("SK_ARC")).toBe(true);

@@ -3,7 +3,6 @@ import {
   expectedClassDailyAttackSlots,
   expectedClassEncounterAttackSlots,
   expectedClassUtilityPowerCount,
-  isHumanRace,
   requiredAsiMilestonesUpTo,
   totalFeatSlots
 } from "./advancement";
@@ -32,7 +31,12 @@ import {
   getClassFeatureChoiceGroups,
   parseClassPowerChoiceSelection
 } from "./classFeatureChoices";
-import { countsAsRaceOptions, getRacialTraitRuleSelectSlots } from "./racialTraitRuleSelects";
+import {
+  countsAsRaceOptions,
+  getRacialTraitRuleSelectSlots,
+  resolveRacialFeatSlotCountForBuild,
+  resolveRacialSkillTrainingSlotCountForBuild
+} from "./racialTraitRuleSelects";
 import { getRaceExtraTraitIds, getRaceTraitBundleSlots } from "./raceSubraces";
 import { getRaceSecondarySelectSlots, selectableStartingLanguages } from "./raceRuleSelects";
 import { autoGrantedTrainedSkillIds } from "./grantedSkillsQuery";
@@ -215,26 +219,16 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
       }
       const clsForRaceSelects = !isHybrid ? index.classes.find((c) => c.id === build.classId) : undefined;
       for (const slot of getRacialTraitRuleSelectSlots(race, racialTraitById, rs, clsForRaceSelects, index.races)) {
+        if (slot.kind === "feat" || slot.kind === "skillTraining") continue;
         const picked = rs[slot.key];
         if (!picked) {
           errors.push(`Race: ${slot.label} — make a selection.`);
           continue;
         }
-        if (slot.kind === "skillTraining" && !legalSkillIds.has(picked)) {
-          errors.push(`Race: ${slot.label} — pick a valid skill.`);
-        }
         if (slot.kind === "countsAsRace") {
           const legalRaceIds = new Set(countsAsRaceOptions(index, build.raceId).map((r) => r.id));
           if (!legalRaceIds.has(picked)) {
             errors.push(`Race: ${slot.label} — pick a valid former race.`);
-          }
-        }
-        if (slot.kind === "feat") {
-          const feat = index.feats.find((f) => f.id === picked);
-          if (!feat) {
-            errors.push(`Race: ${slot.label} — pick a valid feat.`);
-          } else if (!build.featIds.includes(picked)) {
-            errors.push(`Race: ${slot.label} — add the selected feat on the Feats tab.`);
           }
         }
       }
@@ -313,8 +307,8 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
 
     classSkillRules = parseClassSkillRules(cls);
 
-    const raceName = index.races.find((r) => r.id === build.raceId)?.name;
-    const human = isHumanRace(raceName);
+    const racialFeatSlots = resolveRacialFeatSlotCountForBuild(index, build);
+    const racialSkillSlots = resolveRacialSkillTrainingSlotCountForBuild(index, build);
     const bonusThirdClassAtWill = bonusClassAtWillSlotFromRaceBuild(index, build);
     const atWillPenalty = paragonMulticlassPrimaryAtWillSlotPenalty(index, build);
     const wantAw = Math.max(
@@ -326,14 +320,14 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
     const wantUtil = expectedClassUtilityPowerCount(build.level);
     powerSlotRules = { atWill: wantAw, encounter: wantEnc, daily: wantDaily, utility: wantUtil };
 
-    const expectedFeats = totalFeatSlots(build.level, human);
+    const expectedFeats = totalFeatSlots(build.level, racialFeatSlots);
     const uniqueFeat = new Set(build.featIds);
     if (uniqueFeat.size !== build.featIds.length) {
       errors.push("Duplicate feats are not allowed; pick each feat only once.");
     }
     if (build.featIds.length !== expectedFeats) {
       errors.push(
-        `Select exactly ${expectedFeats} feat${expectedFeats === 1 ? "" : "s"} for level ${build.level} (currently ${build.featIds.length}).`
+        `Feats: select exactly ${expectedFeats} feat${expectedFeats === 1 ? "" : "s"} for level ${build.level} (currently ${build.featIds.length}).`
       );
     }
     errors.push(...validateMulticlassFeats(index, build));
@@ -368,9 +362,11 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
       const name = skillsById.get(id)?.name?.toLowerCase();
       return Boolean(name && classSkillLower.has(name) && !requiredLower.has(name));
     }).length;
-    const expectedOptional = classSkillRules.chooseAdditionalCount;
+    const expectedOptional = classSkillRules.chooseAdditionalCount + racialSkillSlots;
     if (optionalSelected !== expectedOptional) {
-      errors.push(`Select ${expectedOptional} additional class skills (currently ${optionalSelected}).`);
+      errors.push(
+        `Skills: select ${expectedOptional} trained class skill${expectedOptional === 1 ? "" : "s"} (currently ${optionalSelected}).`
+      );
     }
 
     const offListNames = build.trainedSkillIds
@@ -498,17 +494,16 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
       }
     }
 
+    const racialFeatSlots = resolveRacialFeatSlotCountForBuild(index, build);
+    const racialSkillSlots = resolveRacialSkillTrainingSlotCountForBuild(index, build);
     const intScore = build.abilityScores.INT || 10;
-    const expectedTrainHybrid = expectedHybridTrainedSkillCount(intScore);
+    const expectedTrainHybrid = expectedHybridTrainedSkillCount(intScore) + racialSkillSlots;
     const unionSkillNames = hybridCombinedClassSkillNames(hybridA, hybridB);
     classSkillRules = {
       classSkillNames: unionSkillNames,
       requiredTrainedSkillNames: [],
       chooseAdditionalCount: expectedTrainHybrid
     };
-
-    const raceName = index.races.find((r) => r.id === build.raceId)?.name;
-    const human = isHumanRace(raceName);
     const bonusThirdClassAtWill = bonusClassAtWillSlotFromRaceBuild(index, build);
     const atWillPenalty = paragonMulticlassPrimaryAtWillSlotPenalty(index, build);
     const wantAw = Math.max(
@@ -520,14 +515,14 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
     const wantUtil = expectedClassUtilityPowerCount(build.level);
     powerSlotRules = { atWill: wantAw, encounter: wantEnc, daily: wantDaily, utility: wantUtil };
 
-    const expectedFeats = totalFeatSlots(build.level, human);
+    const expectedFeats = totalFeatSlots(build.level, racialFeatSlots);
     const uniqueFeat = new Set(build.featIds);
     if (uniqueFeat.size !== build.featIds.length) {
       errors.push("Duplicate feats are not allowed; pick each feat only once.");
     }
     if (build.featIds.length !== expectedFeats) {
       errors.push(
-        `Select exactly ${expectedFeats} feat${expectedFeats === 1 ? "" : "s"} for level ${build.level} (currently ${build.featIds.length}).`
+        `Feats: select exactly ${expectedFeats} feat${expectedFeats === 1 ? "" : "s"} for level ${build.level} (currently ${build.featIds.length}).`
       );
     }
     errors.push(...validateMulticlassFeats(index, build));
@@ -562,7 +557,7 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
     }).length;
     if (optionalSelectedHy !== classSkillRules.chooseAdditionalCount) {
       errors.push(
-        `Select exactly ${classSkillRules.chooseAdditionalCount} trained skills from your hybrid class skill lists (currently ${optionalSelectedHy}).`
+        `Skills: select ${classSkillRules.chooseAdditionalCount} trained skill${classSkillRules.chooseAdditionalCount === 1 ? "" : "s"} from your hybrid class skill lists (currently ${optionalSelectedHy}).`
       );
     }
 

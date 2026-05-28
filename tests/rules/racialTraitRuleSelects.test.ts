@@ -3,7 +3,9 @@ import type { Race, RacialTrait, RulesIndex } from "../../src/rules/models";
 import {
   countsAsRaceOptions,
   getRacialTraitRuleSelectSlots,
-  raceTraitSelectRequiresMatches
+  raceTraitSelectRequiresMatches,
+  resolveRacialFeatSlotCountForBuild,
+  resolveRacialSkillTrainingSlotCountForBuild
 } from "../../src/rules/racialTraitRuleSelects";
 import { findPastSpiritTraitForCountsAsRace, getRaceExtraTraitIds } from "../../src/rules/raceSubraces";
 
@@ -76,6 +78,51 @@ describe("getRacialTraitRuleSelectSlots", () => {
     expect(getRacialTraitRuleSelectSlots(race, byId, {}, binder, [])[0]?.key).toBe(
       "skillTraining:TR_SKILL:0"
     );
+  });
+});
+
+describe("resolveRacialSlotCountsForBuild", () => {
+  it("counts feat and skillTraining slots for Human with Fighter", () => {
+    const race: Race = {
+      id: "R_H",
+      name: "Human",
+      slug: "human",
+      raw: { specific: { "Racial Traits": "TR_SKILL,TR_FEAT" } }
+    };
+    const bonusSkill: RacialTrait = {
+      id: "TR_SKILL",
+      name: "Bonus Skill",
+      slug: "bonus-skill",
+      raw: {
+        rules: {
+          select: [
+            {
+              attrs: {
+                type: "Skill Training",
+                number: "1",
+                Category: "$$CLASS",
+                requires: "!Binder|Blackguard"
+              }
+            }
+          ]
+        }
+      }
+    };
+    const bonusFeat: RacialTrait = {
+      id: "TR_FEAT",
+      name: "Bonus Feat",
+      slug: "bonus-feat",
+      raw: { rules: { select: [{ attrs: { type: "Feat", number: "1" } }] } }
+    };
+    const byId = new Map([
+      ["TR_SKILL", bonusSkill],
+      ["TR_FEAT", bonusFeat]
+    ]);
+    const fighter = { id: "ID_F", name: "Fighter", slug: "fighter", raw: {} };
+    const index = { races: [race], classes: [fighter], racialTraits: [bonusSkill, bonusFeat] };
+    const build = { raceId: "R_H", classId: "ID_F", trainedSkillIds: [], featIds: [] };
+    expect(resolveRacialFeatSlotCountForBuild(index, build)).toBe(1);
+    expect(resolveRacialSkillTrainingSlotCountForBuild(index, build)).toBe(1);
   });
 });
 

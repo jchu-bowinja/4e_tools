@@ -5,7 +5,7 @@ import {
   collectActiveRacialTraits
 } from "../../src/rules/activeRacialTraits";
 import {
-  HUMAN_POWER_OPTION_RACE_KEY,
+  ID_RACIAL_TRAIT_BONUS_AT_WILL,
   ID_RACIAL_TRAIT_HEROIC_EFFORT,
   ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION
 } from "../../src/rules/grantedPowersQuery";
@@ -98,7 +98,14 @@ describe("collectActiveRacialTraitIds", () => {
       id: ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION,
       name: "Human Power Selection",
       slug: "human-power",
-      raw: {}
+      raw: {
+        specific: {
+          _PARSED_SUB_FEATURES: `${ID_RACIAL_TRAIT_HEROIC_EFFORT},${ID_RACIAL_TRAIT_BONUS_AT_WILL}`
+        },
+        rules: {
+          select: [{ attrs: { type: "Racial Trait", number: "1", Category: "Human Power Selection" } }]
+        }
+      }
     };
     const heroic: RacialTrait = {
       id: ID_RACIAL_TRAIT_HEROIC_EFFORT,
@@ -106,15 +113,21 @@ describe("collectActiveRacialTraitIds", () => {
       slug: "heroic-effort",
       raw: {}
     };
+    const bonusAtWill: RacialTrait = {
+      id: ID_RACIAL_TRAIT_BONUS_AT_WILL,
+      name: "Bonus At-Will Power",
+      slug: "bonus-at-will",
+      raw: {}
+    };
     const byId = new Map([
       [ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION, powerPick],
-      [ID_RACIAL_TRAIT_HEROIC_EFFORT, heroic]
+      [ID_RACIAL_TRAIT_HEROIC_EFFORT, heroic],
+      [ID_RACIAL_TRAIT_BONUS_AT_WILL, bonusAtWill]
     ]);
 
     const ids = collectActiveRacialTraitIds(race, byId, {
-      [HUMAN_POWER_OPTION_RACE_KEY]: ID_RACIAL_TRAIT_HEROIC_EFFORT
+      subrace: ID_RACIAL_TRAIT_HEROIC_EFFORT
     });
-    expect(ids).toContain(ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION);
     expect(ids).toContain(ID_RACIAL_TRAIT_HEROIC_EFFORT);
   });
 

@@ -18,12 +18,13 @@ describe("reconcileTrainedSkillIds", () => {
   const build = {
     raceId: "R1",
     classId: "C1",
-    raceSelections: { "skillTraining:TR:0": "SK_DIP" }
+    raceSelections: { "skillTraining:TR:0": "SK_DIP" },
+    trainedSkillIds: ["SK_DIP"]
   } as CharacterBuild;
 
   it("merges manual picks with current auto-grants", () => {
     const prevAuto = new Set<string>();
-    const next = reconcileTrainedSkillIds(index, build, [], prevAuto);
+    const next = reconcileTrainedSkillIds(index, build, build.trainedSkillIds, prevAuto);
     expect(next).toEqual(expect.arrayContaining(["SK_ARC", "SK_DIP"]));
     expect(next).toHaveLength(2);
 

@@ -1,9 +1,4 @@
 import type { CharacterBuild, Race, RacialTrait, RulesIndex } from "./models";
-import {
-  HUMAN_POWER_OPTION_RACE_KEY,
-  ID_RACIAL_TRAIT_HEROIC_EFFORT,
-  ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION
-} from "./grantedPowersQuery";
 import { expandRacialTraitIdsWithGrantedChildren } from "./racialTraitGrants";
 import { getRaceExtraTraitIds, resolveDisplayedRacialTraitsForRace } from "./raceSubraces";
 import { parseRacialTraitIdsFromRace } from "./racialTraits";
@@ -40,13 +35,6 @@ export function collectActiveRacialTraitIds(
 
   for (const id of getRaceExtraTraitIds(race, traitsById, raceSelections, races)) {
     push(id);
-  }
-
-  if (parseRacialTraitIdsFromRace(race).includes(ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION)) {
-    const pick = raceSelections?.[HUMAN_POWER_OPTION_RACE_KEY];
-    if (pick === ID_RACIAL_TRAIT_HEROIC_EFFORT) {
-      push(ID_RACIAL_TRAIT_HEROIC_EFFORT);
-    }
   }
 
   return expandRacialTraitIdsWithGrantedChildren(out, traitsById);

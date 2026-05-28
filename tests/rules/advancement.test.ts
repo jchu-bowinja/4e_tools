@@ -9,7 +9,7 @@ import {
 describe("advancement", () => {
   it("counts feat slots including 1st-level and human bonus", () => {
     expect(totalFeatSlots(1, false)).toBe(1);
-    expect(totalFeatSlots(1, true)).toBe(2);
+    expect(totalFeatSlots(1, 1)).toBe(2);
     expect(totalFeatSlots(2, false)).toBe(2);
     expect(totalFeatSlots(11, false)).toBe(7);
   });

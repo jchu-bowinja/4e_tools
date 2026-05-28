@@ -12,12 +12,13 @@ export const ASI_TWO_CHOICE_LEVELS: readonly number[] = [4, 8, 14, 18, 24, 28];
 /** Automatic +1 to all abilities at these tiers (PHB). */
 export const ASI_ALL_ABILITIES_LEVELS: readonly number[] = [11, 21];
 
-export function totalFeatSlots(level: number, humanBonusFeat: boolean): number {
+/** Level-based feat slots plus racial bonus feat picks (from racial trait `Feat` selects). */
+export function totalFeatSlots(level: number, extraRacialFeatSlots = 0): number {
   let n = 0;
   for (const L of FEAT_GAIN_LEVELS) {
     if (L <= level) n += 1;
   }
-  return n + (humanBonusFeat ? 1 : 0);
+  return n + Math.max(0, extraRacialFeatSlots);
 }
 
 export function isHumanRace(raceName: string | undefined): boolean {

@@ -1,6 +1,5 @@
 import type { CharacterBuild, RulesIndex } from "./models";
 import { collectFeatGrantedSkillTrainingIds } from "./featGrantFlags";
-import { collectRacialSkillTrainingIdsFromBuild } from "./racialSkillSelections";
 
 function normalized(s: string): string {
   return s.trim().toLowerCase();
@@ -40,12 +39,6 @@ export function autoGrantedTrainedSkillIds(index: RulesIndex, build: CharacterBu
     }
   }
   for (const id of collectFeatGrantedSkillTrainingIds(index, build)) {
-    if (!seen.has(id)) {
-      seen.add(id);
-      out.push(id);
-    }
-  }
-  for (const id of collectRacialSkillTrainingIdsFromBuild(index, build)) {
     if (!seen.has(id)) {
       seen.add(id);
       out.push(id);

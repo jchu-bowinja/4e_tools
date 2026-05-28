@@ -5,6 +5,7 @@ import {
   collectPowerIdsFromRacialTrait,
   collectSelectablePowerIdsFromRacialTrait,
   HUMAN_POWER_OPTION_RACE_KEY,
+  findHumanPowerSelectionBundleSlot,
   ID_RACIAL_TRAIT_BONUS_AT_WILL,
   ID_RACIAL_TRAIT_HEROIC_EFFORT,
   ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION,
@@ -255,13 +256,40 @@ describe("bonus class at-will from racial traits", () => {
       id: ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION,
       name: "Human Power Selection",
       slug: "hps",
-      raw: {}
+      raw: {
+        specific: {
+          _PARSED_SUB_FEATURES: `${ID_RACIAL_TRAIT_HEROIC_EFFORT},${ID_RACIAL_TRAIT_BONUS_AT_WILL}`
+        },
+        rules: {
+          select: [{ attrs: { type: "Racial Trait", number: "1", Category: "Human Power Selection" } }]
+        }
+      }
     };
-    const map = new Map([[parentTrait.id, parentTrait]]);
+    const map = new Map([
+      [parentTrait.id, parentTrait],
+      [
+        ID_RACIAL_TRAIT_HEROIC_EFFORT,
+        { id: ID_RACIAL_TRAIT_HEROIC_EFFORT, name: "Heroic Effort", slug: "he", raw: {} }
+      ],
+      [
+        ID_RACIAL_TRAIT_BONUS_AT_WILL,
+        { id: ID_RACIAL_TRAIT_BONUS_AT_WILL, name: "Bonus At-Will Power", slug: "baw", raw: {} }
+      ]
+    ]);
     expect(raceGrantsBonusClassAtWillSlot(race as Parameters<typeof raceGrantsBonusClassAtWillSlot>[0], map, [], {})).toBe(true);
     expect(
       raceGrantsBonusClassAtWillSlot(race as Parameters<typeof raceGrantsBonusClassAtWillSlot>[0], map, [], {
         [HUMAN_POWER_OPTION_RACE_KEY]: ID_RACIAL_TRAIT_HEROIC_EFFORT
+      })
+    ).toBe(false);
+    const slot = findHumanPowerSelectionBundleSlot(
+      race as Parameters<typeof findHumanPowerSelectionBundleSlot>[0],
+      map
+    );
+    expect(slot?.selectionKey).toBe("subrace");
+    expect(
+      raceGrantsBonusClassAtWillSlot(race as Parameters<typeof raceGrantsBonusClassAtWillSlot>[0], map, [], {
+        subrace: ID_RACIAL_TRAIT_HEROIC_EFFORT
       })
     ).toBe(false);
   });

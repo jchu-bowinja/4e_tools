@@ -50,6 +50,13 @@ describe.skipIf(!existsSync(rulesIndexPath))("bonus third class at-will (generat
         raceSelections: { [HUMAN_POWER_OPTION_RACE_KEY]: ID_RACIAL_TRAIT_BONUS_AT_WILL }
       })
     ).toBe(true);
+
+    expect(
+      bonusClassAtWillSlotFromRaceBuild(index, {
+        raceId: humanRace.id,
+        raceSelections: { subrace: ID_RACIAL_TRAIT_HEROIC_EFFORT }
+      })
+    ).toBe(false);
   });
 
   it("Bonus At-Will racial trait (356) is present in the racial trait dataset", () => {

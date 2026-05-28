@@ -32,7 +32,7 @@ import {
 } from "../../rules/hybridPowerSlots";
 import { computeBuilderLikeDerivedStats } from "../../rules/derivedStatsFromBuild";
 import { resolveFeatOptions } from "../../rules/optionResolver";
-import { applyAsiBonusesToScores, isHumanRace, requiredAsiMilestonesUpTo, totalFeatSlots } from "../../rules/advancement";
+import { applyAsiBonusesToScores, requiredAsiMilestonesUpTo, totalFeatSlots } from "../../rules/advancement";
 import {
   attackPowerBucketFromUsage,
   buildClassPowerSlotDefinitions,
@@ -48,9 +48,7 @@ import { getDilettanteCandidatePowers, getPowersForOwnerId } from "../../rules/c
 import {
   autoGrantedClassPowers,
   bonusClassAtWillSlotFromRaceBuild,
-  HUMAN_POWER_OPTION_RACE_KEY,
-  ID_RACIAL_TRAIT_BONUS_AT_WILL,
-  ID_RACIAL_TRAIT_HEROIC_EFFORT,
+  findHumanPowerSelectionBundleSlot,
   ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION,
   collectFeatGrantedPowersForBuild,
   collectFeatModifiedPowersForBuild,
@@ -84,7 +82,12 @@ import {
   raceDefersAbilityBonusToSubrace,
   resolveRaceAbilityBonusInfo
 } from "../../rules/abilityScores";
-import { countsAsRaceOptions, getRacialTraitRuleSelectSlots } from "../../rules/racialTraitRuleSelects";
+import {
+  countsAsRaceOptions,
+  getRacialTraitRuleSelectSlotsForRaceTab,
+  resolveRacialFeatSlotCountForBuild,
+  resolveRacialSkillTrainingSlotCountForBuild
+} from "../../rules/racialTraitRuleSelects";
 import { getRaceSecondarySelectSlots, selectableStartingLanguages } from "../../rules/raceRuleSelects";
 import { parseRacialTraitIdsFromRace } from "../../rules/racialTraits";
 import {
@@ -1052,9 +1055,9 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     () => getRaceExtraTraitIds(selectedRace, racialTraitById, build.raceSelections, index.races),
     [selectedRace, racialTraitById, build.raceSelections, index.races]
   );
-  const racialTraitRuleSelectSlots = useMemo(
+  const racialTraitRuleSelectSlotsRaceTab = useMemo(
     () =>
-      getRacialTraitRuleSelectSlots(
+      getRacialTraitRuleSelectSlotsForRaceTab(
         selectedRace,
         racialTraitById,
         build.raceSelections,
@@ -1062,6 +1065,14 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         index.races
       ),
     [selectedRace, racialTraitById, build.raceSelections, selectedClass, index.races]
+  );
+  const racialFeatSlotCount = useMemo(
+    () => resolveRacialFeatSlotCountForBuild(index, build),
+    [index, build.raceId, build.raceSelections, build.classId, build.characterStyle]
+  );
+  const racialSkillTrainingSlotCount = useMemo(
+    () => resolveRacialSkillTrainingSlotCountForBuild(index, build),
+    [index, build.raceId, build.raceSelections, build.classId, build.characterStyle]
   );
   const countsAsRacePickOptions = useMemo(
     () => countsAsRaceOptions(index, build.raceId),
@@ -1463,8 +1474,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     [featOptions, showInvalidFeats]
   );
   const expectedFeatCount = useMemo(
-    () => totalFeatSlots(build.level, isHumanRace(selectedRace?.name)),
-    [build.level, selectedRace?.name]
+    () => totalFeatSlots(build.level, racialFeatSlotCount),
+    [build.level, racialFeatSlotCount]
   );
   const filteredFeatRows = useMemo(() => {
     const filtered = filterFeatOptions(displayedFeatOptions, {
@@ -1596,13 +1607,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     return reconcileClassPowerSlotsForBuild(pruned, lv, bonus, index);
   }
 
-  const humanPowerExtraTraitIds = useMemo(() => {
-    const top = parseRacialTraitIdsFromRace(selectedRace);
-    if (!top.includes(ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION)) return [];
-    const pick = build.raceSelections?.[HUMAN_POWER_OPTION_RACE_KEY];
-    if (pick === ID_RACIAL_TRAIT_HEROIC_EFFORT) return [ID_RACIAL_TRAIT_HEROIC_EFFORT];
-    return [];
-  }, [selectedRace, build.raceSelections]);
   const paragonAtWillPenalty = useMemo(
     () => paragonMulticlassPrimaryAtWillSlotPenalty(index, build),
     [index, build]
@@ -1613,11 +1617,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   }, [build.level, bonusClassAtWill, isHybridBuild, paragonAtWillPenalty]);
   const racePowerGroups = useMemo(
     () =>
-      racePowerGroupsForRace(selectedRace, racialTraitById, [
-        ...humanPowerExtraTraitIds,
-        ...raceExtraTraitIds
-      ]),
-    [selectedRace, racialTraitById, humanPowerExtraTraitIds, raceExtraTraitIds]
+      racePowerGroupsForRace(selectedRace, racialTraitById, raceExtraTraitIds),
+    [selectedRace, racialTraitById, raceExtraTraitIds]
   );
   const classAutoGrantedPowers = useMemo(() => {
     if (isHybridBuild && hybridBaseClassAId && hybridBaseClassBId) {
@@ -1727,7 +1728,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     }
     return count;
   }, [build.trainedSkillIds, skillNameById, selectedClassSkillNamesLower, requiredClassSkillNamesLower]);
-  const maxAdditionalTrainedSkills = legality.classSkillRules?.chooseAdditionalCount ?? 0;
+  const maxAdditionalTrainedSkills =
+    (legality.classSkillRules?.chooseAdditionalCount ?? 0) + racialSkillTrainingSlotCount;
   const trainedSkillSelectionMaxed = trainedOptionalClassSkillCount >= maxAdditionalTrainedSkills;
   const prereqContext = useMemo(() => buildPrereqCharacterContext(index, build), [index, build]);
   const hybridPrereqOptions = useMemo(() => {
@@ -2072,6 +2074,10 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     const next = { ...(build.raceSelections || {}) };
     if (optionTraitId) next[selectionKey] = optionTraitId;
     else delete next[selectionKey];
+    const humanPowerSlot = findHumanPowerSelectionBundleSlot(selectedRace, racialTraitById);
+    if (humanPowerSlot && selectionKey === humanPowerSlot.selectionKey) {
+      delete next.humanPowerOption;
+    }
     for (const key of Object.keys(next)) {
       if (key.startsWith("racialPower:")) delete next[key];
     }
@@ -2099,12 +2105,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     }
     const keys = Object.keys(next);
     let nextBuild: CharacterBuild = { ...build, raceSelections: keys.length ? next : undefined };
-    if (slotKey.startsWith("racialFeat:") && value) {
-      const featIds = nextBuild.featIds.includes(value)
-        ? nextBuild.featIds
-        : [...nextBuild.featIds, value];
-      nextBuild = { ...nextBuild, featIds };
-    }
     nextBuild = pruneStalePowerSelections(index, nextBuild);
     const { classPowerSlots, powerIds } = reconcilePowerSlotsForBuild(nextBuild, build.level);
     updateBuild({ ...nextBuild, classPowerSlots, powerIds });
@@ -2315,7 +2315,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 for (const k of Object.keys(asiNext)) {
                   if (!milestoneKeys.has(k)) delete asiNext[k];
                 }
-                const maxFeats = totalFeatSlots(lv, isHumanRace(selectedRace?.name));
+                const maxFeats = totalFeatSlots(lv, resolveRacialFeatSlotCountForBuild(index, { ...build, level: lv }));
                 const nextBase: CharacterBuild = {
                   ...build,
                   level: lv,
@@ -2384,9 +2384,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 raceAbilityBonusInfo.fixed.length > 0 ||
                 raceAbilityBonusInfo.chooseOne.length > 0 ||
                 raceSecondarySlots.length > 0 ||
-                racialTraitRuleSelectSlots.length > 0 ||
-                racePowerGroups.some((g) => g.choiceOnly) ||
-                parseRacialTraitIdsFromRace(selectedRace).includes(ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION)) && (
+                racialTraitRuleSelectSlotsRaceTab.length > 0 ||
+                racePowerGroups.some((g) => g.choiceOnly)) && (
                 <div style={{ marginTop: "0.65rem", ...ui.blockSubsection, backgroundColor: "var(--surface-1)", borderColor: "var(--panel-border)" }}>
                   <h4 style={subsectionTitleStyle}>Race choices</h4>
                   {raceTraitBundleSlots.map((bundle) => {
@@ -2422,38 +2421,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                       </label>
                     );
                   })}
-                  {parseRacialTraitIdsFromRace(selectedRace).includes(ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION) && (
-                    <label style={{ display: "block", marginBottom: "0.75rem" }}>
-                      <span style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem", fontSize: "0.85rem" }}>
-                        Human power option
-                      </span>
-                      <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.78rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
-                        PHB-style characters use the third class at-will slot (default below). Pick{" "}
-                        <strong>Heroic Effort</strong> only if you use the Essentials option instead of that third at-will.
-                      </p>
-                      <select
-                        value={build.raceSelections?.[HUMAN_POWER_OPTION_RACE_KEY] || ""}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          const next = { ...(build.raceSelections || {}) };
-                          if (v) next[HUMAN_POWER_OPTION_RACE_KEY] = v;
-                          else delete next[HUMAN_POWER_OPTION_RACE_KEY];
-                          const keys = Object.keys(next);
-                          const nextBase: CharacterBuild = {
-                            ...build,
-                            raceSelections: keys.length ? next : undefined
-                          };
-                          const { classPowerSlots, powerIds } = reconcilePowerSlotsForBuild(nextBase, build.level);
-                          updateBuild({ ...nextBase, classPowerSlots, powerIds });
-                        }}
-                        style={{ width: "100%", maxWidth: "28rem", padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--panel-border)" }}
-                      >
-                        <option value="">Third class at-will (PHB-style default)</option>
-                        <option value={ID_RACIAL_TRAIT_BONUS_AT_WILL}>Bonus At-Will Power (same as default)</option>
-                        <option value={ID_RACIAL_TRAIT_HEROIC_EFFORT}>Heroic Effort (Essentials — no third at-will)</option>
-                      </select>
-                    </label>
-                  )}
                   {racePowerGroups
                     .filter((g) => g.choiceOnly)
                     .map((g) => {
@@ -2569,25 +2536,11 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                       )}
                     </label>
                   ))}
-                  {racialTraitRuleSelectSlots.map((slot) => (
+                  {racialTraitRuleSelectSlotsRaceTab.map((slot) => (
                     <label key={slot.key} style={{ display: "block", marginBottom: "0.65rem" }}>
                       <span style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem", fontSize: "0.85rem" }}>
                         {slot.label}
                       </span>
-                      {slot.kind === "skillTraining" && (
-                        <select
-                          value={(build.raceSelections || {})[slot.key] || ""}
-                          onChange={(e) => commitRacialTraitRuleSelection(slot.key, e.target.value)}
-                          style={{ width: "100%", maxWidth: "28rem", padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--panel-border)" }}
-                        >
-                          <option value="">Select skill…</option>
-                          {skillsSortedAll.map((sk) => (
-                            <option key={sk.id} value={sk.id}>
-                              {sk.name}
-                            </option>
-                          ))}
-                        </select>
-                      )}
                       {slot.kind === "countsAsRace" && (
                         <select
                           value={(build.raceSelections || {})[slot.key] || ""}
@@ -2600,22 +2553,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                               {r.name}
                             </option>
                           ))}
-                        </select>
-                      )}
-                      {slot.kind === "feat" && (
-                        <select
-                          value={(build.raceSelections || {})[slot.key] || ""}
-                          onChange={(e) => commitRacialTraitRuleSelection(slot.key, e.target.value)}
-                          style={{ width: "100%", maxWidth: "28rem", padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--panel-border)" }}
-                        >
-                          <option value="">Select feat…</option>
-                          {featOptions
-                            .filter((o) => o.legal && (o.item.tier === "Heroic" || !o.item.tier))
-                            .map((o) => (
-                              <option key={o.item.id} value={o.item.id}>
-                                {o.item.name}
-                              </option>
-                            ))}
                         </select>
                       )}
                     </label>
@@ -3531,6 +3468,13 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             <h3 style={builderSectionTitleStyle}>Skills</h3>
             <p style={{ margin: "0.25rem 0 0.65rem 0", color: "var(--text-muted)", fontSize: "0.9rem", lineHeight: 1.45 }}>
               All skills are listed. You can only <strong>train</strong> skills from your class list (checkbox enabled). Other skills are shown for reference.
+              {racialSkillTrainingSlotCount > 0 ? (
+                <>
+                  {" "}
+                  Your race grants {racialSkillTrainingSlotCount} extra trained class skill
+                  {racialSkillTrainingSlotCount === 1 ? "" : "s"} included in the count below.
+                </>
+              ) : null}
             </p>
             {(isHybridBuild ? !hybridClassSelectionComplete : !selectedClass) && (
               <p style={{ margin: "0 0 0.65rem 0", fontSize: "0.88rem", color: "var(--text-muted)" }}>
@@ -3854,8 +3798,11 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 </strong>
                 <strong style={{ color: "var(--text-muted)" }}> / {expectedFeatCount}</strong>{" "}
                 Selected Feats
-                {isHumanRace(selectedRace?.name) ? (
-                  <span style={{ fontWeight: 400, color: "var(--text-muted)" }}> (includes human bonus feat).</span>
+                {racialFeatSlotCount > 0 ? (
+                  <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>
+                    {" "}
+                    (includes {racialFeatSlotCount} racial bonus feat{racialFeatSlotCount === 1 ? "" : "s"}).
+                  </span>
                 ) : null}
               </div>
               {selectedFeats.length === 0 ? (

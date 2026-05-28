@@ -45,6 +45,48 @@ export const ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION = "ID_FMP_RACIAL_TRAIT_2966";
 export const ID_RACIAL_TRAIT_BONUS_AT_WILL = "ID_FMP_RACIAL_TRAIT_356";
 export const ID_RACIAL_TRAIT_HEROIC_EFFORT = "ID_FMP_RACIAL_TRAIT_2965";
 
+/** Human Power Selection bundle slot, when present (selection key is often `subrace`). */
+export function findHumanPowerSelectionBundleSlot(
+  race: Race | undefined,
+  traitsById: Map<string, RacialTrait>
+) {
+  return getRaceTraitBundleSlots(race, traitsById).find(
+    (s) => s.parentTraitId === ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION
+  );
+}
+
+/**
+ * Human Power Selection pick from the race bundle or legacy `humanPowerOption`.
+ * `undefined` means PHB default (third class at-will, not Heroic Effort).
+ */
+export function resolveHumanPowerSelectionTraitId(
+  race: Race | undefined,
+  traitsById: Map<string, RacialTrait>,
+  raceSelections?: Record<string, string>
+): string | undefined {
+  const slot = findHumanPowerSelectionBundleSlot(race, traitsById);
+  if (slot) {
+    const fromBundle = raceSelections?.[slot.selectionKey]?.trim();
+    if (fromBundle) return fromBundle;
+  }
+  const legacy = raceSelections?.[HUMAN_POWER_OPTION_RACE_KEY]?.trim();
+  if (legacy) return legacy;
+  return undefined;
+}
+
+/** Whether Human Power Selection grants the third class at-will slot (default / Bonus At-Will, not Heroic Effort). */
+export function humanPowerSelectionGrantsBonusClassAtWill(
+  race: Race | undefined,
+  traitsById: Map<string, RacialTrait>,
+  raceSelections?: Record<string, string>
+): boolean {
+  if (!race || !parseRacialTraitIdsFromRace(race).includes(ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION)) {
+    return false;
+  }
+  const pick = resolveHumanPowerSelectionTraitId(race, traitsById, raceSelections);
+  return pick !== ID_RACIAL_TRAIT_HEROIC_EFFORT;
+}
+
 /** PHB Bonus At-Will racial trait or any Power select with `$$CLASS,at-will,1` (extra class at-will pick). */
 export function racialTraitGrantsBonusClassAtWillSlot(trait: RacialTrait): boolean {
   if (trait.id === ID_RACIAL_TRAIT_BONUS_AT_WILL) return true;
@@ -77,9 +119,7 @@ export function raceGrantsBonusClassAtWillSlot(
   });
 
   if (topTraitIds.includes(ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION)) {
-    const pick = raceSelections?.[HUMAN_POWER_OPTION_RACE_KEY];
-    if (pick === ID_RACIAL_TRAIT_HEROIC_EFFORT) return false;
-    return true;
+    return humanPowerSelectionGrantsBonusClassAtWill(race, traitsById, raceSelections);
   }
 
   for (const traitId of allTraitIds) {
@@ -242,6 +282,14 @@ export function racePowerGroupsForRace(
       continue;
     }
     if (bundleParentIds.has(traitId)) {
+      continue;
+    }
+    /** Human Power sub-options: at-will pick is on the Powers tab; Heroic Effort is a fixed grant. */
+    if (traitId === ID_RACIAL_TRAIT_BONUS_AT_WILL || traitId === ID_RACIAL_TRAIT_HEROIC_EFFORT) {
+      const granted = collectPowerIdsFromRacialTrait(trait);
+      if (granted.length > 0) {
+        out.push({ traitId, traitName, choiceOnly: false, powerIds: granted });
+      }
       continue;
     }
     if (traitHasPowerSelect(trait)) {

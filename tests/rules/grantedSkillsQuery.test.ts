@@ -22,7 +22,7 @@ describe("autoGrantedTrainedSkillIds", () => {
     expect(autoGrantedTrainedSkillIds(index, build)).toEqual(["SK_ARC"]);
   });
 
-  it("includes racial skill training picks from raceSelections", () => {
+  it("includes racial bonus skills when trained on the Skills tab (not via raceSelections)", () => {
     const index = {
       skills: [{ id: "SK_DIP", name: "Diplomacy", slug: "diplomacy", raw: {} }],
       feats: [],
@@ -31,12 +31,10 @@ describe("autoGrantedTrainedSkillIds", () => {
     const build = {
       raceId: "R_H",
       raceSelections: { "skillTraining:TR_HUMAN_SKILL:0": "SK_DIP" },
-      trainedSkillIds: []
+      trainedSkillIds: ["SK_DIP"]
     } as CharacterBuild;
-    expect(autoGrantedTrainedSkillIds(index, build)).toEqual(["SK_DIP"]);
-    expect(effectiveTrainedSkillIdsForBuild(index, { ...build, trainedSkillIds: ["SK_DIP"] })).toEqual([
-      "SK_DIP"
-    ]);
+    expect(autoGrantedTrainedSkillIds(index, build)).toEqual([]);
+    expect(effectiveTrainedSkillIdsForBuild(index, build)).toEqual(["SK_DIP"]);
   });
 });
 
