@@ -30,12 +30,22 @@ export interface ClassFeatureChoiceVisibleWhen {
   optionId: string;
 }
 
+/** Heroes of the Feywild optional bard feature (two picks at 1st, +1 at 13th and 17th). */
+export const SIGNS_OF_INFLUENCE_CLASS_FEATURE_ID = "ID_FMP_CLASS_FEATURE_4139";
+
+/** Optional class features keyed by class id when compendium does not list them on `_PARSED_CLASS_FEATURE`. */
+const OPTIONAL_CLASS_FEATURE_NAMES_BY_CLASS_ID: Record<string, string[]> = {
+  ID_FMP_CLASS_104: ["Signs of Influence"]
+};
+
 export interface ClassFeatureChoiceGroup {
   key: string;
   kind: ClassFeatureChoiceKind;
   parentFeatureId: string;
   parentFeatureName: string;
   pickCount: number;
+  /** Character level required before this pick group is offered (defaults to 1). */
+  minLevel?: number;
   /** Populated when `kind` is `power` (e.g. wizard cantrips). */
   powerIds: string[];
   options: ClassFeatureChoiceOption[];
@@ -108,6 +118,74 @@ function classFeatureSelectRules(cf: ClassFeature | undefined): ClassFeatureSele
   const rules = cf?.raw?.rules as Record<string, unknown> | undefined;
   const select = rules?.select;
   return Array.isArray(select) ? (select as ClassFeatureSelectRule[]) : [];
+}
+
+function parsePositiveInt(text: unknown, fallback: number): number {
+  const n = Number.parseInt(String(text ?? "").trim(), 10);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+/** Level-gated `select` rows on a class feature (e.g. Signs of Influence at 1 / 13 / 17). */
+export function levelGatedClassFeatureSelects(
+  feature: ClassFeature
+): Array<{ minLevel: number; pickCount: number }> {
+  const out: Array<{ minLevel: number; pickCount: number }> = [];
+  for (const item of classFeatureSelectRules(feature)) {
+    const attrs = item.attrs ?? {};
+    if (attrs.type !== "Class Feature") continue;
+    out.push({
+      minLevel: parsePositiveInt(attrs.Level, 1),
+      pickCount: parsePositiveInt(attrs.number, 1)
+    });
+  }
+  return out;
+}
+
+function optionsFromClassFeatureSelect(
+  index: RulesIndex,
+  parent: ClassFeature
+): ClassFeatureChoiceOption[] {
+  const parentId = parent.id;
+  const parentName = parent.name;
+  const { byId } = buildClassFeatureLookups(index);
+  const subIds = parseTraitNamesFromField(specOf(parent), "_PARSED_SUB_FEATURES");
+  if (subIds.length) {
+    return subIds
+      .map((sid) => byId.get(sid))
+      .filter((f): f is ClassFeature => !!f)
+      .map((child) => ({
+        id: child.id,
+        name: child.name,
+        parentFeatureId: parentId,
+        parentFeatureName: parentName,
+        shortDescription: child.shortDescription ?? null,
+        body: child.body ?? null,
+        powerIds: []
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+  }
+  const options: ClassFeatureChoiceOption[] = [];
+  for (const item of classFeatureSelectRules(parent)) {
+    const attrs = item.attrs ?? {};
+    if (attrs.type !== "Class Feature") continue;
+    const cat = String(attrs.Category ?? "");
+    for (const token of cat.split("|")) {
+      const tid = token.trim();
+      if (!tid.startsWith("ID_")) continue;
+      const child = byId.get(tid);
+      if (!child) continue;
+      options.push({
+        id: child.id,
+        name: child.name,
+        parentFeatureId: parentId,
+        parentFeatureName: parentName,
+        shortDescription: child.shortDescription ?? null,
+        body: child.body ?? null,
+        powerIds: []
+      });
+    }
+  }
+  return options.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
 }
 
 /**
@@ -347,6 +425,86 @@ function supplementOptionalParsedClassFeatureGroups(
   ];
 }
 
+/** Optional features from source books (e.g. HotF Signs of Influence on bard). */
+function supplementMappedOptionalClassFeatureGroups(
+  index: RulesIndex,
+  cls: ClassDef,
+  groups: ClassFeatureChoiceGroup[]
+): ClassFeatureChoiceGroup[] {
+  const mapped = OPTIONAL_CLASS_FEATURE_NAMES_BY_CLASS_ID[cls.id];
+  if (!mapped?.length) return groups;
+
+  const { byName } = buildClassFeatureLookups(index);
+  const existingKeys = new Set(groups.map((g) => g.key));
+  const out = [...groups];
+
+  for (const featureName of mapped) {
+    const feature = byName.get(featureName);
+    if (!feature) continue;
+
+    const optKey = `classFeatureOptional:${feature.id}`;
+    if (!existingKeys.has(optKey)) {
+      out.push({
+        key: optKey,
+        kind: "classFeature",
+        parentFeatureId: feature.id,
+        parentFeatureName: feature.name,
+        pickCount: 1,
+        optional: true,
+        powerIds: [],
+        options: [
+          {
+            id: CLASS_FEATURE_CHOICE_NONE,
+            name: `No ${feature.name}`,
+            parentFeatureId: feature.id,
+            parentFeatureName: feature.name,
+            shortDescription: null,
+            body: null,
+            powerIds: []
+          },
+          {
+            id: feature.id,
+            name: feature.name,
+            parentFeatureId: feature.id,
+            parentFeatureName: feature.name,
+            shortDescription: feature.shortDescription ?? null,
+            body: feature.body ?? null,
+            powerIds: []
+          }
+        ]
+      });
+      existingKeys.add(optKey);
+    }
+
+    const nested = optionsFromClassFeatureSelect(index, feature);
+    if (nested.length < 2) continue;
+
+    const levelGates = levelGatedClassFeatureSelects(feature);
+    if (!levelGates.length) continue;
+
+    for (const { minLevel, pickCount } of levelGates) {
+      const pickKey =
+        minLevel <= 1 ? `classFeature:${feature.id}` : `classFeature:${feature.id}:${minLevel}`;
+      if (existingKeys.has(pickKey)) continue;
+      out.push({
+        key: pickKey,
+        kind: "classFeature",
+        parentFeatureId: feature.id,
+        parentFeatureName:
+          minLevel <= 1 ? feature.name : `${feature.name} (level ${minLevel})`,
+        pickCount,
+        minLevel,
+        visibleWhen: { groupKey: optKey, optionId: feature.id },
+        powerIds: [],
+        options: nested
+      });
+      existingKeys.add(pickKey);
+    }
+  }
+
+  return out;
+}
+
 export function getClassFeatureChoiceGroups(
   index: RulesIndex,
   cls: ClassDef | undefined
@@ -387,6 +545,7 @@ export function getClassFeatureChoiceGroups(
 
   groups = supplementLeaderPickChoiceGroups(index, cls, groups);
   groups = supplementOptionalParsedClassFeatureGroups(index, cls, groups);
+  groups = supplementMappedOptionalClassFeatureGroups(index, cls, groups);
 
   const expanded = expandClassFeaturePowerChoiceGroups(index, cls.id, groups);
   const poolCounts = new Map<string, number>();
@@ -405,8 +564,11 @@ export function getClassFeatureChoiceGroups(
 
 export function isClassFeatureChoiceGroupVisible(
   group: ClassFeatureChoiceGroup,
-  classSelections: Record<string, string> | undefined
+  classSelections: Record<string, string> | undefined,
+  characterLevel?: number
 ): boolean {
+  const minLevel = group.minLevel ?? 1;
+  if (characterLevel != null && characterLevel < minLevel) return false;
   const when = group.visibleWhen;
   if (!when) return true;
   return classSelections?.[when.groupKey]?.trim() === when.optionId;
@@ -414,19 +576,59 @@ export function isClassFeatureChoiceGroupVisible(
 
 export function filterVisibleClassFeatureChoiceGroups(
   groups: ClassFeatureChoiceGroup[],
-  classSelections: Record<string, string> | undefined
+  classSelections: Record<string, string> | undefined,
+  characterLevel?: number
 ): ClassFeatureChoiceGroup[] {
-  return groups.filter((g) => isClassFeatureChoiceGroupVisible(g, classSelections));
+  return groups.filter((g) => isClassFeatureChoiceGroupVisible(g, classSelections, characterLevel));
+}
+
+export function classFeatureChoiceLabel(group: ClassFeatureChoiceGroup): string {
+  const levelNote =
+    group.minLevel != null && group.minLevel > 1 ? ` (at level ${group.minLevel}+)` : "";
+  const picks = `${group.pickCount} pick${group.pickCount === 1 ? "" : "s"}`;
+  return `${group.parentFeatureName}${levelNote} — ${picks}`;
+}
+
+/** All class-feature option ids chosen under the same parent (across level-gated pick groups). */
+export function collectClassFeatureSubOptionIds(
+  groups: ClassFeatureChoiceGroup[],
+  classSelections: Record<string, string> | undefined,
+  characterLevel?: number
+): string[] {
+  const ids: string[] = [];
+  for (const g of filterVisibleClassFeatureChoiceGroups(groups, classSelections, characterLevel)) {
+    if (g.kind !== "classFeature" || g.optional) continue;
+    if (g.pickCount > 1) {
+      ids.push(...parseClassPowerChoiceSelection(classSelections?.[g.key]));
+    } else {
+      const picked = classSelections?.[g.key]?.trim();
+      if (picked?.startsWith("ID_") && picked !== CLASS_FEATURE_CHOICE_NONE) ids.push(picked);
+    }
+  }
+  return ids;
+}
+
+export function resolveClassFeatureChoiceIdsForGroup(
+  group: ClassFeatureChoiceGroup,
+  classSelections: Record<string, string> | undefined
+): string[] {
+  if (group.kind !== "classFeature") return [];
+  if (group.pickCount > 1) {
+    return parseClassPowerChoiceSelection(classSelections?.[group.key]);
+  }
+  const picked = classSelections?.[group.key]?.trim();
+  return picked?.startsWith("ID_") && picked !== CLASS_FEATURE_CHOICE_NONE ? [picked] : [];
 }
 
 /** Drop selections for groups that are currently hidden (e.g. Sharpshooter sub-pick after choosing Weapon Talent). */
 export function pruneHiddenClassFeatureSelections(
   classSelections: Record<string, string>,
-  groups: ClassFeatureChoiceGroup[]
+  groups: ClassFeatureChoiceGroup[],
+  characterLevel?: number
 ): Record<string, string> {
   const next = { ...classSelections };
   for (const g of groups) {
-    if (!isClassFeatureChoiceGroupVisible(g, next)) {
+    if (!isClassFeatureChoiceGroupVisible(g, next, characterLevel)) {
       delete next[g.key];
     }
   }
@@ -585,14 +787,15 @@ export function filterClassFeatureChoiceGroupsRequiringSelection(
 function collectClassFeaturePowerChoiceIdsForClass(
   index: RulesIndex,
   classId: string | undefined,
-  classSelections: Record<string, string> | undefined
+  classSelections: Record<string, string> | undefined,
+  characterLevel: number
 ): string[] {
   if (!classId) return [];
   const cls = index.classes.find((c) => c.id === classId);
   const groups = getClassFeatureChoiceGroups(index, cls);
   const rs = effectiveClassSelectionsForChoiceGroups(index, classId, classSelections, groups);
   const ids: string[] = [];
-  for (const g of filterVisibleClassFeatureChoiceGroups(groups, rs)) {
+  for (const g of filterVisibleClassFeatureChoiceGroups(groups, rs, characterLevel)) {
     if (g.kind !== "power") continue;
     ids.push(...resolveClassPowerChoiceIdsForGroup(index, g, classId, rs));
   }
@@ -602,23 +805,30 @@ function collectClassFeaturePowerChoiceIdsForClass(
 /** Class feature power picks (Channel Divinity, cantrips, …) including auto-granted fixed sets. */
 export function collectClassFeaturePowerChoiceIds(
   index: RulesIndex,
-  build: Pick<CharacterBuild, "classId" | "characterStyle" | "hybridClassIdA" | "hybridClassIdB" | "classSelections">
+  build: Pick<
+    CharacterBuild,
+    "classId" | "characterStyle" | "hybridClassIdA" | "hybridClassIdB" | "classSelections" | "level"
+  >
 ): string[] {
   const rs = build.classSelections;
+  const level = build.level;
   if (build.characterStyle === "hybrid") {
     const ha = index.hybridClasses?.find((h) => h.id === build.hybridClassIdA);
     const hb = index.hybridClasses?.find((h) => h.id === build.hybridClassIdB);
     return [
-      ...collectClassFeaturePowerChoiceIdsForClass(index, ha?.baseClassId, rs),
-      ...collectClassFeaturePowerChoiceIdsForClass(index, hb?.baseClassId, rs)
+      ...collectClassFeaturePowerChoiceIdsForClass(index, ha?.baseClassId, rs, level),
+      ...collectClassFeaturePowerChoiceIdsForClass(index, hb?.baseClassId, rs, level)
     ];
   }
-  return collectClassFeaturePowerChoiceIdsForClass(index, build.classId, rs);
+  return collectClassFeaturePowerChoiceIdsForClass(index, build.classId, rs, level);
 }
 
 export function resolveClassFeaturePowerChoicePowers(
   index: RulesIndex,
-  build: Pick<CharacterBuild, "classId" | "characterStyle" | "hybridClassIdA" | "hybridClassIdB" | "classSelections">
+  build: Pick<
+    CharacterBuild,
+    "classId" | "characterStyle" | "hybridClassIdA" | "hybridClassIdB" | "classSelections" | "level"
+  >
 ): Power[] {
   const byId = new Map(index.powers.map((p) => [p.id, p]));
   const seen = new Set<string>();

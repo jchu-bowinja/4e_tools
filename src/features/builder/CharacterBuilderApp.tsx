@@ -103,6 +103,7 @@ import {
   resolveDisplayedRacialTraitsForRace
 } from "../../rules/raceSubraces";
 import {
+  classFeatureChoiceLabel,
   classFeaturePowerIdsForClass,
   type ClassFeatureChoiceGroup,
   filterVisibleClassFeatureChoiceGroups,
@@ -114,6 +115,7 @@ import {
   isFixedClassPowerChoiceGroup,
   parseClassPowerChoiceSelection,
   pruneHiddenClassFeatureSelections,
+  resolveClassFeatureChoiceIdsForGroup,
   resolveClassPowerChoiceIdsForGroup
 } from "../../rules/classFeatureChoices";
 import { getClassTraitRows, getHybridClassTraitRows, type TraitDisplayRow } from "../../rules/supportTraits";
@@ -1049,9 +1051,10 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     () =>
       filterVisibleClassFeatureChoiceGroups(
         classFeatureChoiceGroups,
-        classSelectionsForFeatureChoices
+        classSelectionsForFeatureChoices,
+        build.level
       ),
-    [classFeatureChoiceGroups, classSelectionsForFeatureChoices]
+    [classFeatureChoiceGroups, classSelectionsForFeatureChoices, build.level]
   );
   const visibleClassFeatureChoiceGroupsOnClassTab = useMemo(
     () => visibleClassFeatureChoiceGroups.filter((g) => g.kind === "classFeature"),
@@ -1414,12 +1417,14 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     if (isHybridBuild) {
       if (!selectedHybridA || !selectedHybridB) return { weaponLine: "", armorLine: "" };
       return computeClassGrantedProficiencyDisplayLines(
+        index,
         { isHybrid: true, hybridA: selectedHybridA, hybridB: selectedHybridB },
         build
       );
     }
     if (!selectedClass) return { weaponLine: "", armorLine: "" };
     return computeClassGrantedProficiencyDisplayLines(
+      index,
       {
         isHybrid: false,
         classSpecific: {
@@ -1431,6 +1436,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       build
     );
   }, [
+    index,
     isHybridBuild,
     selectedHybridA,
     selectedHybridB,
@@ -2231,7 +2237,11 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   let next = { ...(build.classSelections || {}) };
                   if (filtered.length) next[group.key] = formatClassPowerChoiceSelection(filtered);
                   else delete next[group.key];
-                  next = pruneHiddenClassFeatureSelections(next, classFeatureChoiceGroups);
+                  next = pruneHiddenClassFeatureSelections(
+                    next,
+                    classFeatureChoiceGroups,
+                    build.level
+                  );
                   updateBuild({
                     ...build,
                     classSelections: Object.keys(next).length ? next : undefined
@@ -3321,6 +3331,86 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     <h4 style={subsectionTitleStyle}>Class choices</h4>
                     {visibleClassFeatureChoiceGroupsOnClassTab.map((group) => {
                       const rs = classSelectionsForFeatureChoices;
+                      if (group.pickCount > 1) {
+                        const picks = parseClassPowerChoiceSelection(rs[group.key]);
+                        const usedInSiblingGroups = new Set(
+                          visibleClassFeatureChoiceGroupsOnClassTab
+                            .filter(
+                              (g) =>
+                                g.parentFeatureId === group.parentFeatureId &&
+                                g.key !== group.key &&
+                                !g.optional
+                            )
+                            .flatMap((g) =>
+                              resolveClassFeatureChoiceIdsForGroup(g, rs)
+                            )
+                        );
+                        return (
+                          <div key={group.key} style={{ maxWidth: "28rem", marginBottom: "0.85rem" }}>
+                            <span style={{ display: "block", fontWeight: 600, marginBottom: "0.35rem", fontSize: "0.85rem" }}>
+                              {classFeatureChoiceLabel(group)}
+                            </span>
+                            {Array.from({ length: group.pickCount }, (_, slot) => {
+                              const selectedId = picks[slot] || "";
+                              const usedElsewhere = new Set(picks.filter((_, i) => i !== slot));
+                              return (
+                                <label key={`${group.key}-${slot}`} style={{ display: "block", marginBottom: "0.35rem" }}>
+                                  <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                                    Pick {slot + 1}
+                                  </span>
+                                  <select
+                                    value={selectedId}
+                                    onChange={(e) => {
+                                      const v = e.target.value;
+                                      const nextPicks = [...picks];
+                                      while (nextPicks.length < group.pickCount) nextPicks.push("");
+                                      nextPicks[slot] = v;
+                                      const filtered = nextPicks.filter(Boolean);
+                                      let next = { ...(build.classSelections || {}) };
+                                      if (filtered.length) {
+                                        next[group.key] = formatClassPowerChoiceSelection(filtered);
+                                      } else {
+                                        delete next[group.key];
+                                      }
+                                      next = pruneHiddenClassFeatureSelections(
+                                        next,
+                                        classFeatureChoiceGroups,
+                                        build.level
+                                      );
+                                      updateBuild({
+                                        ...build,
+                                        classSelections: Object.keys(next).length ? next : undefined
+                                      });
+                                    }}
+                                    style={{
+                                      width: "100%",
+                                      marginTop: "0.2rem",
+                                      padding: "0.4rem",
+                                      borderRadius: "6px",
+                                      border: "1px solid var(--panel-border)"
+                                    }}
+                                  >
+                                    <option value="">Select…</option>
+                                    {group.options.map((opt) => {
+                                      if (
+                                        (usedElsewhere.has(opt.id) || usedInSiblingGroups.has(opt.id)) &&
+                                        opt.id !== selectedId
+                                      ) {
+                                        return null;
+                                      }
+                                      return (
+                                        <option key={opt.id} value={opt.id}>
+                                          {opt.name}
+                                        </option>
+                                      );
+                                    })}
+                                  </select>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        );
+                      }
                       const pickedId =
                         rs[group.key] || (group.optional ? "__none__" : "");
                       const picked = group.options.find((o) => o.id === pickedId);
@@ -3338,7 +3428,11 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                               if (v && (!group.optional || v !== "__none__")) next[group.key] = v;
                               else if (group.optional) next[group.key] = "__none__";
                               else delete next[group.key];
-                              next = pruneHiddenClassFeatureSelections(next, classFeatureChoiceGroups);
+                              next = pruneHiddenClassFeatureSelections(
+                                next,
+                                classFeatureChoiceGroups,
+                                build.level
+                              );
                               const keys = Object.keys(next);
                               updateBuild({ ...build, classSelections: keys.length ? next : undefined });
                             }}
@@ -5566,11 +5660,21 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 <p style={{ margin: 0, fontSize: "0.88rem" }}>
                   <strong>Class choices:</strong>{" "}
                   {visibleClassFeatureChoiceGroupsOnClassTab
-                    .map((g) => {
-                      const opt = g.options.find((o) => o.id === classSelectionsForFeatureChoices[g.key]);
-                      return opt ? `${g.parentFeatureName}: ${opt.name}` : null;
+                    .flatMap((g) => {
+                      if (g.optional) {
+                        const opt = g.options.find((o) => o.id === classSelectionsForFeatureChoices[g.key]);
+                        return opt && opt.id !== "__none__"
+                          ? [`${g.parentFeatureName}: ${opt.name}`]
+                          : [];
+                      }
+                      const names = resolveClassFeatureChoiceIdsForGroup(
+                        g,
+                        classSelectionsForFeatureChoices
+                      )
+                        .map((id) => g.options.find((o) => o.id === id)?.name)
+                        .filter(Boolean);
+                      return names.length ? [`${g.parentFeatureName}: ${names.join(", ")}`] : [];
                     })
-                    .filter(Boolean)
                     .join(" · ") || "—"}
                 </p>
               )}

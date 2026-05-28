@@ -31,12 +31,14 @@ import {
 } from "./hybridPowerSlots";
 import { resolveRaceAbilityBonusInfo } from "./abilityScores";
 import {
+  CLASS_FEATURE_CHOICE_NONE,
   classFeaturePowerIdsForClass,
   filterVisibleClassFeatureChoiceGroups,
   effectiveClassSelectionsForChoiceGroups,
   getClassFeatureChoiceGroups,
   isFixedClassPowerChoiceGroup,
-  parseClassPowerChoiceSelection
+  parseClassPowerChoiceSelection,
+  resolveClassFeatureChoiceIdsForGroup
 } from "./classFeatureChoices";
 import {
   countsAsRaceOptions,
@@ -152,17 +154,43 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
       build.classSelections,
       choiceGroups
     );
-    for (const group of filterVisibleClassFeatureChoiceGroups(choiceGroups, rs)) {
+    const visibleGroups = filterVisibleClassFeatureChoiceGroups(choiceGroups, rs, build.level);
+    const subOptionIdsByParent = new Map<string, string[]>();
+    for (const group of visibleGroups) {
       if (group.kind === "classFeature") {
-        const picked = rs[group.key];
-        if (!picked) {
-          if (group.optional) continue;
-          errors.push(`Class: ${group.parentFeatureName} — make a selection.`);
+        if (group.optional) {
+          const picked = rs[group.key]?.trim();
+          if (!picked) continue;
+          if (picked === CLASS_FEATURE_CHOICE_NONE) continue;
+          if (!group.options.some((o) => o.id === picked)) {
+            errors.push(`Class: ${group.parentFeatureName} — choose a valid option.`);
+          }
           continue;
         }
-        if (picked === "__none__") continue;
-        if (!group.options.some((o) => o.id === picked)) {
-          errors.push(`Class: ${group.parentFeatureName} — choose a valid option.`);
+        const legal = new Set(group.options.map((o) => o.id));
+        const picks = resolveClassFeatureChoiceIdsForGroup(group, rs);
+        if (picks.length < group.pickCount) {
+          errors.push(
+            `Class: ${group.parentFeatureName} — choose ${group.pickCount} option${group.pickCount === 1 ? "" : "s"}.`
+          );
+          continue;
+        }
+        const seen = new Set<string>();
+        for (const pid of picks) {
+          if (!legal.has(pid)) {
+            errors.push(`Class: ${group.parentFeatureName} — choose a valid option.`);
+            break;
+          }
+          if (seen.has(pid)) {
+            errors.push(`Class: ${group.parentFeatureName} — choose different options.`);
+            break;
+          }
+          seen.add(pid);
+        }
+        if (group.parentFeatureId) {
+          const list = subOptionIdsByParent.get(group.parentFeatureId) ?? [];
+          list.push(...picks);
+          subOptionIdsByParent.set(group.parentFeatureId, list);
         }
         continue;
       }
@@ -188,6 +216,15 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
           break;
         }
         seen.add(pid);
+      }
+    }
+    for (const [parentId, picks] of subOptionIdsByParent) {
+      const unique = new Set(picks);
+      if (unique.size !== picks.length) {
+        const parentName =
+          choiceGroups.find((g) => g.parentFeatureId === parentId)?.parentFeatureName ??
+          "Class feature";
+        errors.push(`Class: ${parentName} — each sign can only be chosen once.`);
       }
     }
   }

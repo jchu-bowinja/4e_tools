@@ -37,7 +37,7 @@ export function collectFeatProficiencyGrants(index: RulesIndex, featIds: string[
   return dedupeProficiencyGrants(all);
 }
 
-function collectClassFeatureProficiencyGrants(
+export function collectClassFeatureProficiencyGrants(
   index: RulesIndex,
   build: CharacterBuild
 ): ProficiencyGrant[] {

@@ -8,6 +8,7 @@ import {
   proficiencyGrantsFromClassFeatureRaw,
   weaponAttackAbilityForCharacter
 } from "../../src/rules/classFeatureProficiencies";
+import { computeClassGrantedProficiencyDisplayLines } from "../../src/rules/characterProficiencyDisplay";
 import { collectCharacterProficiencyGrants } from "../../src/rules/featProficiencies";
 import type { CharacterBuild, ClassDef, ClassFeature, RulesIndex, Weapon } from "../../src/rules/models";
 import { getClassTraitRows } from "../../src/rules/supportTraits";
@@ -101,6 +102,13 @@ describe("Archer Warlord", () => {
     expect(grants.some((g) => g.kind === "weaponCategory" && g.value.includes("military ranged"))).toBe(
       true
     );
+
+    const classTabLines = computeClassGrantedProficiencyDisplayLines(
+      index,
+      { isHybrid: false, classSpecific: warlordClass.raw.specific as Record<string, unknown> },
+      build
+    );
+    expect(classTabLines.weaponLine).toMatch(/military ranged/i);
 
     const parsed = proficiencyGrantsFromClassFeatureRaw(archerWarlord.raw);
     expect(parsed.some((g) => g.value.includes("military ranged"))).toBe(true);

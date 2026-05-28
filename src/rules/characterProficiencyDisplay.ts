@@ -1,10 +1,11 @@
 import { effectiveClassArmorProficienciesText } from "./classFeatureProficiencies";
 import {
   appendFeatProficiencyPhrasesToArmorLine,
-  appendFeatProficiencyPhrasesToWeaponLine
+  appendFeatProficiencyPhrasesToWeaponLine,
+  collectClassFeatureProficiencyGrants
 } from "./featProficiencies";
 import { mergeHybridProficiencyLines } from "./hybridDerivedStats";
-import type { CharacterBuild, HybridClassDef, ProficiencyGrant } from "./models";
+import type { CharacterBuild, HybridClassDef, ProficiencyGrant, RulesIndex } from "./models";
 
 export interface ClassProficiencyBaseInput {
   isHybrid: boolean;
@@ -59,13 +60,17 @@ export function computeCharacterProficiencyDisplayLines(
   };
 }
 
-/** Class/hybrid base proficiencies only (no feat or racial grants). */
+/** Class/hybrid base proficiencies plus active class-feature grants (no feat or racial grants). */
 export function computeClassGrantedProficiencyDisplayLines(
+  index: RulesIndex,
   base: ClassProficiencyBaseInput,
   build: CharacterBuild
 ): CharacterProficiencyDisplayLines {
+  const classFeatureGrants = collectClassFeatureProficiencyGrants(index, build);
+  const weaponBase = classWeaponProficiencyBaseText(base);
+  const armorBase = effectiveClassArmorProficienciesText(classArmorProficiencyBaseText(base), build);
   return {
-    weaponLine: classWeaponProficiencyBaseText(base).trim(),
-    armorLine: effectiveClassArmorProficienciesText(classArmorProficiencyBaseText(base), build).trim()
+    weaponLine: appendFeatProficiencyPhrasesToWeaponLine(weaponBase, classFeatureGrants).trim(),
+    armorLine: appendFeatProficiencyPhrasesToArmorLine(armorBase, classFeatureGrants).trim()
   };
 }

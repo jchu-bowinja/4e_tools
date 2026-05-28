@@ -1,6 +1,8 @@
 import {
+  CLASS_FEATURE_CHOICE_NONE,
   filterVisibleClassFeatureChoiceGroups,
-  getClassFeatureChoiceGroups
+  getClassFeatureChoiceGroups,
+  resolveClassFeatureChoiceIdsForGroup
 } from "./classFeatureChoices";
 import type { CharacterBuild, ClassFeature, RulesIndex } from "./models";
 import {
@@ -79,9 +81,10 @@ export function collectClassFeatureIdsFromClass(
     if (!classId) return;
     const cls = index.classes.find((c) => c.id === classId);
     const groups = getClassFeatureChoiceGroups(index, cls);
-    for (const g of filterVisibleClassFeatureChoiceGroups(groups, rs)) {
-      const picked = rs[g.key]?.trim();
-      if (picked?.startsWith("ID_") && picked !== "__none__") add(byId.get(picked));
+    for (const g of filterVisibleClassFeatureChoiceGroups(groups, rs, build.level)) {
+      for (const picked of resolveClassFeatureChoiceIdsForGroup(g, rs)) {
+        if (picked !== CLASS_FEATURE_CHOICE_NONE) add(byId.get(picked));
+      }
     }
   };
   if (build.characterStyle === "hybrid") {
