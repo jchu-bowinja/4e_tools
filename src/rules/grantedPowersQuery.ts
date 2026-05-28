@@ -1,12 +1,92 @@
-import type { CharacterBuild, Feat, Power, Race, RacialTrait, RulesIndex } from "./models";
+import type { CharacterBuild, ClassFeature, Feat, Power, Race, RacialTrait, RulesIndex } from "./models";
 import { parseRacialTraitIdsFromRace } from "./racialTraits";
 import { getRaceExtraTraitIds, getRaceTraitBundleSlots } from "./raceSubraces";
+import {
+  featureIsAvailableAtLevel,
+  parseTraitIdsFromField,
+  specOf
+} from "./supportTraits";
 
 function parseCommaSeparatedPowerIds(raw: string): string[] {
   return raw
     .split(",")
     .map((s) => s.trim())
     .filter((id) => id.startsWith("ID_FMP_POWER"));
+}
+
+/** Power IDs listed on a class feature (`specific.Powers` and power `grant` rules). */
+export function collectPowerIdsFromClassFeature(feature: ClassFeature): string[] {
+  const ids = new Set<string>();
+  const spec = feature.raw?.specific as Record<string, unknown> | undefined;
+  const powersField = String(spec?.["Powers"] ?? "").trim();
+  if (powersField) {
+    for (const id of parseCommaSeparatedPowerIds(powersField)) {
+      ids.add(id);
+    }
+  }
+  const rules = feature.raw?.rules as Record<string, unknown> | undefined;
+  const grants = (rules?.["grant"] as Array<{ attrs?: Record<string, unknown> }> | undefined) ?? [];
+  for (const g of grants) {
+    const a = g.attrs || {};
+    if (String(a["type"]) === "Power" && typeof a["name"] === "string" && a["name"].startsWith("ID_FMP_POWER")) {
+      ids.add(a["name"]);
+    }
+  }
+  return [...ids];
+}
+
+/**
+ * Powers granted by paragon-path class features (e.g. Scourge of Io → Draconic Anathema).
+ * These must not appear in level-1 class feature power picks such as Channel Divinity.
+ */
+export function paragonPathClassFeaturePowerIds(index: RulesIndex): Set<string> {
+  const paragonFeatureIds = new Set<string>();
+  for (const path of index.paragonPaths ?? []) {
+    for (const cfId of parseTraitIdsFromField(specOf(path), "Class Features")) {
+      paragonFeatureIds.add(cfId);
+    }
+  }
+  const byId = new Map((index.classFeatures ?? []).map((cf) => [cf.id, cf] as const));
+  const powerIds = new Set<string>();
+  for (const cfId of paragonFeatureIds) {
+    const cf = byId.get(cfId);
+    if (!cf) continue;
+    for (const pid of collectPowerIdsFromClassFeature(cf)) {
+      powerIds.add(pid);
+    }
+  }
+  return powerIds;
+}
+
+export function collectParagonPathClassFeaturePowerIds(
+  index: RulesIndex,
+  paragonPathId: string | undefined,
+  characterLevel: number
+): string[] {
+  if (!paragonPathId) return [];
+  const path = index.paragonPaths.find((p) => p.id === paragonPathId);
+  if (!path) return [];
+  const byId = new Map((index.classFeatures ?? []).map((cf) => [cf.id, cf]));
+  const ids = new Set<string>();
+  for (const cfId of parseTraitIdsFromField(specOf(path), "Class Features")) {
+    const cf = byId.get(cfId);
+    if (!cf || !featureIsAvailableAtLevel(cf, characterLevel)) continue;
+    for (const pid of collectPowerIdsFromClassFeature(cf)) {
+      ids.add(pid);
+    }
+  }
+  return [...ids];
+}
+
+export function resolveParagonPathClassFeaturePowers(
+  index: RulesIndex,
+  paragonPathId: string | undefined,
+  characterLevel: number
+): Power[] {
+  const byId = new Map(index.powers.map((p) => [p.id, p]));
+  return collectParagonPathClassFeaturePowerIds(index, paragonPathId, characterLevel)
+    .map((id) => byId.get(id))
+    .filter((p): p is Power => !!p);
 }
 
 /** Power IDs listed on a racial trait (grant rules + specific.Powers). */
@@ -319,6 +399,32 @@ export function racePowerGroupsForRace(
 /** ETL `grantedPowerIds` only (explicit `rules.grant` type Power). */
 export function featGrantedPowerIdsFromEtl(feat: Feat): string[] {
   return feat.grantedPowerIds?.length ? [...feat.grantedPowerIds] : [];
+}
+
+function featCountsAsChannelDivinity(feat: Feat): boolean {
+  const rules = feat.raw?.rules as { grant?: Array<{ attrs?: Record<string, string> }> } | undefined;
+  for (const gr of rules?.grant ?? []) {
+    const attrs = gr.attrs ?? {};
+    if (String(attrs.type ?? "") !== "CountsAsFeature") continue;
+    const name = String(attrs.name ?? "");
+    if (name.includes("CHANNEL_DIVINITY")) return true;
+  }
+  return false;
+}
+
+/**
+ * Powers granted by feats that do not also count as Channel Divinity (e.g. Divine Fate).
+ * These must not appear in class Channel Divinity picks; they are obtained via the feat.
+ */
+export function featGrantedPowerIdsExcludedFromClassFeaturePicks(index: RulesIndex): Set<string> {
+  const out = new Set<string>();
+  for (const feat of index.feats ?? []) {
+    if (featCountsAsChannelDivinity(feat)) continue;
+    for (const pid of featGrantedPowerIdsFromEtl(feat)) {
+      out.add(pid);
+    }
+  }
+  return out;
 }
 
 /** ETL `modifiedPowerIds` (style / arena fighting augmentations, not grants). */

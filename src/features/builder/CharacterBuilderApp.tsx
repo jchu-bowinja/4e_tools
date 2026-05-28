@@ -59,7 +59,8 @@ import {
   collectFeatGrantedPowersForBuild,
   collectFeatModifiedPowersForBuild,
   racePowerGroupsForRace,
-  racePowerSelectSelectionKey
+  racePowerSelectSelectionKey,
+  resolveParagonPathClassFeaturePowers
 } from "../../rules/grantedPowersQuery";
 import { collectFeatModificationsByPowerId } from "../../rules/featPowerModifications";
 import { collectFeatClassFeatureModificationsForBuild } from "../../rules/featClassFeatureModifications";
@@ -102,11 +103,18 @@ import {
   resolveDisplayedRacialTraitsForRace
 } from "../../rules/raceSubraces";
 import {
+  classFeaturePowerIdsForClass,
+  type ClassFeatureChoiceGroup,
   filterVisibleClassFeatureChoiceGroups,
   formatClassPowerChoiceSelection,
+  classFeaturePowerChoiceLabel,
+  effectiveClassSelectionsForChoiceGroups,
+  fixedClassPowerChoiceIds,
   getClassFeatureChoiceGroups,
+  isFixedClassPowerChoiceGroup,
   parseClassPowerChoiceSelection,
-  pruneHiddenClassFeatureSelections
+  pruneHiddenClassFeatureSelections,
+  resolveClassPowerChoiceIdsForGroup
 } from "../../rules/classFeatureChoices";
 import { getClassTraitRows, getHybridClassTraitRows, type TraitDisplayRow } from "../../rules/supportTraits";
 import { autoGrantedTrainedSkillIds, effectiveTrainedSkillIdSet } from "../../rules/grantedSkillsQuery";
@@ -1021,9 +1029,31 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     () => getClassFeatureChoiceGroups(index, selectedClass),
     [index, selectedClass]
   );
+  const classSelectionsForFeatureChoices = useMemo(
+    () =>
+      effectiveClassSelectionsForChoiceGroups(
+        index,
+        build.classId,
+        build.classSelections,
+        classFeatureChoiceGroups
+      ),
+    [index, build.classId, build.classSelections, classFeatureChoiceGroups]
+  );
   const visibleClassFeatureChoiceGroups = useMemo(
-    () => filterVisibleClassFeatureChoiceGroups(classFeatureChoiceGroups, build.classSelections),
-    [classFeatureChoiceGroups, build.classSelections]
+    () =>
+      filterVisibleClassFeatureChoiceGroups(
+        classFeatureChoiceGroups,
+        classSelectionsForFeatureChoices
+      ),
+    [classFeatureChoiceGroups, classSelectionsForFeatureChoices]
+  );
+  const visibleClassFeatureChoiceGroupsOnClassTab = useMemo(
+    () => visibleClassFeatureChoiceGroups.filter((g) => g.kind === "classFeature"),
+    [visibleClassFeatureChoiceGroups]
+  );
+  const visibleClassFeaturePowerGroupsOnPowersTab = useMemo(
+    () => visibleClassFeatureChoiceGroups.filter((g) => g.kind === "power"),
+    [visibleClassFeatureChoiceGroups]
   );
   const autoGrantedSkillIds = useMemo(() => autoGrantedTrainedSkillIds(index, build), [index, build]);
   const autoGrantedSkillIdSet = useMemo(() => new Set(autoGrantedSkillIds), [autoGrantedSkillIds]);
@@ -1539,7 +1569,18 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     if (!build.paragonPathId || build.level < 11) return [];
     const atk = getPowersForOwnerId(index, build.paragonPathId, build.level, "attack");
     const util = getPowersForOwnerId(index, build.paragonPathId, build.level, "utility");
-    return [...atk, ...util].sort((a, b) => {
+    const featurePowers = resolveParagonPathClassFeaturePowers(
+      index,
+      build.paragonPathId,
+      build.level
+    );
+    const seen = new Set<string>();
+    const merged = [...atk, ...util, ...featurePowers].filter((p) => {
+      if (seen.has(p.id)) return false;
+      seen.add(p.id);
+      return true;
+    });
+    return merged.sort((a, b) => {
       const la = a.level ?? 0;
       const lb = b.level ?? 0;
       if (la !== lb) return la - lb;
@@ -2080,6 +2121,94 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
           featModsByPowerId
         })}
         <PowerConstructionSelects power={p} build={build} onChange={updateBuild} />
+      </div>
+    );
+  }
+
+  function renderClassFeaturePowerChoiceGroup(group: ClassFeatureChoiceGroup): JSX.Element {
+    const rs = classSelectionsForFeatureChoices;
+    const classId = build.classId;
+    if (isFixedClassPowerChoiceGroup(index, group, classId)) {
+      const fixedIds = fixedClassPowerChoiceIds(index, group, classId);
+      return (
+        <div key={group.key} style={{ marginBottom: "0.75rem" }}>
+          <div style={{ fontWeight: 600, fontSize: "0.82rem", color: "var(--text-primary)", marginBottom: "0.35rem" }}>
+            {group.parentFeatureName}
+          </div>
+          <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.78rem", color: "var(--text-muted)" }}>
+            Granted by your class (no selection required).
+          </p>
+          <div>
+            {fixedIds.map((pid) => {
+              const p = index.powers.find((x) => x.id === pid);
+              return p ? renderPowerCardWithSelections(p, `cf-fixed-${group.key}-${p.id}`) : null;
+            })}
+          </div>
+        </div>
+      );
+    }
+    const picks = parseClassPowerChoiceSelection(rs[group.key]);
+    const resolvedIds = resolveClassPowerChoiceIdsForGroup(index, group, classId, rs);
+    const powerById = new Map(index.powers.map((p) => [p.id, p]));
+    const legalPowerIds = classFeaturePowerIdsForClass(index, group, classId);
+    return (
+      <div key={group.key} style={{ marginBottom: "0.75rem", maxWidth: "28rem" }}>
+        <span style={{ display: "block", fontWeight: 600, marginBottom: "0.35rem", fontSize: "0.85rem" }}>
+          {classFeaturePowerChoiceLabel(group)}
+        </span>
+        {Array.from({ length: group.pickCount }, (_, slot) => {
+          const selectedId = picks[slot] || "";
+          const usedElsewhere = new Set(picks.filter((_, i) => i !== slot));
+          return (
+            <label key={`${group.key}-${slot}`} style={{ display: "block", marginBottom: "0.35rem" }}>
+              <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>Pick {slot + 1}</span>
+              <select
+                value={selectedId}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  const nextPicks = [...picks];
+                  while (nextPicks.length < group.pickCount) nextPicks.push("");
+                  nextPicks[slot] = v;
+                  const filtered = nextPicks.filter(Boolean);
+                  let next = { ...(build.classSelections || {}) };
+                  if (filtered.length) next[group.key] = formatClassPowerChoiceSelection(filtered);
+                  else delete next[group.key];
+                  next = pruneHiddenClassFeatureSelections(next, classFeatureChoiceGroups);
+                  updateBuild({
+                    ...build,
+                    classSelections: Object.keys(next).length ? next : undefined
+                  });
+                }}
+                style={{
+                  width: "100%",
+                  marginTop: "0.2rem",
+                  padding: "0.4rem",
+                  borderRadius: "6px",
+                  border: "1px solid var(--panel-border)"
+                }}
+              >
+                <option value="">Select power…</option>
+                {legalPowerIds.map((pid) => {
+                  const p = powerById.get(pid);
+                  if (!p || (usedElsewhere.has(pid) && pid !== selectedId)) return null;
+                  return (
+                    <option key={pid} value={pid}>
+                      {p.name}
+                    </option>
+                  );
+                })}
+              </select>
+            </label>
+          );
+        })}
+        {resolvedIds.length > 0 && (
+          <div style={{ marginTop: "0.45rem" }}>
+            {resolvedIds.map((pid) => {
+              const p = powerById.get(pid);
+              return p ? renderPowerCardWithSelections(p, `cf-pick-${group.key}-${p.id}`) : null;
+            })}
+          </div>
+        )}
       </div>
     );
   }
@@ -3093,107 +3222,49 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     {classAutoGrantedPowers.map((p) => renderPowerCardWithSelections(p, `class-tab-${p.id}`))}
                   </div>
                 )}
-                {visibleClassFeatureChoiceGroups.length > 0 && (
+                {visibleClassFeatureChoiceGroupsOnClassTab.length > 0 && (
                   <div style={{ marginTop: "0.85rem", paddingTop: "0.75rem", borderTop: "1px solid var(--panel-border)" }}>
                     <h4 style={subsectionTitleStyle}>Class choices</h4>
-                    {visibleClassFeatureChoiceGroups.map((group) => {
-                      const rs = build.classSelections || {};
-                      if (group.kind === "classFeature") {
-                        const pickedId = rs[group.key] || "";
-                        const picked = group.options.find((o) => o.id === pickedId);
-                        return (
-                          <label key={group.key} style={{ display: "block", maxWidth: "28rem", marginBottom: "0.75rem" }}>
-                            <span style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem", fontSize: "0.85rem" }}>
-                              {group.parentFeatureName}
-                            </span>
-                            <select
-                              value={pickedId}
-                              onChange={(e) => {
-                                const v = e.target.value;
-                                let next = { ...rs };
-                                if (v) next[group.key] = v;
-                                else delete next[group.key];
-                                next = pruneHiddenClassFeatureSelections(next, classFeatureChoiceGroups);
-                                const keys = Object.keys(next);
-                                updateBuild({ ...build, classSelections: keys.length ? next : undefined });
-                              }}
-                              style={{ width: "100%", padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--panel-border)" }}
-                            >
-                              <option value="">Select…</option>
-                              {group.options.map((opt) => (
-                                <option key={opt.id} value={opt.id}>
-                                  {opt.name}
-                                </option>
-                              ))}
-                            </select>
-                            {picked?.shortDescription && (
-                              <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.8rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
-                                {picked.shortDescription}
-                              </p>
-                            )}
-                            {picked?.body && (
-                              <div style={{ marginTop: "0.35rem", fontSize: "0.82rem", color: "var(--text-secondary)" }}>
-                                <RulesRichText text={picked.body} />
-                              </div>
-                            )}
-                          </label>
-                        );
-                      }
-                      const cantripPicks = parseClassPowerChoiceSelection(rs[group.key]);
-                      const powerById = new Map(index.powers.map((p) => [p.id, p]));
+                    {visibleClassFeatureChoiceGroupsOnClassTab.map((group) => {
+                      const rs = classSelectionsForFeatureChoices;
+                      const pickedId = rs[group.key] || "";
+                      const picked = group.options.find((o) => o.id === pickedId);
                       return (
-                        <div key={group.key} style={{ marginBottom: "0.75rem", maxWidth: "28rem" }}>
-                          <span style={{ display: "block", fontWeight: 600, marginBottom: "0.35rem", fontSize: "0.85rem" }}>
-                            {group.parentFeatureName} ({group.pickCount} picks)
+                        <label key={group.key} style={{ display: "block", maxWidth: "28rem", marginBottom: "0.75rem" }}>
+                          <span style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem", fontSize: "0.85rem" }}>
+                            {group.parentFeatureName}
                           </span>
-                          {Array.from({ length: group.pickCount }, (_, slot) => {
-                            const selectedId = cantripPicks[slot] || "";
-                            const usedElsewhere = new Set(
-                              cantripPicks.filter((_, i) => i !== slot)
-                            );
-                            return (
-                              <label key={`${group.key}-${slot}`} style={{ display: "block", marginBottom: "0.35rem" }}>
-                                <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>Pick {slot + 1}</span>
-                                <select
-                                  value={selectedId}
-                                  onChange={(e) => {
-                                    const v = e.target.value;
-                                    const nextPicks = [...cantripPicks];
-                                    while (nextPicks.length < group.pickCount) nextPicks.push("");
-                                    nextPicks[slot] = v;
-                                    const filtered = nextPicks.filter(Boolean);
-                                    let next = { ...rs };
-                                    if (filtered.length) next[group.key] = formatClassPowerChoiceSelection(filtered);
-                                    else delete next[group.key];
-                                    next = pruneHiddenClassFeatureSelections(next, classFeatureChoiceGroups);
-                                    updateBuild({
-                                      ...build,
-                                      classSelections: Object.keys(next).length ? next : undefined
-                                    });
-                                  }}
-                                  style={{
-                                    width: "100%",
-                                    marginTop: "0.2rem",
-                                    padding: "0.4rem",
-                                    borderRadius: "6px",
-                                    border: "1px solid var(--panel-border)"
-                                  }}
-                                >
-                                  <option value="">Select power…</option>
-                                  {group.powerIds.map((pid) => {
-                                    const p = powerById.get(pid);
-                                    if (!p || (usedElsewhere.has(pid) && pid !== selectedId)) return null;
-                                    return (
-                                      <option key={pid} value={pid}>
-                                        {p.name}
-                                      </option>
-                                    );
-                                  })}
-                                </select>
-                              </label>
-                            );
-                          })}
-                        </div>
+                          <select
+                            value={pickedId}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              let next = { ...(build.classSelections || {}) };
+                              if (v) next[group.key] = v;
+                              else delete next[group.key];
+                              next = pruneHiddenClassFeatureSelections(next, classFeatureChoiceGroups);
+                              const keys = Object.keys(next);
+                              updateBuild({ ...build, classSelections: keys.length ? next : undefined });
+                            }}
+                            style={{ width: "100%", padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--panel-border)" }}
+                          >
+                            <option value="">Select…</option>
+                            {group.options.map((opt) => (
+                              <option key={opt.id} value={opt.id}>
+                                {opt.name}
+                              </option>
+                            ))}
+                          </select>
+                          {picked?.shortDescription && (
+                            <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.8rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
+                              {picked.shortDescription}
+                            </p>
+                          )}
+                          {picked?.body && (
+                            <div style={{ marginTop: "0.35rem", fontSize: "0.82rem", color: "var(--text-secondary)" }}>
+                              <RulesRichText text={picked.body} />
+                            </div>
+                          )}
+                        </label>
                       );
                     })}
                   </div>
@@ -3903,6 +3974,27 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 <strong>Next class slots (PHB schedule):</strong>{" "}
                 {upcomingPowerSlotMilestones.map((m) => `${m.label} at level ${m.atLevel}`).join("; ")}.
               </p>
+            )}
+            {visibleClassFeaturePowerGroupsOnPowersTab.length > 0 && (
+              <section
+                style={{
+                  marginBottom: "1.1rem",
+                  padding: "0.65rem 0.75rem",
+                  backgroundColor: "var(--surface-1)",
+                  borderRadius: "8px",
+                  border: "1px solid var(--panel-border)"
+                }}
+              >
+                <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "0.35rem" }}>
+                  Channel Divinity &amp; class feature powers
+                </div>
+                <p style={{ margin: "0 0 0.5rem 0", fontSize: "0.78rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
+                  Choose Channel Divinity and similar class-granted powers here. They are not selected into attack/utility slots below.
+                </p>
+                {visibleClassFeaturePowerGroupsOnPowersTab.map((group) =>
+                  renderClassFeaturePowerChoiceGroup(group)
+                )}
+              </section>
             )}
             {(racePowerGroups.some((g) => g.powerIds.length > 0) ||
               dilettantePowerGroups.length > 0 ||
@@ -5373,29 +5465,37 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   ) : null}
                 </>
               )}
-              {!isHybridBuild &&
-                visibleClassFeatureChoiceGroups.length > 0 &&
-                (() => {
-                  const rs = build.classSelections || {};
-                  const lines = visibleClassFeatureChoiceGroups
+              {!isHybridBuild && visibleClassFeatureChoiceGroupsOnClassTab.length > 0 && (
+                <p style={{ margin: 0, fontSize: "0.88rem" }}>
+                  <strong>Class choices:</strong>{" "}
+                  {visibleClassFeatureChoiceGroupsOnClassTab
                     .map((g) => {
-                      if (g.kind === "classFeature") {
-                        const opt = g.options.find((o) => o.id === rs[g.key]);
-                        return opt ? `${g.parentFeatureName}: ${opt.name}` : null;
-                      }
-                      const picks = parseClassPowerChoiceSelection(rs[g.key])
+                      const opt = g.options.find((o) => o.id === classSelectionsForFeatureChoices[g.key]);
+                      return opt ? `${g.parentFeatureName}: ${opt.name}` : null;
+                    })
+                    .filter(Boolean)
+                    .join(" · ") || "—"}
+                </p>
+              )}
+              {!isHybridBuild && visibleClassFeaturePowerGroupsOnPowersTab.length > 0 && (
+                <p style={{ margin: 0, fontSize: "0.88rem" }}>
+                  <strong>Channel Divinity:</strong>{" "}
+                  {visibleClassFeaturePowerGroupsOnPowersTab
+                    .map((g) => {
+                      const names = resolveClassPowerChoiceIdsForGroup(
+                        index,
+                        g,
+                        build.classId,
+                        classSelectionsForFeatureChoices
+                      )
                         .map((pid) => index.powers.find((p) => p.id === pid)?.name)
                         .filter(Boolean);
-                      return picks.length ? `${g.parentFeatureName}: ${picks.join(", ")}` : null;
+                      return names.length ? names.join(", ") : null;
                     })
-                    .filter(Boolean);
-                  if (lines.length === 0) return null;
-                  return (
-                    <p style={{ margin: 0, fontSize: "0.88rem" }}>
-                      <strong>Class choices:</strong> {lines.join(" · ")}
-                    </p>
-                  );
-                })()}
+                    .filter(Boolean)
+                    .join(" · ") || "—"}
+                </p>
+              )}
               <p style={{ margin: 0, fontSize: "0.88rem" }}>
                 <strong {...glossaryTooltipUi.hoverA11y("level")}>Level:</strong> {build.level}
               </p>

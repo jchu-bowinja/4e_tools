@@ -1,10 +1,12 @@
 import { getPowersForOwnerId } from "./classPowersQuery";
 import {
   autoGrantedClassPowers,
+  collectParagonPathClassFeaturePowerIds,
   racePowerGroupsForRace,
   racePowerSelectSelectionKey,
   resolveFeatGrantedPowers
 } from "./grantedPowersQuery";
+import { collectClassFeaturePowerChoiceIds } from "./classFeatureChoices";
 import type { CharacterBuild, RulesIndex } from "./models";
 import { collectParagonMulticlassPowerIds } from "./paragonMulticlassing";
 import { getRaceExtraTraitIds } from "./raceSubraces";
@@ -47,6 +49,9 @@ export function collectCharacterPowerIdsForSelections(index: RulesIndex, build: 
   if (paragon) {
     for (const p of getPowersForOwnerId(index, paragon.id, build.level, "attack")) ids.add(p.id);
     for (const p of getPowersForOwnerId(index, paragon.id, build.level, "utility")) ids.add(p.id);
+    for (const pid of collectParagonPathClassFeaturePowerIds(index, paragon.id, build.level)) {
+      ids.add(pid);
+    }
   }
   const epic = index.epicDestinies.find((d) => d.id === build.epicDestinyId);
   if (epic) {
@@ -61,6 +66,8 @@ export function collectCharacterPowerIdsForSelections(index: RulesIndex, build: 
   }
 
   for (const pid of collectParagonMulticlassPowerIds(build)) ids.add(pid);
+
+  for (const pid of collectClassFeaturePowerChoiceIds(index, build)) ids.add(pid);
 
   return ids;
 }

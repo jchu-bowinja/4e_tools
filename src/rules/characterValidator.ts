@@ -31,8 +31,11 @@ import {
 } from "./hybridPowerSlots";
 import { resolveRaceAbilityBonusInfo } from "./abilityScores";
 import {
+  classFeaturePowerIdsForClass,
   filterVisibleClassFeatureChoiceGroups,
+  effectiveClassSelectionsForChoiceGroups,
   getClassFeatureChoiceGroups,
+  isFixedClassPowerChoiceGroup,
   parseClassPowerChoiceSelection
 } from "./classFeatureChoices";
 import {
@@ -142,8 +145,13 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
   }
   if (!isHybrid && build.classId) {
     const clsForBuild = index.classes.find((c) => c.id === build.classId);
-    const rs = build.classSelections || {};
     const choiceGroups = getClassFeatureChoiceGroups(index, clsForBuild);
+    const rs = effectiveClassSelectionsForChoiceGroups(
+      index,
+      build.classId,
+      build.classSelections,
+      choiceGroups
+    );
     for (const group of filterVisibleClassFeatureChoiceGroups(choiceGroups, rs)) {
       if (group.kind === "classFeature") {
         const picked = rs[group.key];
@@ -156,7 +164,10 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
         }
         continue;
       }
-      const legal = new Set(group.powerIds);
+      if (isFixedClassPowerChoiceGroup(index, group, build.classId)) {
+        continue;
+      }
+      const legal = new Set(classFeaturePowerIdsForClass(index, group, build.classId));
       const picks = parseClassPowerChoiceSelection(rs[group.key]);
       if (picks.length < group.pickCount) {
         errors.push(

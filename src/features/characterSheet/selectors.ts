@@ -6,8 +6,10 @@ import { collectParagonMulticlassPowerIds } from "../../rules/paragonMulticlassi
 import {
   autoGrantedClassPowers,
   collectFeatGrantedPowersForBuild,
+  collectParagonPathClassFeaturePowerIds,
   collectPowerIdsFromRacialTrait
 } from "../../rules/grantedPowersQuery";
+import { collectClassFeaturePowerChoiceIds } from "../../rules/classFeatureChoices";
 import { parseRacialTraitIdsFromRace } from "../../rules/racialTraits";
 import { computeBuilderLikeDerivedStats } from "../../rules/derivedStatsFromBuild";
 import type { AcBreakdown } from "../../rules/defenseCalculator";
@@ -231,12 +233,24 @@ export function groupCombatPowers(state: CharacterSheetState, index: RulesIndex)
   ];
   const paragonGranted = [
     ...getPowersForOwnerId(index, state.paragonPathId, state.level, "attack"),
-    ...getPowersForOwnerId(index, state.paragonPathId, state.level, "utility")
+    ...getPowersForOwnerId(index, state.paragonPathId, state.level, "utility"),
+    ...collectParagonPathClassFeaturePowerIds(index, state.paragonPathId, state.level)
+      .map((id) => byId.get(id))
+      .filter((p): p is Power => Boolean(p))
   ];
   const epicGranted = [
     ...getPowersForOwnerId(index, state.epicDestinyId, state.level, "attack"),
     ...getPowersForOwnerId(index, state.epicDestinyId, state.level, "utility")
   ];
+  const classFeatureChoiceGranted = collectClassFeaturePowerChoiceIds(index, {
+    classId: state.classId,
+    characterStyle: state.characterStyle,
+    hybridClassIdA: state.hybridClassIdA,
+    hybridClassIdB: state.hybridClassIdB,
+    classSelections: state.classSelections
+  })
+    .map((id) => byId.get(id))
+    .filter((p): p is Power => Boolean(p));
   const featGranted = collectFeatGrantedPowersForBuild(index, {
     featIds: state.featIds ?? []
   }).flatMap((row) => row.powers);
@@ -259,6 +273,7 @@ export function groupCombatPowers(state: CharacterSheetState, index: RulesIndex)
   const allPowers = [
     ...selected,
     ...autoClass,
+    ...classFeatureChoiceGranted,
     ...raceGranted,
     ...dilettanteGranted,
     ...themeGranted,
