@@ -721,7 +721,7 @@ describe("validateCharacterBuild", () => {
     };
     const result = validateCharacterBuild(idx, build);
     expect(result.errors).toContain("Race: Subrace Test Subrace — make a selection.");
-    expect(result.errors).toContain("Race: choose a racial ability bonus (+2).");
+    expect(result.errors).toContain("Ability Scores: choose a racial ability bonus (+2).");
   });
 
   it("requires two hybrid classes when characterStyle is hybrid", () => {

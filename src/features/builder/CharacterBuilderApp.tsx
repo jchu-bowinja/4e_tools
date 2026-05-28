@@ -2382,7 +2382,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             {selectedRace &&
               (raceTraitBundleSlots.length > 0 ||
                 raceAbilityBonusInfo.fixed.length > 0 ||
-                raceAbilityBonusInfo.chooseOne.length > 0 ||
                 raceSecondarySlots.length > 0 ||
                 racialTraitRuleSelectSlotsRaceTab.length > 0 ||
                 racePowerGroups.some((g) => g.choiceOnly)) && (
@@ -2459,33 +2458,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   )}
                   {raceDefersAbilityBonusToSubrace(selectedRace) && !build.raceSelections?.subrace && (
                     <p style={{ margin: "0 0 0.75rem 0", fontSize: "0.82rem", color: "var(--text-muted)" }}>
-                      Ability bonuses depend on the variant selected above.
+                      Ability bonuses depend on the variant selected above (choose on the Ability Scores tab).
                     </p>
-                  )}
-                  {raceAbilityBonusInfo.chooseOne.length > 0 &&
-                    (!raceDefersAbilityBonusToSubrace(selectedRace) || !!build.raceSelections?.subrace) && (
-                    <label style={{ display: "block", marginBottom: raceSecondarySlots.length > 0 ? "0.75rem" : 0 }}>
-                      <span style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem", fontSize: "0.85rem" }}>
-                        Racial ability (+2) — choose one
-                      </span>
-                      <select
-                        value={build.racialAbilityChoice || ""}
-                        onChange={(e) =>
-                          updateBuild({
-                            ...build,
-                            racialAbilityChoice: (e.target.value || undefined) as CharacterBuild["racialAbilityChoice"]
-                          })
-                        }
-                        style={{ width: "100%", maxWidth: "28rem", padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--panel-border)" }}
-                      >
-                        <option value="">Select ability…</option>
-                        {raceAbilityBonusInfo.chooseOne.map((ability) => (
-                          <option key={ability} value={ability}>
-                            {getAbilityLabel(ability)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
                   )}
                   {raceSecondarySlots.map((slot) => (
                     <label key={slot.key} style={{ display: "block", marginBottom: "0.65rem" }}>
@@ -3336,7 +3310,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     {raceAbilityBonusInfo.fixed.map((a) => `+2 ${getAbilityLabel(a)}`).join(", ")}
                   </p>
                 )}
-                {raceAbilityBonusInfo.chooseOne.length > 0 && (
+                {raceAbilityBonusInfo.chooseOne.length > 0 &&
+                  (!raceDefersAbilityBonusToSubrace(selectedRace) || !!build.raceSelections?.subrace) && (
                   <label
                     style={{
                       display: "flex",
@@ -3362,6 +3337,11 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                       ))}
                     </select>
                   </label>
+                )}
+                {raceDefersAbilityBonusToSubrace(selectedRace) && !build.raceSelections?.subrace && raceAbilityBonusInfo.chooseOne.length === 0 && (
+                  <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.82rem", color: "var(--text-muted)" }}>
+                    Select a race variant on the Race tab to unlock the +2 ability choice.
+                  </p>
                 )}
               </div>
             )}

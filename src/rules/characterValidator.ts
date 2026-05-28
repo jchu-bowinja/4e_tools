@@ -207,10 +207,14 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
       const racialTraitById = new Map((index.racialTraits ?? []).map((t) => [t.id, t]));
       const abilityInfo = resolveRaceAbilityBonusInfo(race, racialTraitById, rs);
       if (abilityInfo.chooseOne.length > 0 && !build.racialAbilityChoice) {
-        errors.push("Race: choose a racial ability bonus (+2).");
+        errors.push("Ability Scores: choose a racial ability bonus (+2).");
       }
-      if (abilityInfo.chooseOne.length > 0 && build.racialAbilityChoice && !abilityInfo.chooseOne.includes(build.racialAbilityChoice)) {
-        errors.push("Race: racial ability bonus (+2) is not valid for the selected variant.");
+      if (
+        abilityInfo.chooseOne.length > 0 &&
+        build.racialAbilityChoice &&
+        !abilityInfo.chooseOne.includes(build.racialAbilityChoice)
+      ) {
+        errors.push("Ability Scores: racial ability bonus (+2) is not valid for the selected variant.");
       }
       for (const bundle of getRaceTraitBundleSlots(race, racialTraitById)) {
         if (!rs[bundle.selectionKey]) {
