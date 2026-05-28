@@ -1,4 +1,5 @@
 import type { CharacterBuild, Power, RulesIndex } from "./models";
+import { resolveBaseAugmentablePowerId } from "./psionicPowerAugments";
 import {
   expectedClassAtWillAttackSlots,
   expectedClassEncounterAttackSlots,
@@ -160,14 +161,19 @@ export function reconcileClassPowerSlotsForBuild(
   }
   for (const k of Object.keys(next)) {
     const v = next[k]?.trim();
-    if (!v || !allowed.has(v)) {
+    if (!v) {
+      delete next[k];
+      continue;
+    }
+    const baseId = resolveBaseAugmentablePowerId(index, v);
+    if (!allowed.has(baseId)) {
       delete next[k];
       continue;
     }
     const def = defByKey.get(k);
-    const p = index.powers.find((x) => x.id === v);
+    const p = index.powers.find((x) => x.id === baseId);
     if (def && p && !powerPrintedLevelEligibleForSlot(p, def)) delete next[k];
-    else next[k] = v;
+    else next[k] = baseId;
   }
 
   let merged: CharacterBuild = { ...build, classPowerSlots: Object.keys(next).length > 0 ? next : undefined };

@@ -1,4 +1,5 @@
 import type { Power, RulesIndex } from "./models";
+import { collapseAugmentablePowersForPicker } from "./psionicPowerAugments";
 
 export function powerTypeCategory(p: Power): "attack" | "utility" | "other" {
   const pt = String((p.raw?.specific as Record<string, unknown> | undefined)?.["Power Type"] || "").toLowerCase();
@@ -23,12 +24,13 @@ export function getClassPowersForLevelRange(
     if (level < 1 || level > maxLevel) return false;
     return powerTypeCategory(p) === kind;
   });
-  return [...list].sort((a, b) => {
+  const sorted = [...list].sort((a, b) => {
     const la = a.level ?? 0;
     const lb = b.level ?? 0;
     if (la !== lb) return la - lb;
     return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
   });
+  return collapseAugmentablePowersForPicker(sorted);
 }
 
 /**
@@ -62,12 +64,13 @@ export function getDilettanteCandidatePowers(
     if (!u.includes("at-will")) return false;
     return true;
   });
-  return [...list].sort((a, b) => {
+  const sorted = [...list].sort((a, b) => {
     const ca = className(a.classId);
     const cb = className(b.classId);
     if (ca !== cb) return ca.localeCompare(cb, undefined, { sensitivity: "base" });
     return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
   });
+  return collapseAugmentablePowersForPicker(sorted);
 }
 
 export function getPowersForOwnerId(
@@ -85,10 +88,11 @@ export function getPowersForOwnerId(
     if (lv < 1 || lv > maxLevel) return false;
     return powerTypeCategory(p) === kind;
   });
-  return [...list].sort((a, b) => {
+  const sorted = [...list].sort((a, b) => {
     const la = a.level ?? 0;
     const lb = b.level ?? 0;
     if (la !== lb) return la - lb;
     return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
   });
+  return collapseAugmentablePowersForPicker(sorted);
 }

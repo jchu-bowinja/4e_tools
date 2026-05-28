@@ -1,6 +1,6 @@
 import type { CSSProperties, ComponentPropsWithoutRef, ElementType, ReactNode } from "react";
 import type { PowerFeatModifications } from "../../rules/featPowerModifications";
-import type { Power } from "../../rules/models";
+import type { Power, RulesIndex } from "../../rules/models";
 import { buildCharacterPowerCardViewModel } from "./characterPowerCardViewModel";
 import { powerCardUsageAccentBarColor, powerCardUsageAccentStyle } from "./powerCardAccent";
 import type { CharacterPowerCardLabeledLine, CharacterPowerCardViewModel, PowerCardUsageBucket } from "./types";
@@ -9,6 +9,8 @@ export type CharacterPowerCardProps = {
   power?: Power;
   vm?: CharacterPowerCardViewModel;
   featMods?: PowerFeatModifications;
+  /** When set, psionic augment tiers are merged onto the card instead of separate pick-list rows. */
+  rulesIndex?: RulesIndex;
   variant?: "builder" | "sheet";
   as?: ElementType;
   renderLineText?: (text: string, segmentKey: string, line: CharacterPowerCardLabeledLine) => ReactNode;
@@ -55,6 +57,7 @@ export function CharacterPowerCard({
   power,
   vm: vmProp,
   featMods,
+  rulesIndex,
   variant = "builder",
   as: Root = "article",
   renderLineText,
@@ -72,7 +75,7 @@ export function CharacterPowerCard({
   style,
   ...rootProps
 }: CharacterPowerCardProps): JSX.Element {
-  const vm = vmProp ?? (power ? buildCharacterPowerCardViewModel(power, featMods) : null);
+  const vm = vmProp ?? (power ? buildCharacterPowerCardViewModel(power, featMods, rulesIndex) : null);
   if (!vm) {
     throw new Error("CharacterPowerCard requires `power` or `vm`.");
   }

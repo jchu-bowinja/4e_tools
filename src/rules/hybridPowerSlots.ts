@@ -18,6 +18,7 @@ import {
   orderedPowerIdsFromSlots,
   powerPrintedLevelEligibleForSlot
 } from "./classPowerSlots";
+import { resolveBaseAugmentablePowerId } from "./psionicPowerAugments";
 import { getClassPowersForLevelRange, powerTypeCategory } from "./classPowersQuery";
 
 function ordinalWord(n: number): string {
@@ -174,16 +175,22 @@ export function reconcileHybridClassPowerSlotsForBuild(
       next[k] = v;
       continue;
     }
-    if (!allowed.has(v)) {
+    const baseId = resolveBaseAugmentablePowerId(index, v);
+    const basePow = index.powers.find((x) => x.id === baseId);
+    if (!basePow) {
       delete next[k];
       continue;
     }
-    if (!powerAllowedForHybridSlot(k, p, baseClassIdA, baseClassIdB)) {
+    if (!allowed.has(baseId)) {
       delete next[k];
       continue;
     }
-    if (!powerPrintedLevelEligibleForSlot(p, def)) delete next[k];
-    else next[k] = v;
+    if (!powerAllowedForHybridSlot(k, basePow, baseClassIdA, baseClassIdB)) {
+      delete next[k];
+      continue;
+    }
+    if (!powerPrintedLevelEligibleForSlot(basePow, def)) delete next[k];
+    else next[k] = baseId;
   }
 
   let merged: CharacterBuild = { ...build, classPowerSlots: Object.keys(next).length > 0 ? next : undefined };

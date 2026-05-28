@@ -1,5 +1,6 @@
 import { attackPowerBucketFromUsage } from "../../rules/classPowerSlots";
 import { collectDilettantePowersForBuild } from "../../rules/dilettantePower";
+import { resolveBaseAugmentablePowerId } from "../../rules/psionicPowerAugments";
 import { getPowersForOwnerId } from "../../rules/classPowersQuery";
 import { collectParagonMulticlassPowerIds } from "../../rules/paragonMulticlassing";
 import {
@@ -210,7 +211,10 @@ function sortPowerCards(list: Power[]): Power[] {
 export function groupCombatPowers(state: CharacterSheetState, index: RulesIndex): GroupedPowerCards {
   const byId = new Map(index.powers.map((power) => [power.id, power]));
   const selected = state.powers.selectedPowerIds
-    .map((id) => byId.get(id))
+    .map((id) => {
+      const baseId = resolveBaseAugmentablePowerId(index, id);
+      return byId.get(baseId) ?? byId.get(id);
+    })
     .filter((p): p is Power => Boolean(p));
   const autoClass = autoGrantedClassPowers(index, state.classId);
   const race = index.races.find((entry) => entry.id === state.raceId);

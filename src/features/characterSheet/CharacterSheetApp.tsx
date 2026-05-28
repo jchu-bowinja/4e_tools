@@ -2734,6 +2734,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                         key={power.id}
                         power={power}
                         featMods={featModsByPowerId.get(power.id)}
+                        rulesIndex={index}
                         variant="sheet"
                         showInsetShadow
                         expended={expended}

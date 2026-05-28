@@ -50,6 +50,7 @@ import {
   getDilettanteCandidatePowersForBuild,
   resolveDilettanteDisplayPower
 } from "../../rules/dilettantePower";
+import { resolveBaseAugmentablePowerId } from "../../rules/psionicPowerAugments";
 import {
   autoGrantedClassPowers,
   bonusClassAtWillSlotFromRaceBuild,
@@ -361,6 +362,7 @@ function renderPowerCard(
       key={options?.key || power.id}
       power={power}
       featMods={featMods}
+      rulesIndex={index}
       variant="builder"
       renderUsageInHeader={(usageLabel) =>
         usageBucketForGlossary && options?.glossaryHover ? (
@@ -2202,7 +2204,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     }
     const prevId = nextBase.classPowerSlots?.[slotKey];
     const nextSlots: Record<string, string> = { ...(nextBase.classPowerSlots || {}) };
-    if (powerId) nextSlots[slotKey] = powerId;
+    const normalizedId = powerId ? resolveBaseAugmentablePowerId(index, powerId) : "";
+    if (normalizedId) nextSlots[slotKey] = normalizedId;
     else delete nextSlots[slotKey];
     const trimmed = Object.keys(nextSlots).length ? nextSlots : undefined;
     let nextBuild: CharacterBuild = {
@@ -2210,7 +2213,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       classPowerSlots: trimmed,
       powerIds: orderedPowerIdsFromSlots(defs, trimmed)
     };
-    if (prevId && prevId !== powerId && nextBuild.powerSelections?.[prevId]) {
+    if (prevId && prevId !== normalizedId && nextBuild.powerSelections?.[prevId]) {
       const ps = { ...nextBuild.powerSelections };
       delete ps[prevId];
       nextBuild = { ...nextBuild, powerSelections: Object.keys(ps).length ? ps : undefined };
@@ -4349,7 +4352,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   const taken = new Set(
                     Object.entries(slotsMap)
                       .filter(([k, v]) => k !== def.key && v)
-                      .map(([, v]) => v)
+                      .map(([, v]) => resolveBaseAugmentablePowerId(index, v))
                   );
                   const pool: Power[] =
                     def.bucket === "utility"
@@ -4366,9 +4369,11 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                       powerAllowedForHybridSlot(def.key, p, hybridBaseClassAId, hybridBaseClassBId)
                     );
                   }
-                  const value = slotsMap[def.key] || "";
+                  const value = slotsMap[def.key]
+                    ? resolveBaseAugmentablePowerId(index, slotsMap[def.key])
+                    : "";
                   const selPow = value ? index.powers.find((p) => p.id === value) : undefined;
-                  let candidates = poolForSlot.filter((p) => !taken.has(p.id) || p.id === slotsMap[def.key]);
+                  let candidates = poolForSlot.filter((p) => !taken.has(p.id) || p.id === value);
                   if (value && selPow && !candidates.some((p) => p.id === value)) {
                     candidates = [selPow, ...candidates];
                   }

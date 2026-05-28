@@ -3,7 +3,8 @@ import {
   applyFeatModificationsToPowerCardVm,
   type PowerFeatModifications
 } from "../../rules/featPowerModifications";
-import type { Power } from "../../rules/models";
+import { buildPsionicAugmentLinesForPower } from "../../rules/psionicPowerAugments";
+import type { Power, RulesIndex } from "../../rules/models";
 import { powerCardUsageBucketFromLabel } from "./powerCardAccent";
 import { splitPowerKeywords } from "./splitPowerKeywords";
 import type { CharacterPowerCardLabeledLine, CharacterPowerCardViewModel } from "./types";
@@ -16,7 +17,8 @@ function labeledLine(label: string, text: string, segmentKey: string): Character
 
 export function buildCharacterPowerCardViewModel(
   power: Power,
-  featMods?: PowerFeatModifications
+  featMods?: PowerFeatModifications,
+  index?: RulesIndex
 ): CharacterPowerCardViewModel {
   const raw = (power.raw || {}) as Record<string, unknown>;
   const specific = (power.raw?.specific as Record<string, unknown> | undefined) || {};
@@ -58,5 +60,13 @@ export function buildCharacterPowerCardViewModel(
     flavor: typeof raw.flavor === "string" ? raw.flavor : ""
   };
 
-  return applyFeatModificationsToPowerCardVm(base, featMods, power.id);
+  const withFeatMods = applyFeatModificationsToPowerCardVm(base, featMods, power.id);
+  const psionicAugments = index ? buildPsionicAugmentLinesForPower(index, power) : [];
+  if (psionicAugments.length === 0) {
+    return withFeatMods;
+  }
+  return {
+    ...withFeatMods,
+    augmentationLines: [...withFeatMods.augmentationLines, ...psionicAugments]
+  };
 }
