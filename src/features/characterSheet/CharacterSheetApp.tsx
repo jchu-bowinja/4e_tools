@@ -23,6 +23,7 @@ import {
   getThemeTraitRows,
   type TraitDisplayRow
 } from "../../rules/supportTraits";
+import { computeCharacterProficiencyDisplayLines } from "../../rules/characterProficiencyDisplay";
 import {
   collectCharacterProficiencyDisplayRows,
   collectCharacterProficiencyGrants
@@ -108,6 +109,7 @@ import { EquipmentTab, type EquipmentEditorSlot } from "../builder/EquipmentTab"
 import type { EquipmentPriceSlot } from "../../rules/equipmentItemPrice";
 import { CharacterEquippedSlotsPanel } from "./CharacterEquippedSlotsPanel";
 import { CharacterInventoryList } from "./CharacterInventoryList";
+import { CharacterProficienciesBlock } from "./CharacterProficienciesBlock";
 import { equipmentSlotGoldCost } from "../../rules/equipmentItemPrice";
 import {
   addAcquiredEquipmentToSheet,
@@ -125,6 +127,7 @@ import { useGlossaryTooltip } from "../../ui/useGlossaryTooltip";
 import { useDelayedHoverPanel } from "../../ui/useDelayedHoverPanel";
 import { AdjustableNumberInput } from "../../ui/AdjustableNumberInput";
 import { JsonCollapsiblePanel } from "../../ui/JsonCollapsiblePanel";
+import { weaponAttackAbilityForCharacter } from "../../rules/classFeatureProficiencies";
 import { summarizeImplementAttack, summarizeMainWeaponAttack } from "../../rules/weaponAttack";
 
 type SheetTab = "overview" | "equipment";
@@ -1119,14 +1122,34 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     () => psionicAugmentationPoolLabel(index, toBuildLikeState(sheet, index)),
     [index, sheet]
   );
+  const sheetBuildForProficiencies = useMemo(() => toBuildLikeState(sheet, index), [sheet, index]);
   const proficiencyGrants = useMemo(
-    () => collectCharacterProficiencyGrants(index, toBuildLikeState(sheet, index)),
-    [index, sheet, sheet.featIds, sheet.raceId, sheet.raceSelections]
+    () => collectCharacterProficiencyGrants(index, sheetBuildForProficiencies),
+    [index, sheetBuildForProficiencies]
   );
   const proficiencyDisplayRows = useMemo(
     () => collectCharacterProficiencyDisplayRows(index, toBuildLikeState(sheet, index)),
     [index, sheet, sheet.featIds, sheet.raceId, sheet.raceSelections]
   );
+  const proficiencyDisplayLines = useMemo(() => {
+    const classSpecific = (derived.cls?.raw?.specific as Record<string, unknown> | undefined) || {};
+    const isHybrid = sheet.characterStyle === "hybrid" && Boolean(sheet.hybridClassIdA && sheet.hybridClassIdB);
+    const hybridA = isHybrid ? index.hybridClasses?.find((h) => h.id === sheet.hybridClassIdA) : undefined;
+    const hybridB = isHybrid ? index.hybridClasses?.find((h) => h.id === sheet.hybridClassIdB) : undefined;
+    return computeCharacterProficiencyDisplayLines(
+      { isHybrid, hybridA, hybridB, classSpecific },
+      sheetBuildForProficiencies,
+      proficiencyGrants
+    );
+  }, [
+    derived.cls,
+    index,
+    sheet.characterStyle,
+    sheet.hybridClassIdA,
+    sheet.hybridClassIdB,
+    sheetBuildForProficiencies,
+    proficiencyGrants
+  ]);
 
   useEffect(() => {
     const build = loadBuild();
@@ -1232,7 +1255,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         magicCombat.mainWeaponAttack,
         proficiencyGrants,
         "mainHand",
-        sheet.equipment
+        sheet.equipment,
+        mainHandWeapon
+          ? weaponAttackAbilityForCharacter(mainHandWeapon, index, sheetBuildForProficiencies)
+          : undefined
       ),
     [
       sheet.level,
@@ -1241,7 +1267,9 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
       sheetWeaponProfText,
       magicCombat.mainWeaponAttack,
       proficiencyGrants,
-      sheet.equipment
+      sheet.equipment,
+      index,
+      sheetBuildForProficiencies
     ]
   );
   const offHandWeaponSummary = useMemo(
@@ -1254,7 +1282,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         magicCombat.offHandWeaponAttack,
         proficiencyGrants,
         "offHand",
-        sheet.equipment
+        sheet.equipment,
+        offHandWeapon
+          ? weaponAttackAbilityForCharacter(offHandWeapon, index, sheetBuildForProficiencies)
+          : undefined
       ),
     [
       sheet.level,
@@ -1263,7 +1294,9 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
       sheetWeaponProfText,
       magicCombat.offHandWeaponAttack,
       proficiencyGrants,
-      sheet.equipment
+      sheet.equipment,
+      index,
+      sheetBuildForProficiencies
     ]
   );
   const implementAttackSummary = useMemo(
@@ -2424,6 +2457,15 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
                   }}
                 />
               </OverviewCollapsibleSection>
+              {(proficiencyDisplayLines.weaponLine || proficiencyDisplayLines.armorLine) && (
+                <OverviewCollapsibleSection title="Proficiencies">
+                  <CharacterProficienciesBlock
+                    weaponLine={proficiencyDisplayLines.weaponLine}
+                    armorLine={proficiencyDisplayLines.armorLine}
+                    fontSize="0.8rem"
+                  />
+                </OverviewCollapsibleSection>
+              )}
             </div>
             <div style={overviewCenterColumnStyle}>
               <OverviewCollapsibleSection title={racialTraitsSectionTitle}>

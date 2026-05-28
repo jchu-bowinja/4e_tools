@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ClassDef, RulesIndex } from "../../src/rules/models";
 import {
   classFeaturePowerIdsForClass,
+  classFeatureSelectablePowerIds,
   classFeaturePowerSelectPoolsForClass,
   collectClassFeaturePowerChoiceIds,
   effectiveClassSelectionsForChoiceGroups,
@@ -457,5 +458,90 @@ describe("classFeatureChoices", () => {
     expect(classFeaturePowerIdsForClass(idx, loh, paladin.id).sort()).toEqual(
       ["ID_FMP_POWER_1566", "ID_FMP_POWER_7240", "ID_FMP_POWER_8097"].sort()
     );
+  });
+
+  it("includes full wizard cantrip list and keeps feat-granted cantrips selectable", () => {
+    const wizard: ClassDef = { id: "ID_FMP_CLASS_9", name: "Wizard", slug: "wizard", raw: {} };
+    const cantripNames = [
+      "Chameleon's Mask",
+      "Disrupt Undead",
+      "Ghost Sound",
+      "Light",
+      "Mage Hand",
+      "Prestidigitation",
+      "Spook",
+      "Suggestion",
+      "Water Stride",
+      "Whispering Wind"
+    ];
+    const powers = cantripNames.map((name, i) => ({
+      id: `ID_FMP_POWER_W${i}`,
+      name,
+      slug: name.toLowerCase().replace(/\s+/g, "-"),
+      classId: wizard.id,
+      raw: {}
+    }));
+    const idx: RulesIndex = {
+      ...index,
+      classes: [wizard],
+      paragonPaths: [],
+      feats: [
+        {
+          id: "ID_FMP_FEAT_FOO",
+          name: "Fey Trickster",
+          slug: "fey",
+          grantedPowerIds: ["ID_FMP_POWER_W5", "ID_FMP_POWER_W2"],
+          raw: { rules: { grant: [{ attrs: { name: "ID_FMP_POWER_W5", type: "Power" } }] } }
+        }
+      ],
+      classFeatures: [
+        {
+          id: "ID_FMP_CLASS_FEATURE_130",
+          name: "Arcanist Cantrips",
+          slug: "arcanist-cantrips",
+          raw: {
+            rules: {
+              select: [{ attrs: { type: "Power", number: "4", Category: "ID_FMP_CLASS_FEATURE_2870" } }]
+            }
+          }
+        },
+        {
+          id: "ID_FMP_CLASS_FEATURE_2870",
+          name: "Mage Cantrips",
+          slug: "mage-cantrips",
+          raw: {
+            specific: { Powers: "ID_FMP_POWER_W0,ID_FMP_POWER_W3" },
+            rules: {
+              select: [
+                { attrs: { type: "Power", number: "3", Category: "ID_FMP_CLASS_FEATURE_2870" } }
+              ]
+            }
+          }
+        }
+      ],
+      powers,
+      classFeatureChoiceGroupsByClassId: {
+        ID_FMP_CLASS_9: [
+          {
+            key: "classPower:ID_FMP_CLASS_FEATURE_130",
+            kind: "power",
+            parentFeatureId: "ID_FMP_CLASS_FEATURE_130",
+            parentFeatureName: "Arcanist Cantrips",
+            pickCount: 4,
+            powerIds: ["ID_FMP_POWER_W0", "ID_FMP_POWER_W3"]
+          }
+        ]
+      }
+    };
+    expect(() => classFeatureSelectablePowerIds(idx, "ID_FMP_CLASS_FEATURE_2870")).not.toThrow();
+    const selectable = classFeatureSelectablePowerIds(idx, "ID_FMP_CLASS_FEATURE_130");
+    expect(selectable.size).toBe(10);
+    const groups = getClassFeatureChoiceGroups(idx, wizard);
+    const cantrips = groups.find((g) => g.parentFeatureId === "ID_FMP_CLASS_FEATURE_130")!;
+    expect(cantrips.pickCount).toBe(4);
+    const legal = classFeaturePowerIdsForClass(idx, cantrips, wizard.id);
+    expect(legal).toHaveLength(10);
+    expect(legal).toContain("ID_FMP_POWER_W2");
+    expect(legal).toContain("ID_FMP_POWER_W5");
   });
 });

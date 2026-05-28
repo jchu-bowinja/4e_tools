@@ -96,10 +96,11 @@ export function summarizeMainWeaponAttack(
   magicItemAttackBonus?: number,
   featProficiencyGrants: ProficiencyGrant[] = [],
   handSlot?: WeaponHandSlot,
-  equippedSlots?: Partial<Record<EquippedSlotKey, string>>
+  equippedSlots?: Partial<Record<EquippedSlotKey, string>>,
+  abilityCodeOverride?: "STR" | "DEX"
 ): WeaponAttackSummary | null {
   if (!weapon) return null;
-  const abilityCode = weaponAttackAbility(weapon);
+  const abilityCode = abilityCodeOverride ?? weaponAttackAbility(weapon);
   const prof = isProficientWithWeapon(weapon, classWeaponProficienciesText, featProficiencyGrants);
   const half = Math.floor(level / 2);
   const mod = abilityMod(scores[abilityCode] ?? 10);

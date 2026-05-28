@@ -4,7 +4,7 @@ import sys
 import xml.etree.ElementTree as ET
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 _ETL_DIR = Path(__file__).resolve().parent
 if str(_ETL_DIR) not in sys.path:
@@ -820,12 +820,50 @@ def _options_from_class_feature_select(
     return options
 
 
-def _power_ids_from_class_feature_row(cf: Dict[str, Any]) -> Set[str]:
-    """Power internal_ids listed on a class feature (`specific.Powers`)."""
+WIZARD_MAGE_CANTRIP_POWER_NAMES: Tuple[str, ...] = (
+    "Chameleon's Mask",
+    "Disrupt Undead",
+    "Ghost Sound",
+    "Light",
+    "Mage Hand",
+    "Prestidigitation",
+    "Spook",
+    "Suggestion",
+    "Water Stride",
+    "Whispering Wind",
+)
+
+MAGE_CANTRIPS_FEATURE_IDS: frozenset = frozenset(
+    {"ID_FMP_CLASS_FEATURE_2870", "ID_FMP_CLASS_FEATURE_130"}
+)
+
+
+def _wizard_mage_cantrip_power_ids(powers_by_name: Dict[str, Dict[str, Any]]) -> Set[str]:
     out: Set[str] = set()
-    for pid in _parse_internal_id_list((cf.get("specific") or {}).get("Powers")):
-        if pid.startswith("ID_FMP_POWER"):
-            out.add(pid)
+    for name in WIZARD_MAGE_CANTRIP_POWER_NAMES:
+        row = powers_by_name.get(name)
+        if row and row.get("internal_id"):
+            out.add(str(row["internal_id"]))
+    return out
+
+
+def _power_ids_from_class_feature_row(
+    cf: Dict[str, Any],
+    *,
+    powers_by_name: Optional[Dict[str, Dict[str, Any]]] = None,
+) -> Set[str]:
+    """Power internal_ids listed on a class feature (`specific.Powers` / `_DisplayPowers`)."""
+    spec = cf.get("specific") or {}
+    out: Set[str] = set()
+    for field in ("Powers", "_DisplayPowers"):
+        for pid in _parse_internal_id_list(spec.get(field)):
+            if pid.startswith("ID_FMP_POWER"):
+                out.add(pid)
+    cf_id = str(cf.get("internal_id") or "")
+    if powers_by_name and (
+        cf_id in MAGE_CANTRIPS_FEATURE_IDS or str(cf.get("name") or "") in ("Mage Cantrips", "Arcanist Cantrips")
+    ):
+        out |= _wizard_mage_cantrip_power_ids(powers_by_name)
     return out
 
 
@@ -881,16 +919,26 @@ def _paragon_path_class_feature_power_ids(
     return out
 
 
-def _power_select_category_ids_from_class_feature(feature: Dict[str, Any]) -> Set[str]:
-    """Power internal_ids from this feature's own `rules.select` Power categories."""
+def _power_select_category_ids_from_class_feature(
+    feature: Dict[str, Any],
+    features_by_id: Dict[str, Dict[str, Any]],
+    *,
+    powers_by_name: Optional[Dict[str, Dict[str, Any]]] = None,
+) -> Set[str]:
+    """Power internal_ids offered by this feature's power picks (select + row + supplements)."""
     out: Set[str] = set()
+    out |= _power_ids_from_class_feature_row(feature, powers_by_name=powers_by_name)
     rules = feature.get("rules") or {}
     for item in rules.get("select") or []:
         attrs = item.get("attrs") or {}
         if attrs.get("type") != "Power":
             continue
         cat = str(attrs.get("Category") or "").strip()
-        if cat.startswith("ID_FMP_POWER"):
+        if cat.startswith("ID_") and "_CLASS_FEATURE_" in cat:
+            ref = features_by_id.get(cat)
+            if ref:
+                out |= _power_ids_from_class_feature_row(ref, powers_by_name=powers_by_name)
+        elif cat.startswith("ID_FMP_POWER"):
             for part in cat.split("|"):
                 pid = part.strip()
                 if pid.startswith("ID_FMP_POWER"):
@@ -904,13 +952,16 @@ def _class_power_select_pools_for_class(
     features_by_id: Dict[str, Dict[str, Any]],
     *,
     exclude_power_ids: Optional[Set[str]] = None,
+    powers_by_name: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> List[List[str]]:
     """
     Per-class power select pools from `rules.select` (e.g. cleric Channel Divinity: two pick-1 lists).
     Only includes entries whose `requires` matches `class_id` when present.
     """
     pools: List[List[str]] = []
-    own_select = _power_select_category_ids_from_class_feature(feature)
+    own_select = _power_select_category_ids_from_class_feature(
+        feature, features_by_id, powers_by_name=powers_by_name
+    )
     rules = feature.get("rules") or {}
     for item in rules.get("select") or []:
         attrs = item.get("attrs") or {}
@@ -924,7 +975,7 @@ def _class_power_select_pools_for_class(
         if cat.startswith("ID_") and "_CLASS_FEATURE_" in cat:
             ref = features_by_id.get(cat)
             if ref:
-                pool |= _power_ids_from_class_feature_row(ref)
+                pool |= _power_ids_from_class_feature_row(ref, powers_by_name=powers_by_name)
         elif cat.startswith("ID_FMP_POWER"):
             for part in cat.split("|"):
                 pid = part.strip()
@@ -948,10 +999,13 @@ def _power_ids_from_class_feature_power_select(
     features_by_id: Dict[str, Dict[str, Any]],
     *,
     exclude_power_ids: Optional[Set[str]] = None,
+    powers_by_name: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> List[str]:
     rules = feature.get("rules") or {}
     ids: Set[str] = set()
-    own_select = _power_select_category_ids_from_class_feature(feature)
+    own_select = _power_select_category_ids_from_class_feature(
+        feature, features_by_id, powers_by_name=powers_by_name
+    )
     spec = feature.get("specific") or {}
     for item in rules.get("select") or []:
         attrs = item.get("attrs") or {}
@@ -961,7 +1015,7 @@ def _power_ids_from_class_feature_power_select(
         if cat.startswith("ID_") and "_CLASS_FEATURE_" in cat:
             ref = features_by_id.get(cat)
             if ref:
-                ids |= _power_ids_from_class_feature_row(ref)
+                ids |= _power_ids_from_class_feature_row(ref, powers_by_name=powers_by_name)
         elif cat.startswith("ID_FMP_POWER"):
             for part in cat.split("|"):
                 pid = part.strip()
@@ -1010,6 +1064,7 @@ def build_class_feature_choice_groups_by_class(
     classes_by_id: Dict[str, Dict[str, Any]],
     paragon_paths_raw: Optional[List[Dict[str, Any]]] = None,
     feats_raw: Optional[List[Dict[str, Any]]] = None,
+    powers_by_name: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> Dict[str, List[Dict[str, Any]]]:
     """
     Level-1 class feature choice groups (Rogue Tactics, Fighter Talents, Implement Mastery, cantrips, …).
@@ -1080,25 +1135,40 @@ def build_class_feature_choice_groups_by_class(
                     class_id,
                     features_by_id,
                     exclude_power_ids=class_feature_pick_exclusions,
+                    powers_by_name=powers_by_name,
                 )
                 if has_pow and power_pools:
-                    for pool_index, pool_ids in enumerate(power_pools):
+                    if len(power_pools) == 1:
                         groups.append(
                             {
-                                "key": f"classPower:{parent_id}:{pool_index}",
+                                "key": f"classPower:{parent_id}",
                                 "kind": "power",
                                 "parentFeatureId": parent_id,
                                 "parentFeatureName": parent_name,
-                                "pickCount": 1,
-                                "powerIds": pool_ids,
+                                "pickCount": pick_pow,
+                                "powerIds": power_pools[0],
                                 "options": [],
                             }
                         )
+                    else:
+                        for pool_index, pool_ids in enumerate(power_pools):
+                            groups.append(
+                                {
+                                    "key": f"classPower:{parent_id}:{pool_index}",
+                                    "kind": "power",
+                                    "parentFeatureId": parent_id,
+                                    "parentFeatureName": parent_name,
+                                    "pickCount": 1,
+                                    "powerIds": pool_ids,
+                                    "options": [],
+                                }
+                            )
                 elif has_pow and pick_pow > 0:
                     power_ids = _power_ids_from_class_feature_power_select(
                         parent,
                         features_by_id,
                         exclude_power_ids=class_feature_pick_exclusions,
+                        powers_by_name=powers_by_name,
                     )
                     if power_ids:
                         groups.append(
@@ -1131,12 +1201,66 @@ def build_class_feature_choice_groups_by_class(
                 continue
             ungranted.append(feat)
 
-        pair_key: Optional[str] = None
-        if len(ungranted) == 2:
-            opts = [
-                _class_feature_child_option_row(f, "", "Class feature") for f in ungranted
+        def _is_leader_pick_feature(cf: Dict[str, Any]) -> bool:
+            return str(cf.get("name") or "").strip().endswith(" Leader")
+
+        leader_feats = [f for f in ungranted if _is_leader_pick_feature(f)]
+        remaining_ungranted = [f for f in ungranted if f not in leader_feats]
+
+        if len(leader_feats) >= 2:
+            leader_opts = [
+                _class_feature_child_option_row(f, "", "Leader") for f in leader_feats
             ]
-            ids = sorted(str(f.get("internal_id") or "") for f in ungranted)
+            leader_ids = sorted(str(f.get("internal_id") or "") for f in leader_feats)
+            groups.append(
+                {
+                    "key": f"classFeaturePair:{':'.join(leader_ids)}",
+                    "kind": "classFeature",
+                    "parentFeatureId": "",
+                    "parentFeatureName": "Leader",
+                    "pickCount": 1,
+                    "options": sorted(
+                        leader_opts,
+                        key=lambda r: str(r.get("name") or "").lower(),
+                    ),
+                }
+            )
+
+        if len(remaining_ungranted) == 1:
+            feat = remaining_ungranted[0]
+            fid = str(feat.get("internal_id") or "")
+            feat_name = str(feat.get("name") or fid)
+            groups.append(
+                {
+                    "key": f"classFeatureOptional:{fid}",
+                    "kind": "classFeature",
+                    "parentFeatureId": fid,
+                    "parentFeatureName": feat_name,
+                    "pickCount": 1,
+                    "optional": True,
+                    "options": [
+                        {
+                            "id": "__none__",
+                            "name": "Standard (default class proficiencies)",
+                            "parentFeatureId": fid,
+                            "parentFeatureName": feat_name,
+                            "shortDescription": None,
+                            "body": None,
+                            "powerIds": [],
+                        },
+                        _class_feature_child_option_row(feat, fid, feat_name),
+                    ],
+                }
+            )
+            remaining_ungranted = []
+
+        pair_key: Optional[str] = None
+        if len(remaining_ungranted) == 2:
+            opts = [
+                _class_feature_child_option_row(f, "", "Class feature")
+                for f in remaining_ungranted
+            ]
+            ids = sorted(str(f.get("internal_id") or "") for f in remaining_ungranted)
             pair_key = f"classFeaturePair:{':'.join(ids)}"
             groups.append(
                 {
@@ -1149,7 +1273,7 @@ def build_class_feature_choice_groups_by_class(
                 }
             )
 
-        for feat in ungranted:
+        for feat in remaining_ungranted:
             has_cf, pick_n = _class_feature_has_select(feat, "Class Feature")
             nested = _options_from_class_feature_select(feat, features_by_id) if has_cf else []
             if len(nested) >= 2:
@@ -2616,8 +2740,19 @@ def build_index(input_path: Path, output_dir: Path) -> None:
         {},
         build_essentials_class_build_options_by_class(classes_raw, builds_raw),
     )
+    powers_by_name: Dict[str, Dict[str, Any]] = {}
+    for row in powers_raw:
+        name = row.get("name")
+        if isinstance(name, str) and name.strip():
+            powers_by_name[name.strip()] = row
+
     class_feature_choice_groups_by_class = build_class_feature_choice_groups_by_class(
-        grants_raw, features_by_id, classes_by_id, paragon_raw, feats_raw
+        grants_raw,
+        features_by_id,
+        classes_by_id,
+        paragon_raw,
+        feats_raw,
+        powers_by_name,
     )
 
     known_races = {r.get("name", "") for r in races_raw}

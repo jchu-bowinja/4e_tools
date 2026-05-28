@@ -21,6 +21,7 @@ import type {
   Armor,
   CharacterBuild,
   ClassDef,
+  HybridClassDef,
   Implement,
   Power,
   Race,
@@ -162,17 +163,36 @@ export function findImplementEquippedFromSheet(state: CharacterSheetState, index
   return (index.implements ?? []).find((imp) => imp.id === inv.sourceId);
 }
 
+function sheetProficiencyHybridContext(
+  index: RulesIndex,
+  state: CharacterSheetState
+): { isHybrid: boolean; hybridA?: HybridClassDef; hybridB?: HybridClassDef } {
+  const isHybrid = state.characterStyle === "hybrid" && Boolean(state.hybridClassIdA && state.hybridClassIdB);
+  const hybridA = isHybrid ? index.hybridClasses?.find((h) => h.id === state.hybridClassIdA) : undefined;
+  const hybridB = isHybrid ? index.hybridClasses?.find((h) => h.id === state.hybridClassIdB) : undefined;
+  return { isHybrid, hybridA, hybridB };
+}
+
 export function sheetWeaponProficiencyText(
   index: RulesIndex,
   state: CharacterSheetState,
   cls: ClassDef | undefined
 ): string {
-  const hybrid = state.characterStyle === "hybrid" && state.hybridClassIdA && state.hybridClassIdB;
-  const hA = hybrid ? index.hybridClasses?.find((h) => h.id === state.hybridClassIdA) : undefined;
-  const hB = hybrid ? index.hybridClasses?.find((h) => h.id === state.hybridClassIdB) : undefined;
-  if (hybrid && hA && hB) return mergeHybridProficiencyLines(hA, hB).weaponLine;
+  const { isHybrid, hybridA, hybridB } = sheetProficiencyHybridContext(index, state);
+  if (isHybrid && hybridA && hybridB) return mergeHybridProficiencyLines(hybridA, hybridB).weaponLine;
   const spec = (cls?.raw?.specific as Record<string, unknown> | undefined) || {};
   return String(spec["Weapon Proficiencies"] || "");
+}
+
+export function sheetArmorProficiencyText(
+  index: RulesIndex,
+  state: CharacterSheetState,
+  cls: ClassDef | undefined
+): string {
+  const { isHybrid, hybridA, hybridB } = sheetProficiencyHybridContext(index, state);
+  if (isHybrid && hybridA && hybridB) return mergeHybridProficiencyLines(hybridA, hybridB).armorLine;
+  const spec = (cls?.raw?.specific as Record<string, unknown> | undefined) || {};
+  return String(spec["Armor Proficiencies"] || "");
 }
 
 export function sheetImplementProficiencyText(

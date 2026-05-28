@@ -1,4 +1,16 @@
-import type { ClassDef, ClassFeature, EpicDestiny, Feat, HybridClassDef, ParagonPath, RacialTrait, RulesIndex, Theme } from "./models";
+import { collectClassFeatureIdsFromClass } from "./characterClassFeatures";
+import type {
+  CharacterBuild,
+  ClassDef,
+  ClassFeature,
+  EpicDestiny,
+  Feat,
+  HybridClassDef,
+  ParagonPath,
+  RacialTrait,
+  RulesIndex,
+  Theme
+} from "./models";
 
 export type TraitFeatAugmentation = {
   featId: string;
@@ -136,13 +148,27 @@ export function resolveTraitDisplayRows(
 export function getClassTraitRows(
   cls: ClassDef | undefined,
   index: RulesIndex,
+  buildOrLevel?: CharacterBuild | number,
   characterLevel?: number
 ): TraitDisplayRow[] {
   if (!cls) return [];
-  const spec = specOf(cls);
+  const level =
+    typeof buildOrLevel === "number"
+      ? buildOrLevel
+      : buildOrLevel?.level ?? characterLevel;
+  const build = typeof buildOrLevel === "object" ? buildOrLevel : undefined;
   const { byId, byName } = buildClassFeatureLookups(index);
+
+  if (build?.classId === cls.id) {
+    const ids = collectClassFeatureIdsFromClass(index, build);
+    return resolveTraitDisplayRows(ids, [], byId, byName, {
+      maxLevel: level
+    });
+  }
+
+  const spec = specOf(cls);
   return resolveTraitDisplayRows([], parseTraitNamesFromField(spec, "_PARSED_CLASS_FEATURE"), byId, byName, {
-    maxLevel: characterLevel
+    maxLevel: level
   });
 }
 

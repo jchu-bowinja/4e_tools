@@ -156,9 +156,11 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
       if (group.kind === "classFeature") {
         const picked = rs[group.key];
         if (!picked) {
+          if (group.optional) continue;
           errors.push(`Class: ${group.parentFeatureName} — make a selection.`);
           continue;
         }
+        if (picked === "__none__") continue;
         if (!group.options.some((o) => o.id === picked)) {
           errors.push(`Class: ${group.parentFeatureName} — choose a valid option.`);
         }

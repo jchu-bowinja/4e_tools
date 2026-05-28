@@ -3,6 +3,14 @@ import {
   paragonPathClassFeaturePowerIds
 } from "./grantedPowersQuery";
 import type { CharacterBuild, ClassDef, ClassFeature, Power, RulesIndex } from "./models";
+import {
+  buildClassFeatureLookups,
+  parseTraitNamesFromField,
+  specOf
+} from "./supportTraits";
+
+/** Optional class-feature choice: keep default proficiencies / omit the feature. */
+export const CLASS_FEATURE_CHOICE_NONE = "__none__";
 
 export type ClassFeatureChoiceKind = "classFeature" | "power";
 
@@ -35,9 +43,66 @@ export interface ClassFeatureChoiceGroup {
   /** Set when one class feature has multiple compendium power select pools (cleric Channel Divinity). */
   powerPoolIndex?: number;
   powerPoolCount?: number;
+  /** When true, empty / `CLASS_FEATURE_CHOICE_NONE` means the optional feature is not taken. */
+  optional?: boolean;
 }
 
 type ClassFeatureSelectRule = { attrs?: Record<string, string> };
+
+/** Essentials / Arcanist mage cantrip list (compendium `Mage Cantrips` row is often incomplete). */
+export const WIZARD_MAGE_CANTRIP_POWER_NAMES = [
+  "Chameleon's Mask",
+  "Disrupt Undead",
+  "Ghost Sound",
+  "Light",
+  "Mage Hand",
+  "Prestidigitation",
+  "Spook",
+  "Suggestion",
+  "Water Stride",
+  "Whispering Wind"
+] as const;
+
+const MAGE_CANTRIPS_FEATURE_IDS = new Set([
+  "ID_FMP_CLASS_FEATURE_2870",
+  "ID_FMP_CLASS_FEATURE_130"
+]);
+
+function parsePowerIdsFromField(spec: Record<string, unknown> | undefined, field: string): string[] {
+  const raw = String(spec?.[field] ?? "").trim();
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter((id) => id.startsWith("ID_FMP_POWER"));
+}
+
+const wizardCantripIdsByIndex = new WeakMap<RulesIndex, Map<string, string>>();
+
+function wizardCantripPowerIdByNormalizedName(index: RulesIndex): Map<string, string> {
+  const cached = wizardCantripIdsByIndex.get(index);
+  if (cached) return cached;
+  const wizardClassId = index.classes.find((c) => c.name === "Wizard")?.id;
+  const byName = new Map<string, string>();
+  for (const p of index.powers) {
+    if (wizardClassId && p.classId && p.classId !== wizardClassId) continue;
+    const key = p.name.trim().toLowerCase();
+    if (!key || byName.has(key)) continue;
+    byName.set(key, p.id);
+  }
+  wizardCantripIdsByIndex.set(index, byName);
+  return byName;
+}
+
+function supplementWizardMageCantripPowerIds(index: RulesIndex): Set<string> {
+  const byName = wizardCantripPowerIdByNormalizedName(index);
+  const ids = new Set<string>();
+  for (const name of WIZARD_MAGE_CANTRIP_POWER_NAMES) {
+    const id = byName.get(name.trim().toLowerCase());
+    if (id) ids.add(id);
+  }
+  return ids;
+}
 
 function classFeatureSelectRules(cf: ClassFeature | undefined): ClassFeatureSelectRule[] {
   const rules = cf?.raw?.rules as Record<string, unknown> | undefined;
@@ -45,25 +110,59 @@ function classFeatureSelectRules(cf: ClassFeature | undefined): ClassFeatureSele
   return Array.isArray(select) ? (select as ClassFeatureSelectRule[]) : [];
 }
 
-/** Power ids listed in a class feature's own `rules.select` Power categories. */
-export function classFeaturePowerSelectCategoryIds(
+/**
+ * All power ids a class feature power pick may offer: `specific.Powers`, resolved `select`
+ * categories (including other class features), and known supplements (wizard cantrips).
+ */
+export function classFeatureSelectablePowerIds(
   index: RulesIndex,
-  parentFeatureId: string
+  parentFeatureId: string,
+  visiting: Set<string> = new Set()
 ): Set<string> {
+  if (visiting.has(parentFeatureId)) return new Set();
+  visiting.add(parentFeatureId);
+
   const cf = index.classFeatures?.find((f) => f.id === parentFeatureId);
   if (!cf) return new Set();
+  const spec = cf.raw?.specific as Record<string, unknown> | undefined;
   const ids = new Set<string>();
+  for (const pid of parsePowerIdsFromField(spec, "Powers")) ids.add(pid);
+  for (const pid of parsePowerIdsFromField(spec, "_DisplayPowers")) ids.add(pid);
+
   for (const item of classFeatureSelectRules(cf)) {
     const attrs = item.attrs ?? {};
     if (attrs.type !== "Power") continue;
     const cat = String(attrs.Category ?? "").trim();
-    if (!cat.includes("ID_FMP_POWER")) continue;
-    for (const part of cat.split("|")) {
-      const pid = part.trim();
-      if (pid.startsWith("ID_FMP_POWER")) ids.add(pid);
+    if (cat.startsWith("ID_FMP_POWER")) {
+      for (const part of cat.split("|")) {
+        const pid = part.trim();
+        if (pid.startsWith("ID_FMP_POWER")) ids.add(pid);
+      }
+    } else if (
+      cat.startsWith("ID_") &&
+      cat.includes("_CLASS_FEATURE_") &&
+      cat !== parentFeatureId
+    ) {
+      for (const pid of classFeatureSelectablePowerIds(index, cat, visiting)) ids.add(pid);
     }
   }
+
+  if (
+    MAGE_CANTRIPS_FEATURE_IDS.has(parentFeatureId) ||
+    cf.name === "Mage Cantrips" ||
+    cf.name === "Arcanist Cantrips"
+  ) {
+    for (const pid of supplementWizardMageCantripPowerIds(index)) ids.add(pid);
+  }
   return ids;
+}
+
+/** Power ids listed for this feature's power pick (used for feat/paragon exclusion bypass). */
+export function classFeaturePowerSelectCategoryIds(
+  index: RulesIndex,
+  parentFeatureId: string
+): Set<string> {
+  return classFeatureSelectablePowerIds(index, parentFeatureId);
 }
 
 /** Compendium power-select pools for a class feature scoped to one class (`requires` on select). */
@@ -84,7 +183,12 @@ export function classFeaturePowerSelectPoolsForClass(
     if (req && req !== classId) continue;
     const cat = String(attrs.Category ?? "").trim();
     const pool: string[] = [];
-    if (cat.includes("ID_FMP_POWER")) {
+    if (cat.startsWith("ID_") && cat.includes("_CLASS_FEATURE_")) {
+      for (const pid of classFeatureSelectablePowerIds(index, cat)) {
+        if (paragonExclude.has(pid) && !ownSelect.has(pid)) continue;
+        pool.push(pid);
+      }
+    } else if (cat.includes("ID_FMP_POWER")) {
       for (const part of cat.split("|")) {
         const pid = part.trim();
         if (!pid.startsWith("ID_FMP_POWER")) continue;
@@ -115,7 +219,7 @@ export function expandClassFeaturePowerChoiceGroups(
       continue;
     }
     const pools = classFeaturePowerSelectPoolsForClass(index, g.parentFeatureId, classId);
-    if (!pools.length) {
+    if (pools.length <= 1) {
       out.push(g);
       continue;
     }
@@ -134,13 +238,122 @@ export function expandClassFeaturePowerChoiceGroups(
   return out;
 }
 
+/** Warlord (and similar): pick one * Leader feature from parsed class features not auto-granted. */
+function supplementLeaderPickChoiceGroups(
+  index: RulesIndex,
+  cls: ClassDef,
+  groups: ClassFeatureChoiceGroup[]
+): ClassFeatureChoiceGroup[] {
+  if (groups.some((g) => g.parentFeatureName === "Leader" && g.kind === "classFeature")) {
+    return groups;
+  }
+  const granted = new Set(index.grantedClassFeatureNamesBySupportId?.[cls.id] ?? []);
+  const parsed = parseTraitNamesFromField(specOf(cls), "_PARSED_CLASS_FEATURE");
+  const leaderNames = parsed.filter((n) => n.endsWith(" Leader") && !granted.has(n));
+  if (leaderNames.length < 2) return groups;
+
+  const { byName } = buildClassFeatureLookups(index);
+  const features = leaderNames
+    .map((name) => byName.get(name))
+    .filter((f): f is ClassFeature => !!f);
+  if (features.length < 2) return groups;
+
+  const ids = features.map((f) => f.id).sort();
+  const options: ClassFeatureChoiceOption[] = features
+    .map((f) => ({
+      id: f.id,
+      name: f.name,
+      parentFeatureId: "",
+      parentFeatureName: "Leader",
+      shortDescription: f.shortDescription ?? null,
+      body: f.body ?? null,
+      powerIds: []
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+
+  return [
+    ...groups,
+    {
+      key: `classFeaturePair:${ids.join(":")}`,
+      kind: "classFeature",
+      parentFeatureId: "",
+      parentFeatureName: "Leader",
+      pickCount: 1,
+      powerIds: [],
+      options
+    }
+  ];
+}
+
+/** Opt-in parsed features (e.g. Archer Warlord) vs default class proficiencies. */
+function supplementOptionalParsedClassFeatureGroups(
+  index: RulesIndex,
+  cls: ClassDef,
+  groups: ClassFeatureChoiceGroup[]
+): ClassFeatureChoiceGroup[] {
+  const optionIds = new Set(
+    groups.flatMap((g) => g.options.map((o) => o.id).filter((id) => id.startsWith("ID_")))
+  );
+  const granted = new Set(index.grantedClassFeatureNamesBySupportId?.[cls.id] ?? []);
+  const parsed = parseTraitNamesFromField(specOf(cls), "_PARSED_CLASS_FEATURE");
+  const { byName } = buildClassFeatureLookups(index);
+
+  const candidates = parsed.filter((name) => {
+    if (granted.has(name) || name.endsWith(" Leader")) return false;
+    const feature = byName.get(name);
+    if (!feature || optionIds.has(feature.id)) return false;
+    return true;
+  });
+
+  if (candidates.length !== 1) return groups;
+
+  const feature = byName.get(candidates[0]!);
+  if (!feature) return groups;
+
+  const key = `classFeatureOptional:${feature.id}`;
+  if (groups.some((g) => g.key === key)) return groups;
+
+  const standardOption: ClassFeatureChoiceOption = {
+    id: CLASS_FEATURE_CHOICE_NONE,
+    name: "Standard (default class proficiencies)",
+    parentFeatureId: feature.id,
+    parentFeatureName: feature.name,
+    shortDescription: null,
+    body: null,
+    powerIds: []
+  };
+  const featureOption: ClassFeatureChoiceOption = {
+    id: feature.id,
+    name: feature.name,
+    parentFeatureId: feature.id,
+    parentFeatureName: feature.name,
+    shortDescription: feature.shortDescription ?? null,
+    body: feature.body ?? null,
+    powerIds: []
+  };
+
+  return [
+    ...groups,
+    {
+      key,
+      kind: "classFeature",
+      parentFeatureId: feature.id,
+      parentFeatureName: feature.name,
+      pickCount: 1,
+      optional: true,
+      powerIds: [],
+      options: [standardOption, featureOption]
+    }
+  ];
+}
+
 export function getClassFeatureChoiceGroups(
   index: RulesIndex,
   cls: ClassDef | undefined
 ): ClassFeatureChoiceGroup[] {
   if (!cls) return [];
   const raw = index.classFeatureChoiceGroupsByClassId?.[cls.id] ?? [];
-  const groups = raw.map((g) => {
+  let groups = raw.map((g) => {
     const vw = g.visibleWhen;
     const visibleWhen =
       vw && typeof vw.groupKey === "string" && typeof vw.optionId === "string"
@@ -167,9 +380,13 @@ export function getClassFeatureChoiceGroups(
         shortDescription: o.shortDescription ?? null,
         body: o.body ?? null,
         powerIds: (o.powerIds ?? []).map((p) => String(p))
-      }))
+      })),
+      optional: Boolean((g as { optional?: boolean }).optional)
     } satisfies ClassFeatureChoiceGroup;
   });
+
+  groups = supplementLeaderPickChoiceGroups(index, cls, groups);
+  groups = supplementOptionalParsedClassFeatureGroups(index, cls, groups);
 
   const expanded = expandClassFeaturePowerChoiceGroups(index, cls.id, groups);
   const poolCounts = new Map<string, number>();
@@ -306,7 +523,7 @@ export function classFeaturePowerIdsForClass(
   const byId = new Map(index.powers.map((p) => [p.id, p]));
   const paragonFeaturePowers = paragonPathClassFeaturePowerIds(index);
   const featOnlyPowers = featGrantedPowerIdsExcludedFromClassFeaturePicks(index);
-  const ownSelect = classFeaturePowerSelectCategoryIds(index, group.parentFeatureId);
+  const ownSelect = classFeatureSelectablePowerIds(index, group.parentFeatureId);
   const candidates = new Set(group.powerIds);
   if (group.powerPoolIndex == null) {
     for (const pid of ownSelect) candidates.add(pid);

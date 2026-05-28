@@ -1,9 +1,12 @@
 import { collectActiveRacialTraitsFromBuild } from "./activeRacialTraits";
+import { collectClassFeatureIdsFromClass } from "./characterClassFeatures";
+import { proficiencyGrantsFromClassFeatureRaw } from "./classFeatureProficiencies";
 import type { Armor, CharacterBuild, Feat, Implement, ProficiencyGrant, RulesIndex, Weapon } from "./models";
 import {
   collectRacialProficiencyGrantsFromBuild,
   proficiencyGrantsFromRacialTrait
 } from "./racialTraitProficiencies";
+import { buildClassFeatureLookups } from "./supportTraits";
 import { parseProficiencyPhrases } from "./weaponAttack";
 
 function norm(s: string): string {
@@ -34,11 +37,31 @@ export function collectFeatProficiencyGrants(index: RulesIndex, featIds: string[
   return dedupeProficiencyGrants(all);
 }
 
-/** Feat + active racial trait proficiency grants (attack, armor/shield validation, display). */
+function collectClassFeatureProficiencyGrants(
+  index: RulesIndex,
+  build: CharacterBuild
+): ProficiencyGrant[] {
+  const { byId } = buildClassFeatureLookups(index);
+  const grants: ProficiencyGrant[] = [];
+  const seen = new Set<string>();
+  for (const fid of collectClassFeatureIdsFromClass(index, build)) {
+    const feature = byId.get(fid);
+    for (const g of proficiencyGrantsFromClassFeatureRaw(feature?.raw)) {
+      const key = `${g.kind}:${g.value}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      grants.push(g);
+    }
+  }
+  return grants;
+}
+
+/** Feat + racial trait + selected class feature proficiency grants. */
 export function collectCharacterProficiencyGrants(index: RulesIndex, build: CharacterBuild): ProficiencyGrant[] {
   const feat = collectFeatProficiencyGrants(index, build.featIds ?? []);
   const racial = collectRacialProficiencyGrantsFromBuild(index, build);
-  return dedupeProficiencyGrants([...feat, ...racial]);
+  const classFeature = collectClassFeatureProficiencyGrants(index, build);
+  return dedupeProficiencyGrants([...feat, ...racial, ...classFeature]);
 }
 
 export function formatProficiencyGrant(g: ProficiencyGrant): string {
@@ -256,6 +279,35 @@ export function appendFeatProficiencyPhrasesToImplementLine(
   if (!extra.length) return baseLine;
   const joined = extra.join("; ");
   return baseLine.trim() ? `${baseLine.trim()}; ${joined}` : joined;
+}
+
+function shieldProficiencyPhrase(grant: ProficiencyGrant): string {
+  const label = (grant.label || grant.value).trim();
+  if (!label) return "";
+  const lower = label.toLowerCase();
+  if (lower.includes("shield")) return label;
+  return `${label} shields`;
+}
+
+export function appendFeatProficiencyPhrasesToArmorLine(
+  baseLine: string,
+  featGrants: ProficiencyGrant[]
+): string {
+  const extra: string[] = [];
+  for (const g of featGrants) {
+    if (g.kind === "armor") {
+      extra.push(g.label || g.value);
+    } else if (g.kind === "shield") {
+      const phrase = shieldProficiencyPhrase(g);
+      if (phrase) extra.push(phrase);
+    }
+  }
+  if (!extra.length) return baseLine;
+  const joined = extra.join(", ");
+  const base = baseLine.trim();
+  if (!base) return joined;
+  const sep = base.includes(";") ? "; " : ", ";
+  return `${base}${sep}${joined}`;
 }
 
 export function validateArmorProficiencyForSelection(

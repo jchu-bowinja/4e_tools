@@ -81,7 +81,7 @@ export function collectClassFeatureIdsFromClass(
     const groups = getClassFeatureChoiceGroups(index, cls);
     for (const g of filterVisibleClassFeatureChoiceGroups(groups, rs)) {
       const picked = rs[g.key]?.trim();
-      if (picked?.startsWith("ID_")) add(byId.get(picked));
+      if (picked?.startsWith("ID_") && picked !== "__none__") add(byId.get(picked));
     }
   };
   if (build.characterStyle === "hybrid") {

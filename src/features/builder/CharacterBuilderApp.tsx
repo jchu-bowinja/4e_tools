@@ -174,6 +174,10 @@ import {
 } from "../../rules/psionicPowerPoints";
 import type { HybridPsionicAugmentationChoice } from "../../rules/models";
 import {
+  computeCharacterProficiencyDisplayLines,
+  computeClassGrantedProficiencyDisplayLines
+} from "../../rules/characterProficiencyDisplay";
+import {
   collectCharacterProficiencyDisplayRows,
   collectCharacterProficiencyGrants
 } from "../../rules/featProficiencies";
@@ -192,7 +196,9 @@ import {
 } from "../characterSheet/sheetEquipment";
 import { CharacterEquippedSlotsPanel } from "../characterSheet/CharacterEquippedSlotsPanel";
 import { CharacterInventoryList } from "../characterSheet/CharacterInventoryList";
+import { CharacterProficienciesBlock } from "../characterSheet/CharacterProficienciesBlock";
 import type { EquipmentPriceSlot } from "../../rules/equipmentItemPrice";
+import { weaponAttackAbilityForCharacter } from "../../rules/classFeatureProficiencies";
 import { summarizeImplementAttack, summarizeMainWeaponAttack } from "../../rules/weaponAttack";
 import { BuilderSidebarItemsPanel } from "./BuilderSidebarItemsPanel";
 import { EquipmentTab, type EquipmentEditorSlot } from "./EquipmentTab";
@@ -1075,7 +1081,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       if (!hybridClassSelectionComplete) return [];
       return getHybridClassTraitRows(selectedHybridA, selectedHybridB, index, build.level);
     }
-    return getClassTraitRows(selectedClass, index, build.level);
+    return getClassTraitRows(selectedClass, index, build);
   }, [
     isHybridBuild,
     hybridClassSelectionComplete,
@@ -1384,12 +1390,54 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   }, [isHybridBuild, selectedHybridA, selectedHybridB, classSpecific]);
   const proficiencyGrants = useMemo(
     () => collectCharacterProficiencyGrants(index, build),
-    [index, build.featIds, build.raceId, build.raceSelections]
+    [index, build]
   );
   const proficiencyDisplayRows = useMemo(
     () => collectCharacterProficiencyDisplayRows(index, build),
     [index, build.featIds, build.raceId, build.raceSelections]
   );
+  const proficiencyDisplayLines = useMemo(
+    () =>
+      computeCharacterProficiencyDisplayLines(
+        {
+          isHybrid: isHybridBuild,
+          hybridA: selectedHybridA,
+          hybridB: selectedHybridB,
+          classSpecific
+        },
+        build,
+        proficiencyGrants
+      ),
+    [isHybridBuild, selectedHybridA, selectedHybridB, classSpecific, build, proficiencyGrants]
+  );
+  const classGrantedProficiencyLines = useMemo(() => {
+    if (isHybridBuild) {
+      if (!selectedHybridA || !selectedHybridB) return { weaponLine: "", armorLine: "" };
+      return computeClassGrantedProficiencyDisplayLines(
+        { isHybrid: true, hybridA: selectedHybridA, hybridB: selectedHybridB },
+        build
+      );
+    }
+    if (!selectedClass) return { weaponLine: "", armorLine: "" };
+    return computeClassGrantedProficiencyDisplayLines(
+      {
+        isHybrid: false,
+        classSpecific: {
+          ...classSpecific,
+          "Weapon Proficiencies": selectedClass.weaponProficiencies ?? classSpecific["Weapon Proficiencies"],
+          "Armor Proficiencies": selectedClass.armorProficiencies ?? classSpecific["Armor Proficiencies"]
+        }
+      },
+      build
+    );
+  }, [
+    isHybridBuild,
+    selectedHybridA,
+    selectedHybridB,
+    selectedClass,
+    classSpecific,
+    build.classSelections
+  ]);
 
   const magicCombat = useMemo(() => computeMagicItemCombatBonuses(index, build), [index, build]);
   const builderInventoryItems = useMemo(
@@ -1417,11 +1465,16 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         magicCombat.mainWeaponAttack,
         proficiencyGrants,
         "mainHand",
-        wieldSlotsForPreview
+        wieldSlotsForPreview,
+        selectedMainWeapon
+          ? weaponAttackAbilityForCharacter(selectedMainWeapon, index, build)
+          : undefined
       ),
     [
+      build,
       build.level,
       effectiveAbilityScores,
+      index,
       selectedMainWeapon,
       classWeaponProfText,
       magicCombat.mainWeaponAttack,
@@ -1439,11 +1492,16 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         magicCombat.offHandWeaponAttack,
         proficiencyGrants,
         "offHand",
-        wieldSlotsForPreview
+        wieldSlotsForPreview,
+        selectedOffHandWeapon
+          ? weaponAttackAbilityForCharacter(selectedOffHandWeapon, index, build)
+          : undefined
       ),
     [
+      build,
       build.level,
       effectiveAbilityScores,
+      index,
       selectedOffHandWeapon,
       classWeaponProfText,
       magicCombat.offHandWeaponAttack,
@@ -3164,6 +3222,32 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 <p style={{ margin: "0.65rem 0 0.65rem 0", fontSize: "0.82rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
                   Powers use each hybrid&apos;s <strong>base class</strong> lists (shown below). Pick two different hybrid entries.
                 </p>
+                {hybridClassSelectionComplete &&
+                  (classGrantedProficiencyLines.weaponLine || classGrantedProficiencyLines.armorLine) && (
+                    <div
+                      style={{
+                        marginTop: "0.65rem",
+                        padding: "0.65rem 0.75rem",
+                        borderRadius: "8px",
+                        border: "1px solid var(--panel-border)",
+                        backgroundColor: "var(--surface-1)"
+                      }}
+                    >
+                      <p style={{ margin: 0, fontWeight: 700, fontSize: "0.88rem", color: "var(--text-primary)" }}>
+                        Combined class proficiencies
+                      </p>
+                      {classGrantedProficiencyLines.weaponLine ? (
+                        <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.84rem", lineHeight: 1.5 }}>
+                          <strong>Weapon Proficiencies:</strong> {classGrantedProficiencyLines.weaponLine}
+                        </p>
+                      ) : null}
+                      {classGrantedProficiencyLines.armorLine ? (
+                        <p style={{ margin: "0.28rem 0 0 0", fontSize: "0.84rem", lineHeight: 1.5 }}>
+                          <strong>Armor Proficiencies:</strong> {classGrantedProficiencyLines.armorLine}
+                        </p>
+                      ) : null}
+                    </div>
+                  )}
                 {hybridClassSelectionComplete && renderClassFeatureTraitList(classTraitRows)}
                 {hybridClassSelectionComplete && classAutoGrantedPowers.length > 0 && (
                   <div
@@ -3188,6 +3272,16 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 <p style={{ margin: "0.25rem 0 0 0" }}><strong>Key Abilities:</strong> {String(classSpecific["Key Abilities"] || selectedClass.keyAbilities || "-")}</p>
                 <p style={{ margin: "0.25rem 0 0 0" }}><strong>Hit Points at 1st Level:</strong> {String(classSpecific["Hit Points at 1st Level"] || selectedClass.hitPointsAt1 || "-")}</p>
                 <p style={{ margin: "0.25rem 0 0 0" }}><strong>Class Skills:</strong> {String(classSpecific["Class Skills"] || "-")}</p>
+                {classGrantedProficiencyLines.weaponLine ? (
+                  <p style={{ margin: "0.25rem 0 0 0" }}>
+                    <strong>Weapon Proficiencies:</strong> {classGrantedProficiencyLines.weaponLine}
+                  </p>
+                ) : null}
+                {classGrantedProficiencyLines.armorLine ? (
+                  <p style={{ margin: "0.25rem 0 0 0" }}>
+                    <strong>Armor Proficiencies:</strong> {classGrantedProficiencyLines.armorLine}
+                  </p>
+                ) : null}
                 {renderClassFeatureTraitList(classTraitRows)}
                 {selectedClass.raw.flavor && (
                   <p style={{ margin: "0.5rem 0 0 0" }}>
@@ -3227,19 +3321,22 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     <h4 style={subsectionTitleStyle}>Class choices</h4>
                     {visibleClassFeatureChoiceGroupsOnClassTab.map((group) => {
                       const rs = classSelectionsForFeatureChoices;
-                      const pickedId = rs[group.key] || "";
+                      const pickedId =
+                        rs[group.key] || (group.optional ? "__none__" : "");
                       const picked = group.options.find((o) => o.id === pickedId);
                       return (
                         <label key={group.key} style={{ display: "block", maxWidth: "28rem", marginBottom: "0.75rem" }}>
                           <span style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem", fontSize: "0.85rem" }}>
                             {group.parentFeatureName}
+                            {group.optional ? " (optional)" : ""}
                           </span>
                           <select
                             value={pickedId}
                             onChange={(e) => {
                               const v = e.target.value;
                               let next = { ...(build.classSelections || {}) };
-                              if (v) next[group.key] = v;
+                              if (v && (!group.optional || v !== "__none__")) next[group.key] = v;
+                              else if (group.optional) next[group.key] = "__none__";
                               else delete next[group.key];
                               next = pruneHiddenClassFeatureSelections(next, classFeatureChoiceGroups);
                               const keys = Object.keys(next);
@@ -3247,7 +3344,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                             }}
                             style={{ width: "100%", padding: "0.4rem", borderRadius: "6px", border: "1px solid var(--panel-border)" }}
                           >
-                            <option value="">Select…</option>
+                            {!group.optional && <option value="">Select…</option>}
                             {group.options.map((opt) => (
                               <option key={opt.id} value={opt.id}>
                                 {opt.name}
@@ -5552,6 +5649,15 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 </CollapsibleDisclosure>
               )}
           </div>
+
+          {(proficiencyDisplayLines.weaponLine || proficiencyDisplayLines.armorLine) && (
+            <LiveSheetCollapsibleSection title="Proficiencies">
+              <CharacterProficienciesBlock
+                weaponLine={proficiencyDisplayLines.weaponLine}
+                armorLine={proficiencyDisplayLines.armorLine}
+              />
+            </LiveSheetCollapsibleSection>
+          )}
 
           <LiveSheetCollapsibleSection title="Combat Stats">
             <div style={{ display: "grid", gap: "0.35rem", minWidth: 0 }}>
