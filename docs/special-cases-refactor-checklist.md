@@ -32,7 +32,7 @@ Update **Status** and **Owner** columns as work completes.
 | Legacy migration | 4 | 0 |
 | ETL structural (reference) | 2 | — |
 
-**P0 complete:** SC-001–004 shipped. **P1 complete (2026-05-30):** SC-010–013, SC-022, SC-032, SC-040–041, SC-062. Regenerate index after ETL changes: `python tools/etl/build_rules_index.py`.
+**P0 complete:** SC-001–004 shipped. **P1 complete (2026-05-30):** SC-010–013, SC-022, SC-032, SC-040–041, SC-062. **P2 psionic tables complete (2026-05-30):** SC-050–052. **Next (optional):** SC-030/031 docs + validation, SC-034 powerIds audit, SC-091 Essentials UI, SC-080–083 legacy. Regenerate index after ETL changes: `python tools/etl/build_rules_index.py`.
 
 ---
 
@@ -102,9 +102,9 @@ Update **Status** and **Owner** columns as work completes.
 
 | ID | Status | Item | Location | Notes | Proposed | Tests |
 |----|--------|------|----------|-------|----------|-------|
-| SC-050 | `pending` | Psionic Augmentation PP by level | `psionicPowerPoints.ts` L24–55, L91–94 | Full 1–30 table in TS | Index `psionicPowerPointsByLevel` from class feature or Internal | `tests/rules/psionicPowerPoints.test.ts` |
-| SC-051 | `pending` | Hybrid psionic breakpoints | `hybridPsionicAugmentation.ts` L4–76 | Fixed levels 7,13,17,23,27 | Index `hybridPsionicAugmentation.breakpoints[]` | `tests/rules/hybridPsionicAugmentation.test.ts`, `tests/rules/hybridPsionicPowerPoints.test.ts` |
-| SC-052 | `pending` | Paragon MC at-will penalty | `psionicPowerPoints.ts` L175–183; `hybridPowerSlots.ts` L146 | Non-psionic → psionic MC loses 1 at-will | Rule flag on `paragonMulticlassing` or class feature grant | `tests/rules/paragonPsionicAtWillPenalty.test.ts`, `tests/rules/hybridParagonPsionicMc.test.ts` |
+| SC-050 | `etl-done` | Psionic Augmentation PP by level | `psionicPowerPoints.ts` | `index.psionicPowerPointsByLevel`; fallback table in TS | ETL PHB3 table on index | `tests/rules/psionicPowerPoints.test.ts`, `tools/etl/test_psionic_index_fields.py`, `rulesIndexPrecomputedFields.test.ts` |
+| SC-051 | `etl-done` | Hybrid psionic breakpoints | `hybridPsionicAugmentation.ts` | `index.hybridPsionicAugmentationBreakpoints`; optional `index` param | ETL `[7,13,17,23,27]` | `tests/rules/hybridPsionicAugmentation.test.ts`, `tests/rules/hybridPsionicPowerPoints.test.ts` |
+| SC-052 | `etl-done` | Paragon MC at-will penalty | `psionicPowerPoints.ts`; `hybridPowerSlots.ts` | `index.paragonMulticlassNonPsionicToPsionicAtWillPenalty` | ETL default `1` | `tests/rules/paragonPsionicAtWillPenalty.test.ts`, `tests/rules/hybridParagonPsionicMc.test.ts` |
 
 ---
 
@@ -180,7 +180,9 @@ interface ParagonPathIndexExtras {
 interface RulesIndexExtras {
   featGrantedPowerIdsExcludedFromClassFeaturePicks?: string[]; // SC-004
   featPowerNameAliases?: Record<string, string>;              // SC-003 (or fix in ETL)
-  psionicPowerPointsByLevel?: Record<number, number>;         // SC-050
+  psionicPowerPointsByLevel?: Record<string, number>;         // SC-050
+  hybridPsionicAugmentationBreakpoints?: number[];          // SC-051
+  paragonMulticlassNonPsionicToPsionicAtWillPenalty?: number; // SC-052
 }
 ```
 
@@ -207,7 +209,7 @@ function resolvePowerIdsFromCategory(
 3. ~~**SC-040**~~ — `powerUsageOverride` on racial traits.
 4. ~~**SC-020–021**~~ — done in ETL (P0 pass).
 5. ~~**SC-010, SC-012–013, SC-022, SC-041, SC-062**~~ — P1 index fields + runtime (2026-05-30).
-6. **SC-050–052** — psionic tables to index (P2).
+6. ~~**SC-050–052**~~ — psionic tables to index (P2, 2026-05-30).
 7. **SC-080–083** — legacy only when touching saves.
 
 ---
@@ -233,3 +235,4 @@ function resolvePowerIdsFromCategory(
 | 2026-05-30 | SC-001–004: ETL exports + runtime duplicate supplements removed |
 | 2026-05-30 | Checklist updated: SC-011/014/020/021/023/034 marked etl-done; P0 summary |
 | 2026-05-30 | P1: SC-010–013, SC-022, SC-032, SC-040–041, SC-062 — ETL index fields, `powerSelectCategory.ts`, `mechanicalEffects.ts`, regenerated `rules_index.json` |
+| 2026-05-30 | P2: SC-050–052 — `psionicPowerPointsByLevel`, hybrid breakpoints, paragon MC at-will penalty on index |

@@ -1686,7 +1686,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   );
   const hybridPsionicAugmentationBreakpoints = useMemo(() => {
     if (build.characterStyle !== "hybrid" || !hybridHasPsionicComponent(index, build)) return [];
-    return hybridPsionicAugmentationBreakpointsForLevel(build.level);
+    return hybridPsionicAugmentationBreakpointsForLevel(build.level, index);
   }, [index, build]);
   const themeGrantedPowers = useMemo(() => {
     if (!build.themeId) return [];
@@ -2117,7 +2117,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   function updateBuild(next: CharacterBuild): void {
     let pruned = pruneStalePowerSelections(index, next);
     pruned = pruneParagonMulticlassing(index, pruned);
-    pruned = pruneHybridPsionicAugmentationChoices(pruned);
+    pruned = pruneHybridPsionicAugmentationChoices(pruned, index);
     const normalized = normalizeCharacterBuild(pruned, index);
     setBuild(normalized);
     saveBuild(normalized);

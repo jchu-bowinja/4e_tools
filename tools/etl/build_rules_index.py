@@ -330,6 +330,49 @@ HUMAN_POWER_SELECTION_TRAIT_ID = "ID_FMP_RACIAL_TRAIT_2966"
 BONUS_AT_WILL_TRAIT_ID = "ID_FMP_RACIAL_TRAIT_356"
 HEROIC_EFFORT_TRAIT_ID = "ID_FMP_RACIAL_TRAIT_2965"
 
+# PHB3 Psionic Augmentation cumulative power points by character level (1–30).
+PSIONIC_POWER_POINTS_BY_LEVEL: Dict[str, int] = {
+    str(lv): pp
+    for lv, pp in [
+        (1, 2),
+        (2, 2),
+        (3, 4),
+        (4, 4),
+        (5, 4),
+        (6, 4),
+        (7, 6),
+        (8, 6),
+        (9, 6),
+        (10, 6),
+        (11, 6),
+        (12, 6),
+        (13, 7),
+        (14, 7),
+        (15, 7),
+        (16, 7),
+        (17, 9),
+        (18, 9),
+        (19, 9),
+        (20, 9),
+        (21, 11),
+        (22, 11),
+        (23, 13),
+        (24, 13),
+        (25, 13),
+        (26, 13),
+        (27, 15),
+        (28, 15),
+        (29, 15),
+        (30, 15),
+    ]
+}
+
+# PHB3 hybrid psionic augmentation: power points vs encounter use at these levels.
+HYBRID_PSIONIC_AUGMENTATION_BREAKPOINTS: List[int] = [7, 13, 17, 23, 27]
+
+# PHB3 paragon multiclass: non-psionic primary → psionic secondary loses this many at-will slots at 11+.
+PARAGON_MC_NON_PSIONIC_TO_PSIONIC_AT_WILL_PENALTY = 1
+
 
 def _parse_comma_internal_ids(raw: Any) -> List[str]:
     return [s.strip() for s in str(raw or "").split(",") if s.strip()]
@@ -3953,6 +3996,11 @@ def build_index(input_path: Path, output_dir: Path) -> None:
             feat_granted_power_ids_excluded_from_class_feature_picks
         ),
         "featPowerNameAliases": dict(_FEAT_POWER_NAME_ALIASES),
+        "psionicPowerPointsByLevel": dict(PSIONIC_POWER_POINTS_BY_LEVEL),
+        "hybridPsionicAugmentationBreakpoints": list(HYBRID_PSIONIC_AUGMENTATION_BREAKPOINTS),
+        "paragonMulticlassNonPsionicToPsionicAtWillPenalty": (
+            PARAGON_MC_NON_PSIONIC_TO_PSIONIC_AT_WILL_PENALTY
+        ),
     }
 
     (output_dir / "rules_index.json").write_text(

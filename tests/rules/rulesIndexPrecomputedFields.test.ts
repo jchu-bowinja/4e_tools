@@ -28,5 +28,9 @@ describe("rules_index precomputed fields (SC-001–004, P1)", () => {
 
     const heritageFeat = index.feats?.find((f) => f.name === "Vampiric Heritage");
     expect(heritageFeat?.internalGrantKeys).toContain("HERITAGE");
+
+    expect(index.psionicPowerPointsByLevel?.["7"]).toBe(6);
+    expect(index.hybridPsionicAugmentationBreakpoints).toEqual([7, 13, 17, 23, 27]);
+    expect(index.paragonMulticlassNonPsionicToPsionicAtWillPenalty).toBe(1);
   });
 });

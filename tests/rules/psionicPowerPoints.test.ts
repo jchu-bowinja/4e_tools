@@ -4,6 +4,7 @@ import {
   basePsionicPowerPointsFromLevel,
   buildHasPsionicAugmentationClass,
   heroicPsionicSwapPowerPointAdjustments,
+  paragonMulticlassNonPsionicToPsionicAtWillPenalty,
   paragonMulticlassPowerPointBonus,
   paragonMulticlassPrimaryAtWillSlotPenalty,
   paragonPathGrantsParagonPowerPoints,
@@ -93,6 +94,24 @@ describe("basePsionicPowerPointsFromLevel", () => {
     expect(basePsionicPowerPointsFromLevel(13)).toBe(7);
     expect(basePsionicPowerPointsFromLevel(21)).toBe(11);
     expect(basePsionicPowerPointsFromLevel(27)).toBe(15);
+  });
+
+  it("reads pool from rules index when provided", () => {
+    const customIndex = {
+      psionicPowerPointsByLevel: { "7": 99 }
+    } as RulesIndex;
+    expect(basePsionicPowerPointsFromLevel(7, customIndex)).toBe(99);
+  });
+});
+
+describe("paragonMulticlassNonPsionicToPsionicAtWillPenalty", () => {
+  it("uses index penalty with fallback", () => {
+    expect(paragonMulticlassNonPsionicToPsionicAtWillPenalty()).toBe(1);
+    expect(
+      paragonMulticlassNonPsionicToPsionicAtWillPenalty({
+        paragonMulticlassNonPsionicToPsionicAtWillPenalty: 2
+      } as RulesIndex)
+    ).toBe(2);
   });
 });
 

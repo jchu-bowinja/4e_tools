@@ -556,6 +556,12 @@ export interface RulesIndex {
   featGrantedPowerIdsExcludedFromClassFeaturePicks?: string[];
   /** ETL: compendium typos for feat modify / Associated Powers name resolution. */
   featPowerNameAliases?: Record<string, string>;
+  /** ETL: PHB3 Psionic Augmentation cumulative pool by character level (keys `"1"`–`"30"`). */
+  psionicPowerPointsByLevel?: Record<string, number>;
+  /** ETL: hybrid psionic augmentation choice levels (power points vs encounter). */
+  hybridPsionicAugmentationBreakpoints?: number[];
+  /** ETL: class at-will slots lost when paragon MC from non-psionic into psionic at 11+. */
+  paragonMulticlassNonPsionicToPsionicAtWillPenalty?: number;
 }
 
 /** +1 to two different abilities at a milestone (4, 8, 14, 18, 24, 28). Keys are level numbers as strings. */

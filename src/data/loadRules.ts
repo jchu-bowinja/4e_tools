@@ -36,7 +36,11 @@ export function validateRulesIndexShape(data: RulesIndex): RulesIndex {
     paragonPathClassFeaturePowerIds: data.paragonPathClassFeaturePowerIds,
     featGrantedPowerIdsExcludedFromClassFeaturePicks:
       data.featGrantedPowerIdsExcludedFromClassFeaturePicks,
-    featPowerNameAliases: data.featPowerNameAliases
+    featPowerNameAliases: data.featPowerNameAliases,
+    psionicPowerPointsByLevel: data.psionicPowerPointsByLevel,
+    hybridPsionicAugmentationBreakpoints: data.hybridPsionicAugmentationBreakpoints,
+    paragonMulticlassNonPsionicToPsionicAtWillPenalty:
+      data.paragonMulticlassNonPsionicToPsionicAtWillPenalty
   };
 }
 

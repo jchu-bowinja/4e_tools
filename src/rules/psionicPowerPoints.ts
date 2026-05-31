@@ -17,11 +17,8 @@ export {
   pruneHybridPsionicAugmentationChoices
 } from "./hybridPsionicAugmentation";
 
-/**
- * Cumulative power points from the Psionic Augmentation class feature (PHB3 table).
- * Levels between listed breakpoints keep the previous total.
- */
-const PSIONIC_AUGMENTATION_POWER_POINTS_BY_LEVEL: Record<number, number> = {
+/** Fallback when `rules_index.json` predates `psionicPowerPointsByLevel`. */
+const FALLBACK_PSIONIC_POWER_POINTS_BY_LEVEL: Record<number, number> = {
   1: 2,
   2: 2,
   3: 4,
@@ -53,6 +50,17 @@ const PSIONIC_AUGMENTATION_POWER_POINTS_BY_LEVEL: Record<number, number> = {
   29: 15,
   30: 15
 };
+
+function psionicPowerPointsTable(index?: RulesIndex): Record<number, number> {
+  const fromIndex = index?.psionicPowerPointsByLevel;
+  if (!fromIndex || !Object.keys(fromIndex).length) return FALLBACK_PSIONIC_POWER_POINTS_BY_LEVEL;
+  const out: Record<number, number> = {};
+  for (const [k, v] of Object.entries(fromIndex)) {
+    const lv = parseInt(k, 10);
+    if (lv >= 1 && lv <= 30 && typeof v === "number") out[lv] = v;
+  }
+  return Object.keys(out).length ? out : FALLBACK_PSIONIC_POWER_POINTS_BY_LEVEL;
+}
 
 /** Power points from PHB3 swap tier (printed level of the augmentable at-will). */
 export function powerPointsForPrintedLevel(printedLevel: number): number {
@@ -88,9 +96,9 @@ export interface PsionicPowerPointSummary {
   hybridEncounterAugmentationBreakpoints: number[];
 }
 
-export function basePsionicPowerPointsFromLevel(level: number): number {
+export function basePsionicPowerPointsFromLevel(level: number, index?: RulesIndex): number {
   const lv = Math.max(1, Math.min(30, Math.floor(level)));
-  return PSIONIC_AUGMENTATION_POWER_POINTS_BY_LEVEL[lv] ?? 2;
+  return psionicPowerPointsTable(index)[lv] ?? 2;
 }
 
 function hybridClassIsPsionic(index: RulesIndex, hybrid: HybridClassDef | undefined): boolean {
@@ -132,7 +140,8 @@ export function hybridPsionicBasePowerPoints(index: RulesIndex, build: Character
   return hybridPsionicPowerPointsFromAugmentableAtWills(
     atWills,
     build.level,
-    build.hybridPsionicAugmentationChoices
+    build.hybridPsionicAugmentationChoices,
+    index
   );
 }
 
@@ -153,7 +162,7 @@ export function basePsionicPowerPointsForBuild(index: RulesIndex, build: Charact
     return hybridPsionicBasePowerPoints(index, build);
   }
   if (!classIsPsionic(index, build.classId)) return 0;
-  return basePsionicPowerPointsFromLevel(build.level);
+  return basePsionicPowerPointsFromLevel(build.level, index);
 }
 
 export function showPsionicPowerPointSummary(summary: PsionicPowerPointSummary): boolean {
@@ -165,7 +174,13 @@ export function showPsionicPowerPointSummary(summary: PsionicPowerPointSummary):
   );
 }
 
-/** Lose one class at-will slot when paragon multiclassing into psionic from a non-psionic class. */
+/** At-will slots lost for non-psionic → psionic paragon MC (PHB3); from index with fallback 1. */
+export function paragonMulticlassNonPsionicToPsionicAtWillPenalty(index?: RulesIndex): number {
+  const fromIndex = index?.paragonMulticlassNonPsionicToPsionicAtWillPenalty;
+  return typeof fromIndex === "number" && fromIndex >= 0 ? fromIndex : 1;
+}
+
+/** Lose class at-will slots when paragon multiclassing into psionic from a non-psionic class. */
 export function paragonMulticlassPrimaryAtWillSlotPenalty(
   index: RulesIndex,
   build: CharacterBuild
@@ -173,13 +188,15 @@ export function paragonMulticlassPrimaryAtWillSlotPenalty(
   if (!build.paragonMulticlassing || build.level < 11) return 0;
   const mcId = multiclassEntryClassId(index, build);
   if (!mcId || !classIsPsionic(index, mcId)) return 0;
+  const penalty = paragonMulticlassNonPsionicToPsionicAtWillPenalty(index);
+  if (penalty === 0) return 0;
   if (build.characterStyle === "hybrid") {
     if (hybridHasPsionicComponent(index, build)) return 0;
-    return 1;
+    return penalty;
   }
   const primaryId = build.classId;
   if (!primaryId || classIsPsionic(index, primaryId)) return 0;
-  return 1;
+  return penalty;
 }
 
 /** Compendium class feature: +2 power points at paragon tier (PHB3). */
@@ -329,7 +346,8 @@ export function summarizePsionicPowerPointAdjustments(
     build.characterStyle === "hybrid" && hybridHasPsionicComponent(index, build)
       ? hybridPsionicEncounterAugmentationBreakpoints(
           build.level,
-          build.hybridPsionicAugmentationChoices
+          build.hybridPsionicAugmentationChoices,
+          index
         )
       : [];
   return {
