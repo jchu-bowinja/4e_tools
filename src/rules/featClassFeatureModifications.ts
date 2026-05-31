@@ -37,7 +37,7 @@ export function collectFeatModificationsByClassFeatureId(
   index: RulesIndex,
   featIds: readonly string[]
 ): Map<string, ClassFeatureFeatAugmentation[]> {
-  const powerLookups = buildPowerNameLookups(index.powers);
+  const powerLookups = buildPowerNameLookups(index.powers, index.featPowerNameAliases ?? {});
   const cfLookups = buildClassFeatureNameLookups(index.classFeatures ?? []);
   const byFeature = new Map<string, ClassFeatureFeatAugmentation[]>();
 

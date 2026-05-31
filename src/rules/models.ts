@@ -526,6 +526,12 @@ export interface RulesIndex {
       }>;
     }>
   >;
+  /** ETL: powers on paragon-path class features — omit from level-1 class feature power picks. */
+  paragonPathClassFeaturePowerIds?: string[];
+  /** ETL: feat-granted powers that do not count as Channel Divinity (e.g. Divine Fate). */
+  featGrantedPowerIdsExcludedFromClassFeaturePicks?: string[];
+  /** ETL: compendium typos for feat modify / Associated Powers name resolution. */
+  featPowerNameAliases?: Record<string, string>;
 }
 
 /** +1 to two different abilities at a milestone (4, 8, 14, 18, 24, 28). Keys are level numbers as strings. */

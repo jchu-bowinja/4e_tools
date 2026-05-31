@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { CLASS_FEATURE_CHOICE_NONE } from "../../src/rules/classFeatureChoices";
 import { ARCHER_WARLORD_CLASS_FEATURE_ID } from "../../src/rules/classFeatureProficiencies";
 import {
   computeCharacterProficiencyDisplayLines,
@@ -50,7 +51,32 @@ describe("characterProficiencyDisplay", () => {
       classes: [warlordClass],
       classFeatures: [archerWarlord],
       grantedClassFeatureNamesBySupportId: { ID_FMP_CLASS_8: ["Commanding Presence", "Inspiring Word"] },
-      classFeatureChoiceGroupsByClassId: { ID_FMP_CLASS_8: [] }
+      classFeatureChoiceGroupsByClassId: {
+        ID_FMP_CLASS_8: [
+          {
+            key: `classFeatureOptional:${ARCHER_WARLORD_CLASS_FEATURE_ID}`,
+            kind: "classFeature",
+            parentFeatureId: ARCHER_WARLORD_CLASS_FEATURE_ID,
+            parentFeatureName: "Archer Warlord",
+            pickCount: 1,
+            optional: true,
+            options: [
+              {
+                id: CLASS_FEATURE_CHOICE_NONE,
+                name: "Standard (default class proficiencies)",
+                parentFeatureId: ARCHER_WARLORD_CLASS_FEATURE_ID,
+                parentFeatureName: "Archer Warlord"
+              },
+              {
+                id: ARCHER_WARLORD_CLASS_FEATURE_ID,
+                name: "Archer Warlord",
+                parentFeatureId: ARCHER_WARLORD_CLASS_FEATURE_ID,
+                parentFeatureName: "Archer Warlord"
+              }
+            ]
+          }
+        ]
+      }
     } as unknown as RulesIndex;
     const archerBuild: CharacterBuild = {
       name: "Test",

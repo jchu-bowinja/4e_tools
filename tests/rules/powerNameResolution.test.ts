@@ -6,11 +6,14 @@ import {
 } from "../../src/rules/powerNameResolution";
 
 describe("powerNameResolution", () => {
-  const lookups = buildPowerNameLookups([
-    { id: "ID_WOLF", name: "Wolf Pack Tactics" },
-    { id: "ID_CMD", name: "Commander's Strike" },
-    { id: "ID_HEAL", name: "Healing Word" }
-  ]);
+  const lookups = buildPowerNameLookups(
+    [
+      { id: "ID_WOLF", name: "Wolf Pack Tactics" },
+      { id: "ID_CMD", name: "Commander's Strike" },
+      { id: "ID_HEAL", name: "Healing Word" }
+    ],
+    { "command's strike": "commander's strike" }
+  );
 
   it("normalizes punctuation for fuzzy match", () => {
     expect(normalizePowerMatchKey("wolfpack tactics")).toBe(normalizePowerMatchKey("Wolf Pack Tactics"));

@@ -35,11 +35,8 @@ export function collectPowerIdsFromClassFeature(feature: ClassFeature): string[]
   return [...ids];
 }
 
-/**
- * Powers granted by paragon-path class features (e.g. Scourge of Io → Draconic Anathema).
- * These must not appear in level-1 class feature power picks such as Channel Divinity.
- */
-export function paragonPathClassFeaturePowerIds(index: RulesIndex): Set<string> {
+/** Fallback when `rules_index.json` predates ETL export of `paragonPathClassFeaturePowerIds`. */
+function computeParagonPathClassFeaturePowerIds(index: RulesIndex): Set<string> {
   const paragonFeatureIds = new Set<string>();
   for (const path of index.paragonPaths ?? []) {
     for (const cfId of parseTraitIdsFromField(specOf(path), "Class Features")) {
@@ -56,6 +53,16 @@ export function paragonPathClassFeaturePowerIds(index: RulesIndex): Set<string> 
     }
   }
   return powerIds;
+}
+
+/**
+ * Powers granted by paragon-path class features (e.g. Scourge of Io → Draconic Anathema).
+ * These must not appear in level-1 class feature power picks such as Channel Divinity.
+ */
+export function paragonPathClassFeaturePowerIds(index: RulesIndex): Set<string> {
+  const fromIndex = index.paragonPathClassFeaturePowerIds;
+  if (fromIndex !== undefined) return new Set(fromIndex);
+  return computeParagonPathClassFeaturePowerIds(index);
 }
 
 export function collectParagonPathClassFeaturePowerIds(
@@ -412,11 +419,8 @@ function featCountsAsChannelDivinity(feat: Feat): boolean {
   return false;
 }
 
-/**
- * Powers granted by feats that do not also count as Channel Divinity (e.g. Divine Fate).
- * These must not appear in class Channel Divinity picks; they are obtained via the feat.
- */
-export function featGrantedPowerIdsExcludedFromClassFeaturePicks(index: RulesIndex): Set<string> {
+/** Fallback when `rules_index.json` predates ETL export of exclusion list. */
+function computeFeatGrantedPowerIdsExcludedFromClassFeaturePicks(index: RulesIndex): Set<string> {
   const out = new Set<string>();
   for (const feat of index.feats ?? []) {
     if (featCountsAsChannelDivinity(feat)) continue;
@@ -425,6 +429,16 @@ export function featGrantedPowerIdsExcludedFromClassFeaturePicks(index: RulesInd
     }
   }
   return out;
+}
+
+/**
+ * Powers granted by feats that do not also count as Channel Divinity (e.g. Divine Fate).
+ * These must not appear in class Channel Divinity picks; they are obtained via the feat.
+ */
+export function featGrantedPowerIdsExcludedFromClassFeaturePicks(index: RulesIndex): Set<string> {
+  const fromIndex = index.featGrantedPowerIdsExcludedFromClassFeaturePicks;
+  if (fromIndex !== undefined) return new Set(fromIndex);
+  return computeFeatGrantedPowerIdsExcludedFromClassFeaturePicks(index);
 }
 
 /** ETL `modifiedPowerIds` (style / arena fighting augmentations, not grants). */

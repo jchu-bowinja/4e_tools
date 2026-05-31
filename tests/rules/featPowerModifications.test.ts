@@ -144,7 +144,8 @@ describe("featPowerModifications", () => {
           slug: "hand-of-radiance",
           raw: { specific: {} }
         }
-      ]
+      ],
+      featPowerNameAliases: { "hand of fury": "hand of radiance" }
     } as unknown as RulesIndex;
 
     const map = collectFeatModificationsByPowerId(index, ["ID_FMP_FEAT_2990"]);

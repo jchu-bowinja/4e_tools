@@ -77,6 +77,33 @@ const index: RulesIndex = {
             parentFeatureName: "Commanding Presence"
           }
         ]
+      },
+      {
+        key: "classFeaturePair:ID_FMP_CLASS_FEATURE_2285:ID_FMP_CLASS_FEATURE_2287:ID_FMP_CLASS_FEATURE_443",
+        kind: "classFeature",
+        parentFeatureId: "",
+        parentFeatureName: "Leader",
+        pickCount: 1,
+        options: [
+          {
+            id: "ID_FMP_CLASS_FEATURE_2287",
+            name: "Battlefront Leader",
+            parentFeatureId: "",
+            parentFeatureName: "Leader"
+          },
+          {
+            id: "ID_FMP_CLASS_FEATURE_2285",
+            name: "Canny Leader",
+            parentFeatureId: "",
+            parentFeatureName: "Leader"
+          },
+          {
+            id: "ID_FMP_CLASS_FEATURE_443",
+            name: "Combat Leader",
+            parentFeatureId: "",
+            parentFeatureName: "Leader"
+          }
+        ]
       }
     ]
   }

@@ -32,7 +32,11 @@ export function validateRulesIndexShape(data: RulesIndex): RulesIndex {
     autoGrantedPowerIdsByClassId: data.autoGrantedPowerIdsByClassId ?? {},
     autoGrantedSkillTrainingNamesBySupportId: data.autoGrantedSkillTrainingNamesBySupportId ?? {},
     classBuildOptionsByClassId: data.classBuildOptionsByClassId ?? {},
-    classFeatureChoiceGroupsByClassId: data.classFeatureChoiceGroupsByClassId ?? {}
+    classFeatureChoiceGroupsByClassId: data.classFeatureChoiceGroupsByClassId ?? {},
+    paragonPathClassFeaturePowerIds: data.paragonPathClassFeaturePowerIds,
+    featGrantedPowerIdsExcludedFromClassFeaturePicks:
+      data.featGrantedPowerIdsExcludedFromClassFeaturePicks,
+    featPowerNameAliases: data.featPowerNameAliases
   };
 }
 

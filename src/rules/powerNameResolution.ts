@@ -1,14 +1,3 @@
-/** Known compendium typos / shorthand in feat Associated Powers or modify rows. */
-const FEAT_POWER_NAME_ALIASES: Record<string, string> = {
-  "command's strike": "commander's strike",
-  "predator's strike": "predator strike",
-  "overhwleming strike": "overwhelming strike",
-  "haunting sounds": "ghost sound",
-  "ghost sounds": "ghost sound",
-  /** Compendium mislabels modify target; feat augments Hand of Radiance (Invoker). */
-  "hand of fury": "hand of radiance"
-};
-
 /** Collapse punctuation/spacing for fuzzy power name match (wolfpack → Wolf Pack). */
 export function normalizePowerMatchKey(name: string): string {
   let s = name.trim().toLowerCase();
@@ -16,18 +5,17 @@ export function normalizePowerMatchKey(name: string): string {
   return s.replace(/[^a-z0-9]/g, "");
 }
 
-function applyAlias(lowerName: string): string {
-  return FEAT_POWER_NAME_ALIASES[lowerName] ?? lowerName;
-}
-
 export type PowerNameLookups = {
   byExactName: Map<string, string>;
   byNormalizedKey: Map<string, string>;
   byId: Map<string, string>;
+  /** From `rules_index.json` `featPowerNameAliases` (ETL). */
+  nameAliases: Record<string, string>;
 };
 
 export function buildPowerNameLookups(
-  powers: ReadonlyArray<{ id: string; name: string }>
+  powers: ReadonlyArray<{ id: string; name: string }>,
+  nameAliases: Record<string, string> = {}
 ): PowerNameLookups {
   const byExactName = new Map<string, string>();
   const byNormalizedKey = new Map<string, string>();
@@ -43,7 +31,11 @@ export function buildPowerNameLookups(
     const norm = normalizePowerMatchKey(name);
     if (norm && !byNormalizedKey.has(norm)) byNormalizedKey.set(norm, id);
   }
-  return { byExactName, byNormalizedKey, byId };
+  return { byExactName, byNormalizedKey, byId, nameAliases };
+}
+
+function applyAlias(lowerName: string, aliases: Record<string, string>): string {
+  return aliases[lowerName] ?? lowerName;
 }
 
 /** Resolve a feat power modification target from compendium id or display name. */
@@ -58,7 +50,7 @@ export function resolvePowerReference(
     return raw;
   }
 
-  const lower = applyAlias(raw.toLowerCase());
+  const lower = applyAlias(raw.toLowerCase(), lookups.nameAliases);
   const exact = lookups.byExactName.get(lower);
   if (exact) return exact;
 

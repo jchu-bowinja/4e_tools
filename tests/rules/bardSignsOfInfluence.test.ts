@@ -69,6 +69,21 @@ const signOptions: ClassFeature[] = [
   { id: "ID_FMP_CLASS_FEATURE_4144", name: "Welcome Guest", slug: "welcome-guest", raw: {} }
 ];
 
+const signChoiceOptions = signOptions.map((s) => ({
+  id: s.id,
+  name: s.name,
+  parentFeatureId: SIGNS_OF_INFLUENCE_CLASS_FEATURE_ID,
+  parentFeatureName: "Signs of Influence",
+  shortDescription: null,
+  body: null,
+  powerIds: [] as string[]
+}));
+
+const signsVisibleWhen = {
+  groupKey: `classFeatureOptional:${SIGNS_OF_INFLUENCE_CLASS_FEATURE_ID}`,
+  optionId: SIGNS_OF_INFLUENCE_CLASS_FEATURE_ID
+};
+
 const index: RulesIndex = {
   races: [],
   classes: [bardClass],
@@ -87,7 +102,65 @@ const index: RulesIndex = {
     ID_FMP_CLASS_104: ["Bardic Virtue", "Majestic Word"]
   },
   classFeatureChoiceGroupsByClassId: {
-    ID_FMP_CLASS_104: []
+    ID_FMP_CLASS_104: [
+      {
+        key: `classFeatureOptional:${SIGNS_OF_INFLUENCE_CLASS_FEATURE_ID}`,
+        kind: "classFeature",
+        parentFeatureId: SIGNS_OF_INFLUENCE_CLASS_FEATURE_ID,
+        parentFeatureName: "Signs of Influence",
+        pickCount: 1,
+        optional: true,
+        options: [
+          {
+            id: CLASS_FEATURE_CHOICE_NONE,
+            name: "No Signs of Influence",
+            parentFeatureId: SIGNS_OF_INFLUENCE_CLASS_FEATURE_ID,
+            parentFeatureName: "Signs of Influence",
+            shortDescription: null,
+            body: null,
+            powerIds: []
+          },
+          {
+            id: SIGNS_OF_INFLUENCE_CLASS_FEATURE_ID,
+            name: "Signs of Influence",
+            parentFeatureId: SIGNS_OF_INFLUENCE_CLASS_FEATURE_ID,
+            parentFeatureName: "Signs of Influence",
+            shortDescription: signsOfInfluence.shortDescription ?? null,
+            body: null,
+            powerIds: []
+          }
+        ]
+      },
+      {
+        key: `classFeature:${SIGNS_OF_INFLUENCE_CLASS_FEATURE_ID}`,
+        kind: "classFeature",
+        parentFeatureId: SIGNS_OF_INFLUENCE_CLASS_FEATURE_ID,
+        parentFeatureName: "Signs of Influence",
+        pickCount: 2,
+        visibleWhen: signsVisibleWhen,
+        options: signChoiceOptions
+      },
+      {
+        key: `classFeature:${SIGNS_OF_INFLUENCE_CLASS_FEATURE_ID}:13`,
+        kind: "classFeature",
+        parentFeatureId: SIGNS_OF_INFLUENCE_CLASS_FEATURE_ID,
+        parentFeatureName: "Signs of Influence (level 13)",
+        pickCount: 1,
+        minLevel: 13,
+        visibleWhen: signsVisibleWhen,
+        options: signChoiceOptions
+      },
+      {
+        key: `classFeature:${SIGNS_OF_INFLUENCE_CLASS_FEATURE_ID}:17`,
+        kind: "classFeature",
+        parentFeatureId: SIGNS_OF_INFLUENCE_CLASS_FEATURE_ID,
+        parentFeatureName: "Signs of Influence (level 17)",
+        pickCount: 1,
+        minLevel: 17,
+        visibleWhen: signsVisibleWhen,
+        options: signChoiceOptions
+      }
+    ]
   }
 };
 

@@ -153,7 +153,7 @@ export function collectFeatModificationsByPowerId(
   index: RulesIndex,
   featIds: readonly string[]
 ): Map<string, PowerFeatModifications> {
-  const powerLookups = buildPowerNameLookups(index.powers);
+  const powerLookups = buildPowerNameLookups(index.powers, index.featPowerNameAliases ?? {});
   const byPower = new Map<string, PowerFeatModifications>();
 
   for (const fid of featIds) {

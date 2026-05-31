@@ -485,6 +485,8 @@ describe("classFeatureChoices", () => {
       ...index,
       classes: [wizard],
       paragonPaths: [],
+      featGrantedPowerIdsExcludedFromClassFeaturePicks: [],
+      paragonPathClassFeaturePowerIds: [],
       feats: [
         {
           id: "ID_FMP_FEAT_FOO",
@@ -528,17 +530,16 @@ describe("classFeatureChoices", () => {
             parentFeatureId: "ID_FMP_CLASS_FEATURE_130",
             parentFeatureName: "Arcanist Cantrips",
             pickCount: 4,
-            powerIds: ["ID_FMP_POWER_W0", "ID_FMP_POWER_W3"]
+            powerIds: powers.map((p) => p.id)
           }
         ]
       }
     };
     expect(() => classFeatureSelectablePowerIds(idx, "ID_FMP_CLASS_FEATURE_2870")).not.toThrow();
-    const selectable = classFeatureSelectablePowerIds(idx, "ID_FMP_CLASS_FEATURE_130");
-    expect(selectable.size).toBe(10);
     const groups = getClassFeatureChoiceGroups(idx, wizard);
     const cantrips = groups.find((g) => g.parentFeatureId === "ID_FMP_CLASS_FEATURE_130")!;
     expect(cantrips.pickCount).toBe(4);
+    expect(cantrips.powerIds).toHaveLength(10);
     const legal = classFeaturePowerIdsForClass(idx, cantrips, wizard.id);
     expect(legal).toHaveLength(10);
     expect(legal).toContain("ID_FMP_POWER_W2");

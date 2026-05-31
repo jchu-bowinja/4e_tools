@@ -3365,6 +3365,12 @@ def build_index(input_path: Path, output_dir: Path) -> None:
         feats_raw,
         powers_by_name,
     )
+    paragon_path_class_feature_power_ids = sorted(
+        _paragon_path_class_feature_power_ids(paragon_raw, features_by_id)
+    )
+    feat_granted_power_ids_excluded_from_class_feature_picks = sorted(
+        _feat_granted_power_ids_excluded_from_class_feature_picks(feats_raw)
+    )
 
     known_races = {r.get("name", "") for r in races_raw}
     known_classes = {c.get("name", "").lower() for c in classes_raw}
@@ -3831,6 +3837,11 @@ def build_index(input_path: Path, output_dir: Path) -> None:
         "grantedClassFeatureNamesBySupportId": granted_class_feature_names_by_support_id,
         "classBuildOptionsByClassId": class_build_options_by_class,
         "classFeatureChoiceGroupsByClassId": class_feature_choice_groups_by_class,
+        "paragonPathClassFeaturePowerIds": paragon_path_class_feature_power_ids,
+        "featGrantedPowerIdsExcludedFromClassFeaturePicks": (
+            feat_granted_power_ids_excluded_from_class_feature_picks
+        ),
+        "featPowerNameAliases": dict(_FEAT_POWER_NAME_ALIASES),
     }
 
     (output_dir / "rules_index.json").write_text(
