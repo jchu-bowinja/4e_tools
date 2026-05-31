@@ -386,7 +386,7 @@ def _power_selectable_ids_from_class_feature(cf: Dict[str, Any]) -> Set[str]:
         attrs = sel.get("attrs") or {}
         if attrs.get("type") != "Power":
             continue
-        cat = str(attrs.get("Category") or "")
+        cat = _select_category(attrs)
         for part in cat.split("|"):
             pid = part.strip()
             if pid.startswith("ID_FMP_POWER"):
@@ -903,6 +903,204 @@ def _supplement_mapped_optional_class_feature_groups(
     return out
 
 
+def _select_category(attrs: Dict[str, Any]) -> str:
+    """Compendium uses both `Category` and `category` on select attrs."""
+    return str(attrs.get("Category") or attrs.get("category") or "").strip()
+
+
+def _parse_trait_package_names(cls: Dict[str, Any]) -> List[str]:
+    raw = str((cls.get("specific") or {}).get("Trait Package") or "").strip()
+    if not raw:
+        return []
+    return [n.strip() for n in raw.split(",") if n.strip()]
+
+
+def _resolve_trait_package_feature(
+    package_name: str,
+    features_by_name: Dict[str, Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """Map Essentials trait package label (Storm Domain, Enchantment School, …) to a class feature row."""
+    candidates = [
+        package_name,
+        f"{package_name} Features and Powers",
+        f"{package_name} Features",
+        package_name.replace(" School", "") + " Apprentice",
+    ]
+    if "(Binder)" in package_name:
+        candidates.insert(0, package_name.replace(" Pact (Binder)", " Pact Boon (Binder)"))
+    if package_name.startswith("Vice of "):
+        vice = package_name.replace("Vice of ", "")
+        candidates.extend([f"Spirit of Vice ({vice})", f"Spirit of Vice ({vice.title()})"])
+    for name in candidates:
+        row = features_by_name.get(name)
+        if row:
+            return row
+    return None
+
+
+def _wilderness_knack_features(
+    features_by_id: Dict[str, Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    rows = [
+        cf
+        for cf in features_by_id.values()
+        if str(cf.get("internal_id") or "").startswith("ID_WOG_SHARED_CLASS_FEATURE_KNACK_")
+    ]
+    return sorted(rows, key=lambda r: str(r.get("name") or "").lower())
+
+
+def _category_references_parent(cat: str, parent_id: str) -> bool:
+    if not cat or not parent_id:
+        return False
+    return parent_id in {t.strip() for t in cat.split(",") if t.strip()}
+
+
+def _child_features_for_parent_category(
+    parent_id: str,
+    features_by_id: Dict[str, Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Features whose compendium `category` field lists `parent_id` (Apprentice Mage schools, Spirit of Vice, …)."""
+    children: List[Dict[str, Any]] = []
+    for cf in features_by_id.values():
+        cat = str(cf.get("category") or "").strip()
+        if _category_references_parent(cat, parent_id):
+            children.append(cf)
+    return sorted(children, key=lambda r: str(r.get("name") or "").lower())
+
+
+def _domain_package_names_from_grants(features_by_name: Dict[str, Dict[str, Any]]) -> List[str]:
+    """All warpriest domain labels from level-3 domain encounter grant `requires` attrs."""
+    feat = features_by_name.get("Level 3 Domain Encounter Power")
+    if not feat:
+        return []
+    names: List[str] = []
+    for gr in (feat.get("rules") or {}).get("grant") or []:
+        req = (gr.get("attrs") or {}).get("requires")
+        if req:
+            label = str(req).strip()
+            if label and label not in names:
+                names.append(label)
+    return names
+
+
+def _trait_package_names_for_class(
+    cls: Dict[str, Any],
+    parent: Dict[str, Any],
+    features_by_name: Dict[str, Dict[str, Any]],
+) -> List[str]:
+    names = _parse_trait_package_names(cls)
+    if str(parent.get("name") or "") == "Domain Features":
+        for label in _domain_package_names_from_grants(features_by_name):
+            if label not in names:
+                names.append(label)
+    return names
+
+
+HUNTER_SCOUT_ASPECT_L7_POWER_NAMES: Tuple[str, ...] = (
+    "Aspect of the Charging Ram",
+    "Aspect of the Hungry Shark",
+    "Aspect of the Soaring Hawk",
+)
+
+
+def _supplement_level_gated_aspect_power_ids(
+    parent: Dict[str, Any],
+    powers_by_name: Optional[Dict[str, Dict[str, Any]]],
+) -> List[str]:
+    name = str(parent.get("name") or "")
+    if "Level 7 Aspect of the Wild" not in name and "Level 17 Aspect of the Wild" not in name:
+        return []
+    if not powers_by_name:
+        return []
+    ids: List[str] = []
+    for pname in HUNTER_SCOUT_ASPECT_L7_POWER_NAMES:
+        row = powers_by_name.get(pname)
+        if row and row.get("internal_id"):
+            ids.append(str(row["internal_id"]))
+    return ids
+
+
+def _supplement_class_feature_select_options(
+    parent: Dict[str, Any],
+    cls: Dict[str, Any],
+    options: List[Dict[str, Any]],
+    features_by_id: Dict[str, Dict[str, Any]],
+    features_by_name: Dict[str, Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Fill Essentials self-referential or incomplete compendium select lists."""
+    parent_id = str(parent.get("internal_id") or "")
+    parent_name = str(parent.get("name") or parent_id)
+    filtered = [o for o in options if str(o.get("id") or "") != parent_id]
+    if len(filtered) >= 2:
+        return filtered
+
+    out = list(filtered)
+    seen = {str(o.get("id") or "") for o in out}
+
+    def add_child(child: Optional[Dict[str, Any]]) -> None:
+        if not child:
+            return
+        cid = str(child.get("internal_id") or "")
+        if not cid or cid in seen:
+            return
+        out.append(_class_feature_child_option_row(child, parent_id, parent_name))
+        seen.add(cid)
+
+    feat_name = str(parent.get("name") or "")
+    for child in _child_features_for_parent_category(parent_id, features_by_id):
+        add_child(child)
+    if len(out) >= 2:
+        return out
+
+    if feat_name == "Archery Style":
+        for name in ("Bow Hunter", "Crossbow Hunter"):
+            add_child(features_by_name.get(name))
+    elif "Wilderness Knacks" in feat_name:
+        for child in _wilderness_knack_features(features_by_id):
+            add_child(child)
+    elif feat_name in (
+        "Level 1 Apprentice Mage",
+        "Domain Features",
+        "Spirit of Vice",
+        "Virtue Choice",
+        "Season Choice",
+        "Pact Boon (Binder)",
+        "Pact Boon",
+    ):
+        for pkg in _trait_package_names_for_class(cls, parent, features_by_name):
+            add_child(_resolve_trait_package_feature(pkg, features_by_name))
+
+    return out
+
+
+def _options_from_trait_package_select(
+    parent: Dict[str, Any],
+    cls: Dict[str, Any],
+    features_by_name: Dict[str, Dict[str, Any]],
+    features_by_id: Dict[str, Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    parent_id = str(parent.get("internal_id") or "")
+    parent_name = str(parent.get("name") or parent_id)
+    options: List[Dict[str, Any]] = []
+    seen: Set[str] = set()
+    for child in _child_features_for_parent_category(parent_id, features_by_id):
+        cid = str(child.get("internal_id") or "")
+        if not cid or cid in seen:
+            continue
+        options.append(_class_feature_child_option_row(child, parent_id, parent_name))
+        seen.add(cid)
+    for pkg in _trait_package_names_for_class(cls, parent, features_by_name):
+        child = _resolve_trait_package_feature(pkg, features_by_name)
+        if not child:
+            continue
+        cid = str(child.get("internal_id") or "")
+        if not cid or cid in seen:
+            continue
+        options.append(_class_feature_child_option_row(child, parent_id, parent_name))
+        seen.add(cid)
+    return options
+
+
 def _class_feature_has_select(
     feature: Dict[str, Any], select_type: str
 ) -> tuple[bool, int]:
@@ -957,10 +1155,12 @@ def _options_from_class_feature_select(
     for item in rules.get("select") or []:
         if (item.get("attrs") or {}).get("type") != "Class Feature":
             continue
-        cat = str((item.get("attrs") or {}).get("Category") or "")
+        cat = _select_category(item.get("attrs") or {})
         for token in cat.split("|"):
             tid = token.strip()
-            if not tid.startswith("ID_"):
+            if not tid.startswith("ID_") or tid == parent_id:
+                continue
+            if re.match(r"^ID_(?:FMP|DBB)_CLASS_\d+$", tid):
                 continue
             child = features_by_id.get(tid)
             if child:
@@ -1086,7 +1286,7 @@ def _power_select_category_ids_from_class_feature(
         attrs = item.get("attrs") or {}
         if attrs.get("type") != "Power":
             continue
-        cat = str(attrs.get("Category") or "").strip()
+        cat = _select_category(attrs)
         if cat.startswith("ID_") and "_CLASS_FEATURE_" in cat:
             ref = features_by_id.get(cat)
             if ref:
@@ -1123,7 +1323,7 @@ def _class_power_select_pools_for_class(
         req = attrs.get("requires")
         if req and req != class_id:
             continue
-        cat = str(attrs.get("Category") or "").strip()
+        cat = _select_category(attrs)
         pool: Set[str] = set()
         if cat.startswith("ID_") and "_CLASS_FEATURE_" in cat:
             ref = features_by_id.get(cat)
@@ -1164,7 +1364,7 @@ def _power_ids_from_class_feature_power_select(
         attrs = item.get("attrs") or {}
         if attrs.get("type") != "Power":
             continue
-        cat = str(attrs.get("Category") or "").strip()
+        cat = _select_category(attrs)
         if cat.startswith("ID_") and "_CLASS_FEATURE_" in cat:
             ref = features_by_id.get(cat)
             if ref:
@@ -1212,6 +1412,56 @@ def _granted_level1_class_feature_ids(
             for sid in _parse_internal_id_list(ps.get("_PARSED_SUB_FEATURES")):
                 granted.add(sid)
     return granted
+
+
+def _append_missing_trait_package_parent_groups(
+    class_id: str,
+    cls: Dict[str, Any],
+    groups: List[Dict[str, Any]],
+    features_by_name: Dict[str, Dict[str, Any]],
+    features_by_id: Dict[str, Dict[str, Any]],
+    classes_by_id: Dict[str, Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Trait-package picks whose parent feature is not listed in grants/parsed features (e.g. Season Choice)."""
+    if not _parse_trait_package_names(cls):
+        return groups
+    existing_parents = {str(g.get("parentFeatureName") or "") for g in groups}
+    for parent_name in ("Season Choice", "Virtue Choice"):
+        if parent_name in existing_parents:
+            continue
+        parent = features_by_name.get(parent_name)
+        if not parent:
+            continue
+        tp = _parse_trait_package_names(cls)
+        applies = _class_feature_applies_to_support_class(parent, class_id, classes_by_id)
+        if not applies:
+            if parent_name == "Season Choice" and not any("Druid of" in t for t in tp):
+                continue
+            if parent_name == "Virtue Choice" and not any("Virtue of" in t for t in tp):
+                continue
+        parent_id = str(parent.get("internal_id") or "")
+        if not parent_id:
+            continue
+        opts = _options_from_trait_package_select(parent, cls, features_by_name, features_by_id)
+        if len(opts) < 2:
+            opts = _supplement_class_feature_select_options(
+                parent, cls, opts, features_by_id, features_by_name
+            )
+        if len(opts) < 2:
+            continue
+        _, pick_n = _class_feature_has_select(parent, "Trait Package")
+        groups.append(
+            {
+                "key": f"classFeature:{parent_id}",
+                "kind": "classFeature",
+                "parentFeatureId": parent_id,
+                "parentFeatureName": parent_name,
+                "pickCount": pick_n or 1,
+                "options": sorted(opts, key=lambda r: str(r.get("name") or "").lower()),
+            }
+        )
+        existing_parents.add(parent_name)
+    return groups
 
 
 def build_class_feature_choice_groups_by_class(
@@ -1272,8 +1522,18 @@ def build_class_feature_choice_groups_by_class(
                 parent_name = str(parent.get("name") or parent_id)
 
                 has_cf, pick_n = _class_feature_has_select(parent, "Class Feature")
-                options = _options_from_class_feature_select(parent, features_by_id) if has_cf else []
-                if options:
+                options = (
+                    _supplement_class_feature_select_options(
+                        parent,
+                        cls,
+                        _options_from_class_feature_select(parent, features_by_id),
+                        features_by_id,
+                        features_by_name,
+                    )
+                    if has_cf
+                    else []
+                )
+                if len(options) >= 2:
                     groups.append(
                         {
                             "key": f"classFeature:{parent_id}",
@@ -1283,6 +1543,30 @@ def build_class_feature_choice_groups_by_class(
                             "pickCount": pick_n or 1,
                             "options": sorted(
                                 options,
+                                key=lambda r: str(r.get("name") or "").lower(),
+                            ),
+                        }
+                    )
+                    continue
+
+                has_tp, pick_tp = _class_feature_has_select(parent, "Trait Package")
+                tp_options = (
+                    _options_from_trait_package_select(
+                        parent, cls, features_by_name, features_by_id
+                    )
+                    if has_tp
+                    else []
+                )
+                if len(tp_options) >= 2:
+                    groups.append(
+                        {
+                            "key": f"classFeature:{parent_id}",
+                            "kind": "classFeature",
+                            "parentFeatureId": parent_id,
+                            "parentFeatureName": parent_name,
+                            "pickCount": pick_tp or 1,
+                            "options": sorted(
+                                tp_options,
                                 key=lambda r: str(r.get("name") or "").lower(),
                             ),
                         }
@@ -1323,6 +1607,7 @@ def build_class_feature_choice_groups_by_class(
                                     "options": [],
                                 }
                             )
+                    continue
                 elif has_pow and pick_pow > 0:
                     power_ids = _power_ids_from_class_feature_power_select(
                         parent,
@@ -1338,6 +1623,145 @@ def build_class_feature_choice_groups_by_class(
                                 "parentFeatureId": parent_id,
                                 "parentFeatureName": parent_name,
                                 "pickCount": pick_pow,
+                                "powerIds": power_ids,
+                                "options": [],
+                            }
+                        )
+                        continue
+
+                sub_ids = _parse_internal_id_list(ps.get("_PARSED_SUB_FEATURES"))
+                if len(sub_ids) >= 2:
+                    sub_opts = [
+                        _class_feature_child_option_row(features_by_id[sid], parent_id, parent_name)
+                        for sid in sub_ids
+                        if sid in features_by_id
+                    ]
+                    if len(sub_opts) >= 2:
+                        groups.append(
+                            {
+                                "key": f"classFeature:{parent_id}",
+                                "kind": "classFeature",
+                                "parentFeatureId": parent_id,
+                                "parentFeatureName": parent_name,
+                                "pickCount": 1,
+                                "options": sorted(
+                                    sub_opts,
+                                    key=lambda r: str(r.get("name") or "").lower(),
+                                ),
+                            }
+                        )
+
+        for g in grants_raw:
+            sp = g.get("specific") or {}
+            if sp.get("_SupportsID") != class_id:
+                continue
+            for gr in (g.get("rules") or {}).get("grant") or []:
+                attrs = gr.get("attrs") or {}
+                if attrs.get("type") != "Class Feature":
+                    continue
+                parent_id = attrs.get("name")
+                if not isinstance(parent_id, str):
+                    continue
+                parent = features_by_id.get(parent_id)
+                if not parent:
+                    continue
+                if not _class_feature_applies_to_support_class(parent, class_id, classes_by_id):
+                    continue
+                ps = parent.get("specific") or {}
+                level = parse_int_from_text(ps.get("Level"))
+                if level is None or level <= 1:
+                    continue
+                parent_name = str(parent.get("name") or parent_id)
+                group_key = f"classPower:{parent_id}:{level}"
+
+                aspect_ids = _supplement_level_gated_aspect_power_ids(parent, powers_by_name)
+                if aspect_ids:
+                    _, pick_pow = _class_feature_has_select(parent, "Power")
+                    groups.append(
+                        {
+                            "key": group_key,
+                            "kind": "power",
+                            "parentFeatureId": parent_id,
+                            "parentFeatureName": parent_name,
+                            "pickCount": pick_pow or 1,
+                            "minLevel": level,
+                            "powerIds": aspect_ids,
+                            "options": [],
+                        }
+                    )
+                    continue
+
+                has_cf, pick_n = _class_feature_has_select(parent, "Class Feature")
+                options = (
+                    _supplement_class_feature_select_options(
+                        parent,
+                        cls,
+                        _options_from_class_feature_select(parent, features_by_id),
+                        features_by_id,
+                        features_by_name,
+                    )
+                    if has_cf
+                    else []
+                )
+                if len(options) >= 2:
+                    groups.append(
+                        {
+                            "key": f"classFeature:{parent_id}:{level}",
+                            "kind": "classFeature",
+                            "parentFeatureId": parent_id,
+                            "parentFeatureName": parent_name,
+                            "pickCount": pick_n or 1,
+                            "minLevel": level,
+                            "options": sorted(
+                                options,
+                                key=lambda r: str(r.get("name") or "").lower(),
+                            ),
+                        }
+                    )
+                    continue
+
+                has_tp, pick_tp = _class_feature_has_select(parent, "Trait Package")
+                tp_options = (
+                    _options_from_trait_package_select(
+                        parent, cls, features_by_name, features_by_id
+                    )
+                    if has_tp
+                    else []
+                )
+                if len(tp_options) >= 2:
+                    groups.append(
+                        {
+                            "key": f"classFeature:{parent_id}:{level}",
+                            "kind": "classFeature",
+                            "parentFeatureId": parent_id,
+                            "parentFeatureName": parent_name,
+                            "pickCount": pick_tp or 1,
+                            "minLevel": level,
+                            "options": sorted(
+                                tp_options,
+                                key=lambda r: str(r.get("name") or "").lower(),
+                            ),
+                        }
+                    )
+                    continue
+
+                has_pow, pick_pow = _class_feature_has_select(parent, "Power")
+                if has_pow and pick_pow > 0:
+                    power_ids = _power_ids_from_class_feature_power_select(
+                        parent,
+                        features_by_id,
+                        exclude_power_ids=class_feature_pick_exclusions,
+                        powers_by_name=powers_by_name,
+                    )
+                    if power_ids:
+                        groups.append(
+                            {
+                                "key": group_key,
+                                "kind": "power",
+                                "parentFeatureId": parent_id,
+                                "parentFeatureName": parent_name,
+                                "pickCount": pick_pow,
+                                "minLevel": level,
                                 "powerIds": power_ids,
                                 "options": [],
                             }
@@ -1435,7 +1859,21 @@ def build_class_feature_choice_groups_by_class(
 
         for feat in remaining_ungranted:
             has_cf, pick_n = _class_feature_has_select(feat, "Class Feature")
-            nested = _options_from_class_feature_select(feat, features_by_id) if has_cf else []
+            nested = _options_from_class_feature_select(feat, features_by_id)
+            if has_cf or len(nested) < 2:
+                nested = _supplement_class_feature_select_options(
+                    feat,
+                    cls,
+                    nested,
+                    features_by_id,
+                    features_by_name,
+                )
+            has_tp, pick_tp = _class_feature_has_select(feat, "Trait Package")
+            if len(nested) < 2 and has_tp:
+                nested = _options_from_trait_package_select(
+                    feat, cls, features_by_name, features_by_id
+                )
+                pick_n = pick_tp
             if len(nested) >= 2:
                 fid = str(feat.get("internal_id") or "")
                 row: Dict[str, Any] = {
@@ -1455,6 +1893,9 @@ def build_class_feature_choice_groups_by_class(
 
         groups = _supplement_mapped_optional_class_feature_groups(
             class_id, groups, features_by_name, features_by_id
+        )
+        groups = _append_missing_trait_package_parent_groups(
+            class_id, cls, groups, features_by_name, features_by_id, classes_by_id
         )
         if groups:
             out[class_id] = groups

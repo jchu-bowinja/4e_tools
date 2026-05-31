@@ -3,10 +3,14 @@ import {
   attackPowerBucketFromUsage,
   attackPowerSlotKindFromUsage,
   buildClassPowerSlotDefinitions,
+  classPowerSlotBucketsWithSelectableOptions,
+  filterClassPowerSlotDefsWithSelectableOptions,
+  maskPowerSlotCountsBySelectableBuckets,
   orderedPowerIdsFromSlots,
   powerPrintedLevelEligibleForSlot,
   upcomingClassPowerSlotMilestones
 } from "../../src/rules/classPowerSlots";
+import type { Power } from "../../src/rules/models";
 describe("attackPowerSlotKindFromUsage", () => {
   it("classifies standard PHB usage strings", () => {
     expect(attackPowerSlotKindFromUsage("At-Will")).toBe("atWill");
@@ -85,5 +89,40 @@ describe("upcomingClassPowerSlotMilestones", () => {
 
   it("returns empty when all core slots are gained", () => {
     expect(upcomingClassPowerSlotMilestones(30)).toEqual([]);
+  });
+});
+
+describe("filterClassPowerSlotDefsWithSelectableOptions", () => {
+  const mageAttack: Power = {
+    id: "enc1",
+    name: "Mage Bolt",
+    slug: "mage-bolt",
+    level: 1,
+    usage: "Encounter",
+    raw: { specific: { "Power Type": "Attack" } }
+  };
+
+  it("drops buckets with no eligible powers", () => {
+    const defs = buildClassPowerSlotDefinitions(1, false);
+    const visible = filterClassPowerSlotDefsWithSelectableOptions(defs, [], []);
+    expect(visible).toEqual([]);
+  });
+
+  it("keeps only buckets that have pickable powers", () => {
+    const defs = buildClassPowerSlotDefinitions(1, false);
+    const visible = filterClassPowerSlotDefsWithSelectableOptions(defs, [mageAttack], []);
+    expect(visible.every((d) => d.bucket === "encounter")).toBe(true);
+    expect(visible.some((d) => d.bucket === "atWill")).toBe(false);
+  });
+
+  it("masks PHB slot counts when buckets are empty", () => {
+    const base = { atWill: 2, encounter: 1, daily: 1, utility: 0 };
+    const buckets = classPowerSlotBucketsWithSelectableOptions(buildClassPowerSlotDefinitions(1, false), [], []);
+    expect(maskPowerSlotCountsBySelectableBuckets(base, buckets)).toEqual({
+      atWill: 0,
+      encounter: 0,
+      daily: 0,
+      utility: 0
+    });
   });
 });

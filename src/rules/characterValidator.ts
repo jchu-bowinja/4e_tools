@@ -7,7 +7,7 @@ import {
   totalFeatSlots
 } from "./advancement";
 import { CharacterBuild, ClassDef, HybridClassDef, Power, RulesIndex, Skill } from "./models";
-import { buildClassPowerSlotDefinitions, attackPowerSlotKindFromUsage, powerPrintedLevelEligibleForSlot } from "./classPowerSlots";
+import { buildClassPowerSlotDefinitions, attackPowerSlotKindFromUsage, classPowerSlotBucketsWithSelectableOptions, maskPowerSlotCountsBySelectableBuckets, powerPrintedLevelEligibleForSlot } from "./classPowerSlots";
 import { getClassPowersForLevelRange } from "./classPowersQuery";
 import {
   getDilettanteCandidatePowersForBuild,
@@ -373,7 +373,6 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
     const wantEnc = expectedClassEncounterAttackSlots(build.level);
     const wantDaily = expectedClassDailyAttackSlots(build.level);
     const wantUtil = expectedClassUtilityPowerCount(build.level);
-    powerSlotRules = { atWill: wantAw, encounter: wantEnc, daily: wantDaily, utility: wantUtil };
 
     const expectedFeats = totalFeatSlots(build.level, racialFeatSlots);
     const uniqueFeat = new Set(build.featIds);
@@ -452,6 +451,16 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
 
     const attackPowers = getClassPowersForLevelRange(index, build.classId, build.level, "attack");
     const utilityPowers = getClassPowersForLevelRange(index, build.classId, build.level, "utility");
+    const slotDefsForBuckets = buildClassPowerSlotDefinitions(build.level, bonusThirdClassAtWill, atWillPenalty);
+    const selectableBuckets = classPowerSlotBucketsWithSelectableOptions(
+      slotDefsForBuckets,
+      attackPowers,
+      utilityPowers
+    );
+    powerSlotRules = maskPowerSlotCountsBySelectableBuckets(
+      { atWill: wantAw, encounter: wantEnc, daily: wantDaily, utility: wantUtil },
+      selectableBuckets
+    );
     const allowedPowerIds = new Set([...attackPowers, ...utilityPowers].map((p) => p.id));
     const stray = build.powerIds.filter((id) => !allowedPowerIds.has(id));
     if (stray.length > 0) {
@@ -568,7 +577,6 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
     const wantEnc = expectedClassEncounterAttackSlots(build.level);
     const wantDaily = expectedClassDailyAttackSlots(build.level);
     const wantUtil = expectedClassUtilityPowerCount(build.level);
-    powerSlotRules = { atWill: wantAw, encounter: wantEnc, daily: wantDaily, utility: wantUtil };
 
     const expectedFeats = totalFeatSlots(build.level, racialFeatSlots);
     const uniqueFeat = new Set(build.featIds);
@@ -646,6 +654,20 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
     const baseBid = hybridB.baseClassId!;
     const attackPowersHy = hybridPowerPoolUnion(index, baseAid, baseBid, build.level, "attack");
     const utilityPowersHy = hybridPowerPoolUnion(index, baseAid, baseBid, build.level, "utility");
+    const slotDefsHyForBuckets = buildHybridPowerSlotDefinitions(build.level, bonusThirdClassAtWill, atWillPenalty);
+    const selectableBucketsHy = classPowerSlotBucketsWithSelectableOptions(
+      slotDefsHyForBuckets,
+      attackPowersHy,
+      utilityPowersHy,
+      {
+        filterPowerForSlot: (def, p) =>
+          !def.key.startsWith("hybrid:") || powerAllowedForHybridSlot(def.key, p, baseAid, baseBid)
+      }
+    );
+    powerSlotRules = maskPowerSlotCountsBySelectableBuckets(
+      { atWill: wantAw, encounter: wantEnc, daily: wantDaily, utility: wantUtil },
+      selectableBucketsHy
+    );
     const allowedPowerIdsHy = new Set([...attackPowersHy, ...utilityPowersHy].map((p) => p.id));
     const strayHy = build.powerIds.filter((id) => !allowedPowerIdsHy.has(id));
     if (strayHy.length > 0) {

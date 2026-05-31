@@ -36,6 +36,7 @@ import { applyAsiBonusesToScores, requiredAsiMilestonesUpTo, totalFeatSlots } fr
 import {
   attackPowerBucketFromUsage,
   buildClassPowerSlotDefinitions,
+  filterClassPowerSlotDefsWithSelectableOptions,
   inferClassPowerSlotsFromPowerIds,
   orderedPowerIdsFromSlots,
   powerPrintedLevelEligibleForSlot,
@@ -1733,6 +1734,30 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     if (isHybridBuild) return buildHybridPowerSlotDefinitions(build.level, bonusClassAtWill, paragonAtWillPenalty);
     return buildClassPowerSlotDefinitions(build.level, bonusClassAtWill, paragonAtWillPenalty);
   }, [build.level, bonusClassAtWill, isHybridBuild, paragonAtWillPenalty]);
+  const visiblePowerSlotDefs = useMemo(() => {
+    const hybridFilter =
+      isHybridBuild && hybridBaseClassAId && hybridBaseClassBId
+        ? {
+            filterPowerForSlot: (def: (typeof powerSlotDefs)[number], p: Power) =>
+              !def.key.startsWith("hybrid:") ||
+              powerAllowedForHybridSlot(def.key, p, hybridBaseClassAId, hybridBaseClassBId)
+          }
+        : undefined;
+    return filterClassPowerSlotDefsWithSelectableOptions(
+      powerSlotDefs,
+      classAttackPowers,
+      classUtilityPowers,
+      hybridFilter
+    );
+  }, [
+    powerSlotDefs,
+    classAttackPowers,
+    classUtilityPowers,
+    isHybridBuild,
+    hybridBaseClassAId,
+    hybridBaseClassBId
+  ]);
+  const hasVisiblePowerSlotSections = visiblePowerSlotDefs.length > 0;
   const racePowerGroups = useMemo(
     () =>
       racePowerGroupsForRace(selectedRace, racialTraitById, raceExtraTraitIds),
@@ -4162,20 +4187,40 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         {activeTab === "powers" && (
           <div>
             <h3 style={builderSectionTitleStyle}>Power Selection</h3>
-            <p style={{ margin: "0.25rem 0 0.65rem 0", fontSize: "0.85rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
-              Each <strong>class</strong> slot is a separate choice. The list for a slot only includes <strong>class</strong> powers whose{" "}
-              <strong>printed level</strong> is at most that slot&apos;s gain level (for example, the 3rd-level encounter slot only lists encounter
-              attacks of printed level 3 or lower). Search filters the lists. Paragon path and epic destiny powers are shown below when you have
-              selected them on their tabs; they are extra powers on top of your class schedule, not chosen into these class slots.
-            </p>
-            {legality.powerSlotRules && (
-              <p style={{ margin: "0 0 0.65rem 0", fontSize: "0.82rem", color: "var(--text-secondary)" }}>
-                <strong>Required for level {build.level}:</strong> {legality.powerSlotRules.atWill} at-will attack,{" "}
-                {legality.powerSlotRules.encounter} encounter attack, {legality.powerSlotRules.daily} daily attack,{" "}
-                {legality.powerSlotRules.utility} utility.
+            {hasVisiblePowerSlotSections && (
+              <p style={{ margin: "0.25rem 0 0.65rem 0", fontSize: "0.85rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
+                Each <strong>class</strong> slot is a separate choice. The list for a slot only includes <strong>class</strong> powers whose{" "}
+                <strong>printed level</strong> is at most that slot&apos;s gain level (for example, the 3rd-level encounter slot only lists encounter
+                attacks of printed level 3 or lower). Search filters the lists. Paragon path and epic destiny powers are shown below when you have
+                selected them on their tabs; they are extra powers on top of your class schedule, not chosen into these class slots.
               </p>
             )}
-            {upcomingPowerSlotMilestones.length > 0 && (
+            {legality.powerSlotRules &&
+              legality.powerSlotRules.atWill +
+                legality.powerSlotRules.encounter +
+                legality.powerSlotRules.daily +
+                legality.powerSlotRules.utility >
+                0 && (
+              <p style={{ margin: "0 0 0.65rem 0", fontSize: "0.82rem", color: "var(--text-secondary)" }}>
+                <strong>Required for level {build.level}:</strong>{" "}
+                {[
+                  legality.powerSlotRules.atWill > 0
+                    ? `${legality.powerSlotRules.atWill} at-will attack`
+                    : null,
+                  legality.powerSlotRules.encounter > 0
+                    ? `${legality.powerSlotRules.encounter} encounter attack`
+                    : null,
+                  legality.powerSlotRules.daily > 0
+                    ? `${legality.powerSlotRules.daily} daily attack`
+                    : null,
+                  legality.powerSlotRules.utility > 0 ? `${legality.powerSlotRules.utility} utility` : null
+                ]
+                  .filter(Boolean)
+                  .join(", ")}
+                .
+              </p>
+            )}
+            {hasVisiblePowerSlotSections && upcomingPowerSlotMilestones.length > 0 && (
               <p style={{ margin: "0 0 0.65rem 0", fontSize: "0.8rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
                 <strong>Next class slots (PHB schedule):</strong>{" "}
                 {upcomingPowerSlotMilestones.map((m) => `${m.label} at level ${m.atLevel}`).join("; ")}.
@@ -4647,8 +4692,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     })}
                   </>
                 )}
-                {powerSlotDefs.map((def, idx) => {
-                  const showBucketHeader = idx === 0 || powerSlotDefs[idx - 1].bucket !== def.bucket;
+                {visiblePowerSlotDefs.map((def, idx) => {
+                  const showBucketHeader = idx === 0 || visiblePowerSlotDefs[idx - 1].bucket !== def.bucket;
                   const slotsMap = build.classPowerSlots || {};
                   const taken = new Set(
                     Object.entries(slotsMap)

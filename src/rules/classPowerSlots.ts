@@ -242,6 +242,58 @@ export function inferClassPowerSlotsFromPowerIds(
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
+export interface ClassPowerSlotPoolFilter {
+  /** Optional per-slot pool filter (e.g. hybrid side restrictions). */
+  filterPowerForSlot?: (def: ClassPowerSlotDef, power: Power) => boolean;
+}
+
+/** Buckets that have at least one pickable power for some slot at the current level. */
+export function classPowerSlotBucketsWithSelectableOptions(
+  defs: ClassPowerSlotDef[],
+  attackPowers: Power[],
+  utilityPowers: Power[],
+  options?: ClassPowerSlotPoolFilter
+): Set<ClassPowerSlotBucket> {
+  const buckets = new Set<ClassPowerSlotBucket>();
+  for (const def of defs) {
+    let pool =
+      def.bucket === "utility"
+        ? utilityPowers
+        : attackPowers.filter((p) => attackPowerBucketFromUsage(p.usage) === def.bucket);
+    if (options?.filterPowerForSlot) {
+      pool = pool.filter((p) => options.filterPowerForSlot!(def, p));
+    }
+    if (pool.some((p) => powerPrintedLevelEligibleForSlot(p, def))) {
+      buckets.add(def.bucket);
+    }
+  }
+  return buckets;
+}
+
+/** PHB slot defs limited to buckets that actually have selectable powers. */
+export function filterClassPowerSlotDefsWithSelectableOptions(
+  defs: ClassPowerSlotDef[],
+  attackPowers: Power[],
+  utilityPowers: Power[],
+  options?: ClassPowerSlotPoolFilter
+): ClassPowerSlotDef[] {
+  const buckets = classPowerSlotBucketsWithSelectableOptions(defs, attackPowers, utilityPowers, options);
+  return defs.filter((d) => buckets.has(d.bucket));
+}
+
+/** Zero out PHB slot quotas for buckets with no pickable powers at the current level. */
+export function maskPowerSlotCountsBySelectableBuckets(
+  counts: Record<ClassPowerSlotBucket, number>,
+  buckets: Set<ClassPowerSlotBucket>
+): Record<ClassPowerSlotBucket, number> {
+  return {
+    atWill: buckets.has("atWill") ? counts.atWill : 0,
+    encounter: buckets.has("encounter") ? counts.encounter : 0,
+    daily: buckets.has("daily") ? counts.daily : 0,
+    utility: buckets.has("utility") ? counts.utility : 0
+  };
+}
+
 export function slotBucketSectionTitle(bucket: ClassPowerSlotBucket): string {
   switch (bucket) {
     case "atWill":

@@ -120,6 +120,26 @@ function classFeatureSelectRules(cf: ClassFeature | undefined): ClassFeatureSele
   return Array.isArray(select) ? (select as ClassFeatureSelectRule[]) : [];
 }
 
+function classFeatureSelectCategory(attrs: Record<string, string>): string {
+  return String(attrs.Category ?? attrs.category ?? "").trim();
+}
+
+function parentClassId(index: RulesIndex, classId: string | undefined): string | undefined {
+  if (!classId) return undefined;
+  const cls = index.classes.find((c) => c.id === classId);
+  const parent = (cls?.raw?.specific as Record<string, unknown> | undefined)?.["_ParentClass"];
+  return typeof parent === "string" && parent.startsWith("ID_") ? parent : undefined;
+}
+
+function powerOwnedByClass(
+  powerClassId: string,
+  classId: string | undefined,
+  parentId: string | undefined
+): boolean {
+  if (!powerClassId || !classId) return true;
+  return powerClassId === classId || (parentId != null && powerClassId === parentId);
+}
+
 function parsePositiveInt(text: unknown, fallback: number): number {
   const n = Number.parseInt(String(text ?? "").trim(), 10);
   return Number.isFinite(n) && n > 0 ? n : fallback;
@@ -168,10 +188,11 @@ function optionsFromClassFeatureSelect(
   for (const item of classFeatureSelectRules(parent)) {
     const attrs = item.attrs ?? {};
     if (attrs.type !== "Class Feature") continue;
-    const cat = String(attrs.Category ?? "");
+    const cat = classFeatureSelectCategory(attrs);
     for (const token of cat.split("|")) {
       const tid = token.trim();
-      if (!tid.startsWith("ID_")) continue;
+      if (!tid.startsWith("ID_") || tid === parentId) continue;
+      if (/^ID_(?:FMP|DBB)_CLASS_\d+$/.test(tid)) continue;
       const child = byId.get(tid);
       if (!child) continue;
       options.push({
@@ -210,7 +231,7 @@ export function classFeatureSelectablePowerIds(
   for (const item of classFeatureSelectRules(cf)) {
     const attrs = item.attrs ?? {};
     if (attrs.type !== "Power") continue;
-    const cat = String(attrs.Category ?? "").trim();
+    const cat = classFeatureSelectCategory(attrs);
     if (cat.startsWith("ID_FMP_POWER")) {
       for (const part of cat.split("|")) {
         const pid = part.trim();
@@ -259,7 +280,7 @@ export function classFeaturePowerSelectPoolsForClass(
     if (attrs.type !== "Power") continue;
     const req = (attrs.requires || "").trim();
     if (req && req !== classId) continue;
-    const cat = String(attrs.Category ?? "").trim();
+    const cat = classFeatureSelectCategory(attrs);
     const pool: string[] = [];
     if (cat.startsWith("ID_") && cat.includes("_CLASS_FEATURE_")) {
       for (const pid of classFeatureSelectablePowerIds(index, cat)) {
@@ -740,8 +761,7 @@ export function classFeaturePowerIdsForClass(
     const p = byId.get(pid);
     if (!p) return false;
     const owner = (p.classId || "").trim();
-    if (!owner || !classId) return true;
-    return owner === classId;
+    return powerOwnedByClass(owner, classId, parentClassId(index, classId));
   });
 }
 

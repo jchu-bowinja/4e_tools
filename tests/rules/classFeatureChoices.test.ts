@@ -544,4 +544,42 @@ describe("classFeatureChoices", () => {
     expect(legal).toContain("ID_FMP_POWER_W2");
     expect(legal).toContain("ID_FMP_POWER_W5");
   });
+
+  it("accepts parent-class power owners for Essentials subclasses", () => {
+    const mage: ClassDef = {
+      id: "ID_FMP_CLASS_722",
+      name: "Mage",
+      slug: "mage",
+      raw: { specific: { _ParentClass: "ID_FMP_CLASS_9" } }
+    };
+    const cantripId = "ID_FMP_POWER_MAGE_CANT";
+    const idx: RulesIndex = {
+      ...index,
+      classes: [mage],
+      powers: [
+        {
+          id: cantripId,
+          name: "Ghost Sound",
+          slug: "ghost-sound",
+          classId: "ID_FMP_CLASS_9",
+          raw: {}
+        }
+      ],
+      classFeatureChoiceGroupsByClassId: {
+        ID_FMP_CLASS_722: [
+          {
+            key: "classPower:ID_FMP_CLASS_FEATURE_2870",
+            kind: "power",
+            parentFeatureId: "ID_FMP_CLASS_FEATURE_2870",
+            parentFeatureName: "Mage Cantrips",
+            pickCount: 3,
+            powerIds: [cantripId]
+          }
+        ]
+      }
+    };
+    const groups = getClassFeatureChoiceGroups(idx, mage);
+    const cantrips = groups.find((g) => g.key === "classPower:ID_FMP_CLASS_FEATURE_2870")!;
+    expect(classFeaturePowerIdsForClass(idx, cantrips, mage.id)).toEqual([cantripId]);
+  });
 });
