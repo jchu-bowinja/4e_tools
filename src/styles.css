@@ -412,6 +412,12 @@ textarea:hover {
   border-color: var(--panel-border-strong);
 }
 
+/* Race/class builder selects: padded option labels align source on the right */
+select.rules-entity-select {
+  font-family: ui-monospace, "Cascadia Mono", "Segoe UI Mono", Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Adjustable number: value + always-visible step buttons in one control */
 .adjustable-number {
   display: inline-flex;

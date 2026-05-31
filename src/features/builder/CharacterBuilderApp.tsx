@@ -240,6 +240,7 @@ import {
 import { FeatFacetMultiSelect } from "./FeatFacetMultiSelect";
 import { FeatSourceFilterDropdown } from "./FeatSourceFilterDropdown";
 import { FeatTagPill } from "./FeatTagPill";
+import { formatRulesEntitySelectOptionLabel, rulesEntityNameColumnWidth } from "../../ui/rulesEntitySelectLabel";
 
 interface Props {
   index: RulesIndex;
@@ -1829,6 +1830,12 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       ),
     [hybridClassesSorted, build.hybridClassIdA, build.hybridClassIdB]
   );
+  const raceSelectNameWidth = useMemo(() => rulesEntityNameColumnWidth(index.races), [index.races]);
+  const classSelectNameWidth = useMemo(() => rulesEntityNameColumnWidth(classesForSelect), [classesForSelect]);
+  const hybridClassSelectNameWidth = useMemo(
+    () => rulesEntityNameColumnWidth(hybridClassesSorted),
+    [hybridClassesSorted]
+  );
   const skillNameById = useMemo(() => new Map(index.skills.map((s) => [s.id, s.name])), [index.skills]);
   const requiredClassSkillNamesLower = useMemo(
     () => new Set((legality.classSkillRules?.requiredTrainedSkillNames || []).map((s) => s.toLowerCase())),
@@ -2572,6 +2579,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
           <>
             <h3 style={builderSectionTitleStyle}>Race</h3>
             <select
+              className="rules-entity-select"
               value={build.raceId || ""}
               onChange={(e) => {
                 const raceId = e.target.value || undefined;
@@ -2589,7 +2597,11 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               style={{ width: "100%" }}
             >
               <option value="">Select race</option>
-              {index.races.map((race) => <option key={race.id} value={race.id}>{race.name}</option>)}
+              {index.races.map((race) => (
+                <option key={race.id} value={race.id}>
+                  {formatRulesEntitySelectOptionLabel(race.name, race.source, raceSelectNameWidth)}
+                </option>
+              ))}
             </select>
             {selectedRace &&
               (raceTraitBundleSlots.length > 0 ||
@@ -2933,6 +2945,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
 
             {!isHybridBuild && (
               <select
+                className="rules-entity-select"
                 value={build.classId || ""}
                 onChange={(e) => {
                   const classId = e.target.value || undefined;
@@ -2951,7 +2964,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 <option value="">Select class</option>
                 {classesForSelect.map((cls) => (
                   <option key={cls.id} value={cls.id}>
-                    {cls.name}
+                    {formatRulesEntitySelectOptionLabel(cls.name, cls.source, classSelectNameWidth)}
                   </option>
                 ))}
               </select>
@@ -2971,6 +2984,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     <label style={{ display: "block", margin: 0, fontSize: "0.88rem", fontWeight: 600 }}>
                       First hybrid class
                       <select
+                        className="rules-entity-select"
                         value={build.hybridClassIdA || ""}
                         onChange={(e) => {
                           const hybridClassIdA = e.target.value || undefined;
@@ -3000,7 +3014,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                           .filter((h) => h.id !== build.hybridClassIdB)
                           .map((h) => (
                             <option key={h.id} value={h.id}>
-                              {h.name}
+                              {formatRulesEntitySelectOptionLabel(h.name, h.source, hybridClassSelectNameWidth)}
                             </option>
                           ))}
                       </select>
@@ -3102,6 +3116,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     <label style={{ display: "block", margin: 0, fontSize: "0.88rem", fontWeight: 600 }}>
                       Second hybrid class
                       <select
+                        className="rules-entity-select"
                         value={build.hybridClassIdB || ""}
                         onChange={(e) => {
                           const hybridClassIdB = e.target.value || undefined;
@@ -3131,7 +3146,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                           .filter((h) => h.id !== build.hybridClassIdA)
                           .map((h) => (
                             <option key={h.id} value={h.id}>
-                              {h.name}
+                              {formatRulesEntitySelectOptionLabel(h.name, h.source, hybridClassSelectNameWidth)}
                             </option>
                           ))}
                       </select>
