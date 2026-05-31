@@ -324,6 +324,60 @@ def parse_int_from_text(text: Any) -> Optional[int]:
     return int(match.group(1)) if match else None
 
 
+def _parsed_class_feature_names_for_class(cls: Dict[str, Any]) -> Set[str]:
+    """Feature display names listed on a class/hybrid `specific._PARSED_CLASS_FEATURE`."""
+    raw = (cls.get("specific") or {}).get("_PARSED_CLASS_FEATURE")
+    if not raw or not isinstance(raw, str):
+        return set()
+    return {n.strip() for n in raw.split(",") if n.strip()}
+
+
+def _parse_subclass_ids(raw: Any) -> Set[str]:
+    """Split compendium `_Subclasses` into full internal ids (avoid substring false positives)."""
+    if not raw or not isinstance(raw, str):
+        return set()
+    return {p.strip() for p in raw.split(",") if p.strip().startswith("ID_")}
+
+
+def _feature_name_matches_parsed_list(name: str, allowed: Set[str]) -> bool:
+    if not name or not allowed:
+        return False
+    if name in allowed:
+        return True
+    # e.g. "Archer Warlord Optional Choice" for parsed "Archer Warlord"
+    return any(name.startswith(f"{a} ") or name.startswith(a) for a in allowed if a)
+
+
+def _class_feature_applies_to_support_class(
+    cf: Dict[str, Any],
+    support_class_id: str,
+    support_by_id: Dict[str, Dict[str, Any]],
+) -> bool:
+    """
+    True when a class feature grant belongs on this class (not a sibling subclass).
+
+    Essentials subclasses (e.g. Warpriest ID_FMP_CLASS_705) share a Grants bundle prefix
+    with PHB classes (Warlock ID_FMP_CLASS_7); filter by parsed feature list and Class.
+    """
+    spec = cf.get("specific") or {}
+    cf_class = spec.get("Class")
+    if cf_class == support_class_id:
+        return True
+    if support_class_id in _parse_subclass_ids(spec.get("_Subclasses")):
+        return True
+    cls = support_by_id.get(support_class_id)
+    if not cls:
+        return False
+    name = str(cf.get("name") or "").strip()
+    allowed = _parsed_class_feature_names_for_class(cls)
+    if _feature_name_matches_parsed_list(name, allowed):
+        return True
+    parent = (cls.get("specific") or {}).get("_ParentClass")
+    if cf_class and parent and cf_class == parent and _feature_name_matches_parsed_list(name, allowed):
+        return True
+    return False
+
+
 def _power_selectable_ids_from_class_feature(cf: Dict[str, Any]) -> Set[str]:
     """Power internal_ids the player picks from lists on this class feature (if any)."""
     out: Set[str] = set()
@@ -369,7 +423,9 @@ def _granted_power_ids_from_class_feature(cf: Dict[str, Any], class_id: str) -> 
 
 
 def build_auto_granted_power_ids_by_class(
-    grants_raw: List[Dict[str, Any]], features_by_id: Dict[str, Dict[str, Any]]
+    grants_raw: List[Dict[str, Any]],
+    features_by_id: Dict[str, Dict[str, Any]],
+    support_by_id: Dict[str, Dict[str, Any]],
 ) -> Dict[str, List[str]]:
     """
     For each class, collect powers granted by class features listed on that class's Grants row,
@@ -393,12 +449,16 @@ def build_auto_granted_power_ids_by_class(
             cf = features_by_id.get(cf_id)
             if not cf:
                 continue
+            if not _class_feature_applies_to_support_class(cf, class_id, support_by_id):
+                continue
             bucket |= _granted_power_ids_from_class_feature(cf, class_id)
     return {cid: sorted(ids) for cid, ids in by_class.items() if ids}
 
 
 def build_granted_class_feature_names_by_support(
-    grants_raw: List[Dict[str, Any]], features_by_id: Dict[str, Dict[str, Any]]
+    grants_raw: List[Dict[str, Any]],
+    features_by_id: Dict[str, Dict[str, Any]],
+    support_by_id: Dict[str, Dict[str, Any]],
 ) -> Dict[str, List[str]]:
     """Map supported entity id -> class feature names granted via Grants rows (direct grants only)."""
     out: Dict[str, Set[str]] = {}
@@ -418,6 +478,8 @@ def build_granted_class_feature_names_by_support(
                 continue
             row = features_by_id.get(cf_id)
             if not row:
+                continue
+            if not _class_feature_applies_to_support_class(row, support_id, support_by_id):
                 continue
             nm = str(row.get("name") or "").strip()
             if nm:
@@ -1126,6 +1188,7 @@ def _granted_level1_class_feature_ids(
     grants_raw: List[Dict[str, Any]],
     class_id: str,
     features_by_id: Dict[str, Dict[str, Any]],
+    support_by_id: Dict[str, Dict[str, Any]],
 ) -> Set[str]:
     granted: Set[str] = set()
     for g in grants_raw:
@@ -1139,10 +1202,12 @@ def _granted_level1_class_feature_ids(
             parent_id = attrs.get("name")
             if not isinstance(parent_id, str):
                 continue
-            granted.add(parent_id)
             parent = features_by_id.get(parent_id)
             if not parent:
                 continue
+            if not _class_feature_applies_to_support_class(parent, class_id, support_by_id):
+                continue
+            granted.add(parent_id)
             ps = parent.get("specific") or {}
             for sid in _parse_internal_id_list(ps.get("_PARSED_SUB_FEATURES")):
                 granted.add(sid)
@@ -1180,7 +1245,9 @@ def build_class_feature_choice_groups_by_class(
         if not class_id.startswith("ID_FMP_CLASS_"):
             continue
         groups: List[Dict[str, Any]] = []
-        granted_l1 = _granted_level1_class_feature_ids(grants_raw, class_id, features_by_id)
+        granted_l1 = _granted_level1_class_feature_ids(
+            grants_raw, class_id, features_by_id, classes_by_id
+        )
 
         for g in grants_raw:
             sp = g.get("specific") or {}
@@ -1195,6 +1262,8 @@ def build_class_feature_choice_groups_by_class(
                     continue
                 parent = features_by_id.get(parent_id)
                 if not parent:
+                    continue
+                if not _class_feature_applies_to_support_class(parent, class_id, classes_by_id):
                     continue
                 ps = parent.get("specific") or {}
                 level = parse_int_from_text(ps.get("Level"))
@@ -2814,7 +2883,17 @@ def build_index(input_path: Path, output_dir: Path) -> None:
             class_feature_by_name[n.strip()] = row
 
     grants_raw = collections["Grants"]
-    auto_granted_power_ids_by_class = build_auto_granted_power_ids_by_class(grants_raw, features_by_id)
+    classes_by_id = {
+        str(c["internal_id"]): c for c in classes_raw if c.get("internal_id")
+    }
+    support_by_id = dict(classes_by_id)
+    for hyb in hybrid_classes_raw:
+        hid = hyb.get("internal_id")
+        if hid:
+            support_by_id[str(hid)] = hyb
+    auto_granted_power_ids_by_class = build_auto_granted_power_ids_by_class(
+        grants_raw, features_by_id, support_by_id
+    )
     skill_training_by_id: Dict[str, Dict[str, Any]] = {
         str(row.get("internal_id")): row
         for row in skill_training_raw
@@ -2824,12 +2903,9 @@ def build_index(input_path: Path, output_dir: Path) -> None:
         grants_raw, skill_training_by_id
     )
     granted_class_feature_names_by_support_id = build_granted_class_feature_names_by_support(
-        grants_raw, features_by_id
+        grants_raw, features_by_id, support_by_id
     )
     builds_raw = collections.get("Build") or []
-    classes_by_id = {
-        str(c["internal_id"]): c for c in classes_raw if c.get("internal_id")
-    }
     class_build_options_by_class = merge_class_build_options_by_class(
         {},
         build_essentials_class_build_options_by_class(classes_raw, builds_raw),
