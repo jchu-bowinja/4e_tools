@@ -22,17 +22,17 @@ Update **Status** and **Owner** columns as work completes.
 
 | Category | Items | Dup ETL+runtime (remaining) |
 |----------|------:|----------------------------:|
-| Hardcoded compendium IDs | 6 | 2 |
+| Hardcoded compendium IDs | 6 | 0 |
 | Heuristic supplements | 4 | 0 |
 | Category / select interpreters (extend) | 5 | 0 |
-| Power usage / mechanical overrides | 3 | 1 |
+| Power usage / mechanical overrides | 3 | 0 |
 | Feat / power resolution | 3 | 0 |
 | Psionic / hybrid tables | 3 | 0 |
 | Paragon / MC / path | 2 | 0 |
 | Legacy migration | 4 | 0 |
 | ETL structural (reference) | 2 | — |
 
-**P0 complete:** SC-001–004 shipped. Regenerate index after ETL changes: `python tools/etl/build_rules_index.py`.
+**P0 complete:** SC-001–004 shipped. **P1 complete (2026-05-30):** SC-010–013, SC-022, SC-032, SC-040–041, SC-062. Regenerate index after ETL changes: `python tools/etl/build_rules_index.py`.
 
 ---
 
@@ -55,10 +55,10 @@ Update **Status** and **Owner** columns as work completes.
 
 | ID | Status | Item | Location | Current behavior | Proposed data | Tests |
 |----|--------|------|----------|------------------|---------------|-------|
-| SC-010 | `pending` | Archer Warlord feature | `classFeatureProficiencies.ts` | Optional pick in index; strips chainmail / light shields; bow STR via `textstring` probe | `mechanicalEffects` on feature row in index | `tests/rules/archerWarlord.test.ts`, `tests/rules/characterProficiencyDisplay.test.ts` |
+| SC-010 | `etl-done` | Archer Warlord feature | `classFeatureProficiencies.ts` + `mechanicalEffects.ts` | ETL `mechanicalEffects`; runtime uses index when passed | `mechanicalEffects` on feature row in index | `tests/rules/archerWarlord.test.ts`, `tests/rules/characterProficiencyDisplay.test.ts` |
 | SC-011 | `etl-done` | Signs of Influence (bard) | ETL `_supplement_mapped_optional_class_feature_groups`; index choice groups | HotF optional + level 1/13/17 gated sub-picks | Done via SC-002; keep `SIGNS_OF_INFLUENCE_CLASS_FEATURE_ID` export for tests | `tests/rules/bardSignsOfInfluence.test.ts` |
-| SC-012 | `pending` | Human Power Selection traits | `grantedPowersQuery.ts` L122–168, L201–203, L368 | IDs `2966` / `356` / `2965`; default third at-will unless Heroic Effort | `raceTraitBundle` metadata: `defaultOptionId`, `grantsBonusAtWillOptionId` | `tests/etl/humanBonusAtWill.integration.test.ts`, `tests/rules/grantedPowersQuery.test.ts`, `tests/rules/activeRacialTraits.test.ts` |
-| SC-013 | `pending` | Paragon Power Points class feature | `psionicPowerPoints.ts` L186–217 | Hardcoded `ID_FMP_CLASS_FEATURE_1818` for +2 PP | `paragonPath.grantsParagonPowerPoints` boolean from ETL grants | `tests/rules/psionicPowerPoints.test.ts` |
+| SC-012 | `etl-done` | Human Power Selection traits | `grantedPowersQuery.ts` | Index `grantsBonusClassAtWillByDefault`, `heroicEffortTraitId`, `bonusAtWillTraitId`; legacy IDs as fallback | Same fields on racial trait row | `tests/etl/humanBonusAtWill.integration.test.ts`, `tests/rules/grantedPowersQuery.test.ts`, `tests/rules/activeRacialTraits.test.ts` |
+| SC-013 | `etl-done` | Paragon Power Points class feature | `psionicPowerPoints.ts` | `path.grantsParagonPowerPoints` from ETL; raw grant fallback | `paragonPath.grantsParagonPowerPoints` | `tests/rules/psionicPowerPoints.test.ts` |
 | SC-014 | `etl-done` | Mage cantrips feature ids | ETL `MAGE_CANTRIPS_FEATURE_IDS` only | Cantrip `powerIds` on choice groups | Covered by SC-001 | `tests/rules/classFeatureChoices.test.ts` |
 
 ---
@@ -69,7 +69,7 @@ Update **Status** and **Owner** columns as work completes.
 |----|--------|------|----------|-----------|--------------|-------|
 | SC-020 | `etl-done` | Warlord Leader pick | ETL `build_class_feature_choice_groups_by_class` (Leader pair group) | Was runtime `endsWith(" Leader")` heuristic | In `classFeatureChoiceGroupsByClassId` only | `tests/rules/warlordLeaderChoice.test.ts` |
 | SC-021 | `etl-done` | Single optional parsed class feature | ETL (`remaining_ungranted == 1` → optional group) | Was runtime Archer Warlord–style heuristic | In index only | `tests/rules/archerWarlord.test.ts` |
-| SC-022 | `pending` | Half-elf parent bundle + Dilettante | `grantedPowersQuery.ts` L284–317, L382–388 | Skip merged power list when subtrait has `$$NOT_CLASS` | `racialTrait.powerBundleMode: "subtraitFirst"` on parent trait in index | `tests/rules/dilettantePower.test.ts`, `tests/rules/grantedPowersQuery.test.ts` |
+| SC-022 | `etl-done` | Half-elf parent bundle + Dilettante | `grantedPowersQuery.ts` | `powerBundleMode: "subtraitFirst"` from index; heuristic fallback | `racialTrait.powerBundleMode` | `tests/rules/dilettantePower.test.ts`, `tests/rules/grantedPowersQuery.test.ts` |
 | SC-023 | `etl-done` | Paragon path powers in class feature picks | `grantedPowersQuery.ts` uses `index.paragonPathClassFeaturePowerIds` when set | Global exclusion set at ETL; runtime compute fallback | `paragonPathClassFeaturePowerIds` + filter in `classFeaturePowerIdsForClass` | `tests/rules/grantedPowersQuery.paragon.test.ts` |
 
 ---
@@ -80,7 +80,7 @@ Update **Status** and **Owner** columns as work completes.
 |----|--------|------|----------|--------------|--------|-------|
 | SC-030 | `keep` | Bonus class at-will slot | `grantedPowersQuery.ts` L170–179 | `$$CLASS,at-will,1` | Document in `docs/class-build-options.md`; centralize in `powerSelectCategory.ts` | `tests/etl/humanBonusAtWill.integration.test.ts` |
 | SC-031 | `keep` | Dilettante candidate pool | `grantedPowersQuery.ts` L319–327; `classPowersQuery.ts` L45–74 | `$$NOT_CLASS,at-will,1` | Same module as SC-030; add ETL validation script | `tests/rules/dilettantePower.test.ts`, `tests/rules/classPowersQuery.test.ts` |
-| SC-032 | `pending` | Dynamic `$$` — no static power ids | `grantedPowersQuery.ts` L255–256 | Runtime skips `$$` in static collector | **New** `resolvePowerSelectCategory(cat, buildContext)` returns ids or lazy query | — |
+| SC-032 | `etl-done` | Dynamic `$$` — no static power ids | `powerSelectCategory.ts`; `grantedPowersQuery.ts` | `isDynamicPowerSelectCategory`; `resolvePowerIdsFromCategory` for class-context resolution | `powerSelectCategory.ts` module | `tests/rules/powerSelectCategory.test.ts` |
 | SC-033 | `keep` | Racial trait rule selects | `racialTraitRuleSelects.ts` | Skill Training / Feat / CountsAsRace + `requires` | Keep; extend prereq `!Class` parsing if gaps found | `tests/rules/racialTraitRuleSelects.test.ts` |
 | SC-034 | `etl-done` | Class feature choice groups (indexed) | `getClassFeatureChoiceGroups` maps index only (+ `expandClassFeaturePowerChoiceGroups`) | `visibleWhen`, power pools; runtime supplements removed | Trust index `powerIds` when complete (follow-up) | `tests/rules/classFeatureChoices.test.ts` |
 
@@ -92,8 +92,8 @@ Update **Status** and **Owner** columns as work completes.
 
 | ID | Status | Item | Location | Override | Proposed | Tests |
 |----|--------|------|----------|----------|----------|-------|
-| SC-040 | `pending` | Dilettante → Encounter usage | `dilettantePower.ts` L10–16, L54–66 | Mutates `Power Usage` on display/grant | `racialTrait.selectOverrides: { usage: "Encounter" }` or `rules.replace` in data | `tests/rules/dilettantePower.test.ts` |
-| SC-041 | `pending` | Class feature power list class filter | `classFeatureChoices.ts` L719–745 | Filters owners to `classId`; excludes paragon/feat-only sets | Move exclusion lists to index (SC-004, SC-023) | `tests/rules/classFeatureChoices.test.ts` |
+| SC-040 | `etl-done` | Dilettante → Encounter usage | `dilettantePower.ts` | `racialTrait.powerUsageOverride` from ETL; `applyPowerUsageOverride` | `powerUsageOverride: "Encounter"` on Dilettante trait | `tests/rules/dilettantePower.test.ts` |
+| SC-041 | `etl-done` | Class feature power list class filter | `classFeatureChoices.ts` | Uses `paragonPathClassFeaturePowerIds` + `featGrantedPowerIdsExcludedFromClassFeaturePicks` from index | Index exclusion sets (SC-004, SC-023) | `tests/rules/classFeatureChoices.test.ts` |
 | SC-042 | `keep` | Psionic augment variant collapse | `psionicPowerAugments.ts` L4–44 | Hides augment rows in pickers | Keep pattern-based; optional ETL `isAugmentVariant` on power row | `tests/rules/psionicPowerAugments.test.ts` |
 
 ---
@@ -114,7 +114,7 @@ Update **Status** and **Owner** columns as work completes.
 |----|--------|------|----------|-------|----------|-------|
 | SC-060 | `keep` | Feat grants / modify / replace (ETL) | `FEAT_RULES_COVERAGE.md`; feat fields on `Feat` | Primary pipeline | Extend consumers (initiative, skills) per doc | `tests/rules/featPowerModifications.test.ts`, `featPowerReplace`, `featMulticlassSlotSwap` |
 | SC-061 | `keep` | Feat augments on class features | `featClassFeatureModifications.ts` | When modify target is feature not power | Keep; ensure ETL sets `classFeatureId` | `tests/rules/featClassFeatureModifications.test.ts` |
-| SC-062 | `pending` | Heritage feat limit | `internalGrantValidation.ts` L22–31 | Name suffix ` Heritage` / ` Bloodline` | `internalGrantKeys` includes `HERITAGE` from ETL | `tests/rules/internalGrantValidation.test.ts` |
+| SC-062 | `etl-done` | Heritage feat limit | `internalGrantValidation.ts` | `internalGrantKeys` includes `HERITAGE` from ETL; name suffix fallback | ETL appends `HERITAGE` on Heritage/Bloodline feats | `tests/rules/internalGrantValidation.test.ts` |
 | SC-063 | `keep` | Psionic second class limit | `internalGrantValidation.ts` L9–19 | `PSIONIC_SECOND_CLASS` internal grant | Keep pattern | `tests/rules/featGrantFlags.test.ts` |
 
 ---
@@ -157,7 +157,10 @@ Use these as targets when implementing SC-001–052; adjust names to match `mode
 // Per racial trait (ETL)
 interface RacialTraitIndexExtras {
   powerSelectCategory?: string;           // e.g. "$$NOT_CLASS,at-will,1"
-  selectUsageOverride?: "Encounter";      // SC-040
+  powerUsageOverride?: string;            // SC-040 (e.g. "Encounter")
+  grantsBonusClassAtWillByDefault?: boolean; // SC-012 Human Power Selection
+  heroicEffortTraitId?: string;
+  bonusAtWillTraitId?: string;
   powerBundleMode?: "subtraitFirst";      // SC-022
   grantsBonusClassAtWill?: boolean;       // SC-030
 }
@@ -166,6 +169,11 @@ interface RacialTraitIndexExtras {
 interface ClassFeatureIndexExtras {
   powerPickSupplementPowerIds?: string[]; // SC-001
   mechanicalEffects?: MechanicalEffect[]; // SC-010
+}
+
+// Per paragon path (ETL)
+interface ParagonPathIndexExtras {
+  grantsParagonPowerPoints?: boolean;     // SC-013
 }
 
 // Global index (ETL)
@@ -195,11 +203,11 @@ function resolvePowerIdsFromCategory(
 ## Suggested implementation order
 
 1. ~~**SC-004** + **SC-001** + **SC-002** (+ SC-020/021/023/034)~~ — **done** (2026-05-30).
-2. **SC-030–032** — `powerSelectCategory.ts`; wire Dilettante + bonus at-will + Human defaults.
-3. **SC-040** — usage override from trait metadata.
+2. ~~**SC-030–032**~~ — `powerSelectCategory.ts`; wired in `grantedPowersQuery.ts`.
+3. ~~**SC-040**~~ — `powerUsageOverride` on racial traits.
 4. ~~**SC-020–021**~~ — done in ETL (P0 pass).
-5. **SC-010** — `mechanicalEffects` for Archer Warlord (template for other feature swaps).
-6. **SC-050–052** — psionic tables to index.
+5. ~~**SC-010, SC-012–013, SC-022, SC-041, SC-062**~~ — P1 index fields + runtime (2026-05-30).
+6. **SC-050–052** — psionic tables to index (P2).
 7. **SC-080–083** — legacy only when touching saves.
 
 ---
@@ -224,3 +232,4 @@ function resolvePowerIdsFromCategory(
 | 2026-05-30 | Initial checklist from codebase audit |
 | 2026-05-30 | SC-001–004: ETL exports + runtime duplicate supplements removed |
 | 2026-05-30 | Checklist updated: SC-011/014/020/021/023/034 marked etl-done; P0 summary |
+| 2026-05-30 | P1: SC-010–013, SC-022, SC-032, SC-040–041, SC-062 — ETL index fields, `powerSelectCategory.ts`, `mechanicalEffects.ts`, regenerated `rules_index.json` |

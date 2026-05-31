@@ -4,15 +4,24 @@ import {
   racePowerSelectSelectionKey,
   type RacePowerGroup
 } from "./grantedPowersQuery";
-import type { CharacterBuild, Power, RulesIndex } from "./models";
+import type { CharacterBuild, Power, RacialTrait, RulesIndex } from "./models";
 import { getRaceExtraTraitIds } from "./raceSubraces";
+
+/** Override compendium usage for display/grants (e.g. Half-Elf Dilettante → Encounter). */
+export function applyPowerUsageOverride(power: Power, usage: string): Power {
+  const raw = power.raw ? { ...power.raw } : {};
+  const specific = { ...((raw.specific as Record<string, unknown> | undefined) || {}) };
+  specific["Power Usage"] = usage;
+  return { ...power, usage, raw: { ...raw, specific } };
+}
 
 /** Applies Half-Elf Dilettante: the chosen at-will is used as an encounter power. */
 export function powerAsDilettanteEncounter(power: Power): Power {
-  const raw = power.raw ? { ...power.raw } : {};
-  const specific = { ...((raw.specific as Record<string, unknown> | undefined) || {}) };
-  specific["Power Usage"] = "Encounter";
-  return { ...power, usage: "Encounter", raw: { ...raw, specific } };
+  return applyPowerUsageOverride(power, "Encounter");
+}
+
+function dilettanteUsageForTrait(trait: RacialTrait | undefined): string {
+  return trait?.powerUsageOverride?.trim() || "Encounter";
 }
 
 export function isDilettantePowerIdForBuild(index: RulesIndex, build: CharacterBuild, powerId: string): boolean {
@@ -48,10 +57,14 @@ export function collectDilettantePowerIdsForBuild(index: RulesIndex, build: Char
 }
 
 export function collectDilettantePowersForBuild(index: RulesIndex, build: CharacterBuild): Power[] {
+  const traitsById = new Map((index.racialTraits ?? []).map((t) => [t.id, t]));
   const out: Power[] = [];
-  for (const id of collectDilettantePowerIdsForBuild(index, build)) {
-    const p = index.powers.find((x) => x.id === id);
-    if (p) out.push(powerAsDilettanteEncounter(p));
+  for (const g of dilettanteRacePowerGroupsForBuild(index, build)) {
+    const pick = resolveDilettantePowerPick(build, g.traitId);
+    if (!pick) continue;
+    const p = index.powers.find((x) => x.id === pick);
+    if (!p) continue;
+    out.push(applyPowerUsageOverride(p, dilettanteUsageForTrait(traitsById.get(g.traitId))));
   }
   return out;
 }
@@ -63,7 +76,14 @@ export function resolveDilettanteDisplayPower(
 ): Power | undefined {
   const p = index.powers.find((x) => x.id === powerId);
   if (!p) return undefined;
-  return isDilettantePowerIdForBuild(index, build, powerId) ? powerAsDilettanteEncounter(p) : p;
+  if (!isDilettantePowerIdForBuild(index, build, powerId)) return p;
+  const traitsById = new Map((index.racialTraits ?? []).map((t) => [t.id, t]));
+  for (const g of dilettanteRacePowerGroupsForBuild(index, build)) {
+    if (resolveDilettantePowerPick(build, g.traitId) === powerId) {
+      return applyPowerUsageOverride(p, dilettanteUsageForTrait(traitsById.get(g.traitId)));
+    }
+  }
+  return powerAsDilettanteEncounter(p);
 }
 
 export function getDilettanteCandidatePowersForBuild(

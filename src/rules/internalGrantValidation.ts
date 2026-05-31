@@ -22,7 +22,9 @@ export function validateInternalGrantFeats(index: RulesIndex, build: CharacterBu
   const heritageEntries = (build.featIds ?? [])
     .map((id) => index.feats.find((f) => f.id === id))
     .filter((f) => {
-      const n = f?.name || "";
+      if (!f) return false;
+      if ((f.internalGrantKeys ?? []).includes("HERITAGE")) return true;
+      const n = f.name || "";
       return n.endsWith(" Heritage") || n.endsWith(" Bloodline");
     });
   if (heritageEntries.length > 1) {

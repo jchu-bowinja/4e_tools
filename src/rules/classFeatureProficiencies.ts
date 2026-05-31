@@ -1,6 +1,9 @@
 import type { CharacterBuild, ProficiencyGrant, RulesIndex, Weapon } from "./models";
-import { buildClassFeatureLookups } from "./supportTraits";
-import type { Ability } from "./models";
+import {
+  applyArmorProficiencyPhraseRemovals,
+  collectActiveClassFeatureMechanicalEffects,
+  weaponAttackAbilityFromMechanicalEffects
+} from "./mechanicalEffects";
 
 export const ARCHER_WARLORD_CLASS_FEATURE_ID = "ID_FMP_CLASS_FEATURE_2286";
 
@@ -55,44 +58,28 @@ export function hasArcherWarlordSelection(build: CharacterBuild): boolean {
   return Object.values(build.classSelections ?? {}).includes(ARCHER_WARLORD_CLASS_FEATURE_ID);
 }
 
-/** Archer Warlord drops chainmail and light shields from effective class armor proficiencies. */
+/** Drops armor proficiency phrases from active class-feature mechanical effects (e.g. Archer Warlord). */
 export function effectiveClassArmorProficienciesText(
   classArmorProficienciesText: string,
-  build: CharacterBuild
+  build: CharacterBuild,
+  index?: RulesIndex
 ): string {
-  if (!hasArcherWarlordSelection(build)) return classArmorProficienciesText;
-  return classArmorProficienciesText
-    .replace(/\bchainmail\b/gi, "")
-    .replace(/\blight shields?\b/gi, "")
-    .replace(/,\s*,/g, ",")
-    .replace(/;\s*;/g, ";")
-    .replace(/^[\s,;]+|[\s,;]+$/g, "")
-    .trim();
-}
-
-function bowGroupTextstringOverrides(raw: Record<string, unknown> | undefined): boolean {
-  const rules = raw?.rules as Record<string, unknown> | undefined;
-  const rows = rules?.textstring;
-  if (!Array.isArray(rows)) return false;
-  for (const row of rows) {
-    const attrs = (row as { attrs?: Record<string, string> })?.attrs;
-    if (!attrs) continue;
-    const name = norm(String(attrs.name || ""));
-    const value = norm(String(attrs.value || ""));
-    if (name.includes("bow") && name.includes("key ability") && value === "str") {
-      return true;
-    }
+  if (!index) {
+    if (!hasArcherWarlordSelection(build)) return classArmorProficienciesText;
+    return classArmorProficienciesText
+      .replace(/\bchainmail\b/gi, "")
+      .replace(/\blight shields?\b/gi, "")
+      .replace(/,\s*,/g, ",")
+      .replace(/;\s*;/g, ";")
+      .replace(/^[\s,;]+|[\s,;]+$/g, "")
+      .trim();
   }
-  return false;
+  const effects = collectActiveClassFeatureMechanicalEffects(index, build);
+  if (!effects.length) return classArmorProficienciesText;
+  return applyArmorProficiencyPhraseRemovals(classArmorProficienciesText, effects);
 }
 
-function isBowWeapon(weapon: Weapon): boolean {
-  const group = norm(String(weapon.weaponGroup || ""));
-  const cat = norm(String(weapon.weaponCategory || ""));
-  return group.includes("bow") || cat.includes("bow");
-}
-
-/** STR instead of DEX for ranged bow attacks when Archer Warlord is active. */
+/** STR/DEX for attacks from active class-feature mechanical effects (e.g. bow → STR). */
 export function weaponAttackAbilityForCharacter(
   weapon: Weapon,
   index: RulesIndex,
@@ -100,11 +87,6 @@ export function weaponAttackAbilityForCharacter(
 ): "STR" | "DEX" {
   const cat = norm(String(weapon.weaponCategory || ""));
   const defaultAbility: "STR" | "DEX" = cat.includes("ranged") ? "DEX" : "STR";
-  if (!isBowWeapon(weapon) || !hasArcherWarlordSelection(build)) {
-    return defaultAbility;
-  }
-  const { byId } = buildClassFeatureLookups(index);
-  const archer = byId.get(ARCHER_WARLORD_CLASS_FEATURE_ID);
-  if (bowGroupTextstringOverrides(archer?.raw)) return "STR";
-  return defaultAbility;
+  const effects = collectActiveClassFeatureMechanicalEffects(index, build);
+  return weaponAttackAbilityFromMechanicalEffects(weapon, effects, defaultAbility);
 }

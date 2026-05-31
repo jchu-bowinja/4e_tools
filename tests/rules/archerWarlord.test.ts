@@ -31,6 +31,10 @@ const archerWarlord: ClassFeature = {
   id: ARCHER_WARLORD_CLASS_FEATURE_ID,
   name: "Archer Warlord",
   slug: "archer-warlord",
+  mechanicalEffects: [
+    { type: "removeArmorProficiencyPhrases", phrases: ["chainmail", "light shields"] },
+    { type: "weaponKeyAbility", weaponGroup: "bow", ability: "STR" }
+  ],
   raw: {
     rules: {
       grant: [{ attrs: { name: "ID_INTERNAL_PROFICIENCY_MILITARY_RANGED", type: "Proficiency" } }],

@@ -324,6 +324,107 @@ def parse_int_from_text(text: Any) -> Optional[int]:
     return int(match.group(1)) if match else None
 
 
+ARCHER_WARLORD_CLASS_FEATURE_ID = "ID_FMP_CLASS_FEATURE_2286"
+PARAGON_POWER_POINTS_CLASS_FEATURE_ID = "ID_FMP_CLASS_FEATURE_1818"
+HUMAN_POWER_SELECTION_TRAIT_ID = "ID_FMP_RACIAL_TRAIT_2966"
+BONUS_AT_WILL_TRAIT_ID = "ID_FMP_RACIAL_TRAIT_356"
+HEROIC_EFFORT_TRAIT_ID = "ID_FMP_RACIAL_TRAIT_2965"
+
+
+def _parse_comma_internal_ids(raw: Any) -> List[str]:
+    return [s.strip() for s in str(raw or "").split(",") if s.strip()]
+
+
+def _racial_trait_power_select_category(row: Dict[str, Any]) -> Optional[str]:
+    rules = row.get("rules") or {}
+    for item in rules.get("select") or []:
+        if not isinstance(item, dict):
+            continue
+        attrs = item.get("attrs") or {}
+        if str(attrs.get("type") or "") != "Power":
+            continue
+        cat = str(attrs.get("Category") or "").strip()
+        if cat:
+            return cat
+    return None
+
+
+def _category_is_dilettante_at_will(category: str) -> bool:
+    return category.strip().lower().startswith("$$not_class,at-will,1")
+
+
+def _category_grants_bonus_class_at_will(category: str) -> bool:
+    return category.strip().lower().startswith("$$class,at-will,1")
+
+
+def _racial_trait_has_dilettante_select(row: Dict[str, Any]) -> bool:
+    cat = _racial_trait_power_select_category(row)
+    return bool(cat and _category_is_dilettante_at_will(cat))
+
+
+def _extract_racial_trait_index_fields(
+    row: Dict[str, Any], traits_by_id: Dict[str, Dict[str, Any]]
+) -> Dict[str, Any]:
+    out: Dict[str, Any] = {}
+    trait_id = str(row.get("internal_id") or "")
+    cat = _racial_trait_power_select_category(row)
+    if cat:
+        out["powerSelectCategory"] = cat
+    if _racial_trait_has_dilettante_select(row):
+        out["powerUsageOverride"] = "Encounter"
+    if trait_id == BONUS_AT_WILL_TRAIT_ID or (cat and _category_grants_bonus_class_at_will(cat)):
+        out["grantsBonusClassAtWill"] = True
+    if trait_id == HUMAN_POWER_SELECTION_TRAIT_ID:
+        out["grantsBonusClassAtWillByDefault"] = True
+        out["heroicEffortTraitId"] = HEROIC_EFFORT_TRAIT_ID
+        out["bonusAtWillTraitId"] = BONUS_AT_WILL_TRAIT_ID
+    spec = row.get("specific") or {}
+    option_ids = _parse_comma_internal_ids(spec.get("_PARSED_SUB_FEATURES"))
+    if len(option_ids) >= 2:
+        selects = (row.get("rules") or {}).get("select") or []
+        is_sibling_bundle = False
+        for item in selects:
+            if not isinstance(item, dict):
+                continue
+            attrs = item.get("attrs") or {}
+            if str(attrs.get("type") or "") != "Racial Trait":
+                continue
+            cat_attr = str(attrs.get("Category") or "")
+            if re.search(r"subrace", cat_attr, re.I):
+                is_sibling_bundle = True
+                break
+            if re.search(r"power selection$", cat_attr, re.I):
+                is_sibling_bundle = True
+                break
+        if is_sibling_bundle and any(
+            _racial_trait_has_dilettante_select(traits_by_id[oid])
+            for oid in option_ids
+            if oid in traits_by_id
+        ):
+            out["powerBundleMode"] = "subtraitFirst"
+    return out
+
+
+def _extract_class_feature_mechanical_effects(row: Dict[str, Any]) -> List[Dict[str, Any]]:
+    fid = str(row.get("internal_id") or "")
+    if fid == ARCHER_WARLORD_CLASS_FEATURE_ID:
+        return [
+            {
+                "type": "removeArmorProficiencyPhrases",
+                "phrases": ["chainmail", "light shields"],
+            },
+            {"type": "weaponKeyAbility", "weaponGroup": "bow", "ability": "STR"},
+        ]
+    return []
+
+
+def _feat_append_heritage_internal_key(feat_grants: Dict[str, Any], feat_name: str) -> Dict[str, Any]:
+    keys = list(feat_grants.get("internalGrantKeys") or [])
+    if (feat_name.endswith(" Heritage") or feat_name.endswith(" Bloodline")) and "HERITAGE" not in keys:
+        keys.append("HERITAGE")
+    return {**feat_grants, "internalGrantKeys": keys}
+
+
 def _parsed_class_feature_names_for_class(cls: Dict[str, Any]) -> Set[str]:
     """Feature display names listed on a class/hybrid `specific._PARSED_CLASS_FEATURE`."""
     raw = (cls.get("specific") or {}).get("_PARSED_CLASS_FEATURE")
@@ -3411,6 +3512,10 @@ def build_index(input_path: Path, output_dir: Path) -> None:
             }
         )
 
+    racial_traits_by_id: Dict[str, Dict[str, Any]] = {
+        str(row.get("internal_id")): row for row in racial_traits_raw if row.get("internal_id")
+    }
+
     racial_traits: List[Dict[str, Any]] = []
     for row in racial_traits_raw:
         spec = row.get("specific") or {}
@@ -3423,12 +3528,14 @@ def build_index(input_path: Path, output_dir: Path) -> None:
                 "shortDescription": spec.get("Short Description"),
                 "body": row.get("body"),
                 "raw": row,
+                **_extract_racial_trait_index_fields(row, racial_traits_by_id),
             }
         )
 
     class_features: List[Dict[str, Any]] = []
     for row in class_features_raw:
         spec = row.get("specific") or {}
+        mechanical = _extract_class_feature_mechanical_effects(row)
         class_features.append(
             {
                 "id": row.get("internal_id"),
@@ -3438,6 +3545,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
                 "shortDescription": spec.get("Short Description"),
                 "body": row.get("body"),
                 "raw": row,
+                **({"mechanicalEffects": mechanical} if mechanical else {}),
             }
         )
 
@@ -3533,6 +3641,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
             feat, power_name_to_id, power_id_to_name
         )
         feat_multiclass_slot_swap = extract_feat_multiclass_slot_swap_offers(feat)
+        feat_grants = _feat_append_heritage_internal_key(feat_grants, str(feat.get("name") or ""))
         feats.append(
             {
                 "id": feat.get("internal_id"),
@@ -3736,6 +3845,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
             class_feature_name_lookup,
             class_feature_id_by_name,
         )
+        granted_cf = path_grants.get("grantedClassFeatureIds") or []
         paragon_paths.append(
             {
                 "id": row.get("internal_id"),
@@ -3747,6 +3857,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
                 "raw": row,
                 **support_entity_stat_bonuses(row),
                 **path_grants,
+                "grantsParagonPowerPoints": PARAGON_POWER_POINTS_CLASS_FEATURE_ID in granted_cf,
             }
         )
 

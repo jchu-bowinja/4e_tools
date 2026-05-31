@@ -1,4 +1,9 @@
 import type { CharacterBuild, ClassFeature, Feat, Power, Race, RacialTrait, RulesIndex } from "./models";
+import {
+  categoryGrantsBonusClassAtWill,
+  categoryIsDilettanteAtWill,
+  isDynamicPowerSelectCategory
+} from "./powerSelectCategory";
 import { parseRacialTraitIdsFromRace } from "./racialTraits";
 import { getRaceExtraTraitIds, getRaceTraitBundleSlots } from "./raceSubraces";
 import {
@@ -132,14 +137,23 @@ export const ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION = "ID_FMP_RACIAL_TRAIT_2966";
 export const ID_RACIAL_TRAIT_BONUS_AT_WILL = "ID_FMP_RACIAL_TRAIT_356";
 export const ID_RACIAL_TRAIT_HEROIC_EFFORT = "ID_FMP_RACIAL_TRAIT_2965";
 
+function humanPowerSelectionParentId(index: RulesIndex | undefined): string {
+  const fromIndex = index?.racialTraits?.find((t) => t.grantsBonusClassAtWillByDefault)?.id;
+  return fromIndex ?? ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION;
+}
+
+function heroicEffortTraitId(index: RulesIndex | undefined, trait: RacialTrait | undefined): string {
+  return trait?.heroicEffortTraitId ?? ID_RACIAL_TRAIT_HEROIC_EFFORT;
+}
+
 /** Human Power Selection bundle slot, when present (selection key is often `subrace`). */
 export function findHumanPowerSelectionBundleSlot(
   race: Race | undefined,
-  traitsById: Map<string, RacialTrait>
+  traitsById: Map<string, RacialTrait>,
+  index?: RulesIndex
 ) {
-  return getRaceTraitBundleSlots(race, traitsById).find(
-    (s) => s.parentTraitId === ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION
-  );
+  const parentId = humanPowerSelectionParentId(index);
+  return getRaceTraitBundleSlots(race, traitsById).find((s) => s.parentTraitId === parentId);
 }
 
 /**
@@ -149,9 +163,10 @@ export function findHumanPowerSelectionBundleSlot(
 export function resolveHumanPowerSelectionTraitId(
   race: Race | undefined,
   traitsById: Map<string, RacialTrait>,
-  raceSelections?: Record<string, string>
+  raceSelections?: Record<string, string>,
+  index?: RulesIndex
 ): string | undefined {
-  const slot = findHumanPowerSelectionBundleSlot(race, traitsById);
+  const slot = findHumanPowerSelectionBundleSlot(race, traitsById, index);
   if (slot) {
     const fromBundle = raceSelections?.[slot.selectionKey]?.trim();
     if (fromBundle) return fromBundle;
@@ -165,24 +180,33 @@ export function resolveHumanPowerSelectionTraitId(
 export function humanPowerSelectionGrantsBonusClassAtWill(
   race: Race | undefined,
   traitsById: Map<string, RacialTrait>,
-  raceSelections?: Record<string, string>
+  raceSelections?: Record<string, string>,
+  index?: RulesIndex
 ): boolean {
-  if (!race || !parseRacialTraitIdsFromRace(race).includes(ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION)) {
+  const parentId = humanPowerSelectionParentId(index);
+  if (!race || !parseRacialTraitIdsFromRace(race).includes(parentId)) {
     return false;
   }
-  const pick = resolveHumanPowerSelectionTraitId(race, traitsById, raceSelections);
-  return pick !== ID_RACIAL_TRAIT_HEROIC_EFFORT;
+  const pick = resolveHumanPowerSelectionTraitId(race, traitsById, raceSelections, index);
+  const heroicId = heroicEffortTraitId(
+    index,
+    traitsById.get(parentId) ?? index?.racialTraits?.find((t) => t.id === parentId)
+  );
+  return pick !== heroicId;
 }
 
 /** PHB Bonus At-Will racial trait or any Power select with `$$CLASS,at-will,1` (extra class at-will pick). */
 export function racialTraitGrantsBonusClassAtWillSlot(trait: RacialTrait): boolean {
+  if (trait.grantsBonusClassAtWill) return true;
   if (trait.id === ID_RACIAL_TRAIT_BONUS_AT_WILL) return true;
+  const cat = trait.powerSelectCategory?.trim();
+  if (cat && categoryGrantsBonusClassAtWill(cat)) return true;
   const rules = trait.raw?.rules as Record<string, unknown> | undefined;
   const selects = (rules?.["select"] as Array<{ attrs?: Record<string, unknown> }>) ?? [];
   return selects.some((s) => {
     if (String(s.attrs?.["type"]) !== "Power") return false;
-    const cat = String(s.attrs?.["Category"] ?? "").trim().toLowerCase();
-    return cat.startsWith("$$class,at-will,1");
+    const rawCat = String(s.attrs?.["Category"] ?? "").trim();
+    return categoryGrantsBonusClassAtWill(rawCat);
   });
 }
 
@@ -194,7 +218,8 @@ export function raceGrantsBonusClassAtWillSlot(
   race: Race | undefined,
   traitsById: Map<string, RacialTrait>,
   extraTraitIds: string[] = [],
-  raceSelections?: Record<string, string>
+  raceSelections?: Record<string, string>,
+  index?: RulesIndex
 ): boolean {
   if (!race) return false;
   const seen = new Set<string>();
@@ -205,8 +230,9 @@ export function raceGrantsBonusClassAtWillSlot(
     return true;
   });
 
-  if (topTraitIds.includes(ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION)) {
-    return humanPowerSelectionGrantsBonusClassAtWill(race, traitsById, raceSelections);
+  const humanParentId = humanPowerSelectionParentId(index);
+  if (topTraitIds.includes(humanParentId)) {
+    return humanPowerSelectionGrantsBonusClassAtWill(race, traitsById, raceSelections, index);
   }
 
   for (const traitId of allTraitIds) {
@@ -223,7 +249,7 @@ export function bonusClassAtWillSlotFromRaceBuild(
   const race = index.races.find((r) => r.id === build.raceId);
   const traitsById = new Map((index.racialTraits ?? []).map((t) => [t.id, t]));
   const extraTraitIds = getRaceExtraTraitIds(race, traitsById, build.raceSelections, index.races);
-  return raceGrantsBonusClassAtWillSlot(race, traitsById, extraTraitIds, build.raceSelections);
+  return raceGrantsBonusClassAtWillSlot(race, traitsById, extraTraitIds, build.raceSelections, index);
 }
 
 function parseCommaSeparatedIds(raw: unknown): string[] {
@@ -260,7 +286,7 @@ export function collectSelectablePowerIdsFromRacialTrait(
     if (fromCategory) continue;
 
     // Dynamic lists (human bonus at-will, dilettante, …) need class context — no static ids here.
-    if (catRaw.startsWith("$$")) continue;
+    if (isDynamicPowerSelectCategory(catRaw)) continue;
 
     // Compendium often puts the trait's own id in Category and lists options in specific.Powers (e.g. Lolthtouched).
     if (powersField && (catRaw === trait.id || !catRaw)) {
@@ -295,6 +321,7 @@ function traitHasPowerSelect(trait: RacialTrait): boolean {
  * subtrait first (subrace-style), then the Dilettante trait emits `dilettantePick`.
  */
 function shouldSkipParentMergedPowerSelection(trait: RacialTrait, traitsById: Map<string, RacialTrait>): boolean {
+  if (trait.powerBundleMode === "subtraitFirst") return true;
   const spec = trait.raw?.specific as Record<string, unknown> | undefined;
   const optionIds = parseCommaSeparatedIds(spec?.["_PARSED_SUB_FEATURES"]);
   if (optionIds.length < 2) return false;
@@ -325,12 +352,14 @@ function parentBundleHasDilettanteSubtrait(trait: RacialTrait, traitsById: Map<s
 
 /** Half-elf Dilettante-style rule: `Category` like `$$NOT_CLASS,at-will,1` (optional extra segments). */
 export function racialTraitHasDilettantePowerSelect(trait: RacialTrait): boolean {
+  const indexed = trait.powerSelectCategory?.trim();
+  if (indexed) return categoryIsDilettanteAtWill(indexed);
   const rules = trait.raw?.rules as Record<string, unknown> | undefined;
   const selects = (rules?.["select"] as Array<{ attrs?: Record<string, unknown> }>) ?? [];
   return selects.some((s) => {
     if (String(s.attrs?.["type"]) !== "Power") return false;
-    const cat = String(s.attrs?.["Category"] ?? "").trim().toLowerCase();
-    return cat.startsWith("$$not_class,at-will,1");
+    const cat = String(s.attrs?.["Category"] ?? "").trim();
+    return categoryIsDilettanteAtWill(cat);
   });
 }
 

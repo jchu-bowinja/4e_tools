@@ -21,14 +21,14 @@ const index = {
     {
       id: "h1",
       name: "Vampiric Heritage",
-      internalGrantKeys: ["BLOODLINE", "VAMPIRE_BLOODLINE"],
+      internalGrantKeys: ["HERITAGE", "BLOODLINE", "VAMPIRE_BLOODLINE"],
       prereqTokens: [],
       raw: {}
     },
     {
       id: "h2",
       name: "Elan Heritage",
-      internalGrantKeys: ["BLOODLINE", "ELAN_BLOODLINE"],
+      internalGrantKeys: ["HERITAGE", "BLOODLINE", "ELAN_BLOODLINE"],
       prereqTokens: [],
       raw: {}
     }

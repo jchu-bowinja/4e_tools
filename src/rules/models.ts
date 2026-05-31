@@ -273,10 +273,30 @@ export interface AbilityScoreLore extends RulesEntity {
   raw: Record<string, unknown>;
 }
 
+/** ETL: optional power-select bundle behavior (Half-Elf Power Selection + Dilettante). */
+export type RacialTraitPowerBundleMode = "subtraitFirst";
+
+/** ETL: class-feature mechanical overrides (Archer Warlord, …). */
+export type ClassFeatureMechanicalEffect =
+  | { type: "removeArmorProficiencyPhrases"; phrases: string[] }
+  | { type: "weaponKeyAbility"; weaponGroup: string; ability: "STR" | "DEX" };
+
 /** Racial trait (from Racial Trait compendium; referenced by races). */
 export interface RacialTrait extends RulesEntity {
   shortDescription?: string | null;
   body?: string | null;
+  /** ETL: first Power `select` Category (e.g. `$$NOT_CLASS,at-will,1`). */
+  powerSelectCategory?: string | null;
+  /** ETL: use subrace-style pick before merged power lists (Dilettante bundles). */
+  powerBundleMode?: RacialTraitPowerBundleMode | null;
+  /** ETL: display/grant usage override (Half-Elf Dilettante → Encounter). */
+  powerUsageOverride?: string | null;
+  /** ETL: trait grants third class at-will (`$$CLASS,at-will,1` or Bonus At-Will). */
+  grantsBonusClassAtWill?: boolean;
+  /** ETL: Human Power Selection default (third at-will unless Heroic Effort picked). */
+  grantsBonusClassAtWillByDefault?: boolean;
+  heroicEffortTraitId?: string | null;
+  bonusAtWillTraitId?: string | null;
   raw: Record<string, unknown>;
 }
 
@@ -284,6 +304,8 @@ export interface RacialTrait extends RulesEntity {
 export interface ClassFeature extends RulesEntity {
   shortDescription?: string | null;
   body?: string | null;
+  /** ETL: parsed mechanical overrides when the feature is active. */
+  mechanicalEffects?: ClassFeatureMechanicalEffect[];
   raw: Record<string, unknown>;
 }
 
@@ -301,6 +323,8 @@ export interface ParagonPath extends RulesEntity {
   prereqsRaw?: string | null;
   prereqTokens: PrereqToken[];
   grantedClassFeatureIds?: string[];
+  /** ETL: path grants Paragon Power Points class feature (PHB3 +2 PP at 11+). */
+  grantsParagonPowerPoints?: boolean;
   statAdds?: StatAddEntry[];
   nadBonusesFromSpecific?: NadBonusesFromSpecific;
   raw: Record<string, unknown>;

@@ -209,6 +209,7 @@ export function paragonPathGrantsParagonPowerPoints(
   characterLevel: number
 ): boolean {
   if (!path || characterLevel < 11) return false;
+  if (path.grantsParagonPowerPoints) return true;
   if (path.grantedClassFeatureIds?.includes(PARAGON_POWER_POINTS_CLASS_FEATURE_ID)) return true;
   for (const { featureId, grantLevel } of paragonPathGrantEntries(path)) {
     if (featureId === PARAGON_POWER_POINTS_CLASS_FEATURE_ID && characterLevel >= grantLevel) {

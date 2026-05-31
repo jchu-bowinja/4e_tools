@@ -38,9 +38,10 @@ export function effectiveWeaponProficiencyDisplayText(
 export function effectiveArmorProficiencyDisplayText(
   baseText: string,
   build: CharacterBuild,
-  featGrants: ProficiencyGrant[]
+  featGrants: ProficiencyGrant[],
+  index?: RulesIndex
 ): string {
-  const adjusted = effectiveClassArmorProficienciesText(baseText, build);
+  const adjusted = effectiveClassArmorProficienciesText(baseText, build, index);
   return appendFeatProficiencyPhrasesToArmorLine(adjusted, featGrants).trim();
 }
 
@@ -52,11 +53,17 @@ export interface CharacterProficiencyDisplayLines {
 export function computeCharacterProficiencyDisplayLines(
   base: ClassProficiencyBaseInput,
   build: CharacterBuild,
-  featGrants: ProficiencyGrant[]
+  featGrants: ProficiencyGrant[],
+  index?: RulesIndex
 ): CharacterProficiencyDisplayLines {
   return {
     weaponLine: effectiveWeaponProficiencyDisplayText(classWeaponProficiencyBaseText(base), featGrants),
-    armorLine: effectiveArmorProficiencyDisplayText(classArmorProficiencyBaseText(base), build, featGrants)
+    armorLine: effectiveArmorProficiencyDisplayText(
+      classArmorProficiencyBaseText(base),
+      build,
+      featGrants,
+      index
+    )
   };
 }
 
@@ -68,7 +75,11 @@ export function computeClassGrantedProficiencyDisplayLines(
 ): CharacterProficiencyDisplayLines {
   const classFeatureGrants = collectClassFeatureProficiencyGrants(index, build);
   const weaponBase = classWeaponProficiencyBaseText(base);
-  const armorBase = effectiveClassArmorProficienciesText(classArmorProficiencyBaseText(base), build);
+  const armorBase = effectiveClassArmorProficienciesText(
+    classArmorProficiencyBaseText(base),
+    build,
+    index
+  );
   return {
     weaponLine: appendFeatProficiencyPhrasesToWeaponLine(weaponBase, classFeatureGrants).trim(),
     armorLine: appendFeatProficiencyPhrasesToArmorLine(armorBase, classFeatureGrants).trim()
