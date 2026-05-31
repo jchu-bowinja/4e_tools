@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { positionFixedTooltip } from "../../src/ui/glossaryTooltipPosition";
+import { positionFixedTooltip, positionRulesEntitySelectPanel } from "../../src/ui/glossaryTooltipPosition";
 
 const layout = { panelWidth: 340, maxHeightVh: 50 };
 
@@ -58,5 +58,25 @@ describe("positionFixedTooltip", () => {
     mockViewport(400, 800);
     const pos = positionFixedTooltip(mockRect({ top: 100, bottom: 125, left: 5 }), layout);
     expect(pos.left).toBe(12);
+  });
+});
+
+describe("positionRulesEntitySelectPanel", () => {
+  it("opens below with a readable min height when space allows", () => {
+    mockViewport(1024, 800);
+    const pos = positionRulesEntitySelectPanel(mockRect({ top: 100, bottom: 125, left: 50, width: 200 }));
+    expect(pos.top).toBe(131);
+    expect(pos.transform).toBeUndefined();
+    expect(pos.maxHeight).toBeGreaterThanOrEqual(96);
+    expect(pos.maxHeight).toBeLessThanOrEqual(320);
+    expect(pos.width).toBeGreaterThanOrEqual(280);
+  });
+
+  it("opens above when the trigger is near the bottom", () => {
+    mockViewport(1024, 800);
+    const pos = positionRulesEntitySelectPanel(mockRect({ top: 700, bottom: 725, left: 50, width: 200 }));
+    expect(pos.transform).toBe("translateY(-100%)");
+    expect(pos.maxHeight).toBeGreaterThanOrEqual(96);
+    expect(pos.maxHeight).toBeLessThanOrEqual(320);
   });
 });

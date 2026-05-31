@@ -241,7 +241,7 @@ import {
 import { FeatFacetMultiSelect } from "./FeatFacetMultiSelect";
 import { FeatSourceFilterDropdown } from "./FeatSourceFilterDropdown";
 import { FeatTagPill } from "./FeatTagPill";
-import { formatRulesEntitySelectOptionLabel, rulesEntityNameColumnWidth } from "../../ui/rulesEntitySelectLabel";
+import { RulesEntitySelect } from "../../ui/RulesEntitySelect";
 
 interface Props {
   index: RulesIndex;
@@ -1855,12 +1855,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       ),
     [hybridClassesSorted, build.hybridClassIdA, build.hybridClassIdB]
   );
-  const raceSelectNameWidth = useMemo(() => rulesEntityNameColumnWidth(index.races), [index.races]);
-  const classSelectNameWidth = useMemo(() => rulesEntityNameColumnWidth(classesForSelect), [classesForSelect]);
-  const hybridClassSelectNameWidth = useMemo(
-    () => rulesEntityNameColumnWidth(hybridClassesSorted),
-    [hybridClassesSorted]
-  );
   const skillNameById = useMemo(() => new Map(index.skills.map((s) => [s.id, s.name])), [index.skills]);
   const requiredClassSkillNamesLower = useMemo(
     () => new Set((legality.classSkillRules?.requiredTrainedSkillNames || []).map((s) => s.toLowerCase())),
@@ -2603,12 +2597,12 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         {activeTab === "race" && (
           <>
             <h3 style={builderSectionTitleStyle}>Race</h3>
-            <select
-              className="rules-entity-select"
-              value={build.raceId || ""}
-              onChange={(e) => {
-                const raceId = e.target.value || undefined;
-                const race = raceId ? index.races.find((r) => r.id === raceId) : undefined;
+            <RulesEntitySelect
+              ariaLabel="Race"
+              placeholder="Select race"
+              options={index.races.map((race) => ({ id: race.id, name: race.name, source: race.source }))}
+              value={build.raceId}
+              onChange={(raceId) => {
                 const nextBase: CharacterBuild = {
                   ...build,
                   raceId,
@@ -2619,15 +2613,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 const { classPowerSlots, powerIds } = reconcilePowerSlotsForBuild(nextBase, build.level);
                 updateBuild({ ...nextBase, classPowerSlots, powerIds });
               }}
-              style={{ width: "100%" }}
-            >
-              <option value="">Select race</option>
-              {index.races.map((race) => (
-                <option key={race.id} value={race.id}>
-                  {formatRulesEntitySelectOptionLabel(race.name, race.source, raceSelectNameWidth)}
-                </option>
-              ))}
-            </select>
+            />
             {selectedRace &&
               (raceTraitBundleSlots.length > 0 ||
                 raceAbilityBonusInfo.fixed.length > 0 ||
@@ -2969,11 +2955,12 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             </div>
 
             {!isHybridBuild && (
-              <select
-                className="rules-entity-select"
-                value={build.classId || ""}
-                onChange={(e) => {
-                  const classId = e.target.value || undefined;
+              <RulesEntitySelect
+                ariaLabel="Class"
+                placeholder="Select class"
+                options={classesForSelect.map((cls) => ({ id: cls.id, name: cls.name, source: cls.source }))}
+                value={build.classId}
+                onChange={(classId) => {
                   const nextBase: CharacterBuild = {
                     ...build,
                     classId,
@@ -2984,15 +2971,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   const { classPowerSlots, powerIds } = reconcilePowerSlotsForBuild(nextBase, build.level);
                   updateBuild({ ...nextBase, classPowerSlots, powerIds });
                 }}
-                style={{ width: "100%" }}
-              >
-                <option value="">Select class</option>
-                {classesForSelect.map((cls) => (
-                  <option key={cls.id} value={cls.id}>
-                    {formatRulesEntitySelectOptionLabel(cls.name, cls.source, classSelectNameWidth)}
-                  </option>
-                ))}
-              </select>
+              />
             )}
 
             {isHybridBuild && (
@@ -3008,11 +2987,15 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem", minWidth: 0 }}>
                     <label style={{ display: "block", margin: 0, fontSize: "0.88rem", fontWeight: 600 }}>
                       First hybrid class
-                      <select
-                        className="rules-entity-select"
-                        value={build.hybridClassIdA || ""}
-                        onChange={(e) => {
-                          const hybridClassIdA = e.target.value || undefined;
+                      <RulesEntitySelect
+                        ariaLabel="First hybrid class"
+                        placeholder="Select hybrid class…"
+                        style={{ marginTop: "0.25rem" }}
+                        options={hybridClassesForHybridSelect
+                          .filter((h) => h.id !== build.hybridClassIdB)
+                          .map((h) => ({ id: h.id, name: h.name, source: h.source }))}
+                        value={build.hybridClassIdA}
+                        onChange={(hybridClassIdA) => {
                           const nextBase: CharacterBuild = {
                             ...build,
                             characterStyle: "hybrid",
@@ -3025,24 +3008,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                           const { classPowerSlots, powerIds } = reconcilePowerSlotsForBuild(nextBase, build.level);
                           updateBuild({ ...nextBase, classPowerSlots, powerIds });
                         }}
-                        style={{
-                          width: "100%",
-                          marginTop: "0.25rem",
-                          padding: "0.4rem",
-                          borderRadius: "6px",
-                          border: "1px solid var(--panel-border)",
-                          boxSizing: "border-box"
-                        }}
-                      >
-                        <option value="">Select hybrid class…</option>
-                        {hybridClassesForHybridSelect
-                          .filter((h) => h.id !== build.hybridClassIdB)
-                          .map((h) => (
-                            <option key={h.id} value={h.id}>
-                              {formatRulesEntitySelectOptionLabel(h.name, h.source, hybridClassSelectNameWidth)}
-                            </option>
-                          ))}
-                      </select>
+                      />
                     </label>
                     {selectedHybridA?.hybridTalentClassFeatures && selectedHybridA.hybridTalentClassFeatures.length > 0 && (
                       <label style={{ display: "block", margin: 0, fontSize: "0.88rem", fontWeight: 600 }}>
@@ -3140,11 +3106,15 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem", minWidth: 0 }}>
                     <label style={{ display: "block", margin: 0, fontSize: "0.88rem", fontWeight: 600 }}>
                       Second hybrid class
-                      <select
-                        className="rules-entity-select"
-                        value={build.hybridClassIdB || ""}
-                        onChange={(e) => {
-                          const hybridClassIdB = e.target.value || undefined;
+                      <RulesEntitySelect
+                        ariaLabel="Second hybrid class"
+                        placeholder="Select hybrid class…"
+                        style={{ marginTop: "0.25rem" }}
+                        options={hybridClassesForHybridSelect
+                          .filter((h) => h.id !== build.hybridClassIdA)
+                          .map((h) => ({ id: h.id, name: h.name, source: h.source }))}
+                        value={build.hybridClassIdB}
+                        onChange={(hybridClassIdB) => {
                           const nextBase: CharacterBuild = {
                             ...build,
                             characterStyle: "hybrid",
@@ -3157,24 +3127,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                           const { classPowerSlots, powerIds } = reconcilePowerSlotsForBuild(nextBase, build.level);
                           updateBuild({ ...nextBase, classPowerSlots, powerIds });
                         }}
-                        style={{
-                          width: "100%",
-                          marginTop: "0.25rem",
-                          padding: "0.4rem",
-                          borderRadius: "6px",
-                          border: "1px solid var(--panel-border)",
-                          boxSizing: "border-box"
-                        }}
-                      >
-                        <option value="">Select hybrid class…</option>
-                        {hybridClassesForHybridSelect
-                          .filter((h) => h.id !== build.hybridClassIdA)
-                          .map((h) => (
-                            <option key={h.id} value={h.id}>
-                              {formatRulesEntitySelectOptionLabel(h.name, h.source, hybridClassSelectNameWidth)}
-                            </option>
-                          ))}
-                      </select>
+                      />
                     </label>
                     {selectedHybridB?.hybridTalentClassFeatures && selectedHybridB.hybridTalentClassFeatures.length > 0 && (
                       <label style={{ display: "block", margin: 0, fontSize: "0.88rem", fontWeight: 600 }}>
