@@ -73,6 +73,46 @@ export function getDilettanteCandidatePowers(
   return collapseAugmentablePowersForPicker(sorted);
 }
 
+export type ClassPowerPoolUsage = "encounter" | "daily" | "at-will" | "utility";
+
+function parentClassIdForPowerPool(index: RulesIndex, classId: string): string | undefined {
+  const cls = index.classes.find((c) => c.id === classId);
+  const parent = (cls?.raw?.specific as Record<string, unknown> | undefined)?.["_ParentClass"];
+  return typeof parent === "string" && parent.startsWith("ID_FMP_") ? parent : undefined;
+}
+
+function powerMatchesUsagePool(p: Power, usage: ClassPowerPoolUsage, level: number): boolean {
+  const lv = p.level ?? 0;
+  if (lv !== level) return false;
+  const u = String(p.usage || "").toLowerCase();
+  const pt = powerTypeCategory(p);
+  if (usage === "utility") return pt === "utility";
+  if (usage === "at-will") return u.includes("at-will") && pt === "attack";
+  if (usage === "encounter") return u.includes("encounter") && pt === "attack";
+  if (usage === "daily") return u.includes("daily") && pt === "attack";
+  return false;
+}
+
+/** Class (and parent class) powers for `$$CLASS,<usage>,<level>` / internal category pools. */
+export function getClassPowerIdsForUsagePool(
+  index: RulesIndex,
+  classId: string | undefined,
+  usage: ClassPowerPoolUsage,
+  level: number
+): string[] {
+  if (!classId || level < 1) return [];
+  const ownerIds = [classId, parentClassIdForPowerPool(index, classId)].filter(
+    (id, i, arr): id is string => !!id && arr.indexOf(id) === i
+  );
+  const list = index.powers.filter((p) => {
+    const owner = (p.classId || "").trim();
+    if (!ownerIds.includes(owner)) return false;
+    return powerMatchesUsagePool(p, usage, level);
+  });
+  const sorted = [...list].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+  return collapseAugmentablePowersForPicker(sorted).map((p) => p.id);
+}
+
 export function getPowersForOwnerId(
   index: RulesIndex,
   ownerId: string | undefined,

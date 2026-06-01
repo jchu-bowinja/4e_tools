@@ -62,7 +62,7 @@ export function collectClassFeatureIdsFromClass(
   }
 
   const selectionId = selectedClassBuildOptionId(build.classSelections);
-  if (selectionId) {
+  if (selectionId?.startsWith("ID_FMP_CLASS_FEATURE_")) {
     add(byId.get(selectionId) ?? byName.get(selectionId));
   }
 

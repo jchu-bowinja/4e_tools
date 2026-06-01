@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   collectCharacterClassFeatureIds,
+  collectClassFeatureIdsFromClass,
   getCharacterClassFeatureTraitRows
 } from "../../src/rules/characterClassFeatures";
+import { CLASS_BUILD_OPTION_SELECTION_KEY } from "../../src/rules/classBuildOptions";
 import type { CharacterBuild, ClassDef, ClassFeature, RulesIndex } from "../../src/rules/models";
 
 const rogueClass: ClassDef = {
@@ -162,5 +164,17 @@ describe("characterClassFeatures", () => {
     const allIds = collectCharacterClassFeatureIds(richIndex, withPath);
     expect(allIds).toContain("ID_PATH_FEAT");
     expect(allIds).toContain("ID_DESTINY_FEAT");
+  });
+
+  it("does not treat Essentials build option id as a class feature", () => {
+    const buildWithEssentials: CharacterBuild = {
+      ...build,
+      classSelections: {
+        ...build.classSelections,
+        [CLASS_BUILD_OPTION_SELECTION_KEY]: "ID_FMP_BUILD_999"
+      }
+    };
+    const ids = collectClassFeatureIdsFromClass(index, buildWithEssentials);
+    expect(ids).not.toContain("ID_FMP_BUILD_999");
   });
 });

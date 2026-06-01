@@ -81,7 +81,7 @@ Update **Status** and **Owner** columns as work completes.
 |----|--------|------|----------|--------------|--------|-------|
 | SC-030 | `etl-done` | Bonus class at-will slot | `powerSelectCategory.ts`; `grantedPowersQuery.ts` | `$$CLASS,at-will,1` | Documented in `class-build-options.md`; ETL `grantsBonusClassAtWill` | `tests/etl/humanBonusAtWill.integration.test.ts`, `validate_power_select_categories.py` |
 | SC-031 | `etl-done` | Dilettante candidate pool | `powerSelectCategory.ts`; `classPowersQuery.ts` | `$$NOT_CLASS,at-will,1` | Documented + `validate_power_select_categories.py` | `tests/rules/dilettantePower.test.ts`, `tools/etl/test_validate_power_select_categories.py` |
-| SC-032 | `etl-done` | Dynamic `$$` — no static power ids | `powerSelectCategory.ts`; `grantedPowersQuery.ts` | `isDynamicPowerSelectCategory`; `resolvePowerIdsFromCategory` for class-context resolution | `powerSelectCategory.ts` module | `tests/rules/powerSelectCategory.test.ts` |
+| SC-032 | `etl-done` | Dynamic `$$` — class-context resolution | `powerSelectCategory.ts`; ETL + `grantedPowersQuery.ts` | `classPowerPool` for `$$CLASS,encounter,1` / `ID_INTERNAL_CATEGORY_*`; bonus at-will unchanged | `powerSelectCategory.ts` | `tests/rules/powerSelectCategory.test.ts`, `audit_class_feature_choice_power_ids.py` |
 | SC-033 | `keep` | Racial trait rule selects | `racialTraitRuleSelects.ts` | Skill Training / Feat / CountsAsRace + `requires` | Keep; extend prereq `!Class` parsing if gaps found | `tests/rules/racialTraitRuleSelects.test.ts` |
 | SC-034 | `etl-done` | Class feature choice groups (indexed) | `getClassFeatureChoiceGroups` maps index only (+ `expandClassFeaturePowerChoiceGroups`) | `powerIds` precomputed at ETL; audit via `audit_class_feature_choice_power_ids.py` | `tests/rules/classFeatureChoices.test.ts`, `audit_class_feature_choice_power_ids.py` |
 
@@ -147,6 +147,10 @@ Update **Status** and **Owner** columns as work completes.
 |----|--------|------|----------|-------|
 | SC-090 | `keep` | Subclass grant filtering (Warpriest / Warlock) | `build_rules_index.py` L351–378 | General `_class_feature_applies_to_support_class` |
 | SC-091 | `done` | Essentials guided builds in UI | `CharacterBuilderApp.tsx`; `classBuildOptions.ts` | Class tab picker; `classSelections.buildOptionId` | `tests/rules/classBuildOptions.test.ts` |
+| SC-092 | `done` | Build option ≠ class feature | `characterClassFeatures.ts` | Only `ID_FMP_CLASS_FEATURE_*` in `collectClassFeatureIdsFromClass` | `tests/rules/characterClassFeatures.test.ts` |
+| SC-093 | `done` | `$$CLASS,<usage>,<level>` power pools | ETL `build_rules_index.py`; `powerSelectCategory.ts`; `classPowersQuery.ts` | Mage/spellbook encounter+daily+utility; parent class (`_ParentClass`) | `audit_class_feature_choice_power_ids.py`, `powerSelectCategory.test.ts` |
+| SC-094 | `done` | Parsed-but-ungranted L1 power picks | ETL `_append_ungranted_power_choice_groups` | Hexblade, Skald, Protector, Elementalist | `audit_class_feature_choice_power_ids.py` (0 L1 gaps) |
+| SC-095 | `done` | Extra power-select category shapes | ETL + `powerSelectCategory.ts` | `ID_FMP_CLASS_*,usage,level`; `$$Class,at-will`; feature-ref + `_PARSED_SUB_FEATURES` powers | `powerSelectCategory.test.ts` |
 
 ---
 
@@ -213,7 +217,10 @@ function resolvePowerIdsFromCategory(
 6. ~~**SC-050–052**~~ — psionic tables to index (P2, 2026-05-30).
 7. ~~**SC-030/031 docs + validation; SC-034 audit**~~ — done (2026-05-30).
 8. ~~**SC-091**~~ — Essentials guided builds UI (2026-05-30).
-9. **SC-080–083** — legacy only when touching saves.
+9. ~~**SC-092–093**~~ — build option fix + `$$CLASS` power pools at ETL (2026-05-30).
+10. ~~**SC-094–095**~~ — ungranted L1 power groups + Skald/Protector/Elementalist categories (2026-05-30).
+11. **SC-080–083** — legacy only when touching saves.
+12. **Follow-up** — auto-suggest build `powerIds` into class slots (optional UX).
 
 ---
 
@@ -243,3 +250,5 @@ function resolvePowerIdsFromCategory(
 | 2026-05-30 | P2: SC-050–052 — `psionicPowerPointsByLevel`, hybrid breakpoints, paragon MC at-will penalty on index |
 | 2026-05-30 | SC-030/031/034/070 follow-up — `class-build-options.md` power tokens; validate/audit scripts; gap report |
 | 2026-05-30 | SC-091 — Essentials class build picker on Class tab |
+| 2026-05-30 | SC-092–093 — build option not a class feature; ETL/runtime `$$CLASS` usage pools (+ parent class) |
+| 2026-05-30 | SC-094–095 — ungranted parsed L1 power groups; `ID_FMP_CLASS_*,usage,level` and `$$Class,at-will` |

@@ -1,16 +1,27 @@
 import type { RulesIndex } from "./models";
-import { getDilettanteCandidatePowers } from "./classPowersQuery";
+import {
+  type ClassPowerPoolUsage,
+  getClassPowerIdsForUsagePool,
+  getDilettanteCandidatePowers
+} from "./classPowersQuery";
 
 export type PowerSelectCategoryKind =
   | "staticPowerIds"
   | "classAtWillBonus"
   | "dilettanteAtWill"
+  | "classPowerPool"
+  | "explicitClassPowerPool"
   | "unknown";
 
 export type ParsedPowerSelectCategory = {
   kind: PowerSelectCategoryKind;
   /** Set when kind is `staticPowerIds`. */
   powerIds?: string[];
+  /** Set when kind is `classPowerPool`. */
+  poolUsage?: ClassPowerPoolUsage;
+  poolLevel?: number;
+  /** Set when kind is `explicitClassPowerPool` (`ID_FMP_CLASS_104,daily,1`). */
+  poolClassId?: string;
   raw: string;
 };
 
@@ -21,6 +32,10 @@ export function parsePowerSelectCategory(category: string): ParsedPowerSelectCat
   const raw = category.trim();
   const lower = raw.toLowerCase();
   if (!lower.startsWith(DYNAMIC_PREFIX)) {
+    const explicit = parseExplicitClassPowerPoolCategory(raw);
+    if (explicit) {
+      return { kind: "explicitClassPowerPool", ...explicit, raw };
+    }
     const powerIds = raw
       .split("|")
       .map((p) => p.trim())
@@ -33,15 +48,59 @@ export function parsePowerSelectCategory(category: string): ParsedPowerSelectCat
   }
   const parts = lower.slice(2).split(",").map((p) => p.trim());
   const head = parts[0] ?? "";
-  const usage = parts[1] ?? "";
-  const level = parts[2] ?? "";
-  if (head === "class" && usage === "at-will" && level === "1") {
+  const usageToken = parts[1] ?? "";
+  const levelText = parts[2] ?? "";
+  if (head === "class" && usageToken === "at-will" && levelText === "1") {
     return { kind: "classAtWillBonus", raw };
   }
-  if (head === "not_class" && usage === "at-will" && level === "1") {
+  if (head === "not_class" && usageToken === "at-will" && levelText === "1") {
     return { kind: "dilettanteAtWill", raw };
   }
+  if (head === "class" && levelText) {
+    const poolUsage = parseClassPowerPoolUsage(usageToken);
+    const poolLevel = Number.parseInt(levelText, 10);
+    if (poolUsage && Number.isFinite(poolLevel) && poolLevel >= 1) {
+      return { kind: "classPowerPool", poolUsage, poolLevel, raw };
+    }
+  }
+  if (head === "class" && !levelText) {
+    const poolUsage = parseClassPowerPoolUsage(usageToken);
+    if (poolUsage) {
+      return { kind: "classPowerPool", poolUsage, poolLevel: 1, raw };
+    }
+  }
   return { kind: "unknown", raw };
+}
+
+function parseExplicitClassPowerPoolCategory(
+  category: string
+): { poolClassId: string; poolUsage: ClassPowerPoolUsage; poolLevel: number } | undefined {
+  const parts = category.split(",").map((p) => p.trim());
+  if (parts.length < 3) return undefined;
+  const classId = parts[0] ?? "";
+  if (!classId.startsWith("ID_FMP_CLASS_") || classId.includes("_CLASS_FEATURE_")) {
+    return undefined;
+  }
+  const poolUsage = parseClassPowerPoolUsage(parts[1] ?? "");
+  const poolLevel = Number.parseInt(parts[2] ?? "", 10);
+  if (!poolUsage || !Number.isFinite(poolLevel) || poolLevel < 1) return undefined;
+  return { poolClassId: classId, poolUsage, poolLevel };
+}
+
+function parseClassPowerPoolUsage(token: string): ClassPowerPoolUsage | undefined {
+  const lower = token.toLowerCase();
+  if (lower === "encounter" || lower === "daily" || lower === "utility") {
+    return lower;
+  }
+  if (lower === "at-will" || lower === "at_will" || lower === "atwill") {
+    return "at-will";
+  }
+  const upper = token.toUpperCase();
+  if (upper.includes("ENCOUNTER")) return "encounter";
+  if (upper.includes("DAILY")) return "daily";
+  if (upper.includes("UTILITY")) return "utility";
+  if (upper.includes("AT_WILL") || upper.includes("AT-WILL")) return "at-will";
+  return undefined;
 }
 
 export function isDynamicPowerSelectCategory(category: string): boolean {
@@ -81,6 +140,23 @@ export function resolvePowerIdsFromCategory(
   }
   if (parsed.kind === "classAtWillBonus") {
     return [];
+  }
+  if (parsed.kind === "classPowerPool") {
+    if (!ctx.classId || parsed.poolUsage == null || parsed.poolLevel == null) {
+      return "dynamic";
+    }
+    return getClassPowerIdsForUsagePool(index, ctx.classId, parsed.poolUsage, parsed.poolLevel);
+  }
+  if (parsed.kind === "explicitClassPowerPool") {
+    if (!parsed.poolClassId || parsed.poolUsage == null || parsed.poolLevel == null) {
+      return "dynamic";
+    }
+    return getClassPowerIdsForUsagePool(
+      index,
+      parsed.poolClassId,
+      parsed.poolUsage,
+      parsed.poolLevel
+    );
   }
   return [];
 }
