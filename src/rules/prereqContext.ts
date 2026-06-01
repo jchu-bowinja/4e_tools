@@ -1,3 +1,4 @@
+import { selectedClassBuildOptionId } from "./classBuildOptions";
 import type { CharacterBuild, ClassFeature, RulesIndex } from "./models";
 import {
   collectCountsAsClassNames,
@@ -139,8 +140,7 @@ export function characterClassFeatureNames(index: RulesIndex, build: CharacterBu
   }
 
   if (build.classId) {
-    const picked =
-      build.classSelections?.buildOptionId?.trim() || build.classSelections?.buildOption?.trim();
+    const picked = selectedClassBuildOptionId(build.classSelections);
     if (picked) {
       const opts = index.classBuildOptionsByClassId?.[build.classId] ?? [];
       const row = opts.find((o) => o.id === picked || o.name === picked);

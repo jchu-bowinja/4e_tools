@@ -119,6 +119,14 @@ import {
   resolveClassFeatureChoiceIdsForGroup,
   resolveClassPowerChoiceIdsForGroup
 } from "../../rules/classFeatureChoices";
+import {
+  CLASS_BUILD_OPTION_SELECTION_KEY,
+  classBuildOptionLabel,
+  essentialsClassBuildOptions as listEssentialsClassBuildOptions,
+  hasEssentialsClassBuildPicker,
+  pruneClassBuildOptionSelection,
+  selectedClassBuildOptionId
+} from "../../rules/classBuildOptions";
 import { getClassTraitRows, getHybridClassTraitRows, type TraitDisplayRow } from "../../rules/supportTraits";
 import { autoGrantedTrainedSkillIds, effectiveTrainedSkillIdSet } from "../../rules/grantedSkillsQuery";
 import { computeSkillSheetRows } from "../../rules/skillCalculator";
@@ -1062,6 +1070,19 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     () => visibleClassFeatureChoiceGroups.filter((g) => g.kind === "classFeature"),
     [visibleClassFeatureChoiceGroups]
   );
+  const essentialsBuildOptionRows = useMemo(
+    () => (!isHybridBuild ? listEssentialsClassBuildOptions(index, selectedClass) : []),
+    [index, selectedClass, isHybridBuild]
+  );
+  const showEssentialsClassBuildPicker = useMemo(
+    () => !isHybridBuild && hasEssentialsClassBuildPicker(index, selectedClass),
+    [index, selectedClass, isHybridBuild]
+  );
+  const selectedEssentialsBuildOption = useMemo(() => {
+    const pick = selectedClassBuildOptionId(build.classSelections);
+    if (!pick) return undefined;
+    return essentialsBuildOptionRows.find((o) => o.id === pick);
+  }, [build.classSelections, essentialsBuildOptionRows]);
   const visibleClassFeaturePowerGroupsOnPowersTab = useMemo(
     () => visibleClassFeatureChoiceGroups.filter((g) => g.kind === "power"),
     [visibleClassFeatureChoiceGroups]
@@ -2118,6 +2139,10 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     let pruned = pruneStalePowerSelections(index, next);
     pruned = pruneParagonMulticlassing(index, pruned);
     pruned = pruneHybridPsionicAugmentationChoices(pruned, index);
+    pruned = {
+      ...pruned,
+      classSelections: pruneClassBuildOptionSelection(index, pruned.classId, pruned.classSelections)
+    };
     const normalized = normalizeCharacterBuild(pruned, index);
     setBuild(normalized);
     saveBuild(normalized);
@@ -3302,7 +3327,60 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
           <RulesRichText text={String(selectedClass.raw.body)} />
         </CollapsibleDisclosure>
                 )}
-                {classSpecific["Build Options"] && (
+                {showEssentialsClassBuildPicker && (
+                  <div style={{ marginTop: "0.85rem", maxWidth: "28rem" }}>
+                    <label style={{ display: "block", marginBottom: "0.35rem" }}>
+                      <span style={{ display: "block", fontWeight: 600, fontSize: "0.85rem" }}>
+                        Class build
+                      </span>
+                      <select
+                        value={selectedClassBuildOptionId(build.classSelections) || ""}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          const next = { ...(build.classSelections || {}) };
+                          if (v) next[CLASS_BUILD_OPTION_SELECTION_KEY] = v;
+                          else delete next[CLASS_BUILD_OPTION_SELECTION_KEY];
+                          updateBuild({
+                            ...build,
+                            classSelections: Object.keys(next).length ? next : undefined
+                          });
+                        }}
+                        style={{
+                          width: "100%",
+                          marginTop: "0.25rem",
+                          padding: "0.4rem",
+                          borderRadius: "6px",
+                          border: "1px solid var(--panel-border)"
+                        }}
+                      >
+                        <option value="">Select a build…</option>
+                        {essentialsBuildOptionRows.map((opt) => (
+                          <option key={opt.id} value={opt.id}>
+                            {classBuildOptionLabel(opt)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {selectedEssentialsBuildOption?.shortDescription && (
+                      <p
+                        style={{
+                          margin: "0.35rem 0 0 0",
+                          fontSize: "0.8rem",
+                          color: "var(--text-secondary)",
+                          lineHeight: 1.45
+                        }}
+                      >
+                        <strong>Key abilities:</strong> {selectedEssentialsBuildOption.shortDescription}
+                      </p>
+                    )}
+                    {selectedEssentialsBuildOption?.body && (
+                      <div style={{ marginTop: "0.35rem", fontSize: "0.82rem", color: "var(--text-secondary)" }}>
+                        <RulesRichText text={selectedEssentialsBuildOption.body} />
+                      </div>
+                    )}
+                  </div>
+                )}
+                {classSpecific["Build Options"] && !showEssentialsClassBuildPicker && (
                   <CollapsibleDisclosure
           open
           style={{ marginTop: "0.4rem" }}

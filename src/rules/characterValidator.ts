@@ -41,6 +41,10 @@ import {
   resolveClassFeatureChoiceIdsForGroup
 } from "./classFeatureChoices";
 import {
+  essentialsClassBuildOptions,
+  selectedClassBuildOptionId
+} from "./classBuildOptions";
+import {
   countsAsRaceOptions,
   getRacialTraitRuleSelectSlots,
   resolveRacialFeatSlotCountForBuild,
@@ -225,6 +229,18 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
           choiceGroups.find((g) => g.parentFeatureId === parentId)?.parentFeatureName ??
           "Class feature";
         errors.push(`Class: ${parentName} — each sign can only be chosen once.`);
+      }
+    }
+
+    const essentialsBuilds = essentialsClassBuildOptions(index, clsForBuild);
+    const buildPick = selectedClassBuildOptionId(build.classSelections);
+    if (essentialsBuilds.length >= 2 && !buildPick) {
+      errors.push("Class: choose a class build.");
+    }
+    if (buildPick && essentialsBuilds.length > 0) {
+      const legalBuilds = new Set(essentialsBuilds.map((o) => o.id));
+      if (!legalBuilds.has(buildPick)) {
+        errors.push("Class: choose a valid class build.");
       }
     }
   }

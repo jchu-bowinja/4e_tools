@@ -20,6 +20,29 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def _racial_power_select_index_summary(
+    racial_traits: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Traits with ETL power-select metadata (SC-030 / SC-031)."""
+    rows: List[Dict[str, Any]] = []
+    for trait in racial_traits:
+        cat = trait.get("powerSelectCategory")
+        if not cat and not trait.get("grantsBonusClassAtWillByDefault"):
+            continue
+        rows.append(
+            {
+                "id": trait.get("id"),
+                "name": trait.get("name"),
+                "powerSelectCategory": cat,
+                "grantsBonusClassAtWill": trait.get("grantsBonusClassAtWill"),
+                "grantsBonusClassAtWillByDefault": trait.get("grantsBonusClassAtWillByDefault"),
+                "powerUsageOverride": trait.get("powerUsageOverride"),
+                "powerBundleMode": trait.get("powerBundleMode"),
+            }
+        )
+    return rows
+
+
 def _racial_trait_select_gaps(racial_traits: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     gaps: List[Dict[str, Any]] = []
     for trait in racial_traits:
@@ -103,7 +126,9 @@ def main() -> int:
         return 1
 
     data = json.loads(path.read_text(encoding="utf-8"))
-    racial_select = _racial_trait_select_gaps(data.get("racialTraits") or [])
+    racial_traits = data.get("racialTraits") or []
+    racial_select = _racial_trait_select_gaps(racial_traits)
+    racial_power_select = _racial_power_select_index_summary(racial_traits)
     class_gaps = _class_build_gaps(
         data.get("classes") or [],
         data.get("classBuildOptionsByClassId") or {},
@@ -111,6 +136,7 @@ def main() -> int:
 
     report = {
         "racialTraitsWithSelectRules": racial_select,
+        "racialPowerSelectIndexFields": racial_power_select,
         "classBuildGaps": class_gaps,
     }
 
@@ -124,6 +150,23 @@ def main() -> int:
         print(f"  {row['name']}: {', '.join(row['selectTypes'])}")
     if len(racial_select) > 30:
         print(f"  … and {len(racial_select) - 30} more")
+
+    print("\n=== Racial traits with power-select index metadata ($$CLASS / $$NOT_CLASS, bundles) ===")
+    print(f"count: {len(racial_power_select)}")
+    for row in racial_power_select[:20]:
+        flags = []
+        if row.get("grantsBonusClassAtWill"):
+            flags.append("bonusAtWill")
+        if row.get("grantsBonusClassAtWillByDefault"):
+            flags.append("humanDefault")
+        if row.get("powerUsageOverride"):
+            flags.append(f"usage={row['powerUsageOverride']}")
+        if row.get("powerBundleMode"):
+            flags.append(row["powerBundleMode"])
+        cat = row.get("powerSelectCategory") or ""
+        print(f"  {row['name']}: {cat} [{', '.join(flags)}]")
+    if len(racial_power_select) > 20:
+        print(f"  … and {len(racial_power_select) - 20} more")
 
     print("\n=== Classes with Build Options text or Build select but no indexed options ===")
     for row in class_gaps["buildTextButNoOptions"]:

@@ -11,6 +11,7 @@ Tracked inventory of hardcoded rules, heuristic supplements, and legacy paths in
 | `etl-done` | Precomputed in `rules_index.json`; runtime duplicate removed |
 | `legacy` | Old save format only — low priority |
 | `keep` | Intentionally general; no entity-specific refactor needed |
+| `done` | Shipped (UI or full feature complete) |
 
 **Priority:** P0 = blocks parity / duplicated logic · P1 = high-value generalization · P2 = polish · P3 = legacy
 
@@ -32,7 +33,7 @@ Update **Status** and **Owner** columns as work completes.
 | Legacy migration | 4 | 0 |
 | ETL structural (reference) | 2 | — |
 
-**P0 complete:** SC-001–004 shipped. **P1 complete (2026-05-30):** SC-010–013, SC-022, SC-032, SC-040–041, SC-062. **P2 psionic tables complete (2026-05-30):** SC-050–052. **Next (optional):** SC-030/031 docs + validation, SC-034 powerIds audit, SC-091 Essentials UI, SC-080–083 legacy. Regenerate index after ETL changes: `python tools/etl/build_rules_index.py`.
+**P0 complete:** SC-001–004 shipped. **P1 complete (2026-05-30):** SC-010–013, SC-022, SC-032, SC-040–041, SC-062. **P2 psionic tables complete (2026-05-30):** SC-050–052. **Follow-up (2026-05-30):** SC-030/031 docs + validation; SC-034 audit script; SC-070 gap report extended. **Next:** SC-080–083 legacy, more `$$` class-feature tokens, Essentials build → class-feature grants. Regenerate index after ETL changes: `python tools/etl/build_rules_index.py`.
 
 ---
 
@@ -78,11 +79,11 @@ Update **Status** and **Owner** columns as work completes.
 
 | ID | Status | Item | Location | Token / rule | Action | Tests |
 |----|--------|------|----------|--------------|--------|-------|
-| SC-030 | `keep` | Bonus class at-will slot | `grantedPowersQuery.ts` L170–179 | `$$CLASS,at-will,1` | Document in `docs/class-build-options.md`; centralize in `powerSelectCategory.ts` | `tests/etl/humanBonusAtWill.integration.test.ts` |
-| SC-031 | `keep` | Dilettante candidate pool | `grantedPowersQuery.ts` L319–327; `classPowersQuery.ts` L45–74 | `$$NOT_CLASS,at-will,1` | Same module as SC-030; add ETL validation script | `tests/rules/dilettantePower.test.ts`, `tests/rules/classPowersQuery.test.ts` |
+| SC-030 | `etl-done` | Bonus class at-will slot | `powerSelectCategory.ts`; `grantedPowersQuery.ts` | `$$CLASS,at-will,1` | Documented in `class-build-options.md`; ETL `grantsBonusClassAtWill` | `tests/etl/humanBonusAtWill.integration.test.ts`, `validate_power_select_categories.py` |
+| SC-031 | `etl-done` | Dilettante candidate pool | `powerSelectCategory.ts`; `classPowersQuery.ts` | `$$NOT_CLASS,at-will,1` | Documented + `validate_power_select_categories.py` | `tests/rules/dilettantePower.test.ts`, `tools/etl/test_validate_power_select_categories.py` |
 | SC-032 | `etl-done` | Dynamic `$$` — no static power ids | `powerSelectCategory.ts`; `grantedPowersQuery.ts` | `isDynamicPowerSelectCategory`; `resolvePowerIdsFromCategory` for class-context resolution | `powerSelectCategory.ts` module | `tests/rules/powerSelectCategory.test.ts` |
 | SC-033 | `keep` | Racial trait rule selects | `racialTraitRuleSelects.ts` | Skill Training / Feat / CountsAsRace + `requires` | Keep; extend prereq `!Class` parsing if gaps found | `tests/rules/racialTraitRuleSelects.test.ts` |
-| SC-034 | `etl-done` | Class feature choice groups (indexed) | `getClassFeatureChoiceGroups` maps index only (+ `expandClassFeaturePowerChoiceGroups`) | `visibleWhen`, power pools; runtime supplements removed | Trust index `powerIds` when complete (follow-up) | `tests/rules/classFeatureChoices.test.ts` |
+| SC-034 | `etl-done` | Class feature choice groups (indexed) | `getClassFeatureChoiceGroups` maps index only (+ `expandClassFeaturePowerChoiceGroups`) | `powerIds` precomputed at ETL; audit via `audit_class_feature_choice_power_ids.py` | `tests/rules/classFeatureChoices.test.ts`, `audit_class_feature_choice_power_ids.py` |
 
 **Proposed module:** `src/rules/powerSelectCategory.ts` — single interpreter for all `$$FOO,bar,baz` tokens + registry.
 
@@ -123,7 +124,7 @@ Update **Status** and **Owner** columns as work completes.
 
 | ID | Status | Item | Location | Notes | Proposed | Tests |
 |----|--------|------|----------|-------|----------|-------|
-| SC-070 | `keep` | Subrace / bundle detection | `raceSubraces.ts` | `_SUBRACE_` id alias, power selection category | Keep; add gap rows to `list_race_class_selection_gaps.py` output | `tests/rules/raceSubraces.test.ts` |
+| SC-070 | `etl-done` | Subrace / bundle detection | `raceSubraces.ts` | `_SUBRACE_` id alias, power selection category | `list_race_class_selection_gaps.py` reports `racialPowerSelectIndexFields` | `tests/rules/raceSubraces.test.ts` |
 | SC-071 | `keep` | Dragonborn ability deferral | `abilityScores.ts` L154–187 | "See the Race Chosen" → subrace traits | Keep; optional ETL flag `abilityBonusSource: subrace` | `tests/rules/dragonbornAbility.integration.test.ts` |
 | SC-072 | `keep` | Active racial trait expansion | `activeRacialTraits.ts`; `racialTraitGrants.ts` | Grant children, bundle visibility | Keep | `tests/rules/activeRacialTraits.test.ts`, `racialTraitGrants` |
 
@@ -145,7 +146,7 @@ Update **Status** and **Owner** columns as work completes.
 | ID | Status | Item | Location | Notes |
 |----|--------|------|----------|-------|
 | SC-090 | `keep` | Subclass grant filtering (Warpriest / Warlock) | `build_rules_index.py` L351–378 | General `_class_feature_applies_to_support_class` |
-| SC-091 | `pending` | Essentials guided builds not in UI | `docs/class-build-options.md` L26–30 | Indexed but hidden — product, not refactor |
+| SC-091 | `done` | Essentials guided builds in UI | `CharacterBuilderApp.tsx`; `classBuildOptions.ts` | Class tab picker; `classSelections.buildOptionId` | `tests/rules/classBuildOptions.test.ts` |
 
 ---
 
@@ -210,7 +211,9 @@ function resolvePowerIdsFromCategory(
 4. ~~**SC-020–021**~~ — done in ETL (P0 pass).
 5. ~~**SC-010, SC-012–013, SC-022, SC-041, SC-062**~~ — P1 index fields + runtime (2026-05-30).
 6. ~~**SC-050–052**~~ — psionic tables to index (P2, 2026-05-30).
-7. **SC-080–083** — legacy only when touching saves.
+7. ~~**SC-030/031 docs + validation; SC-034 audit**~~ — done (2026-05-30).
+8. ~~**SC-091**~~ — Essentials guided builds UI (2026-05-30).
+9. **SC-080–083** — legacy only when touching saves.
 
 ---
 
@@ -222,6 +225,8 @@ function resolvePowerIdsFromCategory(
 | Feat rules coverage | `tools/etl/FEAT_RULES_COVERAGE.md` |
 | CB parity workflow | `docs/cb-parity-audit.md` |
 | Gap audit script | `python tools/etl/list_race_class_selection_gaps.py` |
+| Power select validation | `python tools/etl/validate_power_select_categories.py` |
+| Class feature powerIds audit | `python tools/etl/audit_class_feature_choice_power_ids.py` |
 | Heavy feat rules | `python tools/etl/list_feat_rules_beyond_statadd.py` |
 | Original audit conversation | Special-case audit (2026-05-30) |
 
@@ -236,3 +241,5 @@ function resolvePowerIdsFromCategory(
 | 2026-05-30 | Checklist updated: SC-011/014/020/021/023/034 marked etl-done; P0 summary |
 | 2026-05-30 | P1: SC-010–013, SC-022, SC-032, SC-040–041, SC-062 — ETL index fields, `powerSelectCategory.ts`, `mechanicalEffects.ts`, regenerated `rules_index.json` |
 | 2026-05-30 | P2: SC-050–052 — `psionicPowerPointsByLevel`, hybrid breakpoints, paragon MC at-will penalty on index |
+| 2026-05-30 | SC-030/031/034/070 follow-up — `class-build-options.md` power tokens; validate/audit scripts; gap report |
+| 2026-05-30 | SC-091 — Essentials class build picker on Class tab |

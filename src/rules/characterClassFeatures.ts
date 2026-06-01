@@ -4,6 +4,7 @@ import {
   getClassFeatureChoiceGroups,
   resolveClassFeatureChoiceIdsForGroup
 } from "./classFeatureChoices";
+import { selectedClassBuildOptionId } from "./classBuildOptions";
 import type { CharacterBuild, ClassFeature, RulesIndex } from "./models";
 import {
   buildClassFeatureLookups,
@@ -60,9 +61,7 @@ export function collectClassFeatureIdsFromClass(
     }
   }
 
-  const selectionId =
-    build.classSelections?.buildOptionId?.trim() ||
-    build.classSelections?.buildOption?.trim();
+  const selectionId = selectedClassBuildOptionId(build.classSelections);
   if (selectionId) {
     add(byId.get(selectionId) ?? byName.get(selectionId));
   }

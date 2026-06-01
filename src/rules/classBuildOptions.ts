@@ -1,4 +1,10 @@
-import type { ClassDef, RulesIndex } from "./models";
+import type { CharacterBuild, ClassDef, RulesIndex } from "./models";
+
+/** `classSelections` key for Essentials `ID_FMP_BUILD_*` picks. */
+export const CLASS_BUILD_OPTION_SELECTION_KEY = "buildOptionId";
+
+/** Legacy saves may use this key instead of `buildOptionId`. */
+export const LEGACY_CLASS_BUILD_OPTION_SELECTION_KEY = "buildOption";
 
 function splitOptionList(raw: string): string[] {
   return raw
@@ -27,6 +33,48 @@ export interface ClassBuildOptionRow {
 export function classBuildOptionLabel(opt: Pick<ClassBuildOptionRow, "name" | "displayName">): string {
   const display = opt.displayName?.trim();
   return display || opt.name;
+}
+
+export function selectedClassBuildOptionId(
+  classSelections?: CharacterBuild["classSelections"]
+): string | undefined {
+  const id =
+    classSelections?.[CLASS_BUILD_OPTION_SELECTION_KEY]?.trim() ||
+    classSelections?.[LEGACY_CLASS_BUILD_OPTION_SELECTION_KEY]?.trim();
+  return id || undefined;
+}
+
+/** Essentials guided builds (`ID_FMP_BUILD_*` rows from ETL). */
+export function essentialsClassBuildOptions(
+  index: RulesIndex,
+  cls: ClassDef | undefined
+): ClassBuildOptionRow[] {
+  return getClassBuildOptions(index, cls).filter((o) => o.id.startsWith("ID_FMP_BUILD_"));
+}
+
+export function hasEssentialsClassBuildPicker(
+  index: RulesIndex,
+  cls: ClassDef | undefined
+): boolean {
+  return essentialsClassBuildOptions(index, cls).length > 0;
+}
+
+/** Drop build pick when the class changes or the id is no longer valid. */
+export function pruneClassBuildOptionSelection(
+  index: RulesIndex,
+  classId: string | undefined,
+  classSelections?: Record<string, string>
+): Record<string, string> | undefined {
+  const picked = selectedClassBuildOptionId(classSelections);
+  if (!picked) return classSelections;
+  const cls = index.classes.find((c) => c.id === classId);
+  const legal = new Set(essentialsClassBuildOptions(index, cls).map((o) => o.id));
+  if (classId && legal.has(picked)) return classSelections;
+  if (!classSelections) return undefined;
+  const next = { ...classSelections };
+  delete next[CLASS_BUILD_OPTION_SELECTION_KEY];
+  delete next[LEGACY_CLASS_BUILD_OPTION_SELECTION_KEY];
+  return Object.keys(next).length ? next : undefined;
 }
 
 export function getClassBuildOptions(index: RulesIndex, cls: ClassDef | undefined): ClassBuildOptionRow[] {
