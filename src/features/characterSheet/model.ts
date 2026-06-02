@@ -96,5 +96,10 @@ export interface CharacterSheetState {
   resources: CharacterSheetResources;
   inventory: InventoryItem[];
   equipment: Partial<Record<EquippedSlotKey, string>>;
+  /** Adventuring gear / tools (builder `gearIds`). */
+  gearIds?: string[];
+  ritualIds?: string[];
+  martialPracticeIds?: string[];
+  alchemyItemIds?: string[];
   powers: CharacterSheetPowerSelection;
 }

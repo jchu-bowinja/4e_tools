@@ -115,9 +115,18 @@ export function normalizeState(input: unknown): CharacterSheetState {
         ? v.hybridTalentClassFeatureIdB
         : undefined,
     hybridSideASelections: normalizeStringRecord(v.hybridSideASelections),
-    hybridSideBSelections: normalizeStringRecord(v.hybridSideBSelections)
+    hybridSideBSelections: normalizeStringRecord(v.hybridSideBSelections),
+    gearIds: normalizeStringIdArray(v.gearIds),
+    ritualIds: normalizeStringIdArray(v.ritualIds),
+    martialPracticeIds: normalizeStringIdArray(v.martialPracticeIds),
+    alchemyItemIds: normalizeStringIdArray(v.alchemyItemIds)
   };
   return next;
+}
+
+function normalizeStringIdArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((id): id is string => typeof id === "string" && id.trim().length > 0);
 }
 
 export function loadCharacterSheetState(): CharacterSheetState {

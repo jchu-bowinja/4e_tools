@@ -450,6 +450,31 @@ export interface CharacterEquipment {
   familiar?: MagicOnlySlotSelection;
 }
 
+/** Mundane gear from compendium `Gear` (adventuring supplies, ammunition, components, …). */
+export interface GearItem extends RulesEntity {
+  category?: string | null;
+  /** Total price in gold pieces (may include fractional silver/copper). */
+  priceGp?: number | null;
+  weightLb?: number | null;
+  count?: number | null;
+  body?: string | null;
+  raw: Record<string, unknown>;
+}
+
+/** Ritual or martial practice (martial practices use the Ritual compendium type). */
+export interface RitualItem extends RulesEntity {
+  flavor?: string | null;
+  category?: string | null;
+  keySkill?: string | null;
+  level?: number | null;
+  marketPriceGp?: number | null;
+  componentCost?: string | null;
+  time?: string | null;
+  duration?: string | null;
+  body?: string | null;
+  raw: Record<string, unknown>;
+}
+
 export interface MagicItem extends RulesEntity {
   flavor?: string | null;
   level?: number | null;
@@ -503,6 +528,14 @@ export interface RulesIndex {
   backgrounds?: Background[];
   /** Magic item catalog; `loadRules` defaults to []. */
   magicItems?: MagicItem[];
+  /** Mundane gear catalog; `loadRules` defaults to []. */
+  gear?: GearItem[];
+  /** Rituals (excludes martial practices); `loadRules` defaults to []. */
+  rituals?: RitualItem[];
+  /** Martial practices (subset of ritual compendium rows); `loadRules` defaults to []. */
+  martialPractices?: RitualItem[];
+  /** Alchemical items (subset of magic items); `loadRules` defaults to []. */
+  alchemyItems?: MagicItem[];
   /**
    * Powers automatically granted by class features (from ETL / Grants + Class Feature data).
    * Omits powers that are only gained via player choice lists on the same feature.
@@ -624,6 +657,14 @@ export interface CharacterBuild {
   inventory?: InventoryItem[];
   /** Inventory item id equipped per gear slot. */
   equippedSlots?: Partial<Record<EquippedSlotKey, string>>;
+  /** Adventuring gear / tools owned (compendium gear ids). */
+  gearIds?: string[];
+  /** Rituals in the character's ritual book (excludes martial practices). */
+  ritualIds?: string[];
+  /** Mastered martial practices. */
+  martialPracticeIds?: string[];
+  /** Owned alchemical items (magic item ids). */
+  alchemyItemIds?: string[];
   abilityScores: Record<Ability, number>;
   /** Point-buy / starting base only; level bumps live in `asiChoices` and automatic 11/21 bonuses. */
   asiChoices?: AsiChoices;

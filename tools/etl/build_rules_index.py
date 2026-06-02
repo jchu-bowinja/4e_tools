@@ -3580,6 +3580,93 @@ def _is_enchant_from_specific(spec: Dict[str, Any]) -> Optional[str]:
     return text or None
 
 
+def _gear_price_gp(spec: Dict[str, Any]) -> Optional[float]:
+    gp = parse_int_from_text(spec.get("Gold")) or 0
+    sp = parse_int_from_text(spec.get("Silver")) or 0
+    cp = parse_int_from_text(spec.get("Copper")) or 0
+    total = gp + sp / 10.0 + cp / 100.0
+    return total if total > 0 else None
+
+
+def _gear_index_entry(row: Dict[str, Any]) -> Dict[str, Any]:
+    spec = row.get("specific") or {}
+    name = row.get("name") or ""
+    weight_raw = spec.get("Weight")
+    weight_lb: Optional[float] = None
+    if weight_raw is not None and str(weight_raw).strip():
+        try:
+            weight_lb = float(str(weight_raw).strip())
+        except ValueError:
+            weight_lb = None
+    entry: Dict[str, Any] = {
+        "id": row.get("internal_id"),
+        "name": name,
+        "slug": normalize_name(name),
+        "source": row.get("source"),
+        "category": spec.get("Category"),
+        "priceGp": _gear_price_gp(spec),
+        "weightLb": weight_lb,
+        "count": parse_int_from_text(spec.get("count")),
+        "body": row.get("body"),
+        "raw": row,
+    }
+    if entry["priceGp"] is None:
+        entry.pop("priceGp", None)
+    if entry["weightLb"] is None:
+        entry.pop("weightLb", None)
+    if entry["count"] is None:
+        entry.pop("count", None)
+    if not entry.get("body"):
+        entry.pop("body", None)
+    return entry
+
+
+def _ritual_index_entry(row: Dict[str, Any]) -> Dict[str, Any]:
+    spec = row.get("specific") or {}
+    name = row.get("name") or ""
+    entry: Dict[str, Any] = {
+        "id": row.get("internal_id"),
+        "name": name,
+        "slug": normalize_name(name),
+        "source": row.get("source"),
+        "flavor": row.get("flavor"),
+        "category": spec.get("Category"),
+        "keySkill": spec.get("Key Skill"),
+        "level": parse_int_from_text(spec.get("Level")),
+        "marketPriceGp": parse_int_from_text(spec.get("Market Price")),
+        "componentCost": spec.get("Component Cost"),
+        "time": spec.get("Time"),
+        "duration": spec.get("Duration"),
+        "body": row.get("body"),
+        "raw": row,
+    }
+    for key in ("flavor", "category", "keySkill", "level", "marketPriceGp", "componentCost", "time", "duration", "body"):
+        if entry.get(key) in (None, ""):
+            entry.pop(key, None)
+    return entry
+
+
+def _is_martial_practice_ritual_row(row: Dict[str, Any]) -> bool:
+    cat = str((row.get("specific") or {}).get("Category") or "").lower()
+    return "martial practice" in cat
+
+
+def _alchemy_magic_item(row: Dict[str, Any]) -> bool:
+    spec = row.get("specific") or {}
+    mit = spec.get("Magic Item Type")
+    if isinstance(mit, list):
+        mit = mit[0] if mit else None
+    if not mit:
+        return False
+    return str(mit) in {
+        "Alchemical",
+        "Elixir",
+        "Potion",
+        "Consumable",
+        "Other Consumable",
+    }
+
+
 def _magic_item_index_entry(row: Dict[str, Any]) -> Dict[str, Any]:
     spec = row.get("specific") or {}
     name = row.get("name") or ""
@@ -3727,6 +3814,8 @@ def load_raw_collections_from_xml(xml_path: Path) -> Dict[str, List[Dict[str, An
         "Proficiency",
         "Background",
         "Magic Item",
+        "Gear",
+        "Ritual",
         "Build",
     }
     out: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
@@ -3777,8 +3866,36 @@ def load_raw_collections(input_path: Path) -> Dict[str, List[Dict[str, Any]]]:
         "Proficiency": read_json("Proficiency.json"),
         "Background": read_json("Background.json"),
         "Magic Item": read_json("Magic Item.json"),
+        "Gear": read_json("Gear.json"),
+        "Ritual": read_json("Ritual.json"),
         "Build": read_json("Build.json"),
     }
+
+
+def _write_consumables_catalogs(
+    output_dir: Path,
+    gear: List[Dict[str, Any]],
+    rituals: List[Dict[str, Any]],
+    martial_practices: List[Dict[str, Any]],
+    alchemy_items: List[Dict[str, Any]],
+) -> None:
+    """Smaller JSON slices for consumable tabs (lazy-loaded when rules_index predates gear/ritual ETL)."""
+    catalog_dir = output_dir / "catalogs"
+    catalog_dir.mkdir(parents=True, exist_ok=True)
+    adventuring_gear = [
+        g for g in gear if (g.get("category") or "") in {"Gear", "Ammunition"}
+    ]
+    payloads = {
+        "adventuring_gear.json": adventuring_gear,
+        "rituals.json": rituals,
+        "martial_practices.json": martial_practices,
+        "alchemy_items.json": alchemy_items,
+    }
+    for name, rows in payloads.items():
+        (catalog_dir / name).write_text(
+            json.dumps(rows, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
 
 
 def build_index(input_path: Path, output_dir: Path) -> None:
@@ -3806,6 +3923,8 @@ def build_index(input_path: Path, output_dir: Path) -> None:
     proficiencies_raw = collections["Proficiency"]
     backgrounds_raw = collections["Background"]
     magic_items_raw = collections["Magic Item"]
+    gear_raw = collections.get("Gear") or []
+    rituals_raw = collections.get("Ritual") or []
     features_by_id: Dict[str, Dict[str, Any]] = {
         str(row.get("internal_id")): row for row in class_features_raw if row.get("internal_id")
     }
@@ -4263,8 +4382,25 @@ def build_index(input_path: Path, output_dir: Path) -> None:
         backgrounds.append(_background_index_entry(row, known_races, known_classes, anomalies))
 
     magic_items: List[Dict[str, Any]] = []
+    alchemy_items: List[Dict[str, Any]] = []
     for row in magic_items_raw:
-        magic_items.append(_magic_item_index_entry(row))
+        entry = _magic_item_index_entry(row)
+        magic_items.append(entry)
+        if _alchemy_magic_item(row):
+            alchemy_items.append(entry)
+
+    gear: List[Dict[str, Any]] = []
+    for row in gear_raw:
+        gear.append(_gear_index_entry(row))
+
+    rituals: List[Dict[str, Any]] = []
+    martial_practices: List[Dict[str, Any]] = []
+    for row in rituals_raw:
+        entry = _ritual_index_entry(row)
+        if _is_martial_practice_ritual_row(row):
+            martial_practices.append(entry)
+        else:
+            rituals.append(entry)
 
     epic_destinies: List[Dict[str, Any]] = []
     for row in epic_raw:
@@ -4315,6 +4451,10 @@ def build_index(input_path: Path, output_dir: Path) -> None:
                 "proficiencies": len(proficiencies),
                 "backgrounds": len(backgrounds),
                 "magicItems": len(magic_items),
+                "gear": len(gear),
+                "rituals": len(rituals),
+                "martialPractices": len(martial_practices),
+                "alchemyItems": len(alchemy_items),
             },
         },
         "races": races,
@@ -4336,6 +4476,10 @@ def build_index(input_path: Path, output_dir: Path) -> None:
         "proficiencies": proficiencies,
         "backgrounds": backgrounds,
         "magicItems": magic_items,
+        "gear": gear,
+        "rituals": rituals,
+        "martialPractices": martial_practices,
+        "alchemyItems": alchemy_items,
         "autoGrantedPowerIdsByClassId": auto_granted_power_ids_by_class,
         "autoGrantedSkillTrainingNamesBySupportId": auto_granted_skill_training_names_by_support,
         "grantedClassFeatureNamesBySupportId": granted_class_feature_names_by_support_id,
@@ -4356,6 +4500,8 @@ def build_index(input_path: Path, output_dir: Path) -> None:
     (output_dir / "rules_index.json").write_text(
         json.dumps(index, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
+
+    _write_consumables_catalogs(output_dir, gear, rituals, martial_practices, alchemy_items)
 
     with anomalies_path.open("w", encoding="utf-8") as f:
         for row in anomalies:

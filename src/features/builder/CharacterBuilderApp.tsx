@@ -213,6 +213,14 @@ import { weaponAttackAbilityForCharacter } from "../../rules/classFeatureProfici
 import { summarizeImplementAttack, summarizeMainWeaponAttack } from "../../rules/weaponAttack";
 import { BuilderSidebarItemsPanel } from "./BuilderSidebarItemsPanel";
 import { EquipmentTab, type EquipmentEditorSlot } from "./EquipmentTab";
+import { CharacterConsumablePickerTab } from "./CharacterConsumablePickerTab";
+import {
+  adventuringGearPickerRowsFromCatalog,
+  alchemyPickerRowsFromCatalog,
+  martialPracticePickerRowsFromCatalog,
+  ritualPickerRowsFromCatalog
+} from "./consumableTabData";
+import { useConsumablesCatalog } from "../../data/useConsumablesCatalog";
 import {
   LiveSheetCollapsibleSection,
   liveSheetSectionBodyStyle,
@@ -548,7 +556,11 @@ type BuilderTab =
   | "theme"
   | "paragonPath"
   | "epicDestiny"
-  | "equipment";
+  | "equipment"
+  | "adventuringGear"
+  | "rituals"
+  | "alchemy"
+  | "martialPractices";
 
 function abilityModifier(score: number): number {
   return Math.floor((score - 10) / 2);
@@ -1473,6 +1485,18 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     () => characterBuildInventoryItems(build, index),
     [build, index]
   );
+  const { catalog: consumablesCatalog, loading: consumablesLoading, catalogMissing } =
+    useConsumablesCatalog(index);
+  const adventuringGearRows = useMemo(
+    () => adventuringGearPickerRowsFromCatalog(consumablesCatalog),
+    [consumablesCatalog]
+  );
+  const ritualRows = useMemo(() => ritualPickerRowsFromCatalog(consumablesCatalog), [consumablesCatalog]);
+  const martialPracticeRows = useMemo(
+    () => martialPracticePickerRowsFromCatalog(consumablesCatalog),
+    [consumablesCatalog]
+  );
+  const alchemyRows = useMemo(() => alchemyPickerRowsFromCatalog(consumablesCatalog), [consumablesCatalog]);
 
   const wieldSlotsForPreview = useMemo(() => {
     const slots: Partial<Record<EquippedSlotKey, string>> = {
@@ -2054,7 +2078,11 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         theme: 0,
         paragonPath: 0,
         epicDestiny: 0,
-        equipment: 0
+        equipment: 0,
+        adventuringGear: 0,
+        rituals: 0,
+        alchemy: 0,
+        martialPractices: 0
       }
     );
 
@@ -2080,7 +2108,11 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
           : "incomplete",
       epicDestiny:
         errorsByTab.epicDestiny === 0 && (build.level < 21 || !!build.epicDestinyId) ? "complete" : "incomplete",
-      equipment: errorsByTab.equipment === 0 ? "complete" : "incomplete"
+      equipment: errorsByTab.equipment === 0 ? "complete" : "incomplete",
+      adventuringGear: "complete",
+      rituals: "complete",
+      alchemy: "complete",
+      martialPractices: "complete"
     };
     return statuses;
   }, [
@@ -2115,7 +2147,11 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       ["theme", "Theme"],
       ...(build.level >= 11 ? ([["paragonPath", "Paragon path"]] as [BuilderTab, string][]) : []),
       ...(build.level >= 21 ? ([["epicDestiny", "Epic destiny"]] as [BuilderTab, string][]) : []),
-      ["equipment", "Equipment"]
+      ["equipment", "Equipment"],
+      ["adventuringGear", "Adventuring gear"],
+      ["rituals", "Rituals"],
+      ["alchemy", "Alchemy"],
+      ["martialPractices", "Martial practices"]
     ];
     return entries.map(([id, label]) => ({
       id,
@@ -5564,6 +5600,57 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               />
             </div>
           </div>
+        )}
+
+        {activeTab === "adventuringGear" && (
+          <CharacterConsumablePickerTab
+            title="Adventuring gear & tools"
+            description="Mundane gear and ammunition from the compendium."
+            items={adventuringGearRows}
+            selectedIds={build.gearIds ?? []}
+            onSelectedIdsChange={(gearIds) => updateBuild({ ...build, gearIds })}
+            loading={consumablesLoading}
+            catalogMissing={catalogMissing}
+          />
+        )}
+
+        {activeTab === "rituals" && (
+          <CharacterConsumablePickerTab
+            title="Rituals"
+            description="Rituals for your ritual book (excluding martial practices)."
+            items={ritualRows}
+            selectedIds={build.ritualIds ?? []}
+            onSelectedIdsChange={(ritualIds) => updateBuild({ ...build, ritualIds })}
+            maxLevel={build.level}
+            loading={consumablesLoading}
+            catalogMissing={catalogMissing}
+          />
+        )}
+
+        {activeTab === "alchemy" && (
+          <CharacterConsumablePickerTab
+            title="Alchemy"
+            description="Alchemical items, elixirs, potions, and other consumables."
+            items={alchemyRows}
+            selectedIds={build.alchemyItemIds ?? []}
+            onSelectedIdsChange={(alchemyItemIds) => updateBuild({ ...build, alchemyItemIds })}
+            maxLevel={build.level}
+            loading={consumablesLoading}
+            catalogMissing={catalogMissing}
+          />
+        )}
+
+        {activeTab === "martialPractices" && (
+          <CharacterConsumablePickerTab
+            title="Martial practices"
+            description="Martial techniques mastered like rituals."
+            items={martialPracticeRows}
+            selectedIds={build.martialPracticeIds ?? []}
+            onSelectedIdsChange={(martialPracticeIds) => updateBuild({ ...build, martialPracticeIds })}
+            maxLevel={build.level}
+            loading={consumablesLoading}
+            catalogMissing={catalogMissing}
+          />
         )}
 
         <JsonCollapsiblePanel

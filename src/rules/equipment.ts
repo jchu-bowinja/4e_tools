@@ -12,6 +12,7 @@ import type {
   RulesIndex,
   StatAddEntry
 } from "./models";
+import { pruneCharacterConsumableIds } from "./consumablesCatalog";
 import { MAGIC_ONLY_EQUIPMENT_SLOT_KEYS } from "./magicItemEquipment";
 import { mergePassiveDefenseBonuses, passiveDefenseBonusesFromStatAdds, type PassiveDefenseBonuses } from "./supportStatAdds";
 
@@ -359,8 +360,13 @@ export function normalizeCharacterBuild(
     ...rest
   } = stripped;
 
-  return {
+  let next: CharacterBuild = {
     ...rest,
     equipment
   };
+  if (index) {
+    const pruned = pruneCharacterConsumableIds(next, index);
+    next = { ...next, ...pruned };
+  }
+  return next;
 }

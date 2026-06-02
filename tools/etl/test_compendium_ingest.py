@@ -2,8 +2,10 @@ import unittest
 
 from build_rules_index import (
     _background_index_entry,
+    _gear_index_entry,
     _magic_item_index_entry,
     _proficiency_index_entry,
+    _ritual_index_entry,
     _rules_element_to_row,
 )
 import xml.etree.ElementTree as ET
@@ -82,6 +84,35 @@ class TestCompendiumIngest(unittest.TestCase):
         out = _magic_item_index_entry(row)
         self.assertEqual(out["isEnchant"], "Shield")
         self.assertEqual(out["magicItemType"], "Arms Slot Item")
+
+    def test_gear_price_from_mixed_coins(self):
+        row = {
+            "internal_id": "ID_FMP_GEAR_4",
+            "name": "Bedroll",
+            "source": "Player's Handbook",
+            "specific": {"Category": "Gear", "Gold": None, "Silver": "1", "Copper": None},
+        }
+        out = _gear_index_entry(row)
+        self.assertEqual(out["category"], "Gear")
+        self.assertAlmostEqual(out["priceGp"], 0.1)
+
+    def test_ritual_index_entry(self):
+        row = {
+            "internal_id": "ID_FMP_RITUAL_39",
+            "name": "Comprehend Language",
+            "flavor": "The guttural language clarifies.",
+            "specific": {
+                "Category": "Exploration",
+                "Key Skill": "Arcana",
+                "Level": "1",
+                "Market Price": "50 gp",
+            },
+            "body": "You understand speech.",
+        }
+        out = _ritual_index_entry(row)
+        self.assertEqual(out["level"], 1)
+        self.assertEqual(out["marketPriceGp"], 50)
+        self.assertEqual(out["category"], "Exploration")
 
 
 if __name__ == "__main__":

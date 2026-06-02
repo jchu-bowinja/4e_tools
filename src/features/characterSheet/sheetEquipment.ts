@@ -855,6 +855,10 @@ export function buildLikeStateFromSheet(state: CharacterSheetState, index: Rules
     equipment: characterEquipment,
     gold: state.gold,
     inventory: [...state.inventory],
-    equippedSlots: normalizeEquippedSlots(state.equipment)
+    equippedSlots: normalizeEquippedSlots(state.equipment),
+    gearIds: state.gearIds?.length ? [...state.gearIds] : undefined,
+    ritualIds: state.ritualIds?.length ? [...state.ritualIds] : undefined,
+    martialPracticeIds: state.martialPracticeIds?.length ? [...state.martialPracticeIds] : undefined,
+    alchemyItemIds: state.alchemyItemIds?.length ? [...state.alchemyItemIds] : undefined
   };
 }

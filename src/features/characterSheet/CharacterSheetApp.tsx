@@ -106,6 +106,14 @@ import {
   toBuildLikeState
 } from "./selectors";
 import { EquipmentTab, type EquipmentEditorSlot } from "../builder/EquipmentTab";
+import { CharacterConsumablePickerTab } from "../builder/CharacterConsumablePickerTab";
+import {
+  adventuringGearPickerRowsFromCatalog,
+  alchemyPickerRowsFromCatalog,
+  martialPracticePickerRowsFromCatalog,
+  ritualPickerRowsFromCatalog
+} from "../builder/consumableTabData";
+import { useConsumablesCatalog } from "../../data/useConsumablesCatalog";
 import type { EquipmentPriceSlot } from "../../rules/equipmentItemPrice";
 import { CharacterEquippedSlotsPanel } from "./CharacterEquippedSlotsPanel";
 import { CharacterInventoryList } from "./CharacterInventoryList";
@@ -130,11 +138,21 @@ import { JsonCollapsiblePanel } from "../../ui/JsonCollapsiblePanel";
 import { weaponAttackAbilityForCharacter } from "../../rules/classFeatureProficiencies";
 import { summarizeImplementAttack, summarizeMainWeaponAttack } from "../../rules/weaponAttack";
 
-type SheetTab = "overview" | "equipment";
+type SheetTab =
+  | "overview"
+  | "equipment"
+  | "adventuringGear"
+  | "rituals"
+  | "alchemy"
+  | "martialPractices";
 
 const tabLabel: Record<SheetTab, string> = {
   overview: "Character",
-  equipment: "Equipment"
+  equipment: "Equipment",
+  adventuringGear: "Adventuring gear",
+  rituals: "Rituals",
+  alchemy: "Alchemy",
+  martialPractices: "Martial practices"
 };
 
 /** Overview center column (traits + feats; row 2: HP/resources); wide enough for the rest strip without its own scrollbar. */
@@ -1245,6 +1263,18 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
   }, [index, sheet]);
   const sheetEquipmentBuild = useMemo(() => buildLikeStateFromSheet(sheet, index), [sheet, index]);
   const inventoryItems = useMemo(() => characterSheetInventoryItems(sheet, index), [sheet, index]);
+  const { catalog: consumablesCatalog, loading: consumablesLoading, catalogMissing } =
+    useConsumablesCatalog(index);
+  const adventuringGearRows = useMemo(
+    () => adventuringGearPickerRowsFromCatalog(consumablesCatalog),
+    [consumablesCatalog]
+  );
+  const ritualRows = useMemo(() => ritualPickerRowsFromCatalog(consumablesCatalog), [consumablesCatalog]);
+  const martialPracticeRows = useMemo(
+    () => martialPracticePickerRowsFromCatalog(consumablesCatalog),
+    [consumablesCatalog]
+  );
+  const alchemyRows = useMemo(() => alchemyPickerRowsFromCatalog(consumablesCatalog), [consumablesCatalog]);
   const mainWeaponSummary = useMemo(
     () =>
       summarizeMainWeaponAttack(
@@ -3024,6 +3054,71 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               onRemoveItem={removeInventoryItem}
             />
           </div>
+        </div>
+      )}
+
+      {tab === "adventuringGear" && (
+        <div style={contentPanelPaddedStyle}>
+          <CharacterConsumablePickerTab
+            title="Adventuring gear & tools"
+            description="Mundane gear and ammunition from the compendium. Track what your character carries."
+            items={adventuringGearRows}
+            selectedIds={sheet.gearIds ?? []}
+            onSelectedIdsChange={(gearIds) => updateSheet((prev) => ({ ...prev, gearIds }))}
+            hideTitle
+            loading={consumablesLoading}
+            catalogMissing={catalogMissing}
+          />
+        </div>
+      )}
+
+      {tab === "rituals" && (
+        <div style={contentPanelPaddedStyle}>
+          <CharacterConsumablePickerTab
+            title="Rituals"
+            description="Rituals in your ritual book (arcane, divine, primal, and other non-martial practices)."
+            items={ritualRows}
+            selectedIds={sheet.ritualIds ?? []}
+            onSelectedIdsChange={(ritualIds) => updateSheet((prev) => ({ ...prev, ritualIds }))}
+            maxLevel={sheet.level}
+            hideTitle
+            loading={consumablesLoading}
+            catalogMissing={catalogMissing}
+          />
+        </div>
+      )}
+
+      {tab === "alchemy" && (
+        <div style={contentPanelPaddedStyle}>
+          <CharacterConsumablePickerTab
+            title="Alchemy"
+            description="Alchemical items, elixirs, potions, and other consumable magic items."
+            items={alchemyRows}
+            selectedIds={sheet.alchemyItemIds ?? []}
+            onSelectedIdsChange={(alchemyItemIds) => updateSheet((prev) => ({ ...prev, alchemyItemIds }))}
+            maxLevel={sheet.level}
+            hideTitle
+            loading={consumablesLoading}
+            catalogMissing={catalogMissing}
+          />
+        </div>
+      )}
+
+      {tab === "martialPractices" && (
+        <div style={contentPanelPaddedStyle}>
+          <CharacterConsumablePickerTab
+            title="Martial practices"
+            description="Martial techniques learned like rituals but powered by martial training."
+            items={martialPracticeRows}
+            selectedIds={sheet.martialPracticeIds ?? []}
+            onSelectedIdsChange={(martialPracticeIds) =>
+              updateSheet((prev) => ({ ...prev, martialPracticeIds }))
+            }
+            maxLevel={sheet.level}
+            hideTitle
+            loading={consumablesLoading}
+            catalogMissing={catalogMissing}
+          />
         </div>
       )}
 

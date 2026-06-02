@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { generatedStaticPlugin } from "./viteGeneratedStaticPlugin";
 import { reportsApiPlugin } from "./viteReportsApiPlugin";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -86,5 +87,10 @@ function parseMonsterTemplatePastePlugin(): import("vite").Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), parseMonsterTemplatePastePlugin(), reportsApiPlugin(projectRoot)]
+  plugins: [
+    react(),
+    generatedStaticPlugin(projectRoot),
+    parseMonsterTemplatePastePlugin(),
+    reportsApiPlugin(projectRoot)
+  ]
 });
