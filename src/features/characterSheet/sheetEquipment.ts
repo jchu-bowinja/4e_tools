@@ -858,8 +858,12 @@ export function buildLikeStateFromSheet(state: CharacterSheetState, index: Rules
     equippedSlots: normalizeEquippedSlots(state.equipment),
     gear: state.gear?.length ? state.gear.map((e) => ({ ...e })) : undefined,
     rituals: state.rituals?.length ? state.rituals.map((e) => ({ ...e })) : undefined,
+    ritualScrolls: state.ritualScrolls?.length ? state.ritualScrolls.map((e) => ({ ...e })) : undefined,
     martialPractices: state.martialPractices?.length
       ? state.martialPractices.map((e) => ({ ...e }))
+      : undefined,
+    martialPracticeScrolls: state.martialPracticeScrolls?.length
+      ? state.martialPracticeScrolls.map((e) => ({ ...e }))
       : undefined,
     alchemy: state.alchemy?.length ? state.alchemy.map((e) => ({ ...e })) : undefined
   };

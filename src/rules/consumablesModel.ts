@@ -100,12 +100,38 @@ export function removeConsumableEntry(entries: CharacterConsumableEntry[], id: s
 }
 
 /** Strip legacy `*Ids` fields and normalize modern lists on save/load. */
+export function ritualScrollEntries(build: CharacterBuild): CharacterConsumableEntry[] {
+  return normalizeConsumableEntries(build.ritualScrolls);
+}
+
+export function setRitualScrollEntries(
+  build: CharacterBuild,
+  entries: CharacterConsumableEntry[]
+): CharacterBuild {
+  const normalized = normalizeConsumableEntries(entries);
+  return { ...build, ritualScrolls: normalized.length > 0 ? normalized : undefined };
+}
+
+export function martialPracticeScrollEntries(build: CharacterBuild): CharacterConsumableEntry[] {
+  return normalizeConsumableEntries(build.martialPracticeScrolls);
+}
+
+export function setMartialPracticeScrollEntries(
+  build: CharacterBuild,
+  entries: CharacterConsumableEntry[]
+): CharacterBuild {
+  const normalized = normalizeConsumableEntries(entries);
+  return { ...build, martialPracticeScrolls: normalized.length > 0 ? normalized : undefined };
+}
+
 export function migrateCharacterConsumables(build: CharacterBuild): CharacterBuild {
   let next = { ...build };
   for (const key of LIST_KEYS) {
     const entries = consumableEntries(next, key);
     next = setConsumableEntries(next, key, entries);
   }
+  next = setRitualScrollEntries(next, ritualScrollEntries(next));
+  next = setMartialPracticeScrollEntries(next, martialPracticeScrollEntries(next));
   const stripped = { ...next } as CharacterBuild & Record<string, unknown>;
   for (const legacyKey of Object.values(LEGACY_ID_KEYS)) {
     delete stripped[legacyKey];

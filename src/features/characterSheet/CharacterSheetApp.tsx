@@ -115,6 +115,9 @@ import {
 } from "../builder/consumableTabData";
 import { useConsumablesCatalog } from "../../data/useConsumablesCatalog";
 import { ritualCasterStatusMessage } from "../../rules/ritualCasting";
+import { CharacterItemsCategoryNav } from "../builder/CharacterItemsCategoryNav";
+import type { ItemsCategory } from "../builder/characterItemsCategories";
+import { CharacterUnifiedInventoryPanel } from "./CharacterUnifiedInventoryPanel";
 import type { EquipmentPriceSlot } from "../../rules/equipmentItemPrice";
 import { CharacterEquippedSlotsPanel } from "./CharacterEquippedSlotsPanel";
 import { CharacterInventoryList } from "./CharacterInventoryList";
@@ -123,7 +126,6 @@ import { equipmentSlotGoldCost } from "../../rules/equipmentItemPrice";
 import {
   addAcquiredEquipmentToSheet,
   buildLikeStateFromSheet,
-  characterSheetInventoryItems,
   equipInventoryItemOnSheet,
   unequipInventoryItemOnSheet,
   sheetCharacterEquipment,
@@ -139,21 +141,11 @@ import { JsonCollapsiblePanel } from "../../ui/JsonCollapsiblePanel";
 import { weaponAttackAbilityForCharacter } from "../../rules/classFeatureProficiencies";
 import { summarizeImplementAttack, summarizeMainWeaponAttack } from "../../rules/weaponAttack";
 
-type SheetTab =
-  | "overview"
-  | "equipment"
-  | "adventuringGear"
-  | "rituals"
-  | "alchemy"
-  | "martialPractices";
+type SheetTab = "overview" | "items";
 
 const tabLabel: Record<SheetTab, string> = {
   overview: "Character",
-  equipment: "Equipment",
-  adventuringGear: "Adventuring gear",
-  rituals: "Rituals",
-  alchemy: "Alchemy",
-  martialPractices: "Martial practices"
+  items: "Items"
 };
 
 /** Overview center column (traits + feats; row 2: HP/resources); wide enough for the rest strip without its own scrollbar. */
@@ -991,6 +983,7 @@ const CHARACTER_SHEET_CLASS_INFO_PANEL_ID = "character-sheet-class-info-panel";
 export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesIndex; tooltipGlossary: Record<string, string> }): JSX.Element {
   const [sheet, setSheet] = useState<CharacterSheetState>(() => loadCharacterSheetState());
   const [tab, setTab] = useState<SheetTab>("overview");
+  const [itemsCategory, setItemsCategory] = useState<ItemsCategory>("inventory");
   const [draggingPowerId, setDraggingPowerId] = useState<string | null>(null);
   const [savedCharacters, setSavedCharacters] = useState<SavedCharacterEntry[]>(() => loadSavedCharacters());
   const [selectedSavedCharacterId, setSelectedSavedCharacterId] = useState("");
@@ -1263,7 +1256,6 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     return computeMagicItemCombatBonuses(index, toBuildLikeState(sheet, index));
   }, [index, sheet]);
   const sheetEquipmentBuild = useMemo(() => buildLikeStateFromSheet(sheet, index), [sheet, index]);
-  const inventoryItems = useMemo(() => characterSheetInventoryItems(sheet, index), [sheet, index]);
   const { catalog: consumablesCatalog, loading: consumablesLoading, catalogMissing } =
     useConsumablesCatalog(index);
   const adventuringGearRows = useMemo(
@@ -3021,8 +3013,32 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         </div>
       )}
 
-      {tab === "equipment" && (
+      {tab === "items" && (
         <div style={{ display: "grid", gap: "0.55rem" }}>
+          <CharacterItemsCategoryNav value={itemsCategory} onChange={setItemsCategory} />
+          {itemsCategory === "inventory" && (
+            <div style={contentPanelPaddedStyle}>
+              <CharacterUnifiedInventoryPanel
+                index={index}
+                build={sheetEquipmentBuild}
+                onBuildChange={(next) =>
+                  updateSheet((prev) => ({
+                    ...prev,
+                    inventory: next.inventory ?? [],
+                    equipment: next.equippedSlots ?? {},
+                    gear: next.gear,
+                    rituals: next.rituals,
+                    ritualScrolls: next.ritualScrolls,
+                    alchemy: next.alchemy,
+                    martialPractices: next.martialPractices,
+                    martialPracticeScrolls: next.martialPracticeScrolls
+                  }))
+                }
+              />
+            </div>
+          )}
+          {itemsCategory === "equipment" && (
+            <>
           <EquipmentTab
             index={index}
             build={sheetEquipmentBuild}
@@ -3048,21 +3064,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               onUnequipItem={unequipInventoryItem}
             />
           </div>
-          <div style={contentPanelPaddedStyle}>
-            <div className="character-sheet-section-head" style={{ marginBottom: "0.5rem" }}>
-              {inventoryItems.length > 0 ? `Items (${inventoryItems.length})` : "Items"}
-            </div>
-            <CharacterInventoryList
-              items={inventoryItems}
-              onEquipItem={equipInventoryItem}
-              onUnequipItem={unequipInventoryItem}
-              onRemoveItem={removeInventoryItem}
-            />
-          </div>
-        </div>
-      )}
+            </>
+          )}
 
-      {tab === "adventuringGear" && (
+      {itemsCategory === "adventuringGear" && (
         <div style={contentPanelPaddedStyle}>
           <CharacterConsumablePickerTab
             title="Adventuring gear & tools"
@@ -3080,7 +3085,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         </div>
       )}
 
-      {tab === "rituals" && (
+      {itemsCategory === "rituals" && (
         <div style={contentPanelPaddedStyle}>
           <CharacterConsumablePickerTab
             title="Rituals"
@@ -3090,12 +3095,21 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             onEntriesChange={(rituals) =>
               updateSheet((prev) => ({ ...prev, rituals: rituals.length ? rituals : undefined }))
             }
+            scrollEntries={sheet.ritualScrolls ?? []}
+            onScrollEntriesChange={(ritualScrolls) =>
+              updateSheet((prev) => ({
+                ...prev,
+                ritualScrolls: ritualScrolls.length ? ritualScrolls : undefined
+              }))
+            }
             maxLevel={sheet.level}
             gold={sheet.gold ?? 0}
             onGoldChange={(gold) => updateSheet((prev) => ({ ...prev, gold }))}
             showPurchaseActions
+            scrollPurchase="ritual"
             requireRitualCasting
             ritualCasterBlockedMessage={ritualCasterMessage}
+            showLevelSort
             hideTitle
             loading={consumablesLoading}
             catalogMissing={catalogMissing}
@@ -3103,7 +3117,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         </div>
       )}
 
-      {tab === "alchemy" && (
+      {itemsCategory === "alchemy" && (
         <div style={contentPanelPaddedStyle}>
           <CharacterConsumablePickerTab
             title="Alchemy"
@@ -3117,6 +3131,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             gold={sheet.gold ?? 0}
             onGoldChange={(gold) => updateSheet((prev) => ({ ...prev, gold }))}
             showPurchaseActions
+            showLevelSort
             hideTitle
             loading={consumablesLoading}
             catalogMissing={catalogMissing}
@@ -3124,7 +3139,7 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         </div>
       )}
 
-      {tab === "martialPractices" && (
+      {itemsCategory === "martialPractices" && (
         <div style={contentPanelPaddedStyle}>
           <CharacterConsumablePickerTab
             title="Martial practices"
@@ -3140,11 +3155,22 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             maxLevel={sheet.level}
             gold={sheet.gold ?? 0}
             onGoldChange={(gold) => updateSheet((prev) => ({ ...prev, gold }))}
+            scrollEntries={sheet.martialPracticeScrolls ?? []}
+            onScrollEntriesChange={(martialPracticeScrolls) =>
+              updateSheet((prev) => ({
+                ...prev,
+                martialPracticeScrolls: martialPracticeScrolls.length ? martialPracticeScrolls : undefined
+              }))
+            }
             showPurchaseActions
+            scrollPurchase="martialPractice"
+            showLevelSort
             hideTitle
             loading={consumablesLoading}
             catalogMissing={catalogMissing}
           />
+        </div>
+      )}
         </div>
       )}
 

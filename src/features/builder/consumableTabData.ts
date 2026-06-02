@@ -29,6 +29,7 @@ export function ritualPickerRowsFromCatalog(catalog: ConsumablesCatalog): Consum
     name: r.name,
     slug: r.slug,
     source: r.source,
+    level: r.level ?? undefined,
     meta: ritualMetaLine(r),
     flavor: r.flavor ?? undefined,
     body: r.body ?? undefined,
@@ -42,6 +43,7 @@ export function martialPracticePickerRowsFromCatalog(catalog: ConsumablesCatalog
     name: r.name.replace(/\s+Martial Practice$/i, ""),
     slug: r.slug,
     source: r.source,
+    level: r.level ?? undefined,
     meta: ritualMetaLine(r),
     flavor: r.flavor ?? undefined,
     body: r.body ?? undefined,
@@ -55,6 +57,7 @@ export function alchemyPickerRowsFromCatalog(catalog: ConsumablesCatalog): Consu
     name: item.name,
     slug: item.slug,
     source: item.source,
+    level: item.level ?? undefined,
     meta: [
       item.magicItemType,
       item.level != null ? `Level ${item.level}` : null,

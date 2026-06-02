@@ -365,8 +365,12 @@ export function sheetStateFromBuild(build: CharacterBuild, index: RulesIndex): C
     equipment: { ...(normalized.equippedSlots ?? {}) },
     gear: normalized.gear?.length ? normalized.gear.map((e) => ({ ...e })) : undefined,
     rituals: normalized.rituals?.length ? normalized.rituals.map((e) => ({ ...e })) : undefined,
+    ritualScrolls: normalized.ritualScrolls?.length ? normalized.ritualScrolls.map((e) => ({ ...e })) : undefined,
     martialPractices: normalized.martialPractices?.length
       ? normalized.martialPractices.map((e) => ({ ...e }))
+      : undefined,
+    martialPracticeScrolls: normalized.martialPracticeScrolls?.length
+      ? normalized.martialPracticeScrolls.map((e) => ({ ...e }))
       : undefined,
     alchemy: normalized.alchemy?.length ? normalized.alchemy.map((e) => ({ ...e })) : undefined,
     powers: {

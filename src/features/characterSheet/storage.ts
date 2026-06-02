@@ -120,7 +120,9 @@ export function normalizeState(input: unknown): CharacterSheetState {
     hybridSideBSelections: normalizeStringRecord(v.hybridSideBSelections),
     gear: normalizeConsumableEntriesField(v.gear, v.gearIds),
     rituals: normalizeConsumableEntriesField(v.rituals, v.ritualIds),
+    ritualScrolls: normalizeConsumableEntries(v.ritualScrolls),
     martialPractices: normalizeConsumableEntriesField(v.martialPractices, v.martialPracticeIds),
+    martialPracticeScrolls: normalizeConsumableEntries(v.martialPracticeScrolls),
     alchemy: normalizeConsumableEntriesField(v.alchemy, v.alchemyItemIds)
   };
   return next;

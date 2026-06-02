@@ -199,14 +199,8 @@ import {
 } from "../../rules/equipment";
 import { computeMagicItemCombatBonuses } from "../../rules/magicItemEquipment";
 import { equipmentSlotGoldCost } from "../../rules/equipmentItemPrice";
-import {
-  addAcquiredEquipmentToBuild,
-  characterBuildInventoryItems,
-  equipInventoryItemOnBuild,
-  unequipInventoryItemOnBuild
-} from "../characterSheet/sheetEquipment";
+import { addAcquiredEquipmentToBuild, equipInventoryItemOnBuild, unequipInventoryItemOnBuild } from "../characterSheet/sheetEquipment";
 import { CharacterEquippedSlotsPanel } from "../characterSheet/CharacterEquippedSlotsPanel";
-import { CharacterInventoryList } from "../characterSheet/CharacterInventoryList";
 import { CharacterProficienciesBlock } from "../characterSheet/CharacterProficienciesBlock";
 import type { EquipmentPriceSlot } from "../../rules/equipmentItemPrice";
 import { weaponAttackAbilityForCharacter } from "../../rules/classFeatureProficiencies";
@@ -221,8 +215,21 @@ import {
   ritualPickerRowsFromCatalog
 } from "./consumableTabData";
 import { useConsumablesCatalog } from "../../data/useConsumablesCatalog";
-import { consumableEntries, setConsumableEntries } from "../../rules/consumablesModel";
+import {
+  consumableEntries,
+  martialPracticeScrollEntries,
+  ritualScrollEntries,
+  setConsumableEntries,
+  setMartialPracticeScrollEntries,
+  setRitualScrollEntries
+} from "../../rules/consumablesModel";
 import { ritualCasterStatusMessage } from "../../rules/ritualCasting";
+import {
+  resolveValidationItemsCategory,
+  type ItemsCategory
+} from "./characterItemsCategories";
+import { CharacterItemsCategoryNav } from "./CharacterItemsCategoryNav";
+import { CharacterUnifiedInventoryPanel } from "../characterSheet/CharacterUnifiedInventoryPanel";
 import {
   LiveSheetCollapsibleSection,
   liveSheetSectionBodyStyle,
@@ -558,11 +565,7 @@ type BuilderTab =
   | "theme"
   | "paragonPath"
   | "epicDestiny"
-  | "equipment"
-  | "adventuringGear"
-  | "rituals"
-  | "alchemy"
-  | "martialPractices";
+  | "items";
 
 function abilityModifier(score: number): number {
   return Math.floor((score - 10) / 2);
@@ -1019,6 +1022,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   const [activeSavedCharacterId, setActiveSavedCharacterId] = useState("");
   const prevAutoGrantedSkillIdsRef = useRef<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<BuilderTab>("race");
+  const [itemsCategory, setItemsCategory] = useState<ItemsCategory>("inventory");
   const [featSearch, setFeatSearch] = useState("");
   const [featFilterAllText, setFeatFilterAllText] = useState(false);
   const [showInvalidFeats, setShowInvalidFeats] = useState(false);
@@ -1483,10 +1487,6 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   ]);
 
   const magicCombat = useMemo(() => computeMagicItemCombatBonuses(index, build), [index, build]);
-  const builderInventoryItems = useMemo(
-    () => characterBuildInventoryItems(build, index),
-    [build, index]
-  );
   const { catalog: consumablesCatalog, loading: consumablesLoading, catalogMissing } =
     useConsumablesCatalog(index);
   const adventuringGearRows = useMemo(
@@ -2051,8 +2051,18 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     if (m.includes("feat")) return "feats";
     if (m.includes("utility power")) return "powers";
     if (m.includes("at-will") || m.includes("encounter") || m.includes("daily") || m.includes("power")) return "powers";
-    if (m.includes("main weapon") || m.includes("off-hand weapon") || m.includes("selected implement")) return "equipment";
+    if (m.includes("main weapon") || m.includes("off-hand weapon") || m.includes("selected implement")) {
+      return "items";
+    }
+    if (resolveValidationItemsCategory(message)) return "items";
     return null;
+  }
+
+  function openTabForValidationMessage(message: string): void {
+    const category = resolveValidationItemsCategory(message);
+    if (category) setItemsCategory(category);
+    const tab = navigateToTabForError(message);
+    if (tab) setActiveTab(tab);
   }
 
   /** Tab to open when jumping from an error (respects tier locks when those tabs are hidden). */
@@ -2081,11 +2091,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         theme: 0,
         paragonPath: 0,
         epicDestiny: 0,
-        equipment: 0,
-        adventuringGear: 0,
-        rituals: 0,
-        alchemy: 0,
-        martialPractices: 0
+        items: 0
       }
     );
 
@@ -2111,11 +2117,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
           : "incomplete",
       epicDestiny:
         errorsByTab.epicDestiny === 0 && (build.level < 21 || !!build.epicDestinyId) ? "complete" : "incomplete",
-      equipment: errorsByTab.equipment === 0 ? "complete" : "incomplete",
-      adventuringGear: "complete",
-      rituals: "complete",
-      alchemy: "complete",
-      martialPractices: "complete"
+      items: errorsByTab.items === 0 ? "complete" : "incomplete"
     };
     return statuses;
   }, [
@@ -2150,11 +2152,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       ["theme", "Theme"],
       ...(build.level >= 11 ? ([["paragonPath", "Paragon path"]] as [BuilderTab, string][]) : []),
       ...(build.level >= 21 ? ([["epicDestiny", "Epic destiny"]] as [BuilderTab, string][]) : []),
-      ["equipment", "Equipment"],
-      ["adventuringGear", "Adventuring gear"],
-      ["rituals", "Rituals"],
-      ["alchemy", "Alchemy"],
-      ["martialPractices", "Martial practices"]
+      ["items", "Items"]
     ];
     return entries.map(([id, label]) => ({
       id,
@@ -5543,8 +5541,14 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
           </div>
         )}
 
-        {activeTab === "equipment" && (
+        {activeTab === "items" && (
           <div style={{ display: "grid", gap: "0.55rem" }}>
+            <CharacterItemsCategoryNav value={itemsCategory} onChange={setItemsCategory} />
+            {itemsCategory === "inventory" && (
+              <CharacterUnifiedInventoryPanel index={index} build={build} onBuildChange={updateBuild} />
+            )}
+            {itemsCategory === "equipment" && (
+              <>
             <EquipmentTab
               index={index}
               build={build}
@@ -5578,34 +5582,10 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 onUnequipItem={(itemId, slot) => updateBuild(unequipInventoryItemOnBuild(build, itemId, slot, index))}
               />
             </div>
-            <div style={ui.equipmentSubPanel}>
-              <div style={{ fontWeight: 700, marginBottom: "0.5rem" }}>
-                {builderInventoryItems.length > 0
-                  ? `Items (${builderInventoryItems.length})`
-                  : "Items"}
-              </div>
-              <CharacterInventoryList
-                items={builderInventoryItems}
-                emptyMessage="No items yet. Use Add to inventory or Buy on a slot above."
-                onEquipItem={(itemId, slot) => updateBuild(equipInventoryItemOnBuild(build, itemId, slot, index))}
-                onUnequipItem={(itemId, slot) => updateBuild(unequipInventoryItemOnBuild(build, itemId, slot, index))}
-                onRemoveItem={(itemId) => {
-                  const nextEquipped = { ...(build.equippedSlots ?? {}) };
-                  for (const [slot, id] of Object.entries(nextEquipped)) {
-                    if (id === itemId) delete nextEquipped[slot as EquippedSlotKey];
-                  }
-                  updateBuild({
-                    ...build,
-                    inventory: (build.inventory ?? []).filter((item) => item.id !== itemId),
-                    equippedSlots: nextEquipped
-                  });
-                }}
-              />
-            </div>
-          </div>
-        )}
+              </>
+            )}
 
-        {activeTab === "adventuringGear" && (
+        {itemsCategory === "adventuringGear" && (
           <CharacterConsumablePickerTab
             title="Adventuring gear & tools"
             description="Mundane gear and ammunition from the compendium. Add for free or Buy to spend gold."
@@ -5620,25 +5600,31 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
           />
         )}
 
-        {activeTab === "rituals" && (
+        {itemsCategory === "rituals" && (
           <CharacterConsumablePickerTab
             title="Rituals"
             description="Rituals for your ritual book (excluding martial practices). Requires Ritual Casting or Ritual Caster feat."
             items={ritualRows}
             entries={consumableEntries(build, "rituals")}
             onEntriesChange={(rituals) => updateBuild(setConsumableEntries(build, "rituals", rituals))}
+            scrollEntries={ritualScrollEntries(build)}
+            onScrollEntriesChange={(ritualScrolls) =>
+              updateBuild(setRitualScrollEntries(build, ritualScrolls))
+            }
             maxLevel={build.level}
             gold={build.gold ?? 0}
             onGoldChange={(gold) => updateBuild({ ...build, gold })}
             showPurchaseActions
+            scrollPurchase="ritual"
             requireRitualCasting
             ritualCasterBlockedMessage={ritualCasterMessage}
+            showLevelSort
             loading={consumablesLoading}
             catalogMissing={catalogMissing}
           />
         )}
 
-        {activeTab === "alchemy" && (
+        {itemsCategory === "alchemy" && (
           <CharacterConsumablePickerTab
             title="Alchemy"
             description="Alchemical items, elixirs, potions, and other consumables."
@@ -5649,12 +5635,13 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             gold={build.gold ?? 0}
             onGoldChange={(gold) => updateBuild({ ...build, gold })}
             showPurchaseActions
+            showLevelSort
             loading={consumablesLoading}
             catalogMissing={catalogMissing}
           />
         )}
 
-        {activeTab === "martialPractices" && (
+        {itemsCategory === "martialPractices" && (
           <CharacterConsumablePickerTab
             title="Martial practices"
             description="Martial techniques mastered like rituals."
@@ -5666,10 +5653,18 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             maxLevel={build.level}
             gold={build.gold ?? 0}
             onGoldChange={(gold) => updateBuild({ ...build, gold })}
+            scrollEntries={martialPracticeScrollEntries(build)}
+            onScrollEntriesChange={(martialPracticeScrolls) =>
+              updateBuild(setMartialPracticeScrollEntries(build, martialPracticeScrolls))
+            }
             showPurchaseActions
+            scrollPurchase="martialPractice"
+            showLevelSort
             loading={consumablesLoading}
             catalogMissing={catalogMissing}
           />
+        )}
+          </div>
         )}
 
         <JsonCollapsiblePanel
@@ -5718,8 +5713,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                         <button
                           type="button"
                           onClick={() => {
-                            const tab = navigateToTabForError(r);
-                            if (tab) setActiveTab(tab);
+                            openTabForValidationMessage(r);
                           }}
                           style={{
                             border: "none",
@@ -5742,8 +5736,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                       <button
                         type="button"
                         onClick={() => {
-                          const tab = navigateToTabForError(e);
-                          if (tab) setActiveTab(tab);
+                          openTabForValidationMessage(e);
                         }}
                         style={{
                           border: "none",
@@ -6158,12 +6151,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             />
           </LiveSheetCollapsibleSection>
 
-          <BuilderSidebarItemsPanel
-            index={index}
-            build={build}
-            onEquipItem={(itemId, slot) => updateBuild(equipInventoryItemOnBuild(build, itemId, slot, index))}
-            onUnequipItem={(itemId, slot) => updateBuild(unequipInventoryItemOnBuild(build, itemId, slot))}
-          />
+          <BuilderSidebarItemsPanel index={index} build={build} onBuildChange={updateBuild} />
 
           <FloatingHoverPanel
             show={glossaryTooltipUi.showPanel && glossaryTooltipUi.hoverKey != null}

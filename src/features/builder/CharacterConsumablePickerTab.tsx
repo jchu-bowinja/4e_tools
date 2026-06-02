@@ -13,13 +13,19 @@ import { CollapsibleDisclosure } from "../../ui/CollapsibleDisclosure";
 import { RulesRichText } from "./RulesRichText";
 import { builderSectionTitleStyle } from "../../ui/panels";
 import { blockSubsectionStyle, disclosureSummaryStyle } from "../../ui/disclosureStyles";
-import { AdjustableNumberInput } from "../../ui/AdjustableNumberInput";
+import { AdjustableNumberInput, adjustableNumberWidthCh } from "../../ui/AdjustableNumberInput";
+import { CharacterGoldField } from "./CharacterGoldField";
+import { SegmentedControl } from "../../ui/SegmentedControl";
+
+export type ConsumableListSort = "name" | "level";
 
 export interface ConsumablePickerRow {
   id: string;
   name: string;
   slug: string;
   source?: string | null;
+  /** Ritual / practice level for sorting and filtering. */
+  level?: number | null;
   /** Shown under the name (price, level, category, …). */
   meta?: string;
   body?: string | null;
@@ -46,6 +52,12 @@ export interface CharacterConsumablePickerTabProps {
   /** Block adding rituals when the character cannot cast rituals. */
   requireRitualCasting?: boolean;
   ritualCasterBlockedMessage?: string | null;
+  /** Show Name / Level sort toggle (rituals, martial practices, alchemy). */
+  showLevelSort?: boolean;
+  /** Rituals or martial practices: track scrolls separately from book/practice entries. */
+  scrollPurchase?: "ritual" | "martialPractice";
+  scrollEntries?: CharacterConsumableEntry[];
+  onScrollEntriesChange?: (entries: CharacterConsumableEntry[]) => void;
 }
 
 const listPanelStyle: CSSProperties = {
@@ -75,10 +87,21 @@ const actionButtonStyle: CSSProperties = {
   cursor: "pointer"
 };
 
-const qtyButtonStyle: CSSProperties = {
-  ...actionButtonStyle,
-  minWidth: "1.75rem",
-  padding: "0.2rem 0.4rem"
+const selectedRowSummaryStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 1fr) auto",
+  gap: "0.5rem",
+  alignItems: "center",
+  width: "100%",
+  flex: "1 1 auto",
+  minWidth: 0
+};
+
+const selectedRowControlsStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "0.4rem",
+  flexShrink: 0
 };
 
 export function CharacterConsumablePickerTab({
@@ -95,13 +118,23 @@ export function CharacterConsumablePickerTab({
   onGoldChange,
   showPurchaseActions = false,
   requireRitualCasting = false,
-  ritualCasterBlockedMessage = null
+  ritualCasterBlockedMessage = null,
+  showLevelSort = false,
+  scrollPurchase,
+  scrollEntries = [],
+  onScrollEntriesChange
 }: CharacterConsumablePickerTabProps): JSX.Element {
   const [search, setSearch] = useState("");
+  const [listSort, setListSort] = useState<ConsumableListSort>("name");
   const ritualBlocked = requireRitualCasting && Boolean(ritualCasterBlockedMessage);
+  const hasScroll = scrollPurchase != null && onScrollEntriesChange != null;
+  const scrollLabels = scrollPurchase ? scrollPurchaseLabels(scrollPurchase) : null;
 
   const filteredItems = useMemo(() => {
-    const ownedIds = new Set(entries.map((e) => e.id));
+    const ownedIds = new Set([
+      ...entries.map((e) => e.id),
+      ...(hasScroll ? scrollEntries.map((e) => e.id) : [])
+    ]);
     let rows = search.trim()
       ? filterRulesEntitiesByQuery(
           items.map((item) => ({
@@ -116,44 +149,84 @@ export function CharacterConsumablePickerTab({
     if (maxLevel != null) {
       rows = rows.filter((row) => {
         if (ownedIds.has(row.id)) return true;
-        const level = parseLevelFromMeta(row.meta);
+        const level = rowLevel(row);
         return level == null || level <= maxLevel;
       });
     }
-    return rows.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
-  }, [items, search, maxLevel, entries]);
+    return rows.sort((a, b) => compareConsumablePickerRows(a, b, listSort));
+  }, [items, search, maxLevel, entries, scrollEntries, hasScroll, listSort]);
 
   const selectedRows = useMemo(() => {
-    const rows: { entry: CharacterConsumableEntry; row: ConsumablePickerRow }[] = [];
-    for (const entry of entries) {
-      const row = items.find((i) => i.id === entry.id);
-      if (row) rows.push({ entry, row });
+    const ids = new Set<string>();
+    for (const entry of entries) ids.add(entry.id);
+    if (hasScroll) {
+      for (const entry of scrollEntries) ids.add(entry.id);
     }
-    rows.sort((a, b) => a.row.name.localeCompare(b.row.name, undefined, { sensitivity: "base" }));
-    return rows;
-  }, [items, entries]);
+    const rows: ConsumablePickerRow[] = [];
+    for (const id of ids) {
+      const row = items.find((i) => i.id === id);
+      if (row) rows.push(row);
+    }
+    return rows.sort((a, b) => compareConsumablePickerRows(a, b, listSort));
+  }, [items, entries, scrollEntries, hasScroll, listSort]);
 
-  const totalQty = useMemo(() => entries.reduce((sum, e) => sum + e.quantity, 0), [entries]);
+  const totalQty = useMemo(() => {
+    const bookQty = entries.reduce((sum, e) => sum + e.quantity, 0);
+    const scrollQty = hasScroll ? scrollEntries.reduce((sum, e) => sum + e.quantity, 0) : 0;
+    return bookQty + scrollQty;
+  }, [entries, scrollEntries, hasScroll]);
 
   function addFree(id: string, delta = 1): void {
     if (ritualBlocked) return;
     onEntriesChange(addConsumableQuantity(entries, id, delta));
   }
 
-  function buyOne(row: ConsumablePickerRow): void {
-    if (ritualBlocked || !onGoldChange) return;
-    const cost = linePurchaseCostGp(row.unitPriceGp, 1);
-    if (cost == null || gold < cost) return;
+  function purchaseWithGold(cost: number | undefined, onSuccess: () => void): boolean {
+    if (!onGoldChange || cost == null || gold < cost) return false;
     onGoldChange(gold - cost);
-    onEntriesChange(addConsumableQuantity(entries, row.id, 1));
+    onSuccess();
+    return true;
   }
 
-  function setQty(id: string, quantity: number): void {
+  function buyBook(row: ConsumablePickerRow): void {
+    if (ritualBlocked) return;
+    const cost = linePurchaseCostGp(row.unitPriceGp, 1);
+    purchaseWithGold(cost, () => onEntriesChange(addConsumableQuantity(entries, row.id, 1)));
+  }
+
+  function addFreeScroll(id: string, delta = 1): void {
+    if (!hasScroll || !onScrollEntriesChange) return;
+    onScrollEntriesChange(addConsumableQuantity(scrollEntries, id, delta));
+  }
+
+  function buyScroll(row: ConsumablePickerRow): void {
+    if (!hasScroll || !onScrollEntriesChange) return;
+    const cost = linePurchaseCostGp(row.unitPriceGp, 1);
+    purchaseWithGold(cost, () =>
+      onScrollEntriesChange(addConsumableQuantity(scrollEntries, row.id, 1))
+    );
+  }
+
+  function buyOne(row: ConsumablePickerRow): void {
+    buyBook(row);
+  }
+
+  function setBookQty(id: string, quantity: number): void {
     onEntriesChange(setConsumableQuantity(entries, id, quantity));
   }
 
-  function remove(id: string): void {
+  function setScrollQty(id: string, quantity: number): void {
+    if (!onScrollEntriesChange) return;
+    onScrollEntriesChange(setConsumableQuantity(scrollEntries, id, quantity));
+  }
+
+  function removeFromBook(id: string): void {
     onEntriesChange(removeConsumableEntry(entries, id));
+  }
+
+  function removeScrolls(id: string): void {
+    if (!onScrollEntriesChange) return;
+    onScrollEntriesChange(removeConsumableEntry(scrollEntries, id));
   }
 
   return (
@@ -177,26 +250,39 @@ export function CharacterConsumablePickerTab({
           {ritualCasterBlockedMessage}
         </p>
       ) : null}
-      {showPurchaseActions && onGoldChange ? (
-        <label style={{ fontSize: "0.82rem", color: "var(--text-secondary)", display: "block", maxWidth: "12rem" }}>
-          Gold (gp)
-          <AdjustableNumberInput
-            ariaLabel="Gold pieces"
-            value={gold}
-            min={0}
-            max={99_999_999}
-            onChange={(v) => onGoldChange(Math.max(0, Math.trunc(v)))}
-            style={{ ...inputStyle, marginTop: "0.2rem" }}
+      {onGoldChange ? (
+        <CharacterGoldField gold={gold} onChange={onGoldChange} style={{ marginBottom: "0.45rem" }} />
+      ) : null}
+      {showLevelSort ? (
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "0.4rem",
+            alignItems: "center",
+            marginBottom: "0.45rem"
+          }}
+        >
+          <span style={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}>Sort by</span>
+          <SegmentedControl
+            ariaLabel="Sort catalog by name or level"
+            variant="pill"
+            size="compact"
+            value={listSort}
+            onChange={setListSort}
+            options={[
+              { value: "name", label: "Name" },
+              { value: "level", label: "Level" }
+            ]}
           />
-        </label>
+        </div>
       ) : null}
       <label
         style={{
           fontSize: "0.82rem",
           color: "var(--text-secondary)",
           display: "block",
-          maxWidth: "28rem",
-          marginTop: showPurchaseActions && onGoldChange ? "0.45rem" : 0
+          maxWidth: "28rem"
         }}
       >
         Filter
@@ -225,11 +311,13 @@ export function CharacterConsumablePickerTab({
         ) : (
           <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
             {filteredItems.map((row) => {
-              const qty = consumableQuantity(entries, row.id);
+              const bookQty = consumableQuantity(entries, row.id);
+              const scrollQty = hasScroll ? consumableQuantity(scrollEntries, row.id) : 0;
               const cost = linePurchaseCostGp(row.unitPriceGp, 1);
               const canAfford = cost != null ? gold >= cost : false;
-              const addDisabled = ritualBlocked;
-              const buyDisabled = ritualBlocked || cost == null || !canAfford || !onGoldChange;
+              const addBookDisabled = ritualBlocked;
+              const buyBookDisabled = addBookDisabled || cost == null || !canAfford || !onGoldChange;
+              const buyScrollDisabled = cost == null || !canAfford || !onGoldChange;
 
               return (
                 <li
@@ -241,8 +329,8 @@ export function CharacterConsumablePickerTab({
                 >
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "flex-start" }}>
                     <span style={{ flex: "1 1 12rem", minWidth: 0, fontSize: "0.88rem" }}>
-                      <span style={{ fontWeight: qty > 0 ? 600 : 400 }}>{row.name}</span>
-                      {qty > 0 ? (
+                      <span style={{ fontWeight: bookQty > 0 || scrollQty > 0 ? 600 : 400 }}>{row.name}</span>
+                      {bookQty > 0 ? (
                         <span
                           style={{
                             marginLeft: "0.35rem",
@@ -251,7 +339,19 @@ export function CharacterConsumablePickerTab({
                             fontWeight: 500
                           }}
                         >
-                          ×{qty}
+                          {scrollLabels?.bookShort ?? "book"} ×{bookQty}
+                        </span>
+                      ) : null}
+                      {scrollQty > 0 ? (
+                        <span
+                          style={{
+                            marginLeft: "0.35rem",
+                            fontSize: "0.75rem",
+                            color: "var(--text-muted)",
+                            fontWeight: 500
+                          }}
+                        >
+                          scroll ×{scrollQty}
                         </span>
                       ) : null}
                       {row.meta ? (
@@ -269,28 +369,61 @@ export function CharacterConsumablePickerTab({
                       <button
                         type="button"
                         style={actionButtonStyle}
-                        disabled={addDisabled}
+                        disabled={addBookDisabled}
                         onClick={() => addFree(row.id, 1)}
-                        title={ritualBlocked ? ritualCasterBlockedMessage ?? undefined : "Add without spending gold"}
+                        title={
+                          addBookDisabled
+                            ? ritualCasterBlockedMessage ?? undefined
+                            : hasScroll
+                              ? `Add to ${scrollLabels?.bookShort ?? "book"} without spending gold`
+                              : "Add without spending gold"
+                        }
                       >
-                        Add
+                        {hasScroll ? scrollLabels!.addBook : "Add"}
                       </button>
                       {showPurchaseActions && onGoldChange ? (
-                        <button
-                          type="button"
-                          style={actionButtonStyle}
-                          disabled={buyDisabled}
-                          onClick={() => buyOne(row)}
-                          title={
-                            cost == null
-                              ? "No market price"
-                              : canAfford
-                                ? `Buy for ${formatGoldCost(cost)}`
-                                : `Need ${formatGoldCost(cost)} (have ${formatGoldCost(gold)})`
-                          }
-                        >
-                          Buy{cost != null ? ` (${formatGoldCost(cost)})` : ""}
-                        </button>
+                        hasScroll ? (
+                          <>
+                            <button
+                              type="button"
+                              style={actionButtonStyle}
+                              disabled={buyBookDisabled}
+                              onClick={() => buyBook(row)}
+                              title={purchaseTitle(scrollLabels!.bookShort, cost, canAfford)}
+                            >
+                              {scrollLabels!.buyBook}
+                              {cost != null ? ` (${formatGoldCost(cost)})` : ""}
+                            </button>
+                            <button
+                              type="button"
+                              style={actionButtonStyle}
+                              onClick={() => addFreeScroll(row.id, 1)}
+                              title="Add scroll without spending gold"
+                            >
+                              {scrollLabels!.addScroll}
+                            </button>
+                            <button
+                              type="button"
+                              style={actionButtonStyle}
+                              disabled={buyScrollDisabled}
+                              onClick={() => buyScroll(row)}
+                              title={purchaseTitle("scroll", cost, canAfford)}
+                            >
+                              {scrollLabels!.buyScroll}
+                              {cost != null ? ` (${formatGoldCost(cost)})` : ""}
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            style={actionButtonStyle}
+                            disabled={buyBookDisabled}
+                            onClick={() => buyOne(row)}
+                            title={purchaseTitle("item", cost, canAfford)}
+                          >
+                            Buy{cost != null ? ` (${formatGoldCost(cost)})` : ""}
+                          </button>
+                        )
                       ) : null}
                     </span>
                   </div>
@@ -306,55 +439,90 @@ export function CharacterConsumablePickerTab({
             On character ({selectedRows.length})
           </h4>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-            {selectedRows.map(({ entry, row }) => (
+            {selectedRows.map((row) => {
+              const bookQty = consumableQuantity(entries, row.id);
+              const scrollQty = hasScroll ? consumableQuantity(scrollEntries, row.id) : 0;
+              return (
               <CollapsibleDisclosure
                 key={row.id}
                 summary={
-                  <span style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center", width: "100%" }}>
-                    <span style={{ flex: "1 1 8rem" }}>
-                      {row.name}
+                  <span style={selectedRowSummaryStyle}>
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{ fontWeight: 500 }}>{row.name}</span>
                       {row.unitPriceGp != null && showPurchaseActions ? (
-                        <span style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginLeft: "0.35rem" }}>
-                          {formatGoldCost(row.unitPriceGp)} each
+                        <span
+                          style={{
+                            display: "block",
+                            fontSize: "0.78rem",
+                            color: "var(--text-muted)",
+                            marginTop: "0.1rem"
+                          }}
+                        >
+                          {hasScroll && scrollLabels
+                            ? `${formatGoldCost(row.unitPriceGp)} ${scrollLabels.priceNote}`
+                            : `${formatGoldCost(row.unitPriceGp)} each`}
                         </span>
                       ) : null}
                     </span>
                     <span
-                      style={{ display: "inline-flex", alignItems: "center", gap: "0.25rem" }}
+                      style={{
+                        ...selectedRowControlsStyle,
+                        flexWrap: "wrap",
+                        justifyContent: "flex-end"
+                      }}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <button
-                        type="button"
-                        style={qtyButtonStyle}
-                        aria-label={`Decrease ${row.name}`}
-                        onClick={() => setQty(row.id, entry.quantity - 1)}
-                      >
-                        −
-                      </button>
-                      <AdjustableNumberInput
-                        ariaLabel={`Quantity of ${row.name}`}
-                        value={entry.quantity}
-                        min={0}
-                        max={9999}
-                        onChange={(v) => setQty(row.id, v)}
-                        compact
-                        style={{ width: `${Math.max(3, String(entry.quantity).length + 1)}ch` }}
-                      />
-                      <button
-                        type="button"
-                        style={qtyButtonStyle}
-                        aria-label={`Increase ${row.name}`}
-                        onClick={() => setQty(row.id, entry.quantity + 1)}
-                      >
-                        +
-                      </button>
-                      <button
-                        type="button"
-                        style={{ ...actionButtonStyle, marginLeft: "0.25rem" }}
-                        onClick={() => remove(row.id)}
-                      >
-                        Remove
-                      </button>
+                      {hasScroll && scrollLabels ? (
+                        <>
+                          <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                            {scrollLabels.bookQtyLabel}
+                          </span>
+                          <AdjustableNumberInput
+                            ariaLabel={`${scrollLabels.bookQtyLabel} copies of ${row.name}`}
+                            value={bookQty}
+                            min={0}
+                            max={9999}
+                            onChange={(v) => setBookQty(row.id, v)}
+                            compact
+                            style={{ flexShrink: 0 }}
+                            inputStyle={{ width: adjustableNumberWidthCh(bookQty, 9999) }}
+                          />
+                          <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginLeft: "0.15rem" }}>
+                            Scroll
+                          </span>
+                          <AdjustableNumberInput
+                            ariaLabel={`Scrolls of ${row.name}`}
+                            value={scrollQty}
+                            min={0}
+                            max={9999}
+                            onChange={(v) => setScrollQty(row.id, v)}
+                            compact
+                            style={{ flexShrink: 0 }}
+                            inputStyle={{ width: adjustableNumberWidthCh(scrollQty, 9999) }}
+                          />
+                        </>
+                      ) : (
+                        <AdjustableNumberInput
+                          ariaLabel={`Quantity of ${row.name}`}
+                          value={bookQty}
+                          min={0}
+                          max={9999}
+                          onChange={(v) => setBookQty(row.id, v)}
+                          compact
+                          style={{ flexShrink: 0 }}
+                          inputStyle={{ width: adjustableNumberWidthCh(bookQty, 9999) }}
+                        />
+                      )}
+                      {bookQty > 0 ? (
+                        <button type="button" style={actionButtonStyle} onClick={() => removeFromBook(row.id)}>
+                          {hasScroll && scrollLabels ? `Clear ${scrollLabels.bookShort}` : "Remove"}
+                        </button>
+                      ) : null}
+                      {hasScroll && scrollQty > 0 ? (
+                        <button type="button" style={actionButtonStyle} onClick={() => removeScrolls(row.id)}>
+                          Clear scrolls
+                        </button>
+                      ) : null}
                     </span>
                   </span>
                 }
@@ -379,12 +547,71 @@ export function CharacterConsumablePickerTab({
                   />
                 ) : null}
               </CollapsibleDisclosure>
-            ))}
+            );
+            })}
           </div>
         </div>
       ) : null}
     </div>
   );
+}
+
+function scrollPurchaseLabels(variant: "ritual" | "martialPractice"): {
+  bookShort: string;
+  addBook: string;
+  buyBook: string;
+  addScroll: string;
+  buyScroll: string;
+  bookQtyLabel: string;
+  priceNote: string;
+} {
+  if (variant === "ritual") {
+    return {
+      bookShort: "book",
+      addBook: "Add book",
+      buyBook: "Buy book",
+      addScroll: "Add scroll",
+      buyScroll: "Buy scroll",
+      bookQtyLabel: "Book",
+      priceNote: "per book or scroll"
+    };
+  }
+  return {
+    bookShort: "practice",
+    addBook: "Add",
+    buyBook: "Buy",
+    addScroll: "Add scroll",
+    buyScroll: "Buy scroll",
+    bookQtyLabel: "Practice",
+    priceNote: "per practice or scroll"
+  };
+}
+
+function purchaseTitle(kind: string, cost: number | undefined, canAfford: boolean): string {
+  if (cost == null) return "No market price";
+  if (canAfford) return `Buy ${kind} for ${formatGoldCost(cost)}`;
+  return `Need ${formatGoldCost(cost)}`;
+}
+
+function rowLevel(row: ConsumablePickerRow): number | null {
+  if (row.level != null && Number.isFinite(row.level)) return row.level;
+  return parseLevelFromMeta(row.meta);
+}
+
+function compareConsumablePickerRows(
+  a: ConsumablePickerRow,
+  b: ConsumablePickerRow,
+  sort: ConsumableListSort
+): number {
+  const byName = () => a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+  if (sort === "name") return byName();
+  const la = rowLevel(a);
+  const lb = rowLevel(b);
+  if (la == null && lb == null) return byName();
+  if (la == null) return 1;
+  if (lb == null) return -1;
+  if (la !== lb) return la - lb;
+  return byName();
 }
 
 function parseLevelFromMeta(meta: string | undefined): number | null {

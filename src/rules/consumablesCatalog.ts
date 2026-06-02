@@ -3,6 +3,10 @@ import {
   consumableEntries,
   migrateCharacterConsumables,
   pruneConsumableEntries,
+  martialPracticeScrollEntries,
+  ritualScrollEntries,
+  setMartialPracticeScrollEntries,
+  setRitualScrollEntries,
   type ConsumableListKey
 } from "./consumablesModel";
 
@@ -100,6 +104,12 @@ export function pruneCharacterConsumables(build: CharacterBuild, index: RulesInd
     const pruned = pruneConsumableEntries(consumableEntries(next, key), allowed);
     next = { ...next, [key]: pruned.length > 0 ? pruned : undefined };
   }
+  const ritualAllowed = allowedIdsForList(index, "rituals");
+  const prunedScrolls = pruneConsumableEntries(ritualScrollEntries(next), ritualAllowed);
+  next = setRitualScrollEntries(next, prunedScrolls);
+  const practiceAllowed = allowedIdsForList(index, "martialPractices");
+  const prunedPracticeScrolls = pruneConsumableEntries(martialPracticeScrollEntries(next), practiceAllowed);
+  next = setMartialPracticeScrollEntries(next, prunedPracticeScrolls);
   return next;
 }
 

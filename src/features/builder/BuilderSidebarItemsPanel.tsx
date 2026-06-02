@@ -1,27 +1,25 @@
 import { useMemo } from "react";
-import type { CharacterBuild, EquippedSlotKey, RulesIndex } from "../../rules/models";
-import { CharacterInventoryList } from "../characterSheet/CharacterInventoryList";
-import { characterBuildInventoryItems } from "../characterSheet/sheetEquipment";
+import type { CharacterBuild, RulesIndex } from "../../rules/models";
+import { CharacterUnifiedInventoryPanel } from "../characterSheet/CharacterUnifiedInventoryPanel";
+import { unifiedInventoryRows } from "../characterSheet/unifiedInventory";
 import { LiveSheetCollapsibleSection } from "./LiveSheetCollapsibleSection";
 
 export interface BuilderSidebarItemsPanelProps {
   index: RulesIndex;
   build: CharacterBuild;
-  onEquipItem?: (itemId: string, slot: EquippedSlotKey) => void;
-  onUnequipItem?: (itemId: string, slot: EquippedSlotKey) => void;
+  onBuildChange: (build: CharacterBuild) => void;
 }
 
 export function BuilderSidebarItemsPanel({
   index,
   build,
-  onEquipItem,
-  onUnequipItem
+  onBuildChange
 }: BuilderSidebarItemsPanelProps): JSX.Element {
-  const items = useMemo(() => characterBuildInventoryItems(build, index), [build, index]);
+  const count = useMemo(() => unifiedInventoryRows(build, index).length, [build, index]);
 
   return (
-    <LiveSheetCollapsibleSection title={items.length > 0 ? `Items (${items.length})` : "Items"}>
-      <CharacterInventoryList items={items} onEquipItem={onEquipItem} onUnequipItem={onUnequipItem} />
+    <LiveSheetCollapsibleSection title={count > 0 ? `Inventory (${count})` : "Inventory"}>
+      <CharacterUnifiedInventoryPanel index={index} build={build} hideDescription onBuildChange={onBuildChange} />
     </LiveSheetCollapsibleSection>
   );
 }

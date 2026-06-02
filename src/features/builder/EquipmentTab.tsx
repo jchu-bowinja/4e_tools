@@ -28,7 +28,8 @@ import {
   magicItemFamilyDisplayName,
   type EnchantmentFamily
 } from "../../rules/enchantmentFamilies";
-import { AdjustableNumberInput, adjustableNumberWidthCh } from "../../ui/AdjustableNumberInput";
+import { adjustableNumberWidthCh } from "../../ui/AdjustableNumberInput";
+import { CharacterGoldField } from "./CharacterGoldField";
 import { equipmentSlotGoldCost, type EquipmentPriceSlot } from "../../rules/equipmentItemPrice";
 import { EquipmentSlotActions } from "./EquipmentSlotActions";
 import { ensureSelectedEntityInFiltered, filterRulesEntitiesByQuery } from "./featPowerFilters";
@@ -208,13 +209,6 @@ const slotSectionStyle: CSSProperties = {
 const tabContentStyle: CSSProperties = {
   display: "grid",
   gap: "0.85rem"
-};
-
-const goldRowStyle: CSSProperties = {
-  display: "flex",
-  flexWrap: "wrap",
-  alignItems: "center",
-  gap: "0.5rem"
 };
 
 const slotTitleStyle: CSSProperties = {
@@ -797,20 +791,7 @@ export function EquipmentTab({
   return (
     <div style={tabContentStyle}>
       {!hideTitle && <h3 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700 }}>Equipment</h3>}
-      {onGoldChange && (
-        <label style={goldRowStyle}>
-          <span style={{ fontSize: "0.88rem", fontWeight: 600 }}>Gold</span>
-          <AdjustableNumberInput
-            compact
-            min={0}
-            max={99_999_999}
-            value={gold}
-            onChange={onGoldChange}
-            ariaLabel="Gold pieces"
-          />
-          <span style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>gp</span>
-        </label>
-      )}
+      {onGoldChange ? <CharacterGoldField gold={gold} onChange={onGoldChange} /> : null}
       {!useParentSlotPicker && (
         <select
           value={pickedSlot}

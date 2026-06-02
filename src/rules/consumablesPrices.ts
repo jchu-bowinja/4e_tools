@@ -15,12 +15,22 @@ export function ritualMarketPriceGp(ritual: RitualItem): number | undefined {
   return undefined;
 }
 
+/** PHB: purchasing a ritual scroll costs the same as the ritual's market price. */
+export function ritualScrollMarketPriceGp(ritual: RitualItem): number | undefined {
+  return ritualMarketPriceGp(ritual);
+}
+
 export function alchemyUnitPriceGp(item: MagicItem): number | undefined {
   return magicItemGold(item);
 }
 
 export function martialPracticeMarketPriceGp(practice: RitualItem): number | undefined {
   return ritualMarketPriceGp(practice);
+}
+
+/** Martial practice scrolls use the same market price as mastering the practice. */
+export function martialPracticeScrollMarketPriceGp(practice: RitualItem): number | undefined {
+  return martialPracticeMarketPriceGp(practice);
 }
 
 export function linePurchaseCostGp(unitPrice: number | undefined, quantity: number): number | undefined {

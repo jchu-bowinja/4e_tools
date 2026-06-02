@@ -99,7 +99,9 @@ export interface CharacterSheetState {
   equipment: Partial<Record<EquippedSlotKey, string>>;
   gear?: CharacterConsumableEntry[];
   rituals?: CharacterConsumableEntry[];
+  ritualScrolls?: CharacterConsumableEntry[];
   martialPractices?: CharacterConsumableEntry[];
+  martialPracticeScrolls?: CharacterConsumableEntry[];
   alchemy?: CharacterConsumableEntry[];
   /** @deprecated Migrated to `gear` on load. */
   gearIds?: string[];

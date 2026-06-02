@@ -667,8 +667,12 @@ export interface CharacterBuild {
   gear?: CharacterConsumableEntry[];
   /** Rituals in the character's ritual book (excludes martial practices). */
   rituals?: CharacterConsumableEntry[];
+  /** One-use ritual scrolls owned (ritual compendium id per entry). */
+  ritualScrolls?: CharacterConsumableEntry[];
   /** Mastered martial practices. */
   martialPractices?: CharacterConsumableEntry[];
+  /** One-use martial practice scrolls owned (martial practice compendium id per entry). */
+  martialPracticeScrolls?: CharacterConsumableEntry[];
   /** Owned alchemical items with quantities. */
   alchemy?: CharacterConsumableEntry[];
   /** @deprecated Migrated to `gear` on load. */
