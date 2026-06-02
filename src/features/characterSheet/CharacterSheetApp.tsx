@@ -114,6 +114,7 @@ import {
   ritualPickerRowsFromCatalog
 } from "../builder/consumableTabData";
 import { useConsumablesCatalog } from "../../data/useConsumablesCatalog";
+import { ritualCasterStatusMessage } from "../../rules/ritualCasting";
 import type { EquipmentPriceSlot } from "../../rules/equipmentItemPrice";
 import { CharacterEquippedSlotsPanel } from "./CharacterEquippedSlotsPanel";
 import { CharacterInventoryList } from "./CharacterInventoryList";
@@ -1275,6 +1276,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     [consumablesCatalog]
   );
   const alchemyRows = useMemo(() => alchemyPickerRowsFromCatalog(consumablesCatalog), [consumablesCatalog]);
+  const ritualCasterMessage = useMemo(
+    () => ritualCasterStatusMessage(index, toBuildLikeState(sheet, index)),
+    [index, sheet]
+  );
   const mainWeaponSummary = useMemo(
     () =>
       summarizeMainWeaponAttack(
@@ -3063,8 +3068,11 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             title="Adventuring gear & tools"
             description="Mundane gear and ammunition from the compendium. Track what your character carries."
             items={adventuringGearRows}
-            selectedIds={sheet.gearIds ?? []}
-            onSelectedIdsChange={(gearIds) => updateSheet((prev) => ({ ...prev, gearIds }))}
+            entries={sheet.gear ?? []}
+            onEntriesChange={(gear) => updateSheet((prev) => ({ ...prev, gear: gear.length ? gear : undefined }))}
+            gold={sheet.gold ?? 0}
+            onGoldChange={(gold) => updateSheet((prev) => ({ ...prev, gold }))}
+            showPurchaseActions
             hideTitle
             loading={consumablesLoading}
             catalogMissing={catalogMissing}
@@ -3078,9 +3086,16 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             title="Rituals"
             description="Rituals in your ritual book (arcane, divine, primal, and other non-martial practices)."
             items={ritualRows}
-            selectedIds={sheet.ritualIds ?? []}
-            onSelectedIdsChange={(ritualIds) => updateSheet((prev) => ({ ...prev, ritualIds }))}
+            entries={sheet.rituals ?? []}
+            onEntriesChange={(rituals) =>
+              updateSheet((prev) => ({ ...prev, rituals: rituals.length ? rituals : undefined }))
+            }
             maxLevel={sheet.level}
+            gold={sheet.gold ?? 0}
+            onGoldChange={(gold) => updateSheet((prev) => ({ ...prev, gold }))}
+            showPurchaseActions
+            requireRitualCasting
+            ritualCasterBlockedMessage={ritualCasterMessage}
             hideTitle
             loading={consumablesLoading}
             catalogMissing={catalogMissing}
@@ -3094,9 +3109,14 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             title="Alchemy"
             description="Alchemical items, elixirs, potions, and other consumable magic items."
             items={alchemyRows}
-            selectedIds={sheet.alchemyItemIds ?? []}
-            onSelectedIdsChange={(alchemyItemIds) => updateSheet((prev) => ({ ...prev, alchemyItemIds }))}
+            entries={sheet.alchemy ?? []}
+            onEntriesChange={(alchemy) =>
+              updateSheet((prev) => ({ ...prev, alchemy: alchemy.length ? alchemy : undefined }))
+            }
             maxLevel={sheet.level}
+            gold={sheet.gold ?? 0}
+            onGoldChange={(gold) => updateSheet((prev) => ({ ...prev, gold }))}
+            showPurchaseActions
             hideTitle
             loading={consumablesLoading}
             catalogMissing={catalogMissing}
@@ -3110,11 +3130,17 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
             title="Martial practices"
             description="Martial techniques learned like rituals but powered by martial training."
             items={martialPracticeRows}
-            selectedIds={sheet.martialPracticeIds ?? []}
-            onSelectedIdsChange={(martialPracticeIds) =>
-              updateSheet((prev) => ({ ...prev, martialPracticeIds }))
+            entries={sheet.martialPractices ?? []}
+            onEntriesChange={(martialPractices) =>
+              updateSheet((prev) => ({
+                ...prev,
+                martialPractices: martialPractices.length ? martialPractices : undefined
+              }))
             }
             maxLevel={sheet.level}
+            gold={sheet.gold ?? 0}
+            onGoldChange={(gold) => updateSheet((prev) => ({ ...prev, gold }))}
+            showPurchaseActions
             hideTitle
             loading={consumablesLoading}
             catalogMissing={catalogMissing}

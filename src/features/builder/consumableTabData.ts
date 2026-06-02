@@ -2,6 +2,12 @@ import {
   formatGearPriceGp,
   formatMagicItemPrice
 } from "../../rules/consumablesCatalog";
+import {
+  alchemyUnitPriceGp,
+  gearUnitPriceGp,
+  martialPracticeMarketPriceGp,
+  ritualMarketPriceGp
+} from "../../rules/consumablesPrices";
 import type { ConsumablesCatalog } from "../../data/loadConsumablesCatalog";
 import type { ConsumablePickerRow } from "./CharacterConsumablePickerTab";
 
@@ -12,7 +18,8 @@ export function adventuringGearPickerRowsFromCatalog(catalog: ConsumablesCatalog
     slug: g.slug,
     source: g.source,
     meta: [g.category, formatGearPriceGp(g.priceGp)].filter(Boolean).join(" · "),
-    body: g.body ?? undefined
+    body: g.body ?? undefined,
+    unitPriceGp: gearUnitPriceGp(g)
   }));
 }
 
@@ -24,7 +31,8 @@ export function ritualPickerRowsFromCatalog(catalog: ConsumablesCatalog): Consum
     source: r.source,
     meta: ritualMetaLine(r),
     flavor: r.flavor ?? undefined,
-    body: r.body ?? undefined
+    body: r.body ?? undefined,
+    unitPriceGp: ritualMarketPriceGp(r)
   }));
 }
 
@@ -36,7 +44,8 @@ export function martialPracticePickerRowsFromCatalog(catalog: ConsumablesCatalog
     source: r.source,
     meta: ritualMetaLine(r),
     flavor: r.flavor ?? undefined,
-    body: r.body ?? undefined
+    body: r.body ?? undefined,
+    unitPriceGp: martialPracticeMarketPriceGp(r)
   }));
 }
 
@@ -54,7 +63,8 @@ export function alchemyPickerRowsFromCatalog(catalog: ConsumablesCatalog): Consu
       .filter(Boolean)
       .join(" · "),
     flavor: item.flavor ?? undefined,
-    body: typeof item.raw?.body === "string" ? item.raw.body : undefined
+    body: typeof item.raw?.body === "string" ? item.raw.body : undefined,
+    unitPriceGp: alchemyUnitPriceGp(item)
   }));
 }
 

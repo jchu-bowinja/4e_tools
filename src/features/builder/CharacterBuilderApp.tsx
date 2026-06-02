@@ -221,6 +221,8 @@ import {
   ritualPickerRowsFromCatalog
 } from "./consumableTabData";
 import { useConsumablesCatalog } from "../../data/useConsumablesCatalog";
+import { consumableEntries, setConsumableEntries } from "../../rules/consumablesModel";
+import { ritualCasterStatusMessage } from "../../rules/ritualCasting";
 import {
   LiveSheetCollapsibleSection,
   liveSheetSectionBodyStyle,
@@ -1497,6 +1499,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     [consumablesCatalog]
   );
   const alchemyRows = useMemo(() => alchemyPickerRowsFromCatalog(consumablesCatalog), [consumablesCatalog]);
+  const ritualCasterMessage = useMemo(() => ritualCasterStatusMessage(index, build), [index, build]);
 
   const wieldSlotsForPreview = useMemo(() => {
     const slots: Partial<Record<EquippedSlotKey, string>> = {
@@ -5605,10 +5608,13 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         {activeTab === "adventuringGear" && (
           <CharacterConsumablePickerTab
             title="Adventuring gear & tools"
-            description="Mundane gear and ammunition from the compendium."
+            description="Mundane gear and ammunition from the compendium. Add for free or Buy to spend gold."
             items={adventuringGearRows}
-            selectedIds={build.gearIds ?? []}
-            onSelectedIdsChange={(gearIds) => updateBuild({ ...build, gearIds })}
+            entries={consumableEntries(build, "gear")}
+            onEntriesChange={(gear) => updateBuild(setConsumableEntries(build, "gear", gear))}
+            gold={build.gold ?? 0}
+            onGoldChange={(gold) => updateBuild({ ...build, gold })}
+            showPurchaseActions
             loading={consumablesLoading}
             catalogMissing={catalogMissing}
           />
@@ -5617,11 +5623,16 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         {activeTab === "rituals" && (
           <CharacterConsumablePickerTab
             title="Rituals"
-            description="Rituals for your ritual book (excluding martial practices)."
+            description="Rituals for your ritual book (excluding martial practices). Requires Ritual Casting or Ritual Caster feat."
             items={ritualRows}
-            selectedIds={build.ritualIds ?? []}
-            onSelectedIdsChange={(ritualIds) => updateBuild({ ...build, ritualIds })}
+            entries={consumableEntries(build, "rituals")}
+            onEntriesChange={(rituals) => updateBuild(setConsumableEntries(build, "rituals", rituals))}
             maxLevel={build.level}
+            gold={build.gold ?? 0}
+            onGoldChange={(gold) => updateBuild({ ...build, gold })}
+            showPurchaseActions
+            requireRitualCasting
+            ritualCasterBlockedMessage={ritualCasterMessage}
             loading={consumablesLoading}
             catalogMissing={catalogMissing}
           />
@@ -5632,9 +5643,12 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             title="Alchemy"
             description="Alchemical items, elixirs, potions, and other consumables."
             items={alchemyRows}
-            selectedIds={build.alchemyItemIds ?? []}
-            onSelectedIdsChange={(alchemyItemIds) => updateBuild({ ...build, alchemyItemIds })}
+            entries={consumableEntries(build, "alchemy")}
+            onEntriesChange={(alchemy) => updateBuild(setConsumableEntries(build, "alchemy", alchemy))}
             maxLevel={build.level}
+            gold={build.gold ?? 0}
+            onGoldChange={(gold) => updateBuild({ ...build, gold })}
+            showPurchaseActions
             loading={consumablesLoading}
             catalogMissing={catalogMissing}
           />
@@ -5645,9 +5659,14 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
             title="Martial practices"
             description="Martial techniques mastered like rituals."
             items={martialPracticeRows}
-            selectedIds={build.martialPracticeIds ?? []}
-            onSelectedIdsChange={(martialPracticeIds) => updateBuild({ ...build, martialPracticeIds })}
+            entries={consumableEntries(build, "martialPractices")}
+            onEntriesChange={(martialPractices) =>
+              updateBuild(setConsumableEntries(build, "martialPractices", martialPractices))
+            }
             maxLevel={build.level}
+            gold={build.gold ?? 0}
+            onGoldChange={(gold) => updateBuild({ ...build, gold })}
+            showPurchaseActions
             loading={consumablesLoading}
             catalogMissing={catalogMissing}
           />

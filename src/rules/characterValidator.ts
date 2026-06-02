@@ -58,6 +58,7 @@ import { validateMulticlassFeats } from "./multiclassValidation";
 import { validateParagonMulticlassing } from "./paragonMulticlassing";
 import { paragonMulticlassPrimaryAtWillSlotPenalty } from "./psionicPowerPoints";
 import { equipmentDuplicateEnchantmentWarnings } from "./equipment";
+import { consumablesBuildWarnings } from "./consumablesValidation";
 
 export { getClassPowersForLevelRange };
 
@@ -833,6 +834,7 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
   }
 
   warnings.push(...equipmentDuplicateEnchantmentWarnings(build, index));
+  warnings.push(...consumablesBuildWarnings(index, build));
 
   return { errors, warnings, classSkillRules, powerSlotRules, classDefenseBonuses };
 }

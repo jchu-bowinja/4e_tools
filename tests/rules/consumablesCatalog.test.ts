@@ -3,7 +3,8 @@ import {
   ADVENTURING_GEAR_CATEGORIES,
   adventuringGearFromIndex,
   isMartialPracticeRitual,
-  pruneCharacterConsumableIds
+  pruneCharacterConsumableIds,
+  pruneCharacterConsumables
 } from "../../src/rules/consumablesCatalog";
 import type { GearItem, RitualItem, RulesIndex } from "../../src/rules/models";
 
@@ -73,5 +74,28 @@ describe("consumablesCatalog", () => {
     );
     expect(pruned.gearIds).toEqual(["g1"]);
     expect(pruned.ritualIds).toEqual(["r1"]);
+  });
+
+  it("prunes unknown consumable entries with quantities", () => {
+    const index = minimalIndex({
+      gear: [{ id: "g1", name: "Rope", slug: "rope", category: "Gear", raw: {} }],
+      rituals: [],
+      martialPractices: [],
+      alchemyItems: []
+    });
+    const build = {
+      name: "",
+      level: 1,
+      abilityScores: { STR: 10, CON: 10, DEX: 10, INT: 10, WIS: 10, CHA: 10 },
+      trainedSkillIds: [],
+      featIds: [],
+      powerIds: [],
+      gear: [
+        { id: "g1", quantity: 3 },
+        { id: "gone", quantity: 1 }
+      ]
+    };
+    const pruned = pruneCharacterConsumables(build, index);
+    expect(pruned.gear).toEqual([{ id: "g1", quantity: 3 }]);
   });
 });

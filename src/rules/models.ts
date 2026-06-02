@@ -405,6 +405,12 @@ export interface InventoryItem {
   notes?: string;
 }
 
+/** Owned adventuring gear, ritual, practice, or alchemy row with quantity. */
+export interface CharacterConsumableEntry {
+  id: string;
+  quantity: number;
+}
+
 /** Magic-only slot: enchantment + plus; no mundane base. */
 export interface MagicOnlySlotSelection {
   enchantmentId?: string;
@@ -657,13 +663,21 @@ export interface CharacterBuild {
   inventory?: InventoryItem[];
   /** Inventory item id equipped per gear slot. */
   equippedSlots?: Partial<Record<EquippedSlotKey, string>>;
-  /** Adventuring gear / tools owned (compendium gear ids). */
-  gearIds?: string[];
+  /** Adventuring gear / tools with quantities. */
+  gear?: CharacterConsumableEntry[];
   /** Rituals in the character's ritual book (excludes martial practices). */
-  ritualIds?: string[];
+  rituals?: CharacterConsumableEntry[];
   /** Mastered martial practices. */
+  martialPractices?: CharacterConsumableEntry[];
+  /** Owned alchemical items with quantities. */
+  alchemy?: CharacterConsumableEntry[];
+  /** @deprecated Migrated to `gear` on load. */
+  gearIds?: string[];
+  /** @deprecated Migrated to `rituals` on load. */
+  ritualIds?: string[];
+  /** @deprecated Migrated to `martialPractices` on load. */
   martialPracticeIds?: string[];
-  /** Owned alchemical items (magic item ids). */
+  /** @deprecated Migrated to `alchemy` on load. */
   alchemyItemIds?: string[];
   abilityScores: Record<Ability, number>;
   /** Point-buy / starting base only; level bumps live in `asiChoices` and automatic 11/21 bonuses. */

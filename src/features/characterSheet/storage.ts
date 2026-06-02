@@ -1,4 +1,6 @@
 import { migrateLegacyEquipment, normalizeCharacterEquipment } from "../../rules/equipment";
+import { normalizeConsumableEntries } from "../../rules/consumablesModel";
+import type { CharacterConsumableEntry } from "../../rules/models";
 import { normalizeMagicItemSlotIds } from "../../rules/magicItemEquipment";
 import type { Ability } from "../../rules/models";
 import { normalizeActiveConditions } from "./activeConditions";
@@ -116,10 +118,10 @@ export function normalizeState(input: unknown): CharacterSheetState {
         : undefined,
     hybridSideASelections: normalizeStringRecord(v.hybridSideASelections),
     hybridSideBSelections: normalizeStringRecord(v.hybridSideBSelections),
-    gearIds: normalizeStringIdArray(v.gearIds),
-    ritualIds: normalizeStringIdArray(v.ritualIds),
-    martialPracticeIds: normalizeStringIdArray(v.martialPracticeIds),
-    alchemyItemIds: normalizeStringIdArray(v.alchemyItemIds)
+    gear: normalizeConsumableEntriesField(v.gear, v.gearIds),
+    rituals: normalizeConsumableEntriesField(v.rituals, v.ritualIds),
+    martialPractices: normalizeConsumableEntriesField(v.martialPractices, v.martialPracticeIds),
+    alchemy: normalizeConsumableEntriesField(v.alchemy, v.alchemyItemIds)
   };
   return next;
 }
@@ -127,6 +129,17 @@ export function normalizeState(input: unknown): CharacterSheetState {
 function normalizeStringIdArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((id): id is string => typeof id === "string" && id.trim().length > 0);
+}
+
+function normalizeConsumableEntriesField(
+  modern: unknown,
+  legacyIds: unknown
+): CharacterConsumableEntry[] | undefined {
+  const fromModern = normalizeConsumableEntries(modern);
+  if (fromModern.length > 0) return fromModern;
+  const legacy = normalizeStringIdArray(legacyIds);
+  if (legacy.length === 0) return undefined;
+  return legacy.map((id) => ({ id, quantity: 1 }));
 }
 
 export function loadCharacterSheetState(): CharacterSheetState {

@@ -1,5 +1,6 @@
 import type {
   Ability,
+  CharacterConsumableEntry,
   CharacterEquipment,
   CharacterStyle,
   EquippedSlotKey,
@@ -96,10 +97,17 @@ export interface CharacterSheetState {
   resources: CharacterSheetResources;
   inventory: InventoryItem[];
   equipment: Partial<Record<EquippedSlotKey, string>>;
-  /** Adventuring gear / tools (builder `gearIds`). */
+  gear?: CharacterConsumableEntry[];
+  rituals?: CharacterConsumableEntry[];
+  martialPractices?: CharacterConsumableEntry[];
+  alchemy?: CharacterConsumableEntry[];
+  /** @deprecated Migrated to `gear` on load. */
   gearIds?: string[];
+  /** @deprecated Migrated to `rituals` on load. */
   ritualIds?: string[];
+  /** @deprecated Migrated to `martialPractices` on load. */
   martialPracticeIds?: string[];
+  /** @deprecated Migrated to `alchemy` on load. */
   alchemyItemIds?: string[];
   powers: CharacterSheetPowerSelection;
 }
