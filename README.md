@@ -1,150 +1,62 @@
-# D&D 4e Web Builder (MVP)
+# D&D 4e Builder Tools
 
-Web-first, guided D&D 4e character builder using data extracted from the legacy Character Builder.
+Web-first suite of D&D 4th Edition tools built from data extracted from the legacy Character Builder. Static Vite + React app with hash-based navigation between tools.
 
-## What Is Implemented
-
-- ETL pipeline that normalizes source rules into `generated/rules_index.json`
-- ETL anomaly log at `generated/etl_anomalies.jsonl` for parser improvement loops
-- Rules modules for:
-  - prerequisite validation
-  - class + hybrid class skill and power-slot legality validation
-  - armor/shield proficiency legality checks
-  - feat legality filtering
-  - derived stat calculations including class/hybrid defenses and armor/shield AC bonuses
-  - race/subrace granted powers and stale power-selection pruning
-  - weapon + implement attack preview calculations
-- React + TypeScript web UI with:
-  - race/class and hybrid class selection
-  - ability score editing
-  - class skill training selection and live skill sheet modifiers
-  - legal feat filtering
-  - class power selection with level-1 at-will/encounter/daily slot limits
-  - armor and shield selection
-  - weapon + implement equipment and attack previews
-  - live character sheet
-  - local persistence (`localStorage`)
-  - JSON import/export
-  - In-app **Feedback** modal (feedback / bug report) that posts to `POST /api/reports`.
-    - In `npm run dev`, reports append to `received_reports/reports.jsonl` (gitignored).
-    - In Netlify production, `netlify.toml` redirects `/api/reports` to a serverless function (`netlify/functions/reports.ts`) that opens a GitHub issue. See [Hosting on Netlify (with feedback)](#hosting-on-netlify-with-feedback) for setup.
-- Test coverage for ETL artifact presence and rules core behavior
+For implemented features, ETL outputs, and smoke-test checklists, see [docs/roadmap.md](docs/roadmap.md).
 
 ## Prerequisites
 
-- Node.js 18+ (for Vite + React tooling)
-- Python 3.10+ (for ETL scripts)
+- Node.js 18+ (Node 20 used by Netlify builds; see `netlify.toml`)
+- Python 3.10+ (for ETL scripts and dev-server monster template paste parsing)
 
 ## Quick Start
 
-1. Install dependencies:
-   - `npm install`
-2. Build the rules index (required before running the app):
-   - from Character Builder XML: `npm run etl:rules -- combined.dnd40.merged.xml generated`
-3. (Optional) Build the monster index:
-   - `npm run etl:monsters -- <selected-monster-folder-or-xml-file> generated`
-   - example: `npm run etl:monsters -- MonsterFiles/01 generated`
-   - example: `npm run etl:monsters -- combined.monsters.xml generated`
-   - output:
-     - `generated/monsters/index.json` (lightweight list + summary fields)
-     - `generated/monsters/entries/*.json` (one structured parsed monster per file)
-4. Run the app:
-   - `npm run dev`
-5. Run tests:
-   - `npm test`
+1. Install dependencies: `npm install`
+2. Build the rules index (required if `generated/rules_index.json` is missing):
+   - `npm run etl:rules -- combined.dnd40.merged.xml generated`
+   - `combined.dnd40.merged.xml` is gitignored; place your licensed extract at the repo root
+3. (Optional) Build monster data:
+   - `npm run etl:monsters -- <monster-folder-or-xml> generated`
+   - then: `npm run etl:monsters:index-filters`
+4. Run the app: `npm run dev` (typically `http://localhost:5173`)
+5. Run tests: `npm test` (optional perf: `npm run test:perf`)
 
 ## Scripts
 
-- `npm run dev` - start local dev server
-- `npm run build` - build production assets and include `generated/` JSON data in `dist/generated/`
-- `npm run preview` - preview production build locally
-- `npm test` - run Vitest test suite once
-- `npm run etl:rules -- <input-json-or-xml> generated` - build `generated/rules_index.json`
-- `npm run etl:monsters -- <input-folder-or-xml-file> generated` - parse monster XML and emit structured JSON artifacts
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Local dev server (`/api/reports`, `/api/parse-monster-template-paste`) |
+| `npm run build` | Production build; copies `generated/` into `dist/generated/` |
+| `npm run preview` | Preview production build locally |
+| `npm test` | Vitest suite |
+| `npm run test:perf` | Performance tests under `tests/perf/` |
+| `npm run etl:rules -- <input> generated` | Build `generated/rules_index.json` and catalogs |
+| `npm run etl:monsters -- <input> generated` | Parse monster XML into JSON artifacts |
+| `npm run etl:monsters:index-filters` | Enrich monster index filter fields from entry files |
+| `npm run etl:parse-template-paste --` | CLI for pasted monster template text |
 
-## Hosting (Share With Others)
+## App Navigation
 
-This app is a static Vite site. A deployable build is created in `dist/`.
+| Route | Tool |
+| --- | --- |
+| `#/builder` | Character Builder |
+| `#/character-sheet` | Character Sheet |
+| `#/monsters` | Monster browser, templates, encounter builder |
+| `#/glossary` | Glossary Editor |
+| `#/resource-editor` | Resource Editor |
 
-1. Ensure data artifacts exist:
-   - `npm run etl:rules -- combined.dnd40.merged.xml generated`
-   - optional monster data: `npm run etl:monsters -- <selected-monster-folder-or-xml-file> generated`
-2. Build:
-   - `npm run build`
-3. Publish the `dist/` folder with any static host.
+## Hosting
 
-### Fastest Option: Netlify Drop (No Git Setup)
+Build with `npm run build` and publish `dist/` to any static host. Ensure ETL artifacts exist first (see Quick Start).
 
-1. Open [https://app.netlify.com/drop](https://app.netlify.com/drop)
-2. Drag the local `dist/` folder onto the page
-3. Netlify gives you a public URL immediately
+**Netlify Drop** — drag `dist/` onto [app.netlify.com/drop](https://app.netlify.com/drop). Feedback (`POST /api/reports`) will 404 without a serverless function.
 
-Note: a Drop deploy ships only the static `dist/` folder, so the in-app
-**Feedback** modal will get a 404 from `POST /api/reports`. To receive feedback in
-production, deploy from Git instead — see the next section.
+**Netlify (Git + feedback)** — import from Git; `netlify.toml` sets build/publish and routes `/api/reports` to `netlify/functions/reports.ts`. Set env vars `GITHUB_REPO`, `GITHUB_TOKEN`, and optional `GITHUB_LABELS`. Issues are public on public repos; see [validatePayload.ts](src/features/reporting/validatePayload.ts) for payload limits. Local prod path: `netlify dev` with those env vars set.
 
-### Hosting on Netlify (with feedback)
+**Vercel** — build command `npm run build`, output `dist`. Port `netlify/functions/reports.ts` to a Vercel API route to enable feedback.
 
-Deploy from Git so Netlify also builds the serverless function in `netlify/functions/`,
-which receives `POST /api/reports` and creates a GitHub issue for each submission.
+## Documentation
 
-1. Push this repo to GitHub.
-2. In Netlify, **Add new site → Import from Git**, select the repo. Netlify reads
-   `netlify.toml`, so build command (`npm run build`), publish dir (`dist`), and the
-   `/api/reports → /.netlify/functions/reports` redirect are auto-configured.
-3. Create a GitHub fine-grained Personal Access Token:
-   - **Repository access:** only the repo that should receive issues.
-   - **Repository permissions → Issues:** `Read and write`.
-4. In **Site configuration → Environment variables**, add:
-   - `GITHUB_REPO` — `owner/repo` (the same repo you scoped the PAT to)
-   - `GITHUB_TOKEN` — the PAT value
-   - `GITHUB_LABELS` (optional) — comma-separated **extra** labels beyond the submitter’s
-     type (`bug`, `enhancement`, `documentation`, `question`). Each name must already exist
-     on the repo or GitHub will reject the request with 422.
-5. Trigger a deploy. Submitting feedback on the live site will open a new GitHub issue
-   and the modal will show its reference (e.g. `#42`).
-
-Caveats:
-- Issues created by the function are **public** if the target repo is public. The body
-  contains the user-supplied title/description plus the reporting browser's User-Agent,
-  app version, and current route. Don't point this at a sensitive repo.
-- The function only fires on `POST /api/reports` and validates with the same parser the
-  dev server uses (`src/features/reporting/validatePayload.ts`), so payload shape and
-  size limits are identical between dev and prod.
-- To exercise the production path locally, install the Netlify CLI and run
-  `netlify dev` with `GITHUB_REPO`/`GITHUB_TOKEN` exported in your shell.
-
-### Git-Based Option: Vercel
-
-1. Push this repo to GitHub
-2. Import the repo in Vercel
-3. Build command: `npm run build`
-4. Output directory: `dist`
-
-Note: the `/api/reports` receiver in this repo is implemented as a **Netlify** Function.
-On Vercel you'd need to port `netlify/functions/reports.ts` to a Vercel API Route under
-`api/reports.ts` (the validation logic in `src/features/reporting/validatePayload.ts`
-is host-agnostic and can be reused as-is).
-
-After deploy, share the generated URL with others.
-
-## Key Folders
-
-- `tools/etl/` - normalization and indexing pipeline
-- `src/rules/` - typed models, prerequisite evaluator, stat calculator, option resolver
-- `src/features/builder/` - builder state, persistence, UI flow
-- `tests/` - ETL and rules tests
-- `generated/` - generated rules and ETL artifacts
-
-## UI Guidelines
-
-- `docs/ui-bible.md` - project UI style and design bible for consistency, reuse, and UI review passes.
-
-## Acceptance Checklist
-
-- Build a new level-1 hybrid character and verify legal hybrid power slots are enforced.
-- Pick a race/subrace power option, then switch subrace and confirm stale power selections are removed.
-- Add a feat that grants a power and confirm the power appears in character power selections.
-- Equip a weapon and implement and verify the attack preview updates (including nonproficient penalty behavior).
-- Export and re-import the character JSON and confirm powers/selections/derived stats remain consistent.
-
+- [docs/roadmap.md](docs/roadmap.md) — what's implemented, product vision, acceptance checklist
+- [docs/ui-bible.md](docs/ui-bible.md) — UI style guide
+- [docs/class-build-options.md](docs/class-build-options.md) — PHB vs Essentials build indexing
