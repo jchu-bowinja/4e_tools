@@ -3,6 +3,13 @@ The final product will be a fully integrated suite of 4th Edition Dungeons and D
 
 **Race/class builder fidelity:** See [class-build-options.md](./class-build-options.md) for PHB vs Essentials build indexing; run `tools/etl/list_race_class_selection_gaps.py` for coverage gaps.
 
+## Fixes
+### 1. Essentials Classes
+        - Features
+        - Powers
+        - Text
+        - Removing extraneous and null items
+
 ## Standalone Products
 ### 1. Character Builder
         - Character Builder
