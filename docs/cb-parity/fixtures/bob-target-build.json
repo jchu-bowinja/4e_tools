@@ -1,0 +1,50 @@
+{
+  "name": "Bob",
+  "level": 1,
+  "pointBuyBudget": 22,
+  "raceId": "ID_FMP_RACE_7",
+  "classId": "ID_FMP_CLASS_3",
+  "abilityScores": {
+    "STR": 18,
+    "CON": 14,
+    "DEX": 10,
+    "INT": 8,
+    "WIS": 10,
+    "CHA": 11
+  },
+  "racialAbilityChoice": "STR",
+  "raceSelections": {
+    "subrace": "ID_FMP_RACIAL_TRAIT_2965",
+    "language-0": "ID_FMP_LANGUAGE_6"
+  },
+  "classSelections": {
+    "classFeature:ID_FMP_CLASS_FEATURE_1064": "ID_FMP_CLASS_FEATURE_2182",
+    "classFeaturePair:ID_FMP_CLASS_FEATURE_2183:ID_FMP_CLASS_FEATURE_401": "ID_FMP_CLASS_FEATURE_2183"
+  },
+  "trainedSkillIds": [
+    "ID_FMP_SKILL_27",
+    "ID_FMP_SKILL_8",
+    "ID_FMP_SKILL_9",
+    "ID_FMP_SKILL_14"
+  ],
+  "featIds": [
+    "ID_FMP_FEAT_3672",
+    "ID_FMP_FEAT_407"
+  ],
+  "powerIds": [
+    "ID_FMP_POWER_10471",
+    "ID_FMP_POWER_12844",
+    "ID_FMP_POWER_10475",
+    "ID_FMP_POWER_12191"
+  ],
+  "classPowerSlots": {
+    "atWill:0": "ID_FMP_POWER_10471",
+    "atWill:1": "ID_FMP_POWER_12844",
+    "encounter:1": "ID_FMP_POWER_10475",
+    "daily:1": "ID_FMP_POWER_12191"
+  },
+  "gold": 100,
+  "equipment": { "neck": { "enhancement": 0 } },
+  "inventory": [],
+  "equippedSlots": {}
+}
