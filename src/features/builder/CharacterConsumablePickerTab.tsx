@@ -10,7 +10,8 @@ import { linePurchaseCostGp } from "../../rules/consumablesPrices";
 import { formatGoldCost } from "../../rules/itemGold";
 import { filterRulesEntitiesByQuery } from "./featPowerFilters";
 import { CollapsibleDisclosure } from "../../ui/CollapsibleDisclosure";
-import { RulesRichText } from "./RulesRichText";
+import { ConsumableItemDescription } from "../../ui/ConsumableItemDescription";
+import { hasConsumableDescription } from "../../rules/consumablesDisplay";
 import { builderSectionTitleStyle } from "../../ui/panels";
 import { blockSubsectionStyle, disclosureSummaryStyle } from "../../ui/disclosureStyles";
 import { AdjustableNumberInput, adjustableNumberWidthCh } from "../../ui/AdjustableNumberInput";
@@ -104,6 +105,15 @@ const selectedRowControlsStyle: CSSProperties = {
   alignItems: "center",
   gap: "0.4rem",
   flexShrink: 0
+};
+
+const catalogDisclosureSummaryStyle: CSSProperties = {
+  cursor: "pointer",
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "0.5rem",
+  alignItems: "flex-start",
+  width: "100%"
 };
 
 export function CharacterConsumablePickerTab({
@@ -327,6 +337,112 @@ export function CharacterConsumablePickerTab({
               const buyBookDisabled = addBookDisabled || cost == null || !canAfford || !onGoldChange;
               const buyScrollDisabled = cost == null || !canAfford || !onGoldChange;
 
+              const catalogSummary = (
+                <>
+                  <span style={{ flex: "1 1 12rem", minWidth: 0, fontSize: "0.88rem" }}>
+                    <span style={{ fontWeight: bookQty > 0 || scrollQty > 0 ? 600 : 400 }}>{row.name}</span>
+                    {bookQty > 0 ? (
+                      <span
+                        style={{
+                          marginLeft: "0.35rem",
+                          fontSize: "0.75rem",
+                          color: "var(--text-muted)",
+                          fontWeight: 500
+                        }}
+                      >
+                        {scrollLabels?.bookShort ?? "book"} ×{bookQty}
+                      </span>
+                    ) : null}
+                    {scrollQty > 0 ? (
+                      <span
+                        style={{
+                          marginLeft: "0.35rem",
+                          fontSize: "0.75rem",
+                          color: "var(--text-muted)",
+                          fontWeight: 500
+                        }}
+                      >
+                        scroll ×{scrollQty}
+                      </span>
+                    ) : null}
+                    {row.meta ? (
+                      <span style={{ display: "block", fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                        {row.meta}
+                        {row.source ? ` · ${row.source}` : ""}
+                      </span>
+                    ) : row.source ? (
+                      <span style={{ display: "block", fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                        {row.source}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span
+                    style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", alignItems: "center" }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      style={actionButtonStyle}
+                      disabled={addBookDisabled}
+                      onClick={() => addFree(row.id, 1)}
+                      title={
+                        addBookDisabled
+                          ? ritualCasterBlockedMessage ?? undefined
+                          : hasScroll
+                            ? `Add to ${scrollLabels?.bookShort ?? "book"} without spending gold`
+                            : "Add without spending gold"
+                      }
+                    >
+                      {hasScroll ? scrollLabels!.addBook : "Add"}
+                    </button>
+                    {showPurchaseActions && onGoldChange ? (
+                      hasScroll ? (
+                        <>
+                          <button
+                            type="button"
+                            style={actionButtonStyle}
+                            disabled={buyBookDisabled}
+                            onClick={() => buyBook(row)}
+                            title={purchaseTitle(scrollLabels!.bookShort, cost, canAfford)}
+                          >
+                            {scrollLabels!.buyBook}
+                            {cost != null ? ` (${formatGoldCost(cost)})` : ""}
+                          </button>
+                          <button
+                            type="button"
+                            style={actionButtonStyle}
+                            onClick={() => addFreeScroll(row.id, 1)}
+                            title="Add scroll without spending gold"
+                          >
+                            {scrollLabels!.addScroll}
+                          </button>
+                          <button
+                            type="button"
+                            style={actionButtonStyle}
+                            disabled={buyScrollDisabled}
+                            onClick={() => buyScroll(row)}
+                            title={purchaseTitle("scroll", cost, canAfford)}
+                          >
+                            {scrollLabels!.buyScroll}
+                            {cost != null ? ` (${formatGoldCost(cost)})` : ""}
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          style={actionButtonStyle}
+                          disabled={buyBookDisabled}
+                          onClick={() => buyOne(row)}
+                          title={purchaseTitle("item", cost, canAfford)}
+                        >
+                          Buy{cost != null ? ` (${formatGoldCost(cost)})` : ""}
+                        </button>
+                      )
+                    ) : null}
+                  </span>
+                </>
+              );
+
               return (
                 <li
                   key={row.id}
@@ -335,106 +451,19 @@ export function CharacterConsumablePickerTab({
                     padding: "0.4rem 0.25rem"
                   }}
                 >
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "flex-start" }}>
-                    <span style={{ flex: "1 1 12rem", minWidth: 0, fontSize: "0.88rem" }}>
-                      <span style={{ fontWeight: bookQty > 0 || scrollQty > 0 ? 600 : 400 }}>{row.name}</span>
-                      {bookQty > 0 ? (
-                        <span
-                          style={{
-                            marginLeft: "0.35rem",
-                            fontSize: "0.75rem",
-                            color: "var(--text-muted)",
-                            fontWeight: 500
-                          }}
-                        >
-                          {scrollLabels?.bookShort ?? "book"} ×{bookQty}
-                        </span>
-                      ) : null}
-                      {scrollQty > 0 ? (
-                        <span
-                          style={{
-                            marginLeft: "0.35rem",
-                            fontSize: "0.75rem",
-                            color: "var(--text-muted)",
-                            fontWeight: 500
-                          }}
-                        >
-                          scroll ×{scrollQty}
-                        </span>
-                      ) : null}
-                      {row.meta ? (
-                        <span style={{ display: "block", fontSize: "0.78rem", color: "var(--text-muted)" }}>
-                          {row.meta}
-                          {row.source ? ` · ${row.source}` : ""}
-                        </span>
-                      ) : row.source ? (
-                        <span style={{ display: "block", fontSize: "0.78rem", color: "var(--text-muted)" }}>
-                          {row.source}
-                        </span>
-                      ) : null}
-                    </span>
-                    <span style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", alignItems: "center" }}>
-                      <button
-                        type="button"
-                        style={actionButtonStyle}
-                        disabled={addBookDisabled}
-                        onClick={() => addFree(row.id, 1)}
-                        title={
-                          addBookDisabled
-                            ? ritualCasterBlockedMessage ?? undefined
-                            : hasScroll
-                              ? `Add to ${scrollLabels?.bookShort ?? "book"} without spending gold`
-                              : "Add without spending gold"
-                        }
-                      >
-                        {hasScroll ? scrollLabels!.addBook : "Add"}
-                      </button>
-                      {showPurchaseActions && onGoldChange ? (
-                        hasScroll ? (
-                          <>
-                            <button
-                              type="button"
-                              style={actionButtonStyle}
-                              disabled={buyBookDisabled}
-                              onClick={() => buyBook(row)}
-                              title={purchaseTitle(scrollLabels!.bookShort, cost, canAfford)}
-                            >
-                              {scrollLabels!.buyBook}
-                              {cost != null ? ` (${formatGoldCost(cost)})` : ""}
-                            </button>
-                            <button
-                              type="button"
-                              style={actionButtonStyle}
-                              onClick={() => addFreeScroll(row.id, 1)}
-                              title="Add scroll without spending gold"
-                            >
-                              {scrollLabels!.addScroll}
-                            </button>
-                            <button
-                              type="button"
-                              style={actionButtonStyle}
-                              disabled={buyScrollDisabled}
-                              onClick={() => buyScroll(row)}
-                              title={purchaseTitle("scroll", cost, canAfford)}
-                            >
-                              {scrollLabels!.buyScroll}
-                              {cost != null ? ` (${formatGoldCost(cost)})` : ""}
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            type="button"
-                            style={actionButtonStyle}
-                            disabled={buyBookDisabled}
-                            onClick={() => buyOne(row)}
-                            title={purchaseTitle("item", cost, canAfford)}
-                          >
-                            Buy{cost != null ? ` (${formatGoldCost(cost)})` : ""}
-                          </button>
-                        )
-                      ) : null}
-                    </span>
-                  </div>
+                  {hasConsumableDescription(row) ? (
+                    <CollapsibleDisclosure
+                      summary={catalogSummary}
+                      summaryStyle={catalogDisclosureSummaryStyle}
+                      bodyStyle={{ marginTop: "0.35rem", paddingLeft: "0.15rem" }}
+                    >
+                      <ConsumableItemDescription flavor={row.flavor} body={row.body} />
+                    </CollapsibleDisclosure>
+                  ) : (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "flex-start" }}>
+                      {catalogSummary}
+                    </div>
+                  )}
                 </li>
               );
             })}
@@ -547,20 +576,7 @@ export function CharacterConsumablePickerTab({
                 {row.meta ? (
                   <p style={{ margin: "0 0 0.35rem", fontSize: "0.82rem", color: "var(--text-secondary)" }}>{row.meta}</p>
                 ) : null}
-                {row.flavor ? (
-                  <RulesRichText
-                    text={row.flavor}
-                    paragraphStyle={{ fontSize: "0.85rem", fontStyle: "italic" }}
-                    listItemStyle={{ fontSize: "0.85rem" }}
-                  />
-                ) : null}
-                {row.body ? (
-                  <RulesRichText
-                    text={row.body}
-                    paragraphStyle={{ fontSize: "0.85rem" }}
-                    listItemStyle={{ fontSize: "0.85rem" }}
-                  />
-                ) : null}
+                <ConsumableItemDescription flavor={row.flavor} body={row.body} />
               </CollapsibleDisclosure>
             );
             })}

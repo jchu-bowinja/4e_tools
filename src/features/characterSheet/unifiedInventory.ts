@@ -6,6 +6,14 @@ import {
   ritualsFromIndex
 } from "../../rules/consumablesCatalog";
 import {
+  alchemyDescriptionParts,
+  alchemyDetailMeta,
+  gearDescriptionParts,
+  gearDetailMeta,
+  ritualDescriptionParts,
+  ritualDetailMeta
+} from "../../rules/consumablesDisplay";
+import {
   consumableEntries,
   martialPracticeScrollEntries,
   ritualScrollEntries,
@@ -66,6 +74,8 @@ export interface UnifiedConsumableRow {
   name: string;
   quantity: number;
   detail?: string;
+  flavor?: string;
+  body?: string;
 }
 
 export interface UnifiedEquipmentRow {
@@ -86,6 +96,7 @@ export function unifiedInventoryRows(build: CharacterBuild, index: RulesIndex): 
   const gearById = new Map(adventuringGearFromIndex(index).map((g) => [g.id, g]));
   for (const entry of consumableEntries(build, "gear")) {
     const gear = gearById.get(entry.id);
+    const desc = gear ? gearDescriptionParts(gear) : {};
     rows.push({
       kind: "consumable",
       category: "adventuringGear",
@@ -93,13 +104,15 @@ export function unifiedInventoryRows(build: CharacterBuild, index: RulesIndex): 
       sourceId: entry.id,
       name: gear?.name ?? entry.id,
       quantity: entry.quantity,
-      detail: gear?.category ?? undefined
+      detail: gear ? gearDetailMeta(gear) : undefined,
+      ...desc
     });
   }
 
   const ritualsById = new Map(ritualsFromIndex(index).map((r) => [r.id, r]));
   for (const entry of consumableEntries(build, "rituals")) {
     const ritual = ritualsById.get(entry.id);
+    const desc = ritual ? ritualDescriptionParts(ritual) : {};
     rows.push({
       kind: "consumable",
       category: "ritual",
@@ -107,12 +120,14 @@ export function unifiedInventoryRows(build: CharacterBuild, index: RulesIndex): 
       sourceId: entry.id,
       name: ritual?.name ?? entry.id,
       quantity: entry.quantity,
-      detail: ritual?.level != null ? `Level ${ritual.level}` : undefined
+      detail: ritual ? ritualDetailMeta(ritual) : undefined,
+      ...desc
     });
   }
 
   for (const entry of ritualScrollEntries(build)) {
     const ritual = ritualsById.get(entry.id);
+    const desc = ritual ? ritualDescriptionParts(ritual) : {};
     rows.push({
       kind: "consumable",
       category: "ritualScroll",
@@ -120,13 +135,15 @@ export function unifiedInventoryRows(build: CharacterBuild, index: RulesIndex): 
       sourceId: entry.id,
       name: ritual?.name ?? entry.id,
       quantity: entry.quantity,
-      detail: ritual?.level != null ? `Level ${ritual.level}` : undefined
+      detail: ritual ? ritualDetailMeta(ritual) : undefined,
+      ...desc
     });
   }
 
   const alchemyById = new Map(alchemyItemsFromIndex(index).map((a) => [a.id, a]));
   for (const entry of consumableEntries(build, "alchemy")) {
     const item = alchemyById.get(entry.id);
+    const desc = item ? alchemyDescriptionParts(item) : {};
     rows.push({
       kind: "consumable",
       category: "alchemy",
@@ -134,7 +151,8 @@ export function unifiedInventoryRows(build: CharacterBuild, index: RulesIndex): 
       sourceId: entry.id,
       name: item?.name ?? entry.id,
       quantity: entry.quantity,
-      detail: item?.level != null ? `Level ${item.level}` : undefined
+      detail: item ? alchemyDetailMeta(item) : undefined,
+      ...desc
     });
   }
 
@@ -142,6 +160,7 @@ export function unifiedInventoryRows(build: CharacterBuild, index: RulesIndex): 
   for (const entry of consumableEntries(build, "martialPractices")) {
     const practice = practicesById.get(entry.id);
     const displayName = practice?.name.replace(/\s+Martial Practice$/i, "") ?? entry.id;
+    const desc = practice ? ritualDescriptionParts(practice) : {};
     rows.push({
       kind: "consumable",
       category: "martialPractice",
@@ -149,13 +168,15 @@ export function unifiedInventoryRows(build: CharacterBuild, index: RulesIndex): 
       sourceId: entry.id,
       name: displayName,
       quantity: entry.quantity,
-      detail: practice?.level != null ? `Level ${practice.level}` : undefined
+      detail: practice ? ritualDetailMeta(practice) : undefined,
+      ...desc
     });
   }
 
   for (const entry of martialPracticeScrollEntries(build)) {
     const practice = practicesById.get(entry.id);
     const displayName = practice?.name.replace(/\s+Martial Practice$/i, "") ?? entry.id;
+    const desc = practice ? ritualDescriptionParts(practice) : {};
     rows.push({
       kind: "consumable",
       category: "martialPracticeScroll",
@@ -163,7 +184,8 @@ export function unifiedInventoryRows(build: CharacterBuild, index: RulesIndex): 
       sourceId: entry.id,
       name: displayName,
       quantity: entry.quantity,
-      detail: practice?.level != null ? `Level ${practice.level}` : undefined
+      detail: practice ? ritualDetailMeta(practice) : undefined,
+      ...desc
     });
   }
 

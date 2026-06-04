@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import type { HybridClassDef } from "../rules/models";
 import { CollapsibleDisclosure } from "./CollapsibleDisclosure";
 import { disclosureSummaryStyle } from "./disclosureStyles";
-import { RulesRichText } from "../features/builder/RulesRichText";
+import { RulesRichText } from "./RulesRichText";
 
 function hybridRawSpecific(hybrid: HybridClassDef): Record<string, unknown> {
   return (hybrid.raw?.specific as Record<string, unknown> | undefined) || {};

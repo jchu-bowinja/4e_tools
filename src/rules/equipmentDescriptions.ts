@@ -57,7 +57,7 @@ export interface MagicItemDescription {
 }
 
 /** Normalize compendium text fields that may be strings or string arrays. */
-function magicItemTextField(value: unknown): string | undefined {
+export function normalizeCompendiumTextField(value: unknown): string | undefined {
   if (value == null) return undefined;
   if (typeof value === "string") {
     const trimmed = value.trim();
@@ -75,17 +75,17 @@ function magicItemTextField(value: unknown): string | undefined {
 
 export function describeMagicItem(item: MagicItem): MagicItemDescription {
   const out: MagicItemDescription = {};
-  const flavor = magicItemTextField(item.flavor);
+  const flavor = normalizeCompendiumTextField(item.flavor);
   if (flavor) out.flavor = flavor;
-  const property = magicItemTextField(item.property);
+  const property = normalizeCompendiumTextField(item.property);
   if (property) out.property = property;
-  const power = magicItemTextField(item.power);
+  const power = normalizeCompendiumTextField(item.power);
   if (power) out.power = power;
-  const critical = magicItemTextField(item.critical);
+  const critical = normalizeCompendiumTextField(item.critical);
   if (critical) out.critical = critical;
-  const enhancement = magicItemTextField(item.enhancement);
+  const enhancement = normalizeCompendiumTextField(item.enhancement);
   if (enhancement) out.enhancement = enhancement;
-  const requirement = magicItemTextField(item.requirement);
+  const requirement = normalizeCompendiumTextField(item.requirement);
   if (requirement) out.requirement = requirement;
   return out;
 }

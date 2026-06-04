@@ -2,6 +2,9 @@ import { useMemo, useState, type CSSProperties } from "react";
 import type { CharacterBuild, EquippedSlotKey, RulesIndex } from "../../rules/models";
 import { SegmentedControl } from "../../ui/SegmentedControl";
 import { AdjustableNumberInput, adjustableNumberWidthCh } from "../../ui/AdjustableNumberInput";
+import { CollapsibleDisclosure } from "../../ui/CollapsibleDisclosure";
+import { ConsumableItemDescription } from "../../ui/ConsumableItemDescription";
+import { hasConsumableDescription } from "../../rules/consumablesDisplay";
 import { CharacterInventoryList } from "./CharacterInventoryList";
 import {
   equipInventoryItemOnBuild,
@@ -51,6 +54,15 @@ const qtyRowStyle: CSSProperties = {
   gap: "0.35rem",
   alignItems: "center",
   flexShrink: 0
+};
+
+const inventoryDisclosureSummaryStyle: CSSProperties = {
+  cursor: "pointer",
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "0.5rem",
+  alignItems: "flex-start",
+  width: "100%"
 };
 
 export interface CharacterUnifiedInventoryPanelProps {
@@ -162,17 +174,9 @@ export function CharacterUnifiedInventoryPanel({
                   row.category === "ritual" && row.consumableKey === "rituals"
                     ? Math.max(0, minRitualBookQuantityById[row.sourceId] ?? 0)
                     : 0;
-                return (
-                <li key={`${row.category}:${row.sourceId}`} style={rowStyle}>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: "0.5rem",
-                      alignItems: "flex-start"
-                    }}
-                  >
-                    <div style={{ minWidth: 0 }}>
+                const inventorySummary = (
+                  <>
+                    <div style={{ minWidth: 0, flex: "1 1 auto" }}>
                       <div
                         style={{
                           display: "flex",
@@ -192,7 +196,7 @@ export function CharacterUnifiedInventoryPanel({
                         </p>
                       ) : null}
                     </div>
-                    <div style={qtyRowStyle}>
+                    <div style={qtyRowStyle} onClick={(e) => e.stopPropagation()}>
                       <AdjustableNumberInput
                         ariaLabel={`Quantity of ${row.name}`}
                         value={row.quantity}
@@ -224,7 +228,31 @@ export function CharacterUnifiedInventoryPanel({
                         </span>
                       ) : null}
                     </div>
-                  </div>
+                  </>
+                );
+
+                return (
+                <li key={`${row.category}:${row.sourceId}`} style={rowStyle}>
+                  {hasConsumableDescription(row) ? (
+                    <CollapsibleDisclosure
+                      summary={inventorySummary}
+                      summaryStyle={inventoryDisclosureSummaryStyle}
+                      bodyStyle={{ marginTop: "0.35rem" }}
+                    >
+                      <ConsumableItemDescription flavor={row.flavor} body={row.body} />
+                    </CollapsibleDisclosure>
+                  ) : (
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: "0.5rem",
+                        alignItems: "flex-start"
+                      }}
+                    >
+                      {inventorySummary}
+                    </div>
+                  )}
                 </li>
               );
               })}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseRulesDescriptionText } from "../../src/features/builder/RulesRichText";
+import { parseRulesDescriptionText } from "../../src/ui/RulesRichText";
 
 describe("parseRulesDescriptionText", () => {
   it("splits 4e star bullets into paragraph + list", () => {
