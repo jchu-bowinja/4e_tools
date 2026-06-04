@@ -430,6 +430,26 @@ export function applyWizardSpellbookPowerGroupRules(
   });
 }
 
+/** Split mage spellbook pools pick one each; a single pool keeps the ETL pick count (usually 2). */
+export function applyMageSpellbookPowerGroupRules(
+  groups: ClassFeatureChoiceGroup[]
+): ClassFeatureChoiceGroup[] {
+  const poolCountByParent = new Map<string, number>();
+  for (const g of groups) {
+    if (!isMageSpellbookPowerGroup(g)) continue;
+    poolCountByParent.set(
+      g.parentFeatureName,
+      (poolCountByParent.get(g.parentFeatureName) ?? 0) + 1
+    );
+  }
+  return groups.map((g) => {
+    if (!isMageSpellbookPowerGroup(g)) return g;
+    const poolCount = poolCountByParent.get(g.parentFeatureName) ?? 1;
+    if (poolCount >= 2) return { ...g, pickCount: 1 };
+    return g;
+  });
+}
+
 export function wizardSpellbookPowerChoiceLabel(
   group: ClassFeatureChoiceGroup,
   index: RulesIndex

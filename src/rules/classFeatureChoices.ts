@@ -4,6 +4,7 @@ import {
 } from "./grantedPowersQuery";
 import type { CharacterBuild, ClassDef, ClassFeature, Power, RulesIndex } from "./models";
 import {
+  applyMageSpellbookPowerGroupRules,
   applyWizardSpellbookPowerGroupRules,
   isWizardSpellbookPowerGroup,
   wizardSpellbookPowerChoiceLabel
@@ -342,7 +343,9 @@ export function getClassFeatureChoiceGroups(
     return count && count > 1 ? { ...g, powerPoolCount: count } : g;
   });
   return sortClassFeatureChoiceGroupsByLevel(
-    applyWizardSpellbookPowerGroupRules(index, withPoolCounts)
+    applyMageSpellbookPowerGroupRules(
+      applyWizardSpellbookPowerGroupRules(index, withPoolCounts)
+    )
   );
 }
 

@@ -69,7 +69,9 @@ describe("classFeatureChoices", () => {
   it("loads choice groups from index", () => {
     const groups = getClassFeatureChoiceGroups(index, rogueClass);
     expect(groups).toHaveLength(2);
-    expect(groups[0]?.parentFeatureName).toBe("Rogue Tactics");
+    expect(groups.find((g) => g.key === "classFeature:parent")?.parentFeatureName).toBe(
+      "Rogue Tactics"
+    );
   });
 
   it("round-trips cantrip power selections", () => {
