@@ -70,7 +70,7 @@ describe("classBuildOptions", () => {
     expect(cleared?.buildOptionId).toBeUndefined();
   });
 
-  it("validator requires Essentials build when multiple options exist", () => {
+  it("validator does not require Essentials build when multiple options exist", () => {
     const build = {
       name: "Test",
       level: 1,
@@ -94,8 +94,13 @@ describe("classBuildOptions", () => {
       feats: [],
       classFeatureChoiceGroupsByClassId: {}
     } as unknown as RulesIndex;
-    const missing = validateCharacterBuild(miniIndex, build);
-    expect(missing.errors.some((e) => e.includes("class build"))).toBe(true);
+    const withoutPick = validateCharacterBuild(miniIndex, build);
+    expect(withoutPick.errors.some((e) => e.includes("class build"))).toBe(false);
+    const invalidPick = validateCharacterBuild(miniIndex, {
+      ...build,
+      classSelections: { buildOptionId: "ID_FMP_BUILD_INVALID" }
+    });
+    expect(invalidPick.errors.some((e) => e.includes("valid class build"))).toBe(true);
     const ok = validateCharacterBuild(miniIndex, {
       ...build,
       classSelections: { buildOptionId: "ID_FMP_BUILD_6" }

@@ -235,9 +235,6 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
 
     const essentialsBuilds = essentialsClassBuildOptions(index, clsForBuild);
     const buildPick = selectedClassBuildOptionId(build.classSelections);
-    if (essentialsBuilds.length >= 2 && !buildPick) {
-      errors.push("Class: choose a class build.");
-    }
     if (buildPick && essentialsBuilds.length > 0) {
       const legalBuilds = new Set(essentialsBuilds.map((o) => o.id));
       if (!legalBuilds.has(buildPick)) {

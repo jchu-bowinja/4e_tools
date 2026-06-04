@@ -3368,7 +3368,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   <div style={{ marginTop: "0.85rem", maxWidth: "28rem" }}>
                     <label style={{ display: "block", marginBottom: "0.35rem" }}>
                       <span style={{ display: "block", fontWeight: 600, fontSize: "0.85rem" }}>
-                        Class build
+                        Class build (optional)
                       </span>
                       <select
                         value={selectedClassBuildOptionId(build.classSelections) || ""}
