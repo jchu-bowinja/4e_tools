@@ -15695,6 +15695,7 @@
       "type": "Magic Item",
       "source": "Dungeon Magazine 183",
       "revision_date": null,
+      "category": "ID_FMP_CATEGORY_62",
       "flavor": "When burned, this thread, woven from a nightmare by the hand of a hag, makes you a terrifying vision in the eyes of your enemy.",
       "specific": {
         "Level": "15",
@@ -20426,6 +20427,7 @@
       "type": "Magic Item",
       "source": "Player Essentials: Heroes of Shadow",
       "revision_date": "3/25/2011 2:23:17 PM",
+      "category": "Assassin Poison,1",
       "flavor": "This crimson liquid causes fever and disorientation.",
       "specific": {
         "Level": "1",
@@ -20468,6 +20470,7 @@
       "type": "Magic Item",
       "source": "Player Essentials: Heroes of Shadow",
       "revision_date": "3/25/2011 2:23:17 PM",
+      "category": "Assassin Poison,1",
       "flavor": "Purple, oily carrion crawler brain juice can cause sluggishness and paralysis.",
       "specific": {
         "Level": "1",
@@ -20510,6 +20513,7 @@
       "type": "Magic Item",
       "source": "Player Essentials: Heroes of Shadow",
       "revision_date": "3/25/2011 2:23:17 PM",
+      "category": "Assassin Poison,1",
       "flavor": "This thick, green oil has the consistency of blood and makes enemies more susceptible to grievous injuries.",
       "specific": {
         "Level": "1",
@@ -20552,6 +20556,7 @@
       "type": "Magic Item",
       "source": "Player Essentials: Heroes of Shadow",
       "revision_date": "3/25/2011 2:23:17 PM",
+      "category": "Assassin Poison,1",
       "flavor": "This green powder causes mental anguish and eventually insanity.",
       "specific": {
         "Level": "1",
@@ -20594,6 +20599,7 @@
       "type": "Magic Item",
       "source": "Player Essentials: Heroes of Shadow",
       "revision_date": "3/25/2011 2:23:17 PM",
+      "category": "Assassin Poison,1",
       "flavor": "This clear, odorless, tasteless liquid slowly turns a creature's natural defenses against poison into a harmful weapon.",
       "specific": {
         "Level": "1",
@@ -20636,6 +20642,7 @@
       "type": "Magic Item",
       "source": "Player Essentials: Heroes of Shadow",
       "revision_date": "3/25/2011 2:23:17 PM",
+      "category": "Assassin Poison,1",
       "flavor": "This black powder dissolves organic material.",
       "specific": {
         "Level": "1",
@@ -20678,6 +20685,7 @@
       "type": "Magic Item",
       "source": "Player Essentials: Heroes of Shadow",
       "revision_date": "3/25/2011 2:23:17 PM",
+      "category": "Assassin Poison,15",
       "flavor": "This thick oil is dark blue, though it becomes invisible when applied to a weapon or object.",
       "specific": {
         "Level": "15",
@@ -20720,6 +20728,7 @@
       "type": "Magic Item",
       "source": "Player Essentials: Heroes of Shadow",
       "revision_date": "3/25/2011 2:23:18 PM",
+      "category": "Assassin Poison,15",
       "flavor": "This deep purple liquid swirls with milky colors that sometimes seem to resolve into disturbing images.",
       "specific": {
         "Level": "15",
@@ -20762,6 +20771,7 @@
       "type": "Magic Item",
       "source": "Player Essentials: Heroes of Shadow",
       "revision_date": "3/25/2011 2:23:18 PM",
+      "category": "Assassin Poison,15",
       "flavor": "This white powder looks to be the residue of ground-up bones.",
       "specific": {
         "Level": "15",
@@ -20804,6 +20814,7 @@
       "type": "Magic Item",
       "source": "Player Essentials: Heroes of Shadow",
       "revision_date": "3/25/2011 2:23:18 PM",
+      "category": "Assassin Poison,20",
       "flavor": "This poison is far more dangerous than that delivered by the sting of a wyvern itself, as a result of the alchemical process that produces this inky-black liquid.",
       "specific": {
         "Level": "20",
@@ -20846,6 +20857,7 @@
       "type": "Magic Item",
       "source": "Player Essentials: Heroes of Shadow",
       "revision_date": "3/25/2011 2:23:18 PM",
+      "category": "Assassin Poison,25",
       "flavor": "This black powder can render a creature comatose if consumed.",
       "specific": {
         "Level": "25",
@@ -20888,6 +20900,7 @@
       "type": "Magic Item",
       "source": "Player Essentials: Heroes of Shadow",
       "revision_date": "3/25/2011 2:23:18 PM",
+      "category": "Assassin Poison,25",
       "flavor": "Harvested from the bodies of ancient dead dragons, this poison is one of the most lethal.",
       "specific": {
         "Level": "25",
@@ -20930,6 +20943,7 @@
       "type": "Magic Item",
       "source": "Player Essentials: Heroes of Shadow",
       "revision_date": "3/25/2011 2:23:18 PM",
+      "category": "Assassin Poison,25",
       "flavor": "This unremarkable white powder harnesses the petrifying ability of the basilisk.",
       "specific": {
         "Level": "25",
@@ -20972,6 +20986,7 @@
       "type": "Magic Item",
       "source": "Dragon Magazine 423",
       "revision_date": "5/20/2013 12:00:00 AM",
+      "category": "Assassin Poison,15",
       "flavor": "This sticky tar-like substance makes creatures vulnerable to psychic attacks.",
       "specific": {
         "Level": "15",
@@ -21014,6 +21029,7 @@
       "type": "Magic Item",
       "source": "Dragon Magazine 423",
       "revision_date": "5/20/2013 12:00:00 AM",
+      "category": "Assassin Poison,15",
       "flavor": "This fine gray powder turns a creature into a font of gibbering madness.",
       "specific": {
         "Level": "15",
@@ -21056,6 +21072,7 @@
       "type": "Magic Item",
       "source": "Dragon Magazine 423",
       "revision_date": "5/20/2013 12:00:00 AM",
+      "category": "Assassin Poison,15",
       "flavor": "This thin yellow fluid has a slight acrid tang and makes creatures less effective in combat.",
       "specific": {
         "Level": "15",
@@ -21098,6 +21115,7 @@
       "type": "Magic Item",
       "source": "Dragon Magazine 423",
       "revision_date": "5/20/2013 12:00:00 AM",
+      "category": "Assassin Poison,15",
       "flavor": "This black dust scintillates with an odd sheen in the light, causing your head to spin if you stare at it too long.",
       "specific": {
         "Level": "15",
@@ -21140,6 +21158,7 @@
       "type": "Magic Item",
       "source": "Dragon Magazine 423",
       "revision_date": "5/20/2013 12:00:00 AM",
+      "category": "Assassin Poison,25",
       "flavor": "This green powder clumps when you squeeze it, behaving like a solid mass one moment and like a powder the next.",
       "specific": {
         "Level": "25",
@@ -21182,6 +21201,7 @@
       "type": "Magic Item",
       "source": "Dragon Magazine 423",
       "revision_date": "5/20/2013 12:00:00 AM",
+      "category": "Assassin Poison,25",
       "flavor": "This purple fluid scrambles a creature’s brain functions, momentarily reducing it to a defenseless state.",
       "specific": {
         "Level": "25",

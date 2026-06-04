@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ClassDef, ClassFeature, EpicDestiny, ParagonPath, RulesIndex, Theme } from "../../src/rules/models";
 import {
+  buildClassFeatureLookups,
   getClassTraitRows,
   getEpicDestinyTraitRows,
   getParagonTraitRows,
@@ -8,6 +9,7 @@ import {
   parseTraitIdsFromField,
   parseTraitNamesFromField,
   resolveTraitDisplayRows,
+  sortTraitDisplayRowsByLevel,
   traitDescriptionForDisplay,
   traitNameForDisplay
 } from "../../src/rules/supportTraits";
@@ -259,5 +261,39 @@ describe("supportTraits", () => {
     expect(getEpicDestinyTraitRows(destiny, miniIndex([undaunted]), 30)[0]?.shortDescription).toBe(
       "Your Wisdom score and your Charisma score both increase by 2."
     );
+  });
+
+  it("sortTraitDisplayRowsByLevel orders by compendium level then name", () => {
+    const features: ClassFeature[] = [
+      {
+        id: "ID_MASTER",
+        name: "Master Mage",
+        slug: "master-mage",
+        raw: { specific: { Level: "10" } }
+      },
+      {
+        id: "ID_L1",
+        name: "Apprentice Mage",
+        slug: "apprentice-mage",
+        raw: { specific: { Level: "1" } }
+      },
+      {
+        id: "ID_L5",
+        name: "Expert Mage",
+        slug: "expert-mage",
+        raw: { specific: { Level: "5" } }
+      }
+    ];
+    const index = miniIndex(features);
+    const { byId } = buildClassFeatureLookups(index);
+    const rows = sortTraitDisplayRowsByLevel(
+      [
+        { id: "ID_MASTER", name: "Master Mage" },
+        { id: "ID_L1", name: "Apprentice Mage" },
+        { id: "ID_L5", name: "Expert Mage" }
+      ],
+      byId
+    );
+    expect(rows.map((r) => r.id)).toEqual(["ID_L1", "ID_L5", "ID_MASTER"]);
   });
 });

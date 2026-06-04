@@ -115,6 +115,10 @@ import {
 } from "../builder/consumableTabData";
 import { useConsumablesCatalog } from "../../data/useConsumablesCatalog";
 import { ritualCasterStatusMessage } from "../../rules/ritualCasting";
+import {
+  applyWizardFreeRitualBookMinimumsToBuild,
+  minRitualBookQuantityForWizardFreeRituals
+} from "../../rules/wizardSpellbook";
 import { CharacterItemsCategoryNav } from "../builder/CharacterItemsCategoryNav";
 import type { ItemsCategory } from "../builder/characterItemsCategories";
 import { CharacterUnifiedInventoryPanel } from "./CharacterUnifiedInventoryPanel";
@@ -1256,6 +1260,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     return computeMagicItemCombatBonuses(index, toBuildLikeState(sheet, index));
   }, [index, sheet]);
   const sheetEquipmentBuild = useMemo(() => buildLikeStateFromSheet(sheet, index), [sheet, index]);
+  const wizardFreeRitualMinBookQty = useMemo(
+    () => minRitualBookQuantityForWizardFreeRituals(index, sheetEquipmentBuild),
+    [index, sheetEquipmentBuild]
+  );
   const { catalog: consumablesCatalog, loading: consumablesLoading, catalogMissing } =
     useConsumablesCatalog(index);
   const adventuringGearRows = useMemo(
@@ -3021,19 +3029,21 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
               <CharacterUnifiedInventoryPanel
                 index={index}
                 build={sheetEquipmentBuild}
-                onBuildChange={(next) =>
+                minRitualBookQuantityById={wizardFreeRitualMinBookQty}
+                onBuildChange={(next) => {
+                  const clamped = applyWizardFreeRitualBookMinimumsToBuild(index, next);
                   updateSheet((prev) => ({
                     ...prev,
-                    inventory: next.inventory ?? [],
-                    equipment: next.equippedSlots ?? {},
-                    gear: next.gear,
-                    rituals: next.rituals,
-                    ritualScrolls: next.ritualScrolls,
-                    alchemy: next.alchemy,
-                    martialPractices: next.martialPractices,
-                    martialPracticeScrolls: next.martialPracticeScrolls
-                  }))
-                }
+                    inventory: clamped.inventory ?? [],
+                    equipment: clamped.equippedSlots ?? {},
+                    gear: clamped.gear,
+                    rituals: clamped.rituals,
+                    ritualScrolls: clamped.ritualScrolls,
+                    alchemy: clamped.alchemy,
+                    martialPractices: clamped.martialPractices,
+                    martialPracticeScrolls: clamped.martialPracticeScrolls
+                  }));
+                }}
               />
             </div>
           )}

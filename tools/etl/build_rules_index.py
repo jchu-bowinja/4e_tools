@@ -628,7 +628,22 @@ def build_granted_class_feature_names_by_support(
             nm = str(row.get("name") or "").strip()
             if nm:
                 bucket.add(nm)
-    return {sid: sorted(names) for sid, names in out.items() if names}
+    by_name = {
+        str(r.get("name") or "").strip(): r for r in features_by_id.values() if r.get("name")
+    }
+
+    def sort_key(nm: str) -> tuple:
+        row = by_name.get(nm)
+        lvl = None
+        if row:
+            lvl = parse_int_from_text((row.get("specific") or {}).get("Level"))
+            if lvl is None:
+                m = re.match(r"^Level\s+(\d+)\b", str(row.get("name") or ""), re.I)
+                if m:
+                    lvl = int(m.group(1))
+        return (lvl if lvl is not None else 0, nm.lower())
+
+    return {sid: sorted(names, key=sort_key) for sid, names in out.items() if names}
 
 
 def build_auto_granted_skill_training_names_by_support(
@@ -1174,6 +1189,13 @@ def _supplement_class_feature_select_options(
     """Fill Essentials self-referential or incomplete compendium select lists."""
     parent_id = str(parent.get("internal_id") or "")
     parent_name = str(parent.get("name") or parent_id)
+    feat_name = str(parent.get("name") or "")
+    if feat_name == "Level 4 Apprentice Mage":
+        return sorted(
+            _apprentice_mage_school_option_rows(parent_id, parent_name, features_by_id),
+            key=lambda r: str(r.get("name") or "").lower(),
+        )
+
     filtered = [o for o in options if str(o.get("id") or "") != parent_id]
     if len(filtered) >= 2:
         return filtered
@@ -1190,7 +1212,6 @@ def _supplement_class_feature_select_options(
         out.append(_class_feature_child_option_row(child, parent_id, parent_name))
         seen.add(cid)
 
-    feat_name = str(parent.get("name") or "")
     for child in _child_features_for_parent_category(parent_id, features_by_id):
         add_child(child)
     if len(out) >= 2:
@@ -1204,6 +1225,7 @@ def _supplement_class_feature_select_options(
             add_child(child)
     elif feat_name in (
         "Level 1 Apprentice Mage",
+        "Level 4 Apprentice Mage",
         "Domain Features",
         "Spirit of Vice",
         "Virtue Choice",
@@ -1211,6 +1233,12 @@ def _supplement_class_feature_select_options(
         "Pact Boon (Binder)",
         "Pact Boon",
     ):
+        if feat_name in ("Level 1 Apprentice Mage", "Level 4 Apprentice Mage"):
+            for row in _apprentice_mage_school_option_rows(parent_id, parent_name, features_by_id):
+                cid = str(row.get("id") or "")
+                if cid and cid not in seen:
+                    out.append(row)
+                    seen.add(cid)
         for pkg in _trait_package_names_for_class(cls, parent, features_by_name):
             add_child(_resolve_trait_package_feature(pkg, features_by_name))
 
@@ -1249,16 +1277,60 @@ def _class_feature_has_select(
     feature: Dict[str, Any], select_type: str
 ) -> tuple[bool, int]:
     rules = feature.get("rules") or {}
-    pick = 0
-    found = False
+    picks: List[int] = []
+    requires_keys: List[str] = []
     for item in rules.get("select") or []:
         attrs = item.get("attrs") or {}
         if attrs.get("type") != select_type:
             continue
-        found = True
         n = parse_int_from_text(attrs.get("number"))
-        pick += n if n is not None and n > 0 else 1
-    return found, pick if found else 0
+        picks.append(n if n is not None and n > 0 else 1)
+        requires_keys.append(str(attrs.get("requires") or "").strip())
+    if not picks:
+        return False, 0
+    # Mutually exclusive branches (e.g. standard mage schools vs. renegade) — one pick total.
+    if select_type == "Class Feature" and len(picks) > 1 and len(set(requires_keys)) > 1:
+        return True, max(picks)
+    return True, sum(picks)
+
+
+MAGE_APPRENTICE_SCHOOL_PARENT_ID = "ID_FMP_CLASS_FEATURE_2867"
+
+
+def _class_feature_select_requires_default_branch(attrs: Dict[str, Any]) -> bool:
+    """Include only default compendium branches (empty or negated `requires`)."""
+    requires = str(attrs.get("requires") or "").strip()
+    return not requires or requires.startswith("!")
+
+
+def _apprentice_mage_school_option_rows(
+    parent_id: str,
+    parent_name: str,
+    features_by_id: Dict[str, Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Enchantment / Evocation / Illusion / Pyromancy apprentices under Level 1 Apprentice Mage."""
+    rows: List[Dict[str, Any]] = []
+    for child in _child_features_for_parent_category(MAGE_APPRENTICE_SCHOOL_PARENT_ID, features_by_id):
+        rows.append(_class_feature_child_option_row(child, parent_id, parent_name))
+    return rows
+
+
+def _options_from_select_category_feature_id(
+    tid: str,
+    parent_id: str,
+    parent_name: str,
+    features_by_id: Dict[str, Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Expand a Category class-feature id to leaf picks (schools), not container features."""
+    child = features_by_id.get(tid)
+    if not child:
+        return []
+    school_children = _child_features_for_parent_category(tid, features_by_id)
+    if school_children:
+        return [
+            _class_feature_child_option_row(sc, parent_id, parent_name) for sc in school_children
+        ]
+    return [_class_feature_child_option_row(child, parent_id, parent_name)]
 
 
 def _class_feature_child_option_row(
@@ -1294,21 +1366,30 @@ def _options_from_class_feature_select(
             if child:
                 options.append(_class_feature_child_option_row(child, parent_id, parent_name))
         return options
-    options = []
+    options: List[Dict[str, Any]] = []
+    seen_ids: Set[str] = set()
     rules = parent.get("rules") or {}
     for item in rules.get("select") or []:
-        if (item.get("attrs") or {}).get("type") != "Class Feature":
+        attrs = item.get("attrs") or {}
+        if attrs.get("type") != "Class Feature":
             continue
-        cat = _select_category(item.get("attrs") or {})
+        if not _class_feature_select_requires_default_branch(attrs):
+            continue
+        cat = _select_category(attrs)
         for token in cat.split("|"):
             tid = token.strip()
             if not tid.startswith("ID_") or tid == parent_id:
                 continue
             if re.match(r"^ID_(?:FMP|DBB)_CLASS_\d+$", tid):
                 continue
-            child = features_by_id.get(tid)
-            if child:
-                options.append(_class_feature_child_option_row(child, parent_id, parent_name))
+            for row in _options_from_select_category_feature_id(
+                tid, parent_id, parent_name, features_by_id
+            ):
+                cid = str(row.get("id") or "")
+                if not cid or cid in seen_ids:
+                    continue
+                seen_ids.add(cid)
+                options.append(row)
     return options
 
 
@@ -1675,14 +1756,26 @@ def _append_ungranted_power_choice_groups(
                     }
                 )
             else:
+                rules = feat.get("rules") or {}
+                selects = [
+                    (item.get("attrs") or {})
+                    for item in (rules.get("select") or [])
+                    if (item.get("attrs") or {}).get("type") == "Power"
+                ]
                 for pool_index, pool_ids in enumerate(power_pools):
+                    attrs = selects[pool_index] if pool_index < len(selects) else {}
+                    pool_pick = pick_pow
+                    if attrs.get("spellbook"):
+                        pool_pick = 2
+                    min_level = parse_int_from_text(attrs.get("Level")) or 1
                     groups.append(
                         {
                             "key": f"classPower:{fid}:{pool_index}",
                             "kind": "power",
                             "parentFeatureId": fid,
                             "parentFeatureName": parent_name,
-                            "pickCount": 1,
+                            "pickCount": pool_pick,
+                            "minLevel": min_level,
                             "powerIds": pool_ids,
                             "options": [],
                         }
@@ -2070,14 +2163,26 @@ def build_class_feature_choice_groups_by_class(
                             }
                         )
                     else:
+                        rules = parent.get("rules") or {}
+                        selects = [
+                            (item.get("attrs") or {})
+                            for item in (rules.get("select") or [])
+                            if (item.get("attrs") or {}).get("type") == "Power"
+                        ]
                         for pool_index, pool_ids in enumerate(power_pools):
+                            attrs = selects[pool_index] if pool_index < len(selects) else {}
+                            pool_pick = pick_pow
+                            if attrs.get("spellbook"):
+                                pool_pick = 2
+                            min_level = parse_int_from_text(attrs.get("Level")) or 1
                             groups.append(
                                 {
                                     "key": f"classPower:{parent_id}:{pool_index}",
                                     "kind": "power",
                                     "parentFeatureId": parent_id,
                                     "parentFeatureName": parent_name,
-                                    "pickCount": 1,
+                                    "pickCount": pool_pick,
+                                    "minLevel": min_level,
                                     "powerIds": pool_ids,
                                     "options": [],
                                 }
@@ -2390,7 +2495,13 @@ def build_class_feature_choice_groups_by_class(
             class_id, cls, groups, features_by_name, features_by_id, classes_by_id
         )
         if groups:
-            out[class_id] = groups
+            out[class_id] = sorted(
+                groups,
+                key=lambda g: (
+                    int(g.get("minLevel") or 1),
+                    str(g.get("parentFeatureName") or "").lower(),
+                ),
+            )
 
     return out
 

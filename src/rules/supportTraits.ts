@@ -36,7 +36,46 @@ export function parseFeatureLevel(feature: ClassFeature): number | undefined {
     const parsed = Number.parseInt(level.trim(), 10);
     if (Number.isFinite(parsed)) return parsed;
   }
+  const fromName = /^Level\s+(\d+)\b/i.exec(feature.name.trim());
+  if (fromName) {
+    const parsed = Number.parseInt(fromName[1], 10);
+    if (Number.isFinite(parsed)) return parsed;
+  }
   return undefined;
+}
+
+/** Order class feature ids by compendium level, then name. */
+export function sortClassFeatureIdsByLevel(
+  index: RulesIndex,
+  ids: string[]
+): string[] {
+  const { byId } = buildClassFeatureLookups(index);
+  return [...ids].sort((a, b) => {
+    const fa = byId.get(a);
+    const fb = byId.get(b);
+    const la = fa ? (parseFeatureLevel(fa) ?? 1) : 999;
+    const lb = fb ? (parseFeatureLevel(fb) ?? 1) : 999;
+    if (la !== lb) return la - lb;
+    return (fa?.name ?? a).localeCompare(fb?.name ?? b, undefined, { sensitivity: "base" });
+  });
+}
+
+/** Sort trait rows by compendium feature level, then name. */
+export function sortTraitDisplayRowsByLevel(
+  rows: TraitDisplayRow[],
+  byId: Map<string, ClassFeature>
+): TraitDisplayRow[] {
+  const levelOf = (row: TraitDisplayRow): number => {
+    if (!row.id.startsWith("ID_")) return 999;
+    const feature = byId.get(row.id);
+    if (!feature) return 999;
+    return parseFeatureLevel(feature) ?? 1;
+  };
+  return [...rows].sort((a, b) => {
+    const diff = levelOf(a) - levelOf(b);
+    if (diff !== 0) return diff;
+    return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+  });
 }
 
 export function featureIsAvailableAtLevel(feature: ClassFeature, characterLevel: number): boolean {
@@ -161,15 +200,17 @@ export function getClassTraitRows(
 
   if (build?.classId === cls.id) {
     const ids = collectClassFeatureIdsFromClass(index, build);
-    return resolveTraitDisplayRows(ids, [], byId, byName, {
+    const rows = resolveTraitDisplayRows(ids, [], byId, byName, {
       maxLevel: level
     });
+    return sortTraitDisplayRowsByLevel(rows, byId);
   }
 
   const spec = specOf(cls);
-  return resolveTraitDisplayRows([], parseTraitNamesFromField(spec, "_PARSED_CLASS_FEATURE"), byId, byName, {
+  const rows = resolveTraitDisplayRows([], parseTraitNamesFromField(spec, "_PARSED_CLASS_FEATURE"), byId, byName, {
     maxLevel: level
   });
+  return sortTraitDisplayRowsByLevel(rows, byId);
 }
 
 export function getHybridClassTraitRows(
@@ -183,9 +224,10 @@ export function getHybridClassTraitRows(
     ...parseTraitNamesFromField(specOf(hybridA), "_PARSED_CLASS_FEATURE"),
     ...parseTraitNamesFromField(specOf(hybridB), "_PARSED_CLASS_FEATURE")
   ];
-  return resolveTraitDisplayRows([], names, byId, byName, {
+  const rows = resolveTraitDisplayRows([], names, byId, byName, {
     maxLevel: characterLevel
   });
+  return sortTraitDisplayRowsByLevel(rows, byId);
 }
 
 export function getThemeTraitRows(

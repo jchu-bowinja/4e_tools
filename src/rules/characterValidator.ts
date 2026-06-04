@@ -33,6 +33,7 @@ import { resolveRaceAbilityBonusInfo } from "./abilityScores";
 import {
   CLASS_FEATURE_CHOICE_NONE,
   classFeaturePowerIdsForClass,
+  filterMageSchoolProgressionChoiceOptions,
   filterVisibleClassFeatureChoiceGroups,
   effectiveClassSelectionsForChoiceGroups,
   getClassFeatureChoiceGroups,
@@ -59,6 +60,8 @@ import { validateParagonMulticlassing } from "./paragonMulticlassing";
 import { paragonMulticlassPrimaryAtWillSlotPenalty } from "./psionicPowerPoints";
 import { equipmentDuplicateEnchantmentWarnings } from "./equipment";
 import { consumablesBuildWarnings } from "./consumablesValidation";
+import { ritualsFromIndex } from "./consumablesCatalog";
+import { validateWizardSpellbookRituals } from "./wizardSpellbook";
 
 export { getClassPowersForLevelRange };
 
@@ -157,7 +160,8 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
       index,
       build.classId,
       build.classSelections,
-      choiceGroups
+      choiceGroups,
+      build.level
     );
     const visibleGroups = filterVisibleClassFeatureChoiceGroups(choiceGroups, rs, build.level);
     const subOptionIdsByParent = new Map<string, string[]>();
@@ -172,7 +176,9 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
           }
           continue;
         }
-        const legal = new Set(group.options.map((o) => o.id));
+        const legal = new Set(
+          filterMageSchoolProgressionChoiceOptions(index, group, rs).map((o) => o.id)
+        );
         const picks = resolveClassFeatureChoiceIdsForGroup(group, rs);
         if (picks.length < group.pickCount) {
           errors.push(
@@ -206,18 +212,18 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
       const picks = parseClassPowerChoiceSelection(rs[group.key]);
       if (picks.length < group.pickCount) {
         errors.push(
-          `Class: ${group.parentFeatureName} — choose ${group.pickCount} power${group.pickCount === 1 ? "" : "s"}.`
+          `Powers: ${group.parentFeatureName} — choose ${group.pickCount} power${group.pickCount === 1 ? "" : "s"}.`
         );
         continue;
       }
       const seen = new Set<string>();
       for (const pid of picks) {
         if (!legal.has(pid)) {
-          errors.push(`Class: ${group.parentFeatureName} — invalid power selection.`);
+          errors.push(`Powers: ${group.parentFeatureName} — invalid power selection.`);
           break;
         }
         if (seen.has(pid)) {
-          errors.push(`Class: ${group.parentFeatureName} — choose different powers.`);
+          errors.push(`Powers: ${group.parentFeatureName} — choose different powers.`);
           break;
         }
         seen.add(pid);
@@ -232,6 +238,14 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
         errors.push(`Class: ${parentName} — each sign can only be chosen once.`);
       }
     }
+
+    errors.push(
+      ...validateWizardSpellbookRituals(
+        index,
+        build,
+        new Set(ritualsFromIndex(index).map((r) => r.id))
+      )
+    );
 
     const essentialsBuilds = essentialsClassBuildOptions(index, clsForBuild);
     const buildPick = selectedClassBuildOptionId(build.classSelections);

@@ -12,6 +12,8 @@ import {
   parseTraitIdsFromField,
   parseTraitNamesFromField,
   specOf,
+  sortClassFeatureIdsByLevel,
+  sortTraitDisplayRowsByLevel,
   traitDescriptionForDisplay,
   traitNameForDisplay,
   type TraitDisplayRow
@@ -95,7 +97,7 @@ export function collectClassFeatureIdsFromClass(
     applyClassFeatureChoiceGroups(build.classId);
   }
 
-  return ids;
+  return sortClassFeatureIdsByLevel(index, ids);
 }
 
 /** Class feature ids the character currently has (build options, grants, path features, …). */
@@ -157,7 +159,7 @@ export function getCharacterClassFeatureTraitRows(
   build: CharacterBuild
 ): TraitDisplayRow[] {
   const { byId } = buildClassFeatureLookups(index);
-  return collectClassFeatureIdsFromClass(index, build)
+  const rows = collectClassFeatureIdsFromClass(index, build)
     .map((id) => byId.get(id))
     .filter((f): f is ClassFeature => !!f)
     .map((f) => ({
@@ -165,4 +167,5 @@ export function getCharacterClassFeatureTraitRows(
       name: traitNameForDisplay(f),
       shortDescription: traitDescriptionForDisplay(f)
     }));
+  return sortTraitDisplayRowsByLevel(rows, byId);
 }

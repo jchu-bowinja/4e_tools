@@ -58,13 +58,16 @@ export interface CharacterUnifiedInventoryPanelProps {
   build: CharacterBuild;
   onBuildChange: (build: CharacterBuild) => void;
   hideDescription?: boolean;
+  /** Minimum ritual-book quantity per id (wizard spellbook free rituals). */
+  minRitualBookQuantityById?: Record<string, number>;
 }
 
 export function CharacterUnifiedInventoryPanel({
   index,
   build,
   onBuildChange,
-  hideDescription = false
+  hideDescription = false,
+  minRitualBookQuantityById = {}
 }: CharacterUnifiedInventoryPanelProps): JSX.Element {
   const [filter, setFilter] = useState<UnifiedInventoryFilter>("all");
   const allRows = useMemo(() => unifiedInventoryRows(build, index), [build, index]);
@@ -154,7 +157,12 @@ export function CharacterUnifiedInventoryPanel({
           ) : null}
           {consumableRows.length > 0 ? (
             <ul style={listStyle}>
-              {consumableRows.map((row) => (
+              {consumableRows.map((row) => {
+                const minBookQty =
+                  row.category === "ritual" && row.consumableKey === "rituals"
+                    ? Math.max(0, minRitualBookQuantityById[row.sourceId] ?? 0)
+                    : 0;
+                return (
                 <li key={`${row.category}:${row.sourceId}`} style={rowStyle}>
                   <div
                     style={{
@@ -188,24 +196,38 @@ export function CharacterUnifiedInventoryPanel({
                       <AdjustableNumberInput
                         ariaLabel={`Quantity of ${row.name}`}
                         value={row.quantity}
-                        min={0}
+                        min={minBookQty}
                         max={9999}
                         compact
-                        onChange={(qty) => onBuildChange(setUnifiedConsumableQuantity(build, row, qty))}
+                        onChange={(qty) =>
+                          onBuildChange(
+                            setUnifiedConsumableQuantity(build, row, Math.max(minBookQty, qty))
+                          )
+                        }
                         style={{ flexShrink: 0 }}
                         inputStyle={{ width: adjustableNumberWidthCh(row.quantity, 9999) }}
                       />
-                      <button
-                        type="button"
-                        style={actionButtonStyle}
-                        onClick={() => onBuildChange(setUnifiedConsumableQuantity(build, row, 0))}
-                      >
-                        Remove
-                      </button>
+                      {row.quantity > minBookQty ? (
+                        <button
+                          type="button"
+                          style={actionButtonStyle}
+                          onClick={() => onBuildChange(setUnifiedConsumableQuantity(build, row, 0))}
+                        >
+                          Remove
+                        </button>
+                      ) : minBookQty > 0 ? (
+                        <span
+                          style={{ fontSize: "0.72rem", color: "var(--text-muted)", maxWidth: "7rem" }}
+                          title="Granted by your spellbook class feature; change picks on the Class tab to remove."
+                        >
+                          Spellbook ritual
+                        </span>
+                      ) : null}
                     </div>
                   </div>
                 </li>
-              ))}
+              );
+              })}
             </ul>
           ) : null}
         </div>

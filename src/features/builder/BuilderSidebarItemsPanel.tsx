@@ -2,6 +2,10 @@ import { useMemo } from "react";
 import type { CharacterBuild, RulesIndex } from "../../rules/models";
 import { CharacterUnifiedInventoryPanel } from "../characterSheet/CharacterUnifiedInventoryPanel";
 import { unifiedInventoryRows } from "../characterSheet/unifiedInventory";
+import {
+  applyWizardFreeRitualBookMinimumsToBuild,
+  minRitualBookQuantityForWizardFreeRituals
+} from "../../rules/wizardSpellbook";
 import { LiveSheetCollapsibleSection } from "./LiveSheetCollapsibleSection";
 
 export interface BuilderSidebarItemsPanelProps {
@@ -16,10 +20,20 @@ export function BuilderSidebarItemsPanel({
   onBuildChange
 }: BuilderSidebarItemsPanelProps): JSX.Element {
   const count = useMemo(() => unifiedInventoryRows(build, index).length, [build, index]);
+  const minRitualBookQty = useMemo(
+    () => minRitualBookQuantityForWizardFreeRituals(index, build),
+    [index, build]
+  );
 
   return (
     <LiveSheetCollapsibleSection title={count > 0 ? `Inventory (${count})` : "Inventory"}>
-      <CharacterUnifiedInventoryPanel index={index} build={build} hideDescription onBuildChange={onBuildChange} />
+      <CharacterUnifiedInventoryPanel
+        index={index}
+        build={build}
+        hideDescription
+        minRitualBookQuantityById={minRitualBookQty}
+        onBuildChange={(next) => onBuildChange(applyWizardFreeRitualBookMinimumsToBuild(index, next))}
+      />
     </LiveSheetCollapsibleSection>
   );
 }

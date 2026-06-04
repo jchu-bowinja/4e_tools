@@ -58,6 +58,8 @@ export interface CharacterConsumablePickerTabProps {
   scrollPurchase?: "ritual" | "martialPractice";
   scrollEntries?: CharacterConsumableEntry[];
   onScrollEntriesChange?: (entries: CharacterConsumableEntry[]) => void;
+  /** Minimum quantity in the book list per id (e.g. wizard spellbook free rituals). */
+  minBookQuantityById?: Record<string, number>;
 }
 
 const listPanelStyle: CSSProperties = {
@@ -122,7 +124,8 @@ export function CharacterConsumablePickerTab({
   showLevelSort = false,
   scrollPurchase,
   scrollEntries = [],
-  onScrollEntriesChange
+  onScrollEntriesChange,
+  minBookQuantityById = {}
 }: CharacterConsumablePickerTabProps): JSX.Element {
   const [search, setSearch] = useState("");
   const [listSort, setListSort] = useState<ConsumableListSort>("name");
@@ -211,8 +214,12 @@ export function CharacterConsumablePickerTab({
     buyBook(row);
   }
 
+  function minBookQty(id: string): number {
+    return Math.max(0, minBookQuantityById[id] ?? 0);
+  }
+
   function setBookQty(id: string, quantity: number): void {
-    onEntriesChange(setConsumableQuantity(entries, id, quantity));
+    onEntriesChange(setConsumableQuantity(entries, id, Math.max(minBookQty(id), quantity)));
   }
 
   function setScrollQty(id: string, quantity: number): void {
@@ -221,6 +228,7 @@ export function CharacterConsumablePickerTab({
   }
 
   function removeFromBook(id: string): void {
+    if (consumableQuantity(entries, id) <= minBookQty(id)) return;
     onEntriesChange(removeConsumableEntry(entries, id));
   }
 
@@ -480,7 +488,7 @@ export function CharacterConsumablePickerTab({
                           <AdjustableNumberInput
                             ariaLabel={`${scrollLabels.bookQtyLabel} copies of ${row.name}`}
                             value={bookQty}
-                            min={0}
+                            min={minBookQty(row.id)}
                             max={9999}
                             onChange={(v) => setBookQty(row.id, v)}
                             compact
@@ -505,7 +513,7 @@ export function CharacterConsumablePickerTab({
                         <AdjustableNumberInput
                           ariaLabel={`Quantity of ${row.name}`}
                           value={bookQty}
-                          min={0}
+                          min={minBookQty(row.id)}
                           max={9999}
                           onChange={(v) => setBookQty(row.id, v)}
                           compact
@@ -513,10 +521,17 @@ export function CharacterConsumablePickerTab({
                           inputStyle={{ width: adjustableNumberWidthCh(bookQty, 9999) }}
                         />
                       )}
-                      {bookQty > 0 ? (
+                      {bookQty > minBookQty(row.id) ? (
                         <button type="button" style={actionButtonStyle} onClick={() => removeFromBook(row.id)}>
                           {hasScroll && scrollLabels ? `Clear ${scrollLabels.bookShort}` : "Remove"}
                         </button>
+                      ) : bookQty > 0 && minBookQty(row.id) > 0 ? (
+                        <span
+                          style={{ fontSize: "0.72rem", color: "var(--text-muted)", maxWidth: "8rem" }}
+                          title="Granted by your spellbook class feature; change picks on the Class tab to remove."
+                        >
+                          Spellbook ritual
+                        </span>
                       ) : null}
                       {hasScroll && scrollQty > 0 ? (
                         <button type="button" style={actionButtonStyle} onClick={() => removeScrolls(row.id)}>

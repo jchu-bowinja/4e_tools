@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   Ability,
   AsiChoices,
@@ -115,8 +115,13 @@ import {
   getClassFeatureChoiceGroups,
   isFixedClassPowerChoiceGroup,
   parseClassPowerChoiceSelection,
+  applyClassFeatureChoiceOptionFilters,
+  filterMageExpertMageChoiceOptions,
+  isAutoMageLevel8ExpertMageGroup,
   pruneHiddenClassFeatureSelections,
+  pruneInvalidMageExpertMageSelections,
   resolveClassFeatureChoiceIdsForGroup,
+  resolveMageLevel8ExpertMageOptionId,
   resolveClassPowerChoiceIdsForGroup
 } from "../../rules/classFeatureChoices";
 import {
@@ -127,6 +132,27 @@ import {
   pruneClassBuildOptionSelection,
   selectedClassBuildOptionId
 } from "../../rules/classBuildOptions";
+import {
+  applyClassSpellbookSlotPick,
+  characterHasClassSpellbook,
+  characterHasMageSpellbook,
+  characterHasWizardSpellbook,
+  applyWizardFreeRitualBookMinimumsToBuild,
+  classSpellbookPowerIdsUsedOutsidePick,
+  clampRitualBookEntriesToWizardFreeMinimums,
+  isClassSpellbookPowerGroup,
+  mergeWizardFreeRitualsIntoBuild,
+  minRitualBookQuantityForWizardFreeRituals,
+  parseWizardSpellbookPowerSelection,
+  parseWizardSpellbookRitualSelection,
+  resolveSpellbookSlotBinding,
+  spellbookPicksForBinding,
+  type SpellbookSlotBinding,
+  syncClassSpellbookPowerSelectionsFromClassSlots,
+  visibleWizardSpellbookRitualMilestones,
+  wizardSpellbookRitualIdsUsedOutsideSlot,
+  wizardSpellbookRitualSelectionKey
+} from "../../rules/wizardSpellbook";
 import { getClassTraitRows, getHybridClassTraitRows, type TraitDisplayRow } from "../../rules/supportTraits";
 import { autoGrantedTrainedSkillIds, effectiveTrainedSkillIdSet } from "../../rules/grantedSkillsQuery";
 import { computeSkillSheetRows } from "../../rules/skillCalculator";
@@ -1065,24 +1091,49 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     () => getClassFeatureChoiceGroups(index, selectedClass),
     [index, selectedClass]
   );
-  const classSelectionsForFeatureChoices = useMemo(
-    () =>
-      effectiveClassSelectionsForChoiceGroups(
+  const classSelectionsForFeatureChoices = useMemo(() => {
+    const base = effectiveClassSelectionsForChoiceGroups(
+      index,
+      build.classId,
+      build.classSelections,
+      classFeatureChoiceGroups,
+      build.level
+    );
+    if (isHybridBuild || !build.classId) return base;
+    const bonus = bonusClassAtWillSlotFromRaceBuild(index, build);
+    const penalty = paragonMulticlassPrimaryAtWillSlotPenalty(index, build);
+    const defs = buildClassPowerSlotDefinitions(build.level, bonus, penalty);
+    return (
+      syncClassSpellbookPowerSelectionsFromClassSlots(
+        base,
+        build.classPowerSlots,
         index,
-        build.classId,
-        build.classSelections,
-        classFeatureChoiceGroups
-      ),
-    [index, build.classId, build.classSelections, classFeatureChoiceGroups]
-  );
+        defs,
+        classFeatureChoiceGroups,
+        build
+      ) ?? base
+    );
+  }, [
+    index,
+    build.classId,
+    build.classSelections,
+    build.classPowerSlots,
+    build.level,
+    classFeatureChoiceGroups,
+    isHybridBuild
+  ]);
   const visibleClassFeatureChoiceGroups = useMemo(
     () =>
-      filterVisibleClassFeatureChoiceGroups(
-        classFeatureChoiceGroups,
-        classSelectionsForFeatureChoices,
-        build.level
+      applyClassFeatureChoiceOptionFilters(
+        index,
+        filterVisibleClassFeatureChoiceGroups(
+          classFeatureChoiceGroups,
+          classSelectionsForFeatureChoices,
+          build.level
+        ),
+        classSelectionsForFeatureChoices
       ),
-    [classFeatureChoiceGroups, classSelectionsForFeatureChoices, build.level]
+    [index, classFeatureChoiceGroups, classSelectionsForFeatureChoices, build.level]
   );
   const visibleClassFeatureChoiceGroupsOnClassTab = useMemo(
     () => visibleClassFeatureChoiceGroups.filter((g) => g.kind === "classFeature"),
@@ -1104,6 +1155,34 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   const visibleClassFeaturePowerGroupsOnPowersTab = useMemo(
     () => visibleClassFeatureChoiceGroups.filter((g) => g.kind === "power"),
     [visibleClassFeatureChoiceGroups]
+  );
+  const showWizardSpellbookRitualsOnClassTab = useMemo(
+    () => !isHybridBuild && characterHasWizardSpellbook(index, build),
+    [index, build, isHybridBuild]
+  );
+  const wizardSpellbookRitualMilestones = useMemo(
+    () => visibleWizardSpellbookRitualMilestones(build.level),
+    [build.level]
+  );
+  const wizardFreeRitualMinBookQty = useMemo(
+    () => minRitualBookQuantityForWizardFreeRituals(index, build),
+    [index, build]
+  );
+  const showClassSpellbookSlotPicks = useMemo(
+    () => !isHybridBuild && characterHasClassSpellbook(index, build),
+    [index, build, isHybridBuild]
+  );
+  const showWizardSpellbookDualDailyUtility = useMemo(
+    () => !isHybridBuild && characterHasWizardSpellbook(index, build),
+    [index, build, isHybridBuild]
+  );
+  const showMageSpellbookSlotPicks = useMemo(
+    () => !isHybridBuild && characterHasMageSpellbook(index, build),
+    [index, build, isHybridBuild]
+  );
+  const visibleNonSpellbookPowerGroupsOnPowersTab = useMemo(
+    () => visibleClassFeaturePowerGroupsOnPowersTab.filter((g) => !isClassSpellbookPowerGroup(g)),
+    [visibleClassFeaturePowerGroupsOnPowersTab]
   );
   const autoGrantedSkillIds = useMemo(() => autoGrantedTrainedSkillIds(index, build), [index, build]);
   const autoGrantedSkillIdSet = useMemo(() => new Set(autoGrantedSkillIds), [autoGrantedSkillIds]);
@@ -2041,6 +2120,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       return "epicDestiny";
     }
     if (m === "choose a race." || m.startsWith("race:")) return "race";
+    if (m.startsWith("powers:")) return "powers";
     if (m === "choose a class." || m.startsWith("class:")) return "class";
     if (m.startsWith("power:")) return "powers";
     if (m.includes("hybrid class")) return "class";
@@ -2277,6 +2357,114 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     );
   }
 
+  function commitWizardSpellbookRitualMilestone(
+    milestoneLevel: number,
+    pickCount: number,
+    slot: number,
+    ritualId: string
+  ): void {
+    const key = wizardSpellbookRitualSelectionKey(milestoneLevel);
+    const picks = [...parseWizardSpellbookRitualSelection(build.classSelections?.[key])];
+    while (picks.length < pickCount) picks.push("");
+    picks[slot] = ritualId;
+    const filtered = picks.filter(Boolean);
+    let nextSelections = { ...(build.classSelections || {}) };
+    if (filtered.length) nextSelections[key] = formatClassPowerChoiceSelection(filtered);
+    else delete nextSelections[key];
+    const nextBuild = mergeWizardFreeRitualsIntoBuild({
+      ...build,
+      classSelections: Object.keys(nextSelections).length ? nextSelections : undefined
+    });
+    updateBuild(nextBuild);
+  }
+
+  function renderWizardSpellbookRitualMilestones(): JSX.Element | null {
+    if (!showWizardSpellbookRitualsOnClassTab || wizardSpellbookRitualMilestones.length === 0) {
+      return null;
+    }
+    const ritualById = new Map(ritualRows.map((r) => [r.id, r]));
+    return (
+      <div style={{ marginTop: "0.85rem", paddingTop: "0.75rem", borderTop: "1px solid var(--panel-border)" }}>
+        <h4 style={subsectionTitleStyle}>Spellbook — free rituals</h4>
+        <p style={{ margin: "0 0 0.5rem 0", fontSize: "0.78rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
+          Wizards with a spellbook start with three 1st-level rituals and gain two more free rituals at levels 5, 11, 15,
+          21, and 25 (each pick must be that level or lower). Selections are added to your ritual book on the Items tab.
+        </p>
+        {wizardSpellbookRitualMilestones.map((milestone) => {
+          const key = wizardSpellbookRitualSelectionKey(milestone.level);
+          const picks = parseWizardSpellbookRitualSelection(build.classSelections?.[key]);
+          const eligible = ritualRows.filter(
+            (r) => r.level == null || r.level <= milestone.level
+          );
+          return (
+            <div key={key} style={{ maxWidth: "28rem", marginBottom: "0.85rem" }}>
+              <span style={{ display: "block", fontWeight: 600, marginBottom: "0.35rem", fontSize: "0.85rem" }}>
+                Level {milestone.level} — {milestone.pickCount} free ritual
+                {milestone.pickCount === 1 ? "" : "s"}
+              </span>
+              {Array.from({ length: milestone.pickCount }, (_, slot) => {
+                const selectedId = picks[slot] || "";
+                const usedElsewhere = wizardSpellbookRitualIdsUsedOutsideSlot(
+                  build.classSelections,
+                  build.level,
+                  milestone.level,
+                  slot
+                );
+                return (
+                  <label key={`${key}-${slot}`} style={{ display: "block", marginBottom: "0.35rem" }}>
+                    <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                      Ritual {slot + 1}
+                    </span>
+                    <select
+                      value={selectedId}
+                      onChange={(e) =>
+                        commitWizardSpellbookRitualMilestone(
+                          milestone.level,
+                          milestone.pickCount,
+                          slot,
+                          e.target.value
+                        )
+                      }
+                      style={{
+                        width: "100%",
+                        marginTop: "0.2rem",
+                        padding: "0.4rem",
+                        borderRadius: "6px",
+                        border: "1px solid var(--panel-border)"
+                      }}
+                    >
+                      <option value="">Select ritual…</option>
+                      {eligible.map((row) => {
+                        if (usedElsewhere.has(row.id) && row.id !== selectedId) return null;
+                        const meta = row.level != null ? ` (level ${row.level})` : "";
+                        return (
+                          <option key={row.id} value={row.id}>
+                            {row.name}
+                            {meta}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </label>
+                );
+              })}
+              {picks.filter(Boolean).length > 0 && (
+                <ul style={{ margin: "0.25rem 0 0 0", paddingLeft: "1.1rem", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
+                  {picks
+                    .filter(Boolean)
+                    .map((rid) => ritualById.get(rid)?.name ?? rid)
+                    .map((name) => (
+                      <li key={name}>{name}</li>
+                    ))}
+                </ul>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
   function renderClassFeaturePowerChoiceGroup(group: ClassFeatureChoiceGroup): JSX.Element {
     const rs = classSelectionsForFeatureChoices;
     const classId = build.classId;
@@ -2306,7 +2494,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     return (
       <div key={group.key} style={{ marginBottom: "0.75rem", maxWidth: "28rem" }}>
         <span style={{ display: "block", fontWeight: 600, marginBottom: "0.35rem", fontSize: "0.85rem" }}>
-          {classFeaturePowerChoiceLabel(group)}
+          {classFeaturePowerChoiceLabel(group, index)}
         </span>
         {Array.from({ length: group.pickCount }, (_, slot) => {
           const selectedId = picks[slot] || "";
@@ -2476,6 +2664,34 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       ...nextBuild,
       powerIds: orderedPowerIdsFromSlots(powerSlotDefs, trimmed)
     });
+  }
+
+  function commitClassSpellbookSlotPick(
+    binding: SpellbookSlotBinding,
+    pickIndex: number,
+    powerId: string,
+    classSlotKey: string
+  ): void {
+    let nextBuild = applyClassSpellbookSlotPick(
+      index,
+      build,
+      powerSlotDefs,
+      binding,
+      pickIndex,
+      powerId,
+      classSlotKey
+    );
+    if (pickIndex === 0) {
+      for (const [featId, state] of Object.entries(nextBuild.featPowerReplacements || {})) {
+        if (state.slotKey === classSlotKey) {
+          nextBuild = disableFeatPowerReplace(nextBuild, featId);
+        }
+      }
+      if (isSlotUsedByParagonAtWillSwap(nextBuild, classSlotKey)) {
+        nextBuild = disableParagonAtWillSwap(nextBuild);
+      }
+    }
+    updateBuild(nextBuild);
   }
 
   function commitClassPowerSlot(slotKey: string, powerId: string): void {
@@ -3485,6 +3701,11 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                                         classFeatureChoiceGroups,
                                         build.level
                                       );
+                                      next = pruneInvalidMageExpertMageSelections(
+                                        index,
+                                        next,
+                                        classFeatureChoiceGroups
+                                      );
                                       updateBuild({
                                         ...build,
                                         classSelections: Object.keys(next).length ? next : undefined
@@ -3522,6 +3743,62 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                       const pickedId =
                         rs[group.key] || (group.optional ? "__none__" : "");
                       const picked = group.options.find((o) => o.id === pickedId);
+                      if (isAutoMageLevel8ExpertMageGroup(index, group, rs)) {
+                        const autoId = resolveMageLevel8ExpertMageOptionId(index, group, rs);
+                        const autoOption =
+                          filterMageExpertMageChoiceOptions(index, group, rs).find(
+                            (o) => o.id === autoId
+                          ) ?? picked;
+                        return (
+                          <div
+                            key={group.key}
+                            style={{ display: "block", maxWidth: "28rem", marginBottom: "0.75rem" }}
+                          >
+                            <span
+                              style={{
+                                display: "block",
+                                fontWeight: 600,
+                                marginBottom: "0.25rem",
+                                fontSize: "0.85rem"
+                              }}
+                            >
+                              {group.parentFeatureName}
+                            </span>
+                            <p
+                              style={{
+                                margin: 0,
+                                fontSize: "0.85rem",
+                                color: "var(--text-secondary)"
+                              }}
+                            >
+                              {autoOption?.name ?? "—"} (granted — second school of magic)
+                            </p>
+                            {autoOption?.shortDescription && (
+                              <p
+                                style={{
+                                  margin: "0.35rem 0 0 0",
+                                  fontSize: "0.8rem",
+                                  color: "var(--text-secondary)",
+                                  lineHeight: 1.45
+                                }}
+                              >
+                                {autoOption.shortDescription}
+                              </p>
+                            )}
+                            {autoOption?.body && (
+                              <div
+                                style={{
+                                  marginTop: "0.35rem",
+                                  fontSize: "0.82rem",
+                                  color: "var(--text-secondary)"
+                                }}
+                              >
+                                <RulesRichText text={autoOption.body} />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
                       return (
                         <label key={group.key} style={{ display: "block", maxWidth: "28rem", marginBottom: "0.75rem" }}>
                           <span style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem", fontSize: "0.85rem" }}>
@@ -3540,6 +3817,11 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                                 next,
                                 classFeatureChoiceGroups,
                                 build.level
+                              );
+                              next = pruneInvalidMageExpertMageSelections(
+                                index,
+                                next,
+                                classFeatureChoiceGroups
                               );
                               const keys = Object.keys(next);
                               updateBuild({ ...build, classSelections: keys.length ? next : undefined });
@@ -3568,6 +3850,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     })}
                   </div>
                 )}
+                {renderWizardSpellbookRitualMilestones()}
                 {classSpecific["Role"] && (
                   <CollapsibleDisclosure
           open
@@ -4259,8 +4542,25 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
               <p style={{ margin: "0.25rem 0 0.65rem 0", fontSize: "0.85rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
                 Each <strong>class</strong> slot is a separate choice. The list for a slot only includes <strong>class</strong> powers whose{" "}
                 <strong>printed level</strong> is at most that slot&apos;s gain level (for example, the 3rd-level encounter slot only lists encounter
-                attacks of printed level 3 or lower). Search filters the lists. Paragon path and epic destiny powers are shown below when you have
-                selected them on their tabs; they are extra powers on top of your class schedule, not chosen into these class slots.
+                attacks of printed level 3 or lower). Search filters the lists.
+                {showClassSpellbookSlotPicks ? (
+                  <>
+                    {" "}
+                    {showMageSpellbookSlotPicks ? (
+                      <>
+                        <strong>Encounter</strong>, <strong>daily</strong>, and <strong>utility</strong> slots use your mage spellbook: choose a
+                        prepared power and an additional spellbook option at each level.
+                      </>
+                    ) : (
+                      <>
+                        <strong>Daily attack</strong> and <strong>utility</strong> slots list two dropdowns per level: your prepared power and a
+                        second spellbook power at that level.
+                      </>
+                    )}
+                  </>
+                ) : null}{" "}
+                Paragon path and epic destiny powers are shown below when you have selected them on their tabs; they are extra powers on top of your
+                class schedule, not chosen into these class slots.
               </p>
             )}
             {legality.powerSlotRules &&
@@ -4294,7 +4594,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                 {upcomingPowerSlotMilestones.map((m) => `${m.label} at level ${m.atLevel}`).join("; ")}.
               </p>
             )}
-            {visibleClassFeaturePowerGroupsOnPowersTab.length > 0 && (
+            {visibleNonSpellbookPowerGroupsOnPowersTab.length > 0 && (
               <section
                 style={{
                   marginBottom: "1.1rem",
@@ -4308,9 +4608,10 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                   Channel Divinity &amp; class feature powers
                 </div>
                 <p style={{ margin: "0 0 0.5rem 0", fontSize: "0.78rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
-                  Choose Channel Divinity and similar class-granted powers here. They are not selected into attack/utility slots below.
+                  Choose Channel Divinity, cantrips, and similar class-granted powers here. They are not selected into
+                  attack/utility slots below.
                 </p>
-                {visibleClassFeaturePowerGroupsOnPowersTab.map((group) =>
+                {visibleNonSpellbookPowerGroupsOnPowersTab.map((group) =>
                   renderClassFeaturePowerChoiceGroup(group)
                 )}
               </section>
@@ -4783,20 +5084,119 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                       powerAllowedForHybridSlot(def.key, p, hybridBaseClassAId, hybridBaseClassBId)
                     );
                   }
+                  const spellbookBinding = showClassSpellbookSlotPicks
+                    ? resolveSpellbookSlotBinding(def, classFeatureChoiceGroups, index, build)
+                    : undefined;
+                  const spellbookDualPick = spellbookBinding != null;
+                  if (spellbookBinding) {
+                    const legalSpellbook = new Set<string>();
+                    if (spellbookBinding.kind === "mage-split") {
+                      for (const g of spellbookBinding.groups) {
+                        for (const pid of classFeaturePowerIdsForClass(index, g, build.classId)) {
+                          legalSpellbook.add(pid);
+                        }
+                      }
+                    } else {
+                      for (const pid of classFeaturePowerIdsForClass(
+                        index,
+                        spellbookBinding.group,
+                        build.classId
+                      )) {
+                        legalSpellbook.add(pid);
+                      }
+                    }
+                    poolForSlot = poolForSlot.filter((p) => legalSpellbook.has(p.id));
+                  }
+                  const spellbookPicks = spellbookBinding
+                    ? spellbookPicksForBinding(spellbookBinding, classSelectionsForFeatureChoices)
+                    : [];
                   const value = slotsMap[def.key]
                     ? resolveBaseAugmentablePowerId(index, slotsMap[def.key])
-                    : "";
-                  const selPow = value ? index.powers.find((p) => p.id === value) : undefined;
-                  let candidates = poolForSlot.filter((p) => !taken.has(p.id) || p.id === value);
-                  if (value && selPow && !candidates.some((p) => p.id === value)) {
-                    candidates = [selPow, ...candidates];
+                    : spellbookPicks[0] || "";
+                  const spellbookValue2 = spellbookPicks[1] || "";
+
+                  const slotSelectStyle: CSSProperties = {
+                    width: "100%",
+                    maxWidth: "28rem",
+                    padding: "0.4rem",
+                    borderRadius: "6px",
+                    border: "1px solid var(--panel-border)",
+                    boxSizing: "border-box"
+                  };
+
+                  function candidatesForSpellbookPick(pickIndex: number, selectedId: string): Power[] {
+                    if (!spellbookBinding) return [];
+                    const usedSpellbook = classSpellbookPowerIdsUsedOutsidePick(
+                      index,
+                      classSelectionsForFeatureChoices,
+                      classFeatureChoiceGroups,
+                      build,
+                      spellbookBinding,
+                      pickIndex
+                    );
+                    const siblingPick = pickIndex === 0 ? spellbookValue2 : value;
+                    let pool =
+                      spellbookBinding.kind === "mage-split"
+                        ? poolForSlot.filter((p) => {
+                            const g = spellbookBinding.groups[pickIndex];
+                            if (!g) return false;
+                            return classFeaturePowerIdsForClass(index, g, build.classId).includes(p.id);
+                          })
+                        : poolForSlot;
+                    let candidates = pool.filter(
+                      (p) =>
+                        (!taken.has(p.id) && !usedSpellbook.has(p.id) && p.id !== siblingPick) || p.id === selectedId
+                    );
+                    const selPow = selectedId ? index.powers.find((p) => p.id === selectedId) : undefined;
+                    if (selectedId && selPow && !candidates.some((p) => p.id === selectedId)) {
+                      candidates = [selPow, ...candidates];
+                    }
+                    return [...filterPowersByQuery(candidates, powerSearch)].sort((a, b) => {
+                      const la = a.level ?? 0;
+                      const lb = b.level ?? 0;
+                      if (lb !== la) return lb - la;
+                      return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+                    });
                   }
-                  const filtered = [...filterPowersByQuery(candidates, powerSearch)].sort((a, b) => {
+
+                  const valueLegacy = slotsMap[def.key]
+                    ? resolveBaseAugmentablePowerId(index, slotsMap[def.key])
+                    : "";
+                  const selPowLegacy = valueLegacy ? index.powers.find((p) => p.id === valueLegacy) : undefined;
+                  const selPowForCard = spellbookDualPick
+                    ? value
+                      ? index.powers.find((p) => p.id === value)
+                      : undefined
+                    : selPowLegacy;
+                  const selPowSpellbook2ForCard =
+                    spellbookDualPick && spellbookValue2
+                      ? index.powers.find((p) => p.id === spellbookValue2)
+                      : undefined;
+                  let candidatesLegacy = poolForSlot.filter((p) => !taken.has(p.id) || p.id === valueLegacy);
+                  if (valueLegacy && selPowLegacy && !candidatesLegacy.some((p) => p.id === valueLegacy)) {
+                    candidatesLegacy = [selPowLegacy, ...candidatesLegacy];
+                  }
+                  const filteredLegacy = [...filterPowersByQuery(candidatesLegacy, powerSearch)].sort((a, b) => {
                     const la = a.level ?? 0;
                     const lb = b.level ?? 0;
                     if (lb !== la) return lb - la;
                     return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
                   });
+
+                  function renderPowerOption(power: Power): JSX.Element {
+                    const ps = (power.raw?.specific as Record<string, unknown> | undefined) || {};
+                    const pl = power.level ?? 0;
+                    return (
+                      <option key={power.id} value={power.id}>
+                        {power.name} (Lv {pl}, {power.usage || "?"}) — {String(ps["Keywords"] || "")}
+                      </option>
+                    );
+                  }
+
+                  const slotSwapActive =
+                    featReplaceRowsBySlotKey.get(def.key)?.some((r) => r.activeSlotKey === def.key) ||
+                    multiclassSwapRowsBySlotKey.get(def.key)?.some((r) => r.activeSlotKey === def.key);
+
                   return (
                     <section key={def.key} style={{ marginBottom: "1rem" }}>
                       {showBucketHeader && (
@@ -4804,10 +5204,16 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                           {slotBucketSectionTitle(def.bucket)}
                         </h4>
                       )}
+                      {showBucketHeader && spellbookDualPick && (
+                        <p style={{ margin: "0 0 0.5rem 0", fontSize: "0.78rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
+                          Choose <strong>two</strong> powers for your spellbook at this level. The first list is the power you prepare in this
+                          slot; the second is an additional spellbook option.
+                        </p>
+                      )}
                       <div style={{ ...ui.blockSubsection, backgroundColor: "var(--surface-1)", padding: "0.65rem 0.75rem" }}>
-                        <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.35rem", color: "var(--text-primary)" }}>
+                        <div style={{ fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.35rem", color: "var(--text-primary)" }}>
                           {def.label}
-                        </label>
+                        </div>
                         {isSlotUsedByParagonAtWillSwap(build, def.key) && (
                           <p style={{ margin: "0 0 0.35rem 0", fontSize: "0.76rem", color: "var(--status-info)" }}>
                             Paragon multiclass at-will swap
@@ -4818,32 +5224,54 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                           <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.86rem" }}>
                             No powers of this type at printed level {def.gainLevel} or below for your level yet.
                           </p>
+                        ) : spellbookDualPick ? (
+                          <>
+                            <label style={{ display: "block", marginBottom: "0.5rem" }}>
+                              <span style={{ display: "block", fontSize: "0.78rem", color: "var(--text-muted)", marginBottom: "0.2rem" }}>
+                                Prepared power (spellbook pick 1)
+                              </span>
+                              <select
+                                value={value}
+                                onChange={(e) =>
+                                  commitClassSpellbookSlotPick(spellbookBinding!, 0, e.target.value, def.key)
+                                }
+                                style={slotSelectStyle}
+                              >
+                                <option value="">— Choose power —</option>
+                                {candidatesForSpellbookPick(0, value).map(renderPowerOption)}
+                              </select>
+                            </label>
+                            <label style={{ display: "block", marginBottom: "0.35rem" }}>
+                              <span style={{ display: "block", fontSize: "0.78rem", color: "var(--text-muted)", marginBottom: "0.2rem" }}>
+                                Spellbook (second power at this level)
+                              </span>
+                              <select
+                                value={spellbookValue2}
+                                onChange={(e) =>
+                                  commitClassSpellbookSlotPick(spellbookBinding!, 1, e.target.value, def.key)
+                                }
+                                style={slotSelectStyle}
+                              >
+                                <option value="">— Choose power —</option>
+                                {candidatesForSpellbookPick(1, spellbookValue2).map(renderPowerOption)}
+                              </select>
+                            </label>
+                          </>
                         ) : (
                           <select
-                            value={value}
+                            value={valueLegacy}
                             onChange={(e) => commitClassPowerSlot(def.key, e.target.value)}
-                            style={{
-                              width: "100%",
-                              maxWidth: "28rem",
-                              padding: "0.4rem",
-                              borderRadius: "6px",
-                              border: "1px solid var(--panel-border)",
-                              boxSizing: "border-box"
-                            }}
+                            style={slotSelectStyle}
                           >
                             <option value="">— Choose power —</option>
-                            {filtered.map((power) => {
-                              const ps = (power.raw?.specific as Record<string, unknown> | undefined) || {};
-                              const pl = power.level ?? 0;
-                              return (
-                                <option key={power.id} value={power.id}>
-                                  {power.name} (Lv {pl}, {power.usage || "?"}) — {String(ps["Keywords"] || "")}
-                                </option>
-                              );
-                            })}
+                            {filteredLegacy.map(renderPowerOption)}
                           </select>
                         )}
-                        {poolForSlot.length > 0 && filtered.length === 0 && (
+                        {poolForSlot.length > 0 &&
+                          (spellbookDualPick
+                            ? candidatesForSpellbookPick(0, value).length === 0 &&
+                              candidatesForSpellbookPick(1, spellbookValue2).length === 0
+                            : filteredLegacy.length === 0) && (
                           <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.78rem", color: "var(--status-warning)" }}>
                             No powers match this filter; clear search to see options for this slot.
                           </p>
@@ -4987,10 +5415,38 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                           );
                         })}
 
-                        {selPow && !featReplaceRowsBySlotKey.get(def.key)?.some((r) => r.activeSlotKey === def.key) && !multiclassSwapRowsBySlotKey.get(def.key)?.some((r) => r.activeSlotKey === def.key) ? (
+                        {!slotSwapActive && spellbookDualPick && (selPowForCard || selPowSpellbook2ForCard) ? (
+                          <>
+                            {selPowForCard ? (
+                              <div style={{ marginTop: "0.5rem" }}>
+                                <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--text-secondary)" }}>
+                                  Prepared power card
+                                </div>
+                                {renderPowerCardWithSelections(
+                                  selPowForCard,
+                                  `slot-${def.key}-pick0-${selPowForCard.id}`
+                                )}
+                              </div>
+                            ) : null}
+                            {selPowSpellbook2ForCard ? (
+                              <div style={{ marginTop: "0.5rem" }}>
+                                <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--text-secondary)" }}>
+                                  Second spellbook power card
+                                </div>
+                                {renderPowerCardWithSelections(
+                                  selPowSpellbook2ForCard,
+                                  `slot-${def.key}-pick1-${selPowSpellbook2ForCard.id}`
+                                )}
+                              </div>
+                            ) : null}
+                          </>
+                        ) : null}
+                        {!slotSwapActive && !spellbookDualPick && selPowForCard ? (
                           <div style={{ marginTop: "0.5rem" }}>
-                            <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--text-secondary)" }}>Selected power card</div>
-                            {renderPowerCardWithSelections(selPow, `slot-${def.key}-${selPow.id}`)}
+                            <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--text-secondary)" }}>
+                              Selected power card
+                            </div>
+                            {renderPowerCardWithSelections(selPowForCard, `slot-${def.key}-${selPowForCard.id}`)}
                           </div>
                         ) : null}
                       </div>
@@ -5545,7 +6001,12 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
           <div style={{ display: "grid", gap: "0.55rem" }}>
             <CharacterItemsCategoryNav value={itemsCategory} onChange={setItemsCategory} />
             {itemsCategory === "inventory" && (
-              <CharacterUnifiedInventoryPanel index={index} build={build} onBuildChange={updateBuild} />
+              <CharacterUnifiedInventoryPanel
+                index={index}
+                build={build}
+                minRitualBookQuantityById={wizardFreeRitualMinBookQty}
+                onBuildChange={(next) => updateBuild(applyWizardFreeRitualBookMinimumsToBuild(index, next))}
+              />
             )}
             {itemsCategory === "equipment" && (
               <>
@@ -5603,10 +6064,23 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
         {itemsCategory === "rituals" && (
           <CharacterConsumablePickerTab
             title="Rituals"
-            description="Rituals for your ritual book (excluding martial practices). Requires Ritual Casting or Ritual Caster feat."
+            description={
+              Object.keys(wizardFreeRitualMinBookQty).length > 0
+                ? "Rituals for your ritual book (excluding martial practices). Requires Ritual Casting or Ritual Caster feat. Spellbook free rituals cannot be removed from the book while still selected on the Class tab (you may own extra copies)."
+                : "Rituals for your ritual book (excluding martial practices). Requires Ritual Casting or Ritual Caster feat."
+            }
             items={ritualRows}
             entries={consumableEntries(build, "rituals")}
-            onEntriesChange={(rituals) => updateBuild(setConsumableEntries(build, "rituals", rituals))}
+            minBookQuantityById={wizardFreeRitualMinBookQty}
+            onEntriesChange={(rituals) =>
+              updateBuild(
+                setConsumableEntries(
+                  build,
+                  "rituals",
+                  clampRitualBookEntriesToWizardFreeMinimums(rituals, wizardFreeRitualMinBookQty)
+                )
+              )
+            }
             scrollEntries={ritualScrollEntries(build)}
             onScrollEntriesChange={(ritualScrolls) =>
               updateBuild(setRitualScrollEntries(build, ritualScrolls))
@@ -5868,10 +6342,45 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     .join(" · ") || "—"}
                 </p>
               )}
-              {!isHybridBuild && visibleClassFeaturePowerGroupsOnPowersTab.length > 0 && (
+              {showWizardSpellbookRitualsOnClassTab && wizardSpellbookRitualMilestones.length > 0 && (
                 <p style={{ margin: 0, fontSize: "0.88rem" }}>
-                  <strong>Channel Divinity:</strong>{" "}
-                  {visibleClassFeaturePowerGroupsOnPowersTab
+                  <strong>Spellbook rituals:</strong>{" "}
+                  {wizardSpellbookRitualMilestones
+                    .map((m) => {
+                      const names = parseWizardSpellbookRitualSelection(
+                        classSelectionsForFeatureChoices[wizardSpellbookRitualSelectionKey(m.level)]
+                      )
+                        .map((rid) => ritualRows.find((r) => r.id === rid)?.name)
+                        .filter(Boolean);
+                      return names.length ? `L${m.level}: ${names.join(", ")}` : null;
+                    })
+                    .filter(Boolean)
+                    .join(" · ") || "—"}
+                </p>
+              )}
+              {showClassSpellbookSlotPicks && (
+                <p style={{ margin: 0, fontSize: "0.88rem" }}>
+                  <strong>Spellbook powers:</strong>{" "}
+                  {visiblePowerSlotDefs
+                    .map((d) => {
+                      const binding = resolveSpellbookSlotBinding(d, classFeatureChoiceGroups, index, build);
+                      if (!binding) return null;
+                      const picks = spellbookPicksForBinding(binding, classSelectionsForFeatureChoices).filter(
+                        Boolean
+                      );
+                      const names = picks
+                        .map((pid) => index.powers.find((p) => p.id === pid)?.name)
+                        .filter(Boolean);
+                      return names.length ? `${d.label}: ${names.join(", ")}` : null;
+                    })
+                    .filter(Boolean)
+                    .join(" · ") || "—"}
+                </p>
+              )}
+              {!isHybridBuild && visibleNonSpellbookPowerGroupsOnPowersTab.length > 0 && (
+                <p style={{ margin: 0, fontSize: "0.88rem" }}>
+                  <strong>Class feature powers:</strong>{" "}
+                  {visibleNonSpellbookPowerGroupsOnPowersTab
                     .map((g) => {
                       const names = resolveClassPowerChoiceIdsForGroup(
                         index,

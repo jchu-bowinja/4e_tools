@@ -10296,6 +10296,7 @@
       "type": "Ritual",
       "source": "Dungeon Magazine 183",
       "revision_date": "1/18/2011 4:12:51 PM",
+      "category": "ID_INTERNAL_CATEGORY_RITUAL,ID_FMP_DOMAIN_4,14",
       "flavor": "You create a scarecrow by binding a spirit into a physical effigy.",
       "specific": {
         "Category": "Creation",
@@ -10599,6 +10600,7 @@
       "type": "Ritual",
       "source": "Dragon Magazine 405",
       "revision_date": null,
+      "category": "ID_INTERNAL_CATEGORY_RITUAL,ID_INTERNAL_CATEGORY_DECEPTION,3",
       "specific": {
         "Category": "Deception",
         "Key Skill": "Arcana or Religion (no check)",
@@ -10663,6 +10665,7 @@
       "type": "Ritual",
       "source": "Dragon Magazine 405",
       "revision_date": null,
+      "category": "ID_INTERNAL_CATEGORY_RITUAL,ID_FMP_DOMAIN_4,2",
       "specific": {
         "Category": "Creation",
         "Key Skill": "Arcana or Religion (no check)",
@@ -10695,6 +10698,7 @@
       "type": "Ritual",
       "source": "Dragon Magazine 405",
       "revision_date": null,
+      "category": "ID_INTERNAL_CATEGORY_RITUAL,ID_FMP_DOMAIN_4,1",
       "specific": {
         "Category": "Creation",
         "Key Skill": "Arcana (no check)",
@@ -10727,6 +10731,7 @@
       "type": "Ritual",
       "source": "Dragon Magazine 405",
       "revision_date": null,
+      "category": "ID_INTERNAL_CATEGORY_RITUAL,ID_FMP_DOMAIN_4,5",
       "specific": {
         "Category": "Creation",
         "Key Skill": "Arcana (no check)",
