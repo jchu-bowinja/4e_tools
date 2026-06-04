@@ -16,7 +16,11 @@ For implemented features, ETL outputs, and smoke-test checklists, see [docs/road
    - `npm run etl:rules -- combined.dnd40.merged.xml generated`
    - `combined.dnd40.merged.xml` is gitignored; place your licensed extract at the repo root
 3. (Optional) Build monster data:
-   - `npm run etl:monsters -- <monster-folder-or-xml> generated`
+   - From Adventure Tools install (Monster Builder):  
+     `powershell -ExecutionPolicy Bypass -File tools/at-export-monsters.ps1`  
+     (requires .NET Framework 4.x; copies encrypted data to `generated/at-cache`, exports `.monster` XML to `generated/at-monsters`, then runs the Python ETL)
+   - Or from existing `.monster` / XML files:  
+     `npm run etl:monsters -- <monster-folder-or-xml> generated`
    - then: `npm run etl:monsters:index-filters`
 4. Run the app: `npm run dev` (typically `http://localhost:5173`)
 5. Run tests: `npm test` (optional perf: `npm run test:perf`)
@@ -32,6 +36,7 @@ For implemented features, ETL outputs, and smoke-test checklists, see [docs/road
 | `npm run test:perf` | Performance tests under `tests/perf/` |
 | `npm run etl:rules -- <input> generated` | Build `generated/rules_index.json` and catalogs |
 | `npm run etl:monsters -- <input> generated` | Parse monster XML into JSON artifacts |
+| `npm run etl:monsters:adventure-tools` | Export from Adventure Tools install, then run monster ETL |
 | `npm run etl:monsters:index-filters` | Enrich monster index filter fields from entry files |
 | `npm run etl:parse-template-paste --` | CLI for pasted monster template text |
 

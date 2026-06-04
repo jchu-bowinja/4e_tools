@@ -24,6 +24,13 @@ out_json/
 # Regenerable feat-rules audit (`tools/etl/list_feat_rules_beyond_statadd.py -o …`)
 generated/feat_heavy_rules.json
 
+# Regenerable Adventure Tools cache and raw monster exports
+generated/at-cache/
+generated/at-monsters/
+
+# .NET tool build output
+tools/at-monster-export/bin/
+
 # User reports captured by dev-server POST /api/reports
 received_reports/
 debug.log
