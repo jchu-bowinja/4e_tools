@@ -63,5 +63,8 @@ Build with `npm run build` and publish `dist/` to any static host. Ensure ETL ar
 ## Documentation
 
 - [docs/roadmap.md](docs/roadmap.md) — what's implemented, product vision, acceptance checklist
+- [docs/class-build-options.md](docs/class-build-options.md) — PHB vs Essentials builds, class-feature grants, power swap/replace
+- [docs/class-feature-priority-fix-report.md](docs/class-feature-priority-fix-report.md) — archived class-feature pass summary + audit commands
+- [docs/special-cases-refactor-checklist.md](docs/special-cases-refactor-checklist.md) — hardcoded-rule refactor tracker
+- [docs/equipment-system-design.md](docs/equipment-system-design.md) — equipment slot model (implemented)
 - [docs/ui-bible.md](docs/ui-bible.md) — UI style guide
-- [docs/class-build-options.md](docs/class-build-options.md) — PHB vs Essentials build indexing

@@ -1,6 +1,6 @@
 # Equipment system redesign
 
-Status: **Design approved for implementation** (pending any follow-up on open questions below).
+Status: **Implemented** (2026-05). See [Implementation phases](#implementation-phases) below.
 
 This document defines how the character builder and sheet should handle equippable gear: one flow per slot that combines mundane base items, optional compendium magic effects, and a separate enhancement (“plus”) level.
 
@@ -282,9 +282,10 @@ Remove duplicate magic-only dropdown block from Equipment tab.
 | CB fidelity | Match CB where compendium allows; document deviations |
 | Migration | Yes to `equipment` shape; preview above |
 
-## Related files (current)
+## Related files
 
-- `src/rules/magicItemEquipment.ts` — to be refactored into slot-based aggregation
+- `src/rules/equipment.ts` — slot model, migration, `computeEquipmentCombatBonuses`
+- `src/rules/magicItemEquipment.ts` — enchantment lookup and slot aggregation
 - `src/features/builder/CharacterBuilderApp.tsx` — equipment tab
-- `src/rules/models.ts` — `CharacterBuild`
+- `src/rules/models.ts` — `CharacterBuild`, `CharacterEquipment`
 - `tools/etl/build_rules_index.py` — `magicItems`, `armors`, `weapons`, `implements`

@@ -67,6 +67,59 @@ class TestFeatGrants(unittest.TestCase):
         )
         self.assertEqual(out2["countsAsFeatureIds"], ["ID_CF_1"])
 
+    def test_vision_and_grants_internal_keys(self):
+        rules = {
+            "grant": [
+                {"attrs": {"name": "ID_INTERNAL_VISION_DARKVISION", "type": "Vision"}},
+                {"attrs": {"name": "ID_INTERNAL_GRANTS_WIZARD_IMPLEMENTS", "type": "Grants"}},
+            ]
+        }
+        out = extract_grants_from_rules(rules)
+        self.assertEqual(
+            sorted(out["internalGrantKeys"]),
+            ["GRANTS_WIZARD_IMPLEMENTS", "VISION_DARKVISION"],
+        )
+
+    def test_language_grant(self):
+        rules = {
+            "grant": [
+                {"attrs": {"name": "ID_FMP_LANGUAGE_4", "type": "Language"}},
+            ]
+        }
+        out = extract_grants_from_rules(
+            rules,
+            language_id_to_name={"ID_FMP_LANGUAGE_4": "Elven"},
+        )
+        self.assertEqual(out["grantedLanguageIds"], ["ID_FMP_LANGUAGE_4"])
+        self.assertEqual(out["grantedLanguageNames"], ["Elven"])
+
+    def test_bracketed_counts_as_class_name(self):
+        rules = {
+            "grant": [
+                {"attrs": {"name": "[Dilettante]", "type": "CountsAsClass"}},
+            ]
+        }
+        out = extract_grants_from_rules(rules)
+        self.assertEqual(out["countsAsClassNames"], ["Dilettante"])
+
+    def test_power_grant_without_power_token_in_id(self):
+        rules = {
+            "grant": [
+                {"attrs": {"name": "ID_WOG_DIVINE_SANCTION_RULES_ITEM", "type": "Power"}},
+            ]
+        }
+        out = extract_grants_from_rules(rules)
+        self.assertEqual(out["grantedPowerIds"], ["ID_WOG_DIVINE_SANCTION_RULES_ITEM"])
+
+    def test_power_grant_missing_type(self):
+        rules = {
+            "grant": [
+                {"attrs": {"name": "ID_FMP_POWER_7546"}},
+            ]
+        }
+        out = extract_grants_from_rules(rules)
+        self.assertEqual(out["grantedPowerIds"], ["ID_FMP_POWER_7546"])
+
 
 if __name__ == "__main__":
     unittest.main()

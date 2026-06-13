@@ -25,7 +25,7 @@ Our build model lives in `src/rules/models.ts` (`CharacterBuild`). Session notes
 |----------------|-------------------|
 | Name, level | `name`, `level` |
 | Race + subrace / options | `raceId`, `raceSelections`, `racialAbilityChoice` |
-| Class / hybrid / theme | `classId`, `characterStyle`, `hybridClassIdA/B`, `themeId` |
+| Class / hybrid / theme | `classId`, `characterStyle`, `hybridClassIdA/B`, `themeId`, `classSelections` (features, `buildOptionId`, power swaps) |
 | Ability scores | `abilityScores`, `pointBuyBudget`, `asiChoices` |
 | Skills | `trainedSkillIds` |
 | Feats | `featIds` |
@@ -37,7 +37,9 @@ Validation parity: compare CB messages to `src/rules/characterValidator.ts` and 
 
 ---
 
-## Session 1 — New character (level 1, PHB fighter)
+## Session 1 — New character (level 1, PHB fighter) ✅
+
+**Completed:** [2026-05-27-session-01.md](./cb-parity/sessions/2026-05-27-session-01.md) (Bob, PHB Human Fighter 1). Fixture: [`bob-target-build.json`](./cb-parity/fixtures/bob-target-build.json).
 
 **Goal:** Baseline happy path + first JSON snapshot for a simple PHB build.
 

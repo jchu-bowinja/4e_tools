@@ -191,4 +191,17 @@ describe("evaluatePrereqs", () => {
     const result = evaluatePrereqs(tokens, build, raceMap, classMap, skillMap, { index: miniIndex });
     expect(result.ok).toBe(true);
   });
+
+  it("evaluates theme prereq by name", () => {
+    const tokens: PrereqToken[] = [{ kind: "theme", value: "Guardian" }];
+    const indexWithTheme = {
+      ...miniIndex,
+      themes: [{ id: "t1", name: "Guardian", slug: "guardian", prereqTokens: [], raw: {} }]
+    } as unknown as RulesIndex;
+    const themedBuild = { ...build, themeId: "t1" };
+    const ok = evaluatePrereqs(tokens, themedBuild, raceMap, classMap, skillMap, {
+      index: indexWithTheme
+    });
+    expect(ok.ok).toBe(true);
+  });
 });

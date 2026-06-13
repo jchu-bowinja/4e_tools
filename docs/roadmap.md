@@ -2,7 +2,7 @@
 
 The final product will be a fully integrated suite of 4th Edition Dungeons and Dragons tools to assist and manage the experience of playing and running a session or campaign.
 
-**Race/class builder fidelity:** See [class-build-options.md](./class-build-options.md) for PHB vs Essentials build indexing; run `tools/etl/list_race_class_selection_gaps.py` for coverage gaps.
+**Race/class builder fidelity:** See [class-build-options.md](./class-build-options.md) for PHB vs Essentials build indexing, class-feature grants, and power swap/replace. Audit coverage with `tools/etl/list_race_class_selection_gaps.py` and [class-feature-priority-fix-report.md](./class-feature-priority-fix-report.md). Track remaining special cases in [special-cases-refactor-checklist.md](./special-cases-refactor-checklist.md).
 
 ## What's Implemented Today
 
@@ -25,12 +25,15 @@ The final product will be a fully integrated suite of 4th Edition Dungeons and D
 - Armor/shield proficiency and feat legality filtering
 - Derived stat calculations (defenses, skills, HP, psionic resources)
 - Race/subrace granted powers and stale power-selection pruning
-- Equipment, magic items, enchantments, and consumables modeling
+- Class feature choice groups, trait-package grant expansion, DMG2 role progression power swaps, and `rules.replace` power upgrades
+- Class feature mechanical effects (proficiencies, weapon damage/ability) and `rules.modify Power` patches on power cards
+- Equipment, magic items, enchantments, and consumables modeling (see [equipment-system-design.md](./equipment-system-design.md))
 - Weapon + implement attack preview calculations
 
 ### Character Builder (`#/builder`)
 
 - Race/class and hybrid class selection with level advancement (heroic, paragon, epic)
+- PHB class-feature picks and Essentials **Class build** dropdown (`buildOptionId`) with suggested power pre-fill
 - Ability scores, skills, feats, powers, theme, paragon path, and epic destiny tabs
 - Class skill training and live skill sheet modifiers
 - Legal feat filtering and class power selection with slot limits
@@ -89,8 +92,10 @@ Character builder:
 
 - Build a new level-1 hybrid character and verify legal hybrid power slots are enforced.
 - Pick a race/subrace power option, then switch subrace and confirm stale power selections are removed.
+- Pick PHB class features (e.g. Fighter Talents) and confirm granted powers appear; pick an Essentials class build and confirm suggested powers pre-fill empty slots.
+- Select a pact/domain feature (e.g. Warlock Star Pact) and confirm higher-level pact upgrades replace lower-level powers automatically.
 - Add a feat that grants a power and confirm the power appears in character power selections.
-- Equip a weapon and implement and verify the attack preview updates (including nonproficient penalty behavior).
+- Equip a weapon and implement and verify the attack preview updates (including nonproficient penalty behavior and class-feature weapon modifiers).
 - Save the character, open **Character Sheet**, and confirm derived stats and equipment carry over.
 - Export and re-import the character JSON and confirm powers/selections/derived stats remain consistent.
 
@@ -99,15 +104,6 @@ Monsters (optional, requires monster ETL):
 - Load the monster browser and filter by level/role.
 - Add monsters to an encounter roster and verify XP totals update.
 - Generate a roster with the encounter generator and print-preview the result.
-
-## Fixes
-
-### 1. Essentials Classes
-
-- Features
-- Powers
-- Text
-- Removing extraneous and null items
 
 ## Standalone Products
 
@@ -162,3 +158,14 @@ Monsters (optional, requires monster ETL):
 - Integratation for DM to character sheets to encounter tracker
 
 ### 2. Integrated VTT
+
+## Related documentation
+
+| Doc | Purpose |
+|-----|---------|
+| [class-build-options.md](./class-build-options.md) | PHB vs Essentials builds, class-feature grants, power swap/replace |
+| [class-feature-priority-fix-report.md](./class-feature-priority-fix-report.md) | Archived class-feature pass summary + live audit commands |
+| [special-cases-refactor-checklist.md](./special-cases-refactor-checklist.md) | Hardcoded-rule refactor tracker |
+| [equipment-system-design.md](./equipment-system-design.md) | Equipment slot model (implemented) |
+| [cb-parity-audit.md](./cb-parity-audit.md) | Legacy Character Builder parity workflow |
+| [ui-bible.md](./ui-bible.md) | UI style guide |

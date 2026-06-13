@@ -83,6 +83,21 @@ export function collectFeatGrantedSkillTrainingIds(index: RulesIndex, build: Cha
   return ids;
 }
 
+/** Language ids granted by feats (Language grants). */
+export function collectFeatGrantedLanguageIds(index: RulesIndex, build: CharacterBuild): string[] {
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  for (const fid of build.featIds ?? []) {
+    const feat = index.feats.find((f) => f.id === fid);
+    for (const lid of feat?.grantedLanguageIds ?? []) {
+      if (!lid || seen.has(lid)) continue;
+      seen.add(lid);
+      ids.push(lid);
+    }
+  }
+  return ids;
+}
+
 /** Class feature names from CountsAsFeature grants on selected feats. */
 export function collectCountsAsFeatureNames(index: RulesIndex, build: CharacterBuild): string[] {
   const names: string[] = [];

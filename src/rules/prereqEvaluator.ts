@@ -3,6 +3,7 @@ import {
   buildPrereqCharacterContext,
   type PrereqCharacterContext
 } from "./prereqContext";
+import { basePsionicPowerPointsForBuild } from "./psionicPowerPoints";
 
 function tierFromLevel(level: number): Tier {
   if (level >= 21) {
@@ -241,6 +242,25 @@ function evaluateOneToken(
     return reasons;
   }
 
+  if (token.kind === "theme" && typeof token.value === "string" && options?.index) {
+    const theme = build.themeId
+      ? options.index.themes?.find((t) => t.id === build.themeId)
+      : undefined;
+    if (!theme) {
+      reasons.push(`Requires ${token.value} theme`);
+      return reasons;
+    }
+    if (!nameInSet(token.value, new Set([theme.name]))) {
+      reasons.push(`Requires ${token.value} theme`);
+    }
+    return reasons;
+  }
+
+  if (token.kind === "background" && typeof token.value === "string") {
+    // Background selection not modeled on CharacterBuild yet; parsed for index fidelity.
+    return reasons;
+  }
+
   if (token.kind === "racialTrait" && typeof token.value === "string" && context) {
     if (!nameInSet(token.value, context.racialTraitNames)) {
       reasons.push(`Requires ${token.value} racial trait`);
@@ -294,6 +314,30 @@ function evaluateOneToken(
     }
     if (tag === "unlimited multiclass" && !context.hasUnlimitedMulticlass) {
       reasons.push("Requires unlimited multiclass");
+    }
+    return reasons;
+  }
+
+  if (token.kind === "language" && typeof token.value === "string" && options?.index) {
+    const want = norm(token.value);
+    const langIds = new Set(
+      Object.values(build.raceSelections ?? {}).filter((v) => typeof v === "string" && v.startsWith("ID_"))
+    );
+    const names = (options.index.languages ?? [])
+      .filter((l) => langIds.has(l.id))
+      .map((l) => norm(l.name));
+    const known = (options.index.languages ?? []).some((l) => norm(l.name) === want);
+    if (!known) return reasons;
+    if (!names.some((n) => n === want || n.includes(want) || want.includes(n))) {
+      reasons.push(`Requires ${token.value} language`);
+    }
+    return reasons;
+  }
+
+  if (token.kind === "powerPointsAtLeast" && typeof token.value === "number" && options?.index) {
+    const total = basePsionicPowerPointsForBuild(options.index, build);
+    if (total < token.value) {
+      reasons.push(`Requires ${token.value}+ power points`);
     }
     return reasons;
   }

@@ -1,4 +1,4 @@
-# Class build options (ETL + builder)
+# Class build options and class features (ETL + builder)
 
 Two compendium models feed `classBuildOptionsByClassId` in `rules_index.json`:
 
@@ -19,21 +19,59 @@ Merge rule: Essentials `Build` rows live in `classBuildOptionsByClassId`. PHB le
 | Wizard | Arcane Implement Mastery | Orb, Staff, Wand, Tome, … |
 | Wizard | Arcanist Cantrips | Pick 4 powers from the cantrip list |
 
-Builder stores picks under `classSelections` keys like `classFeature:ID_FMP_CLASS_FEATURE_547` or `classPower:ID_FMP_CLASS_FEATURE_130` (comma-separated power ids).
+Builder stores picks under `classSelections` keys like `classFeature:ID_FMP_CLASS_FEATURE_547` or `classPower:ID_FMP_CLASS_FEATURE_130` (comma-separated power ids). Power-swap milestones use `classPowerSwap:ID_FMP_CLASS_FEATURE_*`.
 
 Dependent groups use `visibleWhen: { groupKey, optionId }` in the index (e.g. Sharpshooter crossbow/sling only after picking Sharpshooter Talent in the weapon pair). Hidden selections are cleared when the parent pick changes.
 
-Essentials guided builds (`classBuildOptionsByClassId`) appear on the **Class** tab as a **Class build** dropdown when the class has compendium `Build` rows (Cleric, Paladin, Artificer, …). The pick is stored in `classSelections.buildOptionId` (`ID_FMP_BUILD_*`).
+Essentials guided builds (`classBuildOptionsByClassId`) appear on the **Class** tab as a **Class build** dropdown when the class has compendium `Build` rows (Cleric, Paladin, Artificer, …). The pick is stored in `classSelections.buildOptionId` (`ID_FMP_BUILD_*`). Suggested `powerIds` on the build row pre-fill empty class power slots via `applyEssentialsBuildSuggestedPowerSlots` (player can override).
 
-## Gaps (no mechanical pick in index)
+PHB classes may show optional build labels in legacy CB (e.g. Guardian Fighter) that are **not** persisted rules elements; we do not index or require those in export.
 
-Some classes have no `Build Options` text and no `Build` select in the merged XML (e.g. Blackguard, Skald, Vampire). Essentials builds are indexed when present but not surfaced in the builder yet.
+## Active class features (runtime)
+
+`collectCharacterClassFeatureIds` assembles the feature set from:
+
+1. **Indexed choice groups** — resolved `classSelections` for `classFeature:*` / `classFeaturePair:*` / `classPower:*` keys.
+2. **Auto-granted class features** — from the class row and hybrid support ids.
+3. **Grant expansion** — `expandClassFeatureIdsWithGrants` follows `rules.grant type=Class Feature` chains (pact/domain progressions). Child grants honor `requires` against active feature ids, trait package ids, or `classSelections` values.
+4. **DMG2 role milestones** — `collectRoleProgressionClassFeatureIds` adds features named `Level NN <Role> <Usage> Power` when the class role matches and `powerSwapRules` are indexed.
+5. **Nested sub-picks** — appended at runtime for parent options in indexed groups (P1a/P1b).
+
+### Trait packages
+
+ETL maps selectable pact/domain/school features to compendium trait package ids in `traitPackageIdByClassFeatureId`. Warpriest domain features also map to display labels in `domainLabelByClassFeatureId` (Storm Domain, …). `collectActiveTraitPackageIds` and `collectActiveDomainLabels` derive active keys from selected features; grant expansion uses them to satisfy string `requires`.
+
+### Power replace and swap
+
+| Mechanism | Index field | Runtime module | Behavior |
+|-----------|-------------|----------------|----------|
+| Automatic upgrade | `powerReplacementRules` (`rules.replace power-replace`) | `classFeaturePowerReplace.ts` | Replaces power ids in slots/lists (e.g. Star Pact L13 encounter) |
+| Player pick | `powerSwapRules` (`rules.replace powerswap`) | `classFeaturePowerReplace.ts` | `classPowerSwap:*` selection keys; legal list from fixed `powerIds` or class usage pool |
+| Role bucket | `powerSwapRules` without fixed list | `roleProgressionFeatures.ts` + `classFeaturePowerReplace.ts` | DMG2 milestone features filter class power pools by role |
+
+### Mechanical effects and power modifications
+
+ETL normalizes non-grant class-feature rules onto index fields consumed at runtime:
+
+| Source | Index field | Consumer |
+|--------|-------------|----------|
+| `rules.modify Weapon` (class-mapped) | `mechanicalEffects` | `mechanicalEffects.ts`, attack preview |
+| `rules.modify Power` | `powerModifications` | `classFeaturePowerModifications.ts`, power cards |
+| Proficiency text / grants | `mechanicalEffects`, `proficiencyGrants` | `classFeatureProficiencies.ts` |
+
+Internal Arena Weapon rows without a `Class` field remain unmapped (see priority report).
+
+## Gaps (audit targets)
+
+Some classes have no `Build Options` text and no `Build` select in the merged XML (e.g. Blackguard, Skald, Vampire). They rely on `classFeatureChoiceGroupsByClassId` and auto-grants instead of an Essentials build picker.
 
 Run `python tools/etl/list_race_class_selection_gaps.py` to audit racial `rules.select` traits and classes missing indexed build options.
 
 Run `python tools/etl/validate_power_select_categories.py` after ETL to verify racial-trait `$$` categories have index metadata.
 
 Run `python tools/etl/audit_class_feature_choice_power_ids.py` to find level-1 class feature power picks with empty `powerIds` in the index.
+
+Class-feature coverage summary: [class-feature-priority-fix-report.md](./class-feature-priority-fix-report.md).
 
 ## Power select `Category` tokens (racial + class)
 

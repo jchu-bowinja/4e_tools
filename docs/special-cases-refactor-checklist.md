@@ -19,7 +19,7 @@ Update **Status** and **Owner** columns as work completes.
 
 ---
 
-## Summary counts (2026-05-30)
+## Summary counts (2026-06-13)
 
 | Category | Items | Dup ETL+runtime (remaining) |
 |----------|------:|----------------------------:|
@@ -30,10 +30,11 @@ Update **Status** and **Owner** columns as work completes.
 | Feat / power resolution | 3 | 0 |
 | Psionic / hybrid tables | 3 | 0 |
 | Paragon / MC / path | 2 | 0 |
+| Class-feature grants / swap / replace | 6 | 0 |
 | Legacy migration | 4 | 0 |
-| ETL structural (reference) | 2 | — |
+| ETL structural (reference) | 12 | — |
 
-**P0 complete:** SC-001–004 shipped. **P1 complete (2026-05-30):** SC-010–013, SC-022, SC-032, SC-040–041, SC-062. **P2 psionic tables complete (2026-05-30):** SC-050–052. **Follow-up (2026-05-30):** SC-030/031 docs + validation; SC-034 audit script; SC-070 gap report extended. **Next:** SC-080–083 legacy, more `$$` class-feature tokens, Essentials build → class-feature grants. Regenerate index after ETL changes: `python tools/etl/build_rules_index.py`.
+**P0 complete:** SC-001–004 shipped. **P1 complete (2026-05-30):** SC-010–013, SC-022, SC-032, SC-040–041, SC-062. **P2 psionic tables complete (2026-05-30):** SC-050–052. **Class-feature P1 pass complete (2026-06):** SC-091–101 (grants, modify/replace, trait packages, domain labels, role swaps, Essentials power pre-fill). **Next:** SC-080–083 legacy only when touching saves. Regenerate index after ETL changes: `python tools/etl/build_rules_index.py`.
 
 ---
 
@@ -151,6 +152,12 @@ Update **Status** and **Owner** columns as work completes.
 | SC-093 | `done` | `$$CLASS,<usage>,<level>` power pools | ETL `build_rules_index.py`; `powerSelectCategory.ts`; `classPowersQuery.ts` | Mage/spellbook encounter+daily+utility; parent class (`_ParentClass`) | `audit_class_feature_choice_power_ids.py`, `powerSelectCategory.test.ts` |
 | SC-094 | `done` | Parsed-but-ungranted L1 power picks | ETL `_append_ungranted_power_choice_groups` | Hexblade, Skald, Protector, Elementalist | `audit_class_feature_choice_power_ids.py` (0 L1 gaps) |
 | SC-095 | `done` | Extra power-select category shapes | ETL + `powerSelectCategory.ts` | `ID_FMP_CLASS_*,usage,level`; `$$Class,at-will`; feature-ref + `_PARSED_SUB_FEATURES` powers | `powerSelectCategory.test.ts` |
+| SC-096 | `done` | Trait package pact chains | `traitPackageIds.ts`; `characterClassFeatures.ts` grant expansion | `traitPackageIdByClassFeatureId` on index | `tests/rules/classFeaturePowerReplace.test.ts`, `characterClassFeatures.test.ts` |
+| SC-097 | `done` | DMG2 role-bucket power swaps | `roleProgressionFeatures.ts`; `classFeaturePowerReplace.ts` | `powerSwapRules` without fixed `powerIds`; filter by class role | `tests/rules/classFeaturePowerReplace.test.ts` |
+| SC-098 | `done` | Class feature `rules.replace` | `classFeaturePowerReplace.ts` | `powerReplacementRules` (auto) + `powerSwapRules` (player `classPowerSwap:*` keys) | `tests/rules/classFeaturePowerReplace.test.ts` |
+| SC-099 | `done` | Class feature `rules.modify Power` | `classFeaturePowerModifications.ts` | `powerModifications` on feature row | `tests/rules/classFeaturePowerModifications.test.ts`, `p1ClassFeatureMechanicalPatches.test.ts` |
+| SC-100 | `done` | Essentials build suggested powers | `classBuildOptions.ts` → `classPowerSlots.ts` | Pre-fill empty slots from `classBuildOptionsByClassId[].powerIds` | `tests/rules/classBuildOptions.test.ts` |
+| SC-101 | `done` | Warpriest domain label requires | `traitPackageIds.ts`; `characterClassFeatures.ts` | `domainLabelByClassFeatureId` satisfies string `requires` | `tests/rules/warpriestDomainGrants.test.ts` |
 
 ---
 
@@ -174,6 +181,9 @@ interface RacialTraitIndexExtras {
 interface ClassFeatureIndexExtras {
   powerPickSupplementPowerIds?: string[]; // SC-001
   mechanicalEffects?: MechanicalEffect[]; // SC-010
+  powerModifications?: PowerModification[]; // SC-099
+  powerReplacementRules?: ClassFeaturePowerReplacementRule[]; // SC-098
+  powerSwapRules?: ClassFeaturePowerSwapRule[]; // SC-097, SC-098
 }
 
 // Per paragon path (ETL)
@@ -188,6 +198,10 @@ interface RulesIndexExtras {
   psionicPowerPointsByLevel?: Record<string, number>;         // SC-050
   hybridPsionicAugmentationBreakpoints?: number[];          // SC-051
   paragonMulticlassNonPsionicToPsionicAtWillPenalty?: number; // SC-052
+  traitPackageIdByClassFeatureId?: Record<string, string>;    // SC-096
+  domainLabelByClassFeatureId?: Record<string, string>;       // SC-101
+  classFeatureChoiceGroupsByClassId?: Record<string, ChoiceGroup[]>; // SC-034
+  classBuildOptionsByClassId?: Record<string, BuildOption[]>; // SC-091, SC-100
 }
 ```
 
@@ -219,8 +233,8 @@ function resolvePowerIdsFromCategory(
 8. ~~**SC-091**~~ — Essentials guided builds UI (2026-05-30).
 9. ~~**SC-092–093**~~ — build option fix + `$$CLASS` power pools at ETL (2026-05-30).
 10. ~~**SC-094–095**~~ — ungranted L1 power groups + Skald/Protector/Elementalist categories (2026-05-30).
-11. **SC-080–083** — legacy only when touching saves.
-12. **Follow-up** — auto-suggest build `powerIds` into class slots (optional UX).
+11. ~~**SC-096–101**~~ — trait packages, domain labels, role swaps, power replace/swap, modify Power, Essentials power pre-fill (2026-06).
+12. **SC-080–083** — legacy only when touching saves.
 
 ---
 
@@ -229,6 +243,7 @@ function resolvePowerIdsFromCategory(
 | Resource | Path |
 |----------|------|
 | Class / race build model | `docs/class-build-options.md` |
+| Class-feature coverage (archived) | `docs/class-feature-priority-fix-report.md` |
 | Feat rules coverage | `tools/etl/FEAT_RULES_COVERAGE.md` |
 | CB parity workflow | `docs/cb-parity-audit.md` |
 | Gap audit script | `python tools/etl/list_race_class_selection_gaps.py` |
@@ -252,3 +267,4 @@ function resolvePowerIdsFromCategory(
 | 2026-05-30 | SC-091 — Essentials class build picker on Class tab |
 | 2026-05-30 | SC-092–093 — build option not a class feature; ETL/runtime `$$CLASS` usage pools (+ parent class) |
 | 2026-05-30 | SC-094–095 — ungranted parsed L1 power groups; `ID_FMP_CLASS_*,usage,level` and `$$Class,at-will` |
+| 2026-06-13 | SC-096–101 — trait packages, domain labels, role swaps, power replace/swap, modify Power, Essentials power pre-fill; docs refresh |

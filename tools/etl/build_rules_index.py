@@ -36,7 +36,7 @@ ABILITY_MAP = {
 }
 
 
-from prereq_parser import ParseResult, parse_prereqs  # noqa: E402
+from prereq_parser import ParseResult, build_prereq_lookups_from_raw, parse_prereqs  # noqa: E402
 
 
 def normalize_name(name: str) -> str:
@@ -3297,6 +3297,26 @@ def _counts_as_class_label_from_id(internal_id: str) -> Optional[str]:
     return suffix.replace("_", " ").title()
 
 
+def _counts_as_class_label_from_grant_name(name: str) -> Optional[str]:
+    """CountsAsClass grant `name` may be an internal id or a bracketed label ([Dilettante])."""
+    if name.startswith("ID_INTERNAL_COUNTSASCLASS_"):
+        return _counts_as_class_label_from_id(name)
+    if name.startswith("[") and name.endswith("]"):
+        inner = name[1:-1].replace("_", " ").strip()
+        return inner.title() if inner else inner
+    label = name.strip()
+    return label.title() if label else None
+
+
+def _language_from_grant(
+    name: str, language_id_to_name: Optional[Dict[str, str]]
+) -> Tuple[Optional[str], Optional[str]]:
+    if not name.startswith("ID_"):
+        return None, None
+    lang_name = (language_id_to_name or {}).get(name)
+    return lang_name, name
+
+
 def extract_grants_from_rules(
     rules: Any,
     class_name_to_id: Optional[Dict[str, str]] = None,
@@ -3304,6 +3324,7 @@ def extract_grants_from_rules(
     skill_name_to_id: Optional[Dict[str, str]] = None,
     class_feature_name_lookup: Optional[Dict[str, str]] = None,
     class_feature_id_by_name: Optional[Dict[str, str]] = None,
+    language_id_to_name: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     """Flatten `rules.grant` into compendium internal_ids and structured grant flags."""
     empty: Dict[str, Any] = {
@@ -3319,6 +3340,8 @@ def extract_grants_from_rules(
         "grantedSkillTrainingIds": [],
         "countsAsFeatureNames": [],
         "countsAsFeatureIds": [],
+        "grantedLanguageNames": [],
+        "grantedLanguageIds": [],
     }
     if not isinstance(rules, dict):
         return empty
@@ -3334,6 +3357,8 @@ def extract_grants_from_rules(
     skill_training_ids: List[str] = []
     counts_as_features: List[str] = []
     counts_as_feature_ids: List[str] = []
+    language_names: List[str] = []
+    language_ids: List[str] = []
     has_multiclass = False
     seen_p: Set[str] = set()
     seen_f: Set[str] = set()
@@ -3346,6 +3371,8 @@ def extract_grants_from_rules(
     seen_skill_id: Set[str] = set()
     seen_feature_name: Set[str] = set()
     seen_feature_id: Set[str] = set()
+    seen_language_name: Set[str] = set()
+    seen_language_id: Set[str] = set()
     class_lookup = class_name_to_id or {}
     feature_name_lookup: Dict[str, str] = {}
     st_lookup = skill_training_by_id or {}
@@ -3362,6 +3389,8 @@ def extract_grants_from_rules(
         if not isinstance(name, str):
             continue
         gtype = str(attrs.get("type") or "").strip().lower()
+        if not gtype and name.startswith("ID_") and "_POWER_" in name.upper():
+            gtype = "power"
         if gtype == "proficiency" and name.startswith("ID_INTERNAL_PROFICIENCY_"):
             parsed = _parse_proficiency_grant_internal_id(name)
             if parsed:
@@ -3374,7 +3403,7 @@ def extract_grants_from_rules(
             has_multiclass = True
             continue
         if gtype == "countsasclass":
-            label = _counts_as_class_label_from_id(name)
+            label = _counts_as_class_label_from_grant_name(name)
             if label and label not in seen_counts_name:
                 seen_counts_name.add(label)
                 counts_as_names.append(label)
@@ -3383,11 +3412,20 @@ def extract_grants_from_rules(
                     seen_counts_id.add(cid)
                     counts_as_ids.append(cid)
             continue
-        if gtype == "internal":
+        if gtype in {"internal", "vision", "grants"}:
             ikey = _internal_grant_key_from_id(name)
             if ikey and ikey not in seen_internal:
                 seen_internal.add(ikey)
                 internal_keys.append(ikey)
+            continue
+        if gtype == "language":
+            lang_name, lang_id = _language_from_grant(name, language_id_to_name)
+            if lang_name and lang_name not in seen_language_name:
+                seen_language_name.add(lang_name)
+                language_names.append(lang_name)
+            if lang_id and lang_id not in seen_language_id:
+                seen_language_id.add(lang_id)
+                language_ids.append(lang_id)
             continue
         if gtype == "skill training":
             sk_name, sk_id = _skill_training_from_grant(name, st_lookup, skill_lookup)
@@ -3413,7 +3451,7 @@ def extract_grants_from_rules(
             continue
         if not name.startswith("ID_"):
             continue
-        if gtype == "power" and "_POWER_" in name:
+        if gtype == "power":
             if name not in seen_p:
                 seen_p.add(name)
                 power_ids.append(name)
@@ -3439,6 +3477,8 @@ def extract_grants_from_rules(
         "grantedSkillTrainingIds": skill_training_ids,
         "countsAsFeatureNames": counts_as_features,
         "countsAsFeatureIds": counts_as_feature_ids,
+        "grantedLanguageNames": language_names,
+        "grantedLanguageIds": language_ids,
     }
 
 
@@ -4003,11 +4043,12 @@ def _background_index_entry(
     row: Dict[str, Any],
     known_races: Set[str],
     known_classes: Set[str],
+    prereq_lookups: Any,
     anomalies: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
     spec = row.get("specific") or {}
     prereqs = row.get("prereqs")
-    parse = parse_prereqs(prereqs, known_races, known_classes)
+    parse = parse_prereqs(prereqs, known_races, known_classes, prereq_lookups)
     if parse.anomalies:
         for a in parse.anomalies:
             anomalies.append(
@@ -4476,6 +4517,19 @@ def build_index(input_path: Path, output_dir: Path) -> None:
 
     known_races = {r.get("name", "") for r in races_raw}
     known_classes = {c.get("name", "").lower() for c in classes_raw}
+    prereq_lookups = build_prereq_lookups_from_raw(
+        feats_raw,
+        themes_raw,
+        powers_raw,
+        skills_raw,
+        class_features_raw,
+        backgrounds_raw,
+        racial_traits_raw,
+        proficiencies_raw,
+        languages_raw,
+        weapons_raw,
+        classes_raw,
+    )
 
     anomalies: List[Dict[str, Any]] = []
 
@@ -4584,6 +4638,13 @@ def build_index(input_path: Path, output_dir: Path) -> None:
         if isinstance(sid, str) and isinstance(sname, str) and sname.strip():
             skill_name_to_id[sname.strip().lower()] = sid
 
+    language_id_to_name: Dict[str, str] = {}
+    for lang in languages_raw:
+        lid = lang.get("internal_id")
+        lname = lang.get("name")
+        if isinstance(lid, str) and isinstance(lname, str) and lname.strip():
+            language_id_to_name[lid] = lname.strip()
+
     power_name_to_id = _build_power_name_to_id(powers_raw)
     power_normalized_to_id = _build_power_normalized_name_to_id(powers_raw)
     power_id_to_name = _build_power_id_to_name(powers_raw)
@@ -4638,7 +4699,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
 
     feats: List[Dict[str, Any]] = []
     for feat in feats_raw:
-        parse = parse_prereqs(feat.get("prereqs"), known_races, known_classes)
+        parse = parse_prereqs(feat.get("prereqs"), known_races, known_classes, prereq_lookups)
         spec = feat.get("specific") or {}
         feat_tier, feat_prereq_tokens = resolve_feat_tier_and_prereqs(
             spec.get("Tier"),
@@ -4663,6 +4724,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
             skill_name_to_id,
             class_feature_name_lookup,
             class_feature_id_by_name,
+            language_id_to_name,
         )
         feat_power_mods = extract_feat_power_modifications(
             feat,
@@ -4834,7 +4896,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
 
     themes: List[Dict[str, Any]] = []
     for row in themes_raw:
-        parse = parse_prereqs(row.get("prereqs"), known_races, known_classes)
+        parse = parse_prereqs(row.get("prereqs"), known_races, known_classes, prereq_lookups)
         if parse.anomalies:
             for a in parse.anomalies:
                 anomalies.append(
@@ -4860,7 +4922,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
 
     paragon_paths: List[Dict[str, Any]] = []
     for row in paragon_raw:
-        parse = parse_prereqs(row.get("prereqs"), known_races, known_classes)
+        parse = parse_prereqs(row.get("prereqs"), known_races, known_classes, prereq_lookups)
         if parse.anomalies:
             for a in parse.anomalies:
                 anomalies.append(
@@ -4878,6 +4940,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
             skill_name_to_id,
             class_feature_name_lookup,
             class_feature_id_by_name,
+            language_id_to_name,
         )
         granted_cf = path_grants.get("grantedClassFeatureIds") or []
         paragon_paths.append(
@@ -4901,7 +4964,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
 
     backgrounds: List[Dict[str, Any]] = []
     for row in backgrounds_raw:
-        backgrounds.append(_background_index_entry(row, known_races, known_classes, anomalies))
+        backgrounds.append(_background_index_entry(row, known_races, known_classes, prereq_lookups, anomalies))
 
     magic_items: List[Dict[str, Any]] = []
     alchemy_items: List[Dict[str, Any]] = []
@@ -4926,7 +4989,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
 
     epic_destinies: List[Dict[str, Any]] = []
     for row in epic_raw:
-        parse = parse_prereqs(row.get("prereqs"), known_races, known_classes)
+        parse = parse_prereqs(row.get("prereqs"), known_races, known_classes, prereq_lookups)
         if parse.anomalies:
             for a in parse.anomalies:
                 anomalies.append(

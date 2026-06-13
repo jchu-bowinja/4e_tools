@@ -17,6 +17,10 @@ export interface PrereqToken {
     | "power"
     | "racialPower"
     | "feat"
+    | "theme"
+    | "background"
+    | "language"
+    | "powerPointsAtLeast"
     | "multiclassEntry"
     | "racialTrait"
     | "heritage"
@@ -213,6 +217,10 @@ export interface Feat extends RulesEntity {
   countsAsFeatureNames?: string[];
   /** ETL: resolved class feature ids for CountsAsFeature grants. */
   countsAsFeatureIds?: string[];
+  /** ETL: language names from Language grants. */
+  grantedLanguageNames?: string[];
+  /** ETL: resolved language ids from Language grants. */
+  grantedLanguageIds?: string[];
   raw: Record<string, unknown>;
 }
 

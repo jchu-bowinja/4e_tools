@@ -218,7 +218,7 @@ export function expandTooltipLookupTerms(rawTerm: string): string[] {
 
 /**
  * Expands a displayed string into glossary lookup keys (`resolveTooltipText` tries them in order).
- * Keep `tools/audit-monster-tooltip-terms.mjs` and `audit_monster_tooltip_terms.py` in sync.
+ * Keep `tools/audit-monster-tooltip-terms.mjs` aligned with this module when changing candidate expansion.
  */
 export function candidateTerms(input: string): string[] {
   const trimmed = input.trim();

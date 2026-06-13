@@ -17,7 +17,8 @@ For feats (and the same helpers for themes, paragon paths, epic destinies):
 | `rules.grant` type Proficiency | `proficiencyGrants` | Weapon/armor/shield/implement validation and attack previews |
 | `rules.grant` type Multiclass | `hasMulticlassGrant` | Multiclass feat detection in builder summary |
 | `rules.grant` type CountsAsClass | `countsAsClassNames`, `countsAsClassIds` | Class prereqs (e.g. paragon feats for trained class) |
-| `rules.grant` type Internal | `internalGrantKeys` | Bloodline, ki focus, psionic second class flags; bloodline prereqs |
+| `rules.grant` type Internal / Vision / Grants | `internalGrantKeys` | Bloodline, ki focus, darkvision, implement access flags |
+| `rules.grant` type Language | `grantedLanguageNames`, `grantedLanguageIds` | Bonus languages from background-style feats |
 | `rules.grant` type Skill Training | `grantedSkillTrainingNames`, `grantedSkillTrainingIds` | Auto-trained skills (multiclass entry feats, etc.) |
 | `rules.grant` type CountsAsFeature | `countsAsFeatureNames`, `countsAsFeatureIds` | Class feature prereqs (resolved to compendium feature names) |
 
@@ -68,6 +69,16 @@ Top **combinations** often reduce to a single dominant tag (`[grant]`, `[modify]
 3. **select** — Same as builder option lists: expose selectable internal ids where stable.
 4. **modify / replace** — Highest variance; consider per-family parsers (e.g. “damage type”, “range”) or leave as manual + `raw` until patterns justify code.
 5. **textstring** — Last for mechanics; use for QA strings or human-readable tooltips only unless regex-safe.
+
+## Grant indexing audit
+
+After ETL changes, confirm no feat `grant` rows are left unindexed:
+
+```bash
+python tools/etl/audit_feat_grant_gaps.py
+```
+
+Exit code **0** means every feat with `rules.grant` has matching indexed fields (`grantedPowerIds`, `internalGrantKeys`, `grantedLanguageIds`, etc.).
 
 ## Machine-readable list of heavy feats
 
