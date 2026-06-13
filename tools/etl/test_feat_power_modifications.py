@@ -221,6 +221,70 @@ class TestFeatPowerModifications(unittest.TestCase):
         self.assertEqual(out["powerModifications"][0]["powerId"], "ID_FMP_POWER_7151")
         self.assertEqual(out["powerModifications"][0]["powerName"], "Hand of Fury")
 
+    def test_improved_second_wind_without_power_type(self):
+        feat = {
+            "name": "Improved Second Wind",
+            "specific": {},
+            "rules": {
+                "modify": [
+                    {
+                        "attrs": {
+                            "name": "Second Wind",
+                            "field": "Improved Second Wind",
+                            "value": "Regain an additional 5 hit points.",
+                        }
+                    }
+                ]
+            },
+        }
+        power_lookup = {"second wind": "ID_SW"}
+        out = extract_feat_power_modifications(feat, power_lookup, power_lookup, {"ID_SW": "Second Wind"})
+        self.assertEqual(len(out["powerModifications"]), 1)
+        self.assertEqual(out["powerModifications"][0]["powerId"], "ID_SW")
+
+    def test_soldier_of_faith_metadata_on_granted_power(self):
+        feat = {
+            "name": "Soldier of the Faith",
+            "specific": {},
+            "rules": {
+                "modify": [{"attrs": {"Field": "Power Usage", "value": "Encounter"}}],
+                "grant": [{"attrs": {"name": "ID_FMP_POWER_805", "type": "Power"}}],
+            },
+        }
+        power_lookup = {"lay on hands": "ID_FMP_POWER_805"}
+        out = extract_feat_power_modifications(
+            feat,
+            power_lookup,
+            power_lookup,
+            {"ID_FMP_POWER_805": "Lay on Hands"},
+            granted_power_ids=["ID_FMP_POWER_805"],
+        )
+        self.assertEqual(len(out["powerModifications"]), 1)
+        self.assertEqual(out["powerModifications"][0]["powerId"], "ID_FMP_POWER_805")
+        self.assertEqual(out["powerModifications"][0]["field"], "Power Usage")
+
+    def test_weapon_modify_indexed_separately(self):
+        feat = {
+            "name": "Deadly Axe",
+            "specific": {},
+            "rules": {
+                "modify": [
+                    {
+                        "attrs": {
+                            "name": "Battleaxe",
+                            "type": "Weapon",
+                            "Field": "Properties",
+                            "list-addition": "High Crit",
+                        }
+                    }
+                ]
+            },
+        }
+        weapon_lookup = {"battleaxe": "ID_WEAPON"}
+        out = extract_feat_power_modifications(feat, {}, {}, {}, weapon_name_to_id=weapon_lookup)
+        self.assertEqual(len(out["weaponModifications"]), 1)
+        self.assertEqual(out["weaponModifications"][0]["value"], "High Crit")
+
 
 if __name__ == "__main__":
     unittest.main()

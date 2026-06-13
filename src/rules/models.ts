@@ -138,6 +138,22 @@ export interface FeatPowerModification {
   value: string;
 }
 
+/** ETL: weapon property change from a feat (High Crit, etc.). */
+export interface FeatWeaponModification {
+  weaponName: string;
+  weaponId?: string | null;
+  field: string;
+  value: string;
+}
+
+/** ETL: armor property change from a feat (proficiency category tweaks, etc.). */
+export interface FeatArmorModification {
+  armorName: string;
+  armorId?: string | null;
+  field: string;
+  value: string;
+}
+
 /** ETL: optional class slot swap from `rules.replace` power-replace (e.g. Gythka Expert). */
 export interface FeatPowerReplaceOffer {
   replacementPowerId: string;
@@ -192,6 +208,14 @@ export interface Feat extends RulesEntity {
   modifiedPowerIds?: string[];
   /** ETL: structured power augmentations (Corellon's Wrath Style, Gulg Hunter Practice, etc.). */
   powerModifications?: FeatPowerModification[];
+  /** ETL: weapon property tweaks from rules.modify type Weapon. */
+  weaponModifications?: FeatWeaponModification[];
+  /** ETL: weapon display names with feat modifications. */
+  modifiedWeaponNames?: string[];
+  /** ETL: armor property tweaks from rules.modify type Armor. */
+  armorModifications?: FeatArmorModification[];
+  /** ETL: armor display names with feat modifications. */
+  modifiedArmorNames?: string[];
   /** ETL: named `power-replace` swap offers (weapon mastery, gythka chain, …). */
   powerReplaceOffers?: FeatPowerReplaceOffer[];
   multiclassSlotSwapOffers?: FeatMulticlassSlotSwapOffer[];

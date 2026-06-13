@@ -3510,6 +3510,82 @@ _FEAT_POWER_NAME_ALIASES: Dict[str, str] = {
     "hand of fury": "hand of radiance",
 }
 
+_INTERNAL_POWER_DISPLAY_NAMES: Dict[str, str] = {
+    "ID_INTERNAL_POWER_MELEE_BASIC_ATTACK": "Melee Basic Attack",
+}
+
+
+def _modify_row_value(attrs: Dict[str, Any]) -> str:
+    value = str(attrs.get("value") or "").strip()
+    field = str(attrs.get("Field") or attrs.get("field") or "").strip()
+    if not value and attrs.get("list-addition"):
+        value = str(attrs.get("list-addition") or "").strip()
+    elif not value and field == "Keywords":
+        value = str(attrs.get("list-addition") or "").strip()
+    return value
+
+
+def _power_modify_targets_from_attrs(
+    attrs: Dict[str, Any],
+    feat_name: str,
+    granted_power_ids: List[str],
+    power_id_to_name: Dict[str, str],
+) -> List[str]:
+    pname = str(attrs.get("name") or "").strip()
+    if pname:
+        return [pname]
+    scope = str(attrs.get("select") or "").strip()
+    if scope:
+        return [scope]
+    if granted_power_ids:
+        return [power_id_to_name.get(pid) or pid for pid in granted_power_ids]
+    return [feat_name]
+
+
+def _should_index_power_modify(attrs: Dict[str, Any], gtype: str) -> bool:
+    if gtype in {"power", "class feature", "utility"}:
+        return True
+    if gtype in {"weapon", "armor"}:
+        return False
+    pname = str(attrs.get("name") or "").strip()
+    scope = str(attrs.get("select") or "").strip()
+    field = str(attrs.get("Field") or attrs.get("field") or "").strip()
+    if gtype:
+        return False
+    return bool(pname or scope or field)
+
+
+def _append_power_modification_entry(
+    entries: List[Dict[str, Any]],
+    seen_power_names: Set[str],
+    target_name: str,
+    field: str,
+    value: str,
+    feat_name: str,
+    power_name_to_id: Dict[str, str],
+    power_normalized_to_id: Dict[str, str],
+    power_id_to_name: Dict[str, str],
+    class_feature_id_by_name: Optional[Dict[str, str]],
+) -> None:
+    pname = _INTERNAL_POWER_DISPLAY_NAMES.get(target_name, target_name)
+    key = pname.lower()
+    if key in seen_power_names:
+        return
+    seen_power_names.add(key)
+    pid = _resolve_power_id(pname, power_name_to_id, power_normalized_to_id, power_id_to_name)
+    cfid = None
+    if not pid and class_feature_id_by_name:
+        cfid = _resolve_class_feature_id(pname, class_feature_id_by_name)
+    entries.append(
+        {
+            "powerName": pname,
+            "powerId": pid,
+            "classFeatureId": cfid,
+            "field": field or feat_name,
+            "value": value,
+        }
+    )
+
 
 def _build_power_name_to_id(powers_raw: List[Dict[str, Any]]) -> Dict[str, str]:
     """First compendium row per display name (case-insensitive), matching builder name resolution."""
@@ -3627,73 +3703,111 @@ def extract_feat_power_modifications(
     power_normalized_to_id: Dict[str, str],
     power_id_to_name: Dict[str, str],
     class_feature_id_by_name: Optional[Dict[str, str]] = None,
+    weapon_name_to_id: Optional[Dict[str, str]] = None,
+    armor_name_to_id: Optional[Dict[str, str]] = None,
+    granted_power_ids: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """
   Powers a feat augments (style / arena fighting), not grants.
 
   Sources:
   - rules.modify with type Power (e.g. Corellon's Wrath Style)
+  - rules.modify without type when targeting a power name, granted power, or metadata field
+  - rules.modify type Weapon (weapon property tweaks)
   - specific['Associated Powers'] when no explicit modify row exists (e.g. Gulg Hunter Practice)
     """
     rules = feat.get("rules") if isinstance(feat.get("rules"), dict) else {}
     spec = feat.get("specific") if isinstance(feat.get("specific"), dict) else {}
     feat_name = str(feat.get("name") or "").strip()
+    grant_power_ids = list(granted_power_ids or [])
 
     entries: List[Dict[str, Any]] = []
-    seen_names: Set[str] = set()
+    weapon_entries: List[Dict[str, Any]] = []
+    armor_entries: List[Dict[str, Any]] = []
+    seen_power_names: Set[str] = set()
+    seen_weapon_names: Set[str] = set()
+    seen_armor_names: Set[str] = set()
 
     for modify in rules.get("modify") or []:
         if not isinstance(modify, dict):
             continue
         attrs = modify.get("attrs") or {}
-        if str(attrs.get("type") or "").strip().lower() != "power":
-            continue
-        pname = str(attrs.get("name") or "").strip()
-        if not pname:
-            continue
+        gtype = str(attrs.get("type") or "").strip().lower()
         field = str(attrs.get("Field") or attrs.get("field") or feat_name).strip()
-        value = str(attrs.get("value") or "").strip()
-        if not value and field == "Keywords":
-            value = str(attrs.get("list-addition") or "").strip()
-        key = f"{pname.lower()}::{field.lower()}"
-        if key in seen_names:
+        value = _modify_row_value(attrs)
+
+        if gtype == "weapon":
+            weapon_name = str(attrs.get("name") or "").strip()
+            if not weapon_name:
+                continue
+            wkey = weapon_name.lower()
+            if wkey in seen_weapon_names:
+                continue
+            seen_weapon_names.add(wkey)
+            wid = (weapon_name_to_id or {}).get(wkey)
+            weapon_entries.append(
+                {
+                    "weaponName": weapon_name,
+                    "weaponId": wid,
+                    "field": field,
+                    "value": value,
+                }
+            )
             continue
-        seen_names.add(key)
-        pid = _resolve_power_id(pname, power_name_to_id, power_normalized_to_id, power_id_to_name)
-        cfid = None
-        if not pid and class_feature_id_by_name:
-            cfid = _resolve_class_feature_id(pname, class_feature_id_by_name)
-        entries.append(
-            {
-                "powerName": pname,
-                "powerId": pid,
-                "classFeatureId": cfid,
-                "field": field,
-                "value": value,
-            }
-        )
+
+        if gtype == "armor":
+            armor_name = str(attrs.get("name") or "").strip()
+            if not armor_name:
+                continue
+            akey = armor_name.lower()
+            if akey in seen_armor_names:
+                continue
+            seen_armor_names.add(akey)
+            aid = (armor_name_to_id or {}).get(akey)
+            armor_entries.append(
+                {
+                    "armorName": armor_name,
+                    "armorId": aid,
+                    "field": field,
+                    "value": value,
+                }
+            )
+            continue
+
+        if not _should_index_power_modify(attrs, gtype):
+            continue
+
+        for target in _power_modify_targets_from_attrs(attrs, feat_name, grant_power_ids, power_id_to_name):
+            _append_power_modification_entry(
+                entries,
+                seen_power_names,
+                target,
+                field,
+                value,
+                feat_name,
+                power_name_to_id,
+                power_normalized_to_id,
+                power_id_to_name,
+                class_feature_id_by_name,
+            )
 
     synthesized: List[Dict[str, Any]] = []
     for pname in _parse_associated_power_names(spec):
-        key = pname.lower()
-        if key in seen_names:
+        if pname.lower() in seen_power_names:
             continue
-        seen_names.add(key)
-        apid = _resolve_power_id(pname, power_name_to_id, power_normalized_to_id, power_id_to_name)
-        acfid = (
-            _resolve_class_feature_id(pname, class_feature_id_by_name)
-            if not apid and class_feature_id_by_name
-            else None
+        _append_power_modification_entry(
+            entries,
+            seen_power_names,
+            pname,
+            feat_name,
+            "",
+            feat_name,
+            power_name_to_id,
+            power_normalized_to_id,
+            power_id_to_name,
+            class_feature_id_by_name,
         )
-        entry = {
-            "powerName": pname,
-            "powerId": apid,
-            "classFeatureId": acfid,
-            "field": feat_name,
-            "value": "",
-        }
-        entries.append(entry)
-        synthesized.append(entry)
+        synthesized.append(entries[-1])
 
     if synthesized:
         _append_synthesized_power_modify_rules(feat, synthesized)
@@ -3706,10 +3820,32 @@ def extract_feat_power_modifications(
             seen_ids.add(pid)
             power_ids.append(pid)
 
-    return {
+    weapon_names: List[str] = []
+    seen_weapon_labels: Set[str] = set()
+    for entry in weapon_entries:
+        label = str(entry.get("weaponName") or "").strip()
+        if label and label.lower() not in seen_weapon_labels:
+            seen_weapon_labels.add(label.lower())
+            weapon_names.append(label)
+
+    out: Dict[str, Any] = {
         "modifiedPowerIds": power_ids,
         "powerModifications": entries,
     }
+    if weapon_entries:
+        out["weaponModifications"] = weapon_entries
+        out["modifiedWeaponNames"] = weapon_names
+    armor_names: List[str] = []
+    seen_armor_labels: Set[str] = set()
+    for entry in armor_entries:
+        label = str(entry.get("armorName") or "").strip()
+        if label and label.lower() not in seen_armor_labels:
+            seen_armor_labels.add(label.lower())
+            armor_names.append(label)
+    if armor_entries:
+        out["armorModifications"] = armor_entries
+        out["modifiedArmorNames"] = armor_names
+    return out
 
 
 _POWER_REPLACE_SPEC_RE = re.compile(r"^(.+):([^,]+),(\d+)\+?$")
@@ -4649,6 +4785,20 @@ def build_index(input_path: Path, output_dir: Path) -> None:
     power_normalized_to_id = _build_power_normalized_name_to_id(powers_raw)
     power_id_to_name = _build_power_id_to_name(powers_raw)
 
+    weapon_name_to_id: Dict[str, str] = {}
+    for weapon in weapons_raw:
+        wid = weapon.get("internal_id")
+        wname = weapon.get("name")
+        if isinstance(wid, str) and isinstance(wname, str) and wname.strip():
+            weapon_name_to_id[wname.strip().lower()] = wid
+
+    armor_name_to_id: Dict[str, str] = {}
+    for armor in armor_raw:
+        aid = armor.get("internal_id")
+        aname = armor.get("name")
+        if isinstance(aid, str) and isinstance(aname, str) and aname.strip():
+            armor_name_to_id[aname.strip().lower()] = aid
+
     for row in class_features_raw:
         spec = row.get("specific") or {}
         mechanical = _extract_class_feature_mechanical_effects(row)
@@ -4732,6 +4882,9 @@ def build_index(input_path: Path, output_dir: Path) -> None:
             power_normalized_to_id,
             power_id_to_name,
             class_feature_id_by_name,
+            weapon_name_to_id,
+            armor_name_to_id,
+            feat_grants.get("grantedPowerIds"),
         )
         feat_power_replace = extract_feat_power_replace_offers(
             feat, power_name_to_id, power_id_to_name

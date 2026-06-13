@@ -12,6 +12,10 @@ For feats (and the same helpers for themes, paragon paths, epic destinies):
 | `raw.specific["Bonus to Defense"]` | `nadBonusesFromSpecific` | NAD bumps alongside `statAdds` |
 | `rules.grant` type Power / Class Feature / Racial Trait | `grantedPowerIds`, `grantedClassFeatureIds`, `grantedRacialTraitIds` | Feat powers, class features on sheet/builder |
 | `rules.modify` type Power + `specific['Associated Powers']` | `modifiedPowerIds`, `powerModifications` | Style / arena fighting augmentations (not grants) |
+| `rules.modify` type Weapon | `weaponModifications`, `modifiedWeaponNames` | Weapon property tweaks (High Crit, etc.) |
+| `rules.modify` type Armor | `armorModifications`, `modifiedArmorNames` | Armor category / proficiency tweaks |
+| `rules.modify` type Class Feature / Utility | `powerModifications` | Virtue patches, cantrip augmentations |
+| `rules.modify` without type (Second Wind, granted-power metadata) | `powerModifications` | Usage/keyword patches on named or granted powers |
 | `rules.replace` `power-replace` + `_DisplayPowers` | `powerReplaceOffers` | Named optional class slot swaps (Gythka, weapon mastery, …) |
 | `rules.replace` `multiclass` + `Level` (no `power-replace`) | `multiclassSlotSwapOffers` | PHB Novice / Acolyte / Adept + PHB3 psionic slot swaps (user picks multiclass power) |
 | `rules.grant` type Proficiency | `proficiencyGrants` | Weapon/armor/shield/implement validation and attack previews |
@@ -79,6 +83,14 @@ python tools/etl/audit_feat_grant_gaps.py
 ```
 
 Exit code **0** means every feat with `rules.grant` has matching indexed fields (`grantedPowerIds`, `internalGrantKeys`, `grantedLanguageIds`, etc.).
+
+## Modify indexing audit
+
+```bash
+python tools/etl/audit_feat_modify_gaps.py
+```
+
+Exit code **0** means every feat with `rules.modify` has `powerModifications` and/or `weaponModifications` indexed.
 
 ## Machine-readable list of heavy feats
 
