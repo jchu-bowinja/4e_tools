@@ -1,13 +1,14 @@
 import { attackPowerBucketFromUsage } from "../../rules/classPowerSlots";
 import { collectDilettantePowersForBuild } from "../../rules/dilettantePower";
 import { resolveBaseAugmentablePowerId } from "../../rules/psionicPowerAugments";
-import { getPowersForOwnerId } from "../../rules/classPowersQuery";
+import { getPowersForOwnerId, getThemeGrantedPowers } from "../../rules/classPowersQuery";
 import { collectParagonMulticlassPowerIds } from "../../rules/paragonMulticlassing";
 import {
   autoGrantedClassPowers,
   collectFeatGrantedPowersForBuild,
   collectParagonPathClassFeaturePowerIds,
-  collectPowerIdsFromRacialTrait
+  collectPowerIdsFromRacialTrait,
+  resolveGrantedPowersFromActiveClassFeatures
 } from "../../rules/grantedPowersQuery";
 import { collectClassFeaturePowerChoiceIds } from "../../rules/classFeatureChoices";
 import { parseRacialTraitIdsFromRace } from "../../rules/racialTraits";
@@ -232,6 +233,7 @@ function sortPowerCards(list: Power[]): Power[] {
 
 export function groupCombatPowers(state: CharacterSheetState, index: RulesIndex): GroupedPowerCards {
   const byId = new Map(index.powers.map((power) => [power.id, power]));
+  const build = toBuildLikeState(state, index);
   const selected = state.powers.selectedPowerIds
     .map((id) => {
       const baseId = resolveBaseAugmentablePowerId(index, id);
@@ -247,10 +249,7 @@ export function groupCombatPowers(state: CharacterSheetState, index: RulesIndex)
     .flatMap((trait) => collectPowerIdsFromRacialTrait(trait))
     .map((id) => byId.get(id))
     .filter((p): p is Power => Boolean(p));
-  const themeGranted = [
-    ...getPowersForOwnerId(index, state.themeId, state.level, "attack"),
-    ...getPowersForOwnerId(index, state.themeId, state.level, "utility")
-  ];
+  const themeGranted = getThemeGrantedPowers(index, state.themeId, state.level);
   const paragonGranted = [
     ...getPowersForOwnerId(index, state.paragonPathId, state.level, "attack"),
     ...getPowersForOwnerId(index, state.paragonPathId, state.level, "utility"),
@@ -262,15 +261,10 @@ export function groupCombatPowers(state: CharacterSheetState, index: RulesIndex)
     ...getPowersForOwnerId(index, state.epicDestinyId, state.level, "attack"),
     ...getPowersForOwnerId(index, state.epicDestinyId, state.level, "utility")
   ];
-  const classFeatureChoiceGranted = collectClassFeaturePowerChoiceIds(index, {
-    classId: state.classId,
-    characterStyle: state.characterStyle,
-    hybridClassIdA: state.hybridClassIdA,
-    hybridClassIdB: state.hybridClassIdB,
-    classSelections: state.classSelections
-  })
+  const classFeatureChoiceGranted = collectClassFeaturePowerChoiceIds(index, build)
     .map((id) => byId.get(id))
     .filter((p): p is Power => Boolean(p));
+  const activeClassFeatureGranted = resolveGrantedPowersFromActiveClassFeatures(index, build);
   const featGranted = collectFeatGrantedPowersForBuild(index, {
     featIds: state.featIds ?? []
   }).flatMap((row) => row.powers);
@@ -294,6 +288,7 @@ export function groupCombatPowers(state: CharacterSheetState, index: RulesIndex)
     ...selected,
     ...autoClass,
     ...classFeatureChoiceGranted,
+    ...activeClassFeatureGranted,
     ...raceGranted,
     ...dilettanteGranted,
     ...themeGranted,

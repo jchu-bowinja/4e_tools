@@ -22,9 +22,19 @@ export interface TraitDisplayRow {
   id: string;
   name: string;
   shortDescription?: string | null;
+  /** False when shown on a support tab above the feature's compendium level. */
+  availableAtLevel?: boolean;
   /** Feat augmentations that modify this class feature (not a compendium power). */
   featAugmentations?: TraitFeatAugmentation[];
 }
+
+export type TraitDisplayOptions = {
+  includeLevelInName?: boolean;
+  /** When set, rows above this level are omitted unless `includeUnavailable` is true. */
+  characterLevel?: number;
+  /** Include rows above `characterLevel` with `availableAtLevel: false` (support tab previews). */
+  includeUnavailable?: boolean;
+};
 
 const TRAIT_BODY_FALLBACK_MAX_LEN = 240;
 
@@ -148,37 +158,42 @@ export function resolveTraitDisplayRows(
   names: string[],
   byId: Map<string, ClassFeature>,
   byName: Map<string, ClassFeature>,
-  options?: { includeLevelInName?: boolean; maxLevel?: number }
+  options?: TraitDisplayOptions
 ): TraitDisplayRow[] {
   const includeLevelInName = options?.includeLevelInName ?? false;
-  const maxLevel = options?.maxLevel;
+  const characterLevel = options?.characterLevel;
+  const includeUnavailable = options?.includeUnavailable ?? false;
   const rows: TraitDisplayRow[] = [];
   const seen = new Set<string>();
 
+  const pushRow = (feature: ClassFeature | undefined, id: string, name: string) => {
+    if (seen.has(id)) return;
+    seen.add(id);
+    const availableAtLevel =
+      characterLevel == null || !feature || featureIsAvailableAtLevel(feature, characterLevel);
+    if (characterLevel != null && !availableAtLevel && !includeUnavailable) return;
+    rows.push({
+      id,
+      name,
+      shortDescription: feature ? traitDescriptionForDisplay(feature) : undefined,
+      availableAtLevel
+    });
+  };
+
   for (const id of ids) {
-    if (seen.has(id)) continue;
     const feature = byId.get(id);
     if (!feature) continue;
-    if (maxLevel != null && !featureIsAvailableAtLevel(feature, maxLevel)) continue;
-    seen.add(id);
-    rows.push({
-      id: feature.id,
-      name: traitNameForDisplay(feature, includeLevelInName),
-      shortDescription: traitDescriptionForDisplay(feature)
-    });
+    pushRow(feature, feature.id, traitNameForDisplay(feature, includeLevelInName));
   }
 
   for (const name of names) {
     const feature = byName.get(name);
-    if (feature && maxLevel != null && !featureIsAvailableAtLevel(feature, maxLevel)) continue;
     const id = feature?.id ?? `name:${name}`;
-    if (seen.has(id)) continue;
-    seen.add(id);
-    rows.push({
+    pushRow(
+      feature,
       id,
-      name: feature ? traitNameForDisplay(feature, includeLevelInName) : name,
-      shortDescription: feature ? traitDescriptionForDisplay(feature) : undefined
-    });
+      feature ? traitNameForDisplay(feature, includeLevelInName) : name
+    );
   }
 
   return rows;
@@ -201,14 +216,14 @@ export function getClassTraitRows(
   if (build?.classId === cls.id) {
     const ids = collectClassFeatureIdsFromClass(index, build);
     const rows = resolveTraitDisplayRows(ids, [], byId, byName, {
-      maxLevel: level
+      characterLevel: level
     });
     return sortTraitDisplayRowsByLevel(rows, byId);
   }
 
   const spec = specOf(cls);
   const rows = resolveTraitDisplayRows([], parseTraitNamesFromField(spec, "_PARSED_CLASS_FEATURE"), byId, byName, {
-    maxLevel: level
+    characterLevel: level
   });
   return sortTraitDisplayRowsByLevel(rows, byId);
 }
@@ -225,7 +240,7 @@ export function getHybridClassTraitRows(
     ...parseTraitNamesFromField(specOf(hybridB), "_PARSED_CLASS_FEATURE")
   ];
   const rows = resolveTraitDisplayRows([], names, byId, byName, {
-    maxLevel: characterLevel
+    characterLevel
   });
   return sortTraitDisplayRowsByLevel(rows, byId);
 }
@@ -233,42 +248,51 @@ export function getHybridClassTraitRows(
 export function getThemeTraitRows(
   theme: Theme | undefined,
   index: RulesIndex,
-  characterLevel: number
+  characterLevel: number,
+  options?: Pick<TraitDisplayOptions, "includeUnavailable">
 ): TraitDisplayRow[] {
   if (!theme) return [];
   const spec = specOf(theme);
   const { byId, byName } = buildClassFeatureLookups(index);
-  return resolveTraitDisplayRows(parseTraitIdsFromField(spec, "_PARSED_SUB_FEATURES"), [], byId, byName, {
-    maxLevel: characterLevel
+  const rows = resolveTraitDisplayRows(parseTraitIdsFromField(spec, "_PARSED_SUB_FEATURES"), [], byId, byName, {
+    characterLevel,
+    includeUnavailable: options?.includeUnavailable
   });
+  return sortTraitDisplayRowsByLevel(rows, byId);
 }
 
 export function getParagonTraitRows(
   path: ParagonPath | undefined,
   index: RulesIndex,
-  characterLevel: number
+  characterLevel: number,
+  options?: Pick<TraitDisplayOptions, "includeUnavailable">
 ): TraitDisplayRow[] {
   if (!path) return [];
   const spec = specOf(path);
   const { byId, byName } = buildClassFeatureLookups(index);
-  return resolveTraitDisplayRows(parseTraitIdsFromField(spec, "Class Features"), [], byId, byName, {
+  const rows = resolveTraitDisplayRows(parseTraitIdsFromField(spec, "Class Features"), [], byId, byName, {
     includeLevelInName: true,
-    maxLevel: characterLevel
+    characterLevel,
+    includeUnavailable: options?.includeUnavailable
   });
+  return sortTraitDisplayRowsByLevel(rows, byId);
 }
 
 export function getEpicDestinyTraitRows(
   destiny: EpicDestiny | undefined,
   index: RulesIndex,
-  characterLevel: number
+  characterLevel: number,
+  options?: Pick<TraitDisplayOptions, "includeUnavailable">
 ): TraitDisplayRow[] {
   if (!destiny) return [];
   const spec = specOf(destiny);
   const { byId, byName } = buildClassFeatureLookups(index);
-  return resolveTraitDisplayRows(parseTraitIdsFromField(spec, "Class Features"), [], byId, byName, {
+  const rows = resolveTraitDisplayRows(parseTraitIdsFromField(spec, "Class Features"), [], byId, byName, {
     includeLevelInName: true,
-    maxLevel: characterLevel
+    characterLevel,
+    includeUnavailable: options?.includeUnavailable
   });
+  return sortTraitDisplayRowsByLevel(rows, byId);
 }
 
 /** Class features and racial traits granted by selected feats (`rules.grant` via ETL). */

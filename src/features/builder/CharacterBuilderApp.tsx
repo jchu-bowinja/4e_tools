@@ -45,7 +45,7 @@ import {
   upcomingClassPowerSlotMilestones
 } from "../../rules/classPowerSlots";
 import { getClassPowersForLevelRange, validateCharacterBuild } from "../../rules/characterValidator";
-import { getPowersForOwnerId } from "../../rules/classPowersQuery";
+import { getPowersForOwnerId, getThemeGrantedPowers, type GatedPower, getAllEpicDestinyGrantedPowers, getAllParagonPathGrantedPowers, getAllThemeGrantedPowers } from "../../rules/classPowersQuery";
 import {
   dilettanteRacePowerGroupsForBuild,
   getDilettanteCandidatePowersForBuild,
@@ -61,6 +61,7 @@ import {
   collectFeatModifiedPowersForBuild,
   racePowerGroupsForRace,
   racePowerSelectSelectionKey,
+  resolveGrantedPowersFromActiveClassFeatures,
   resolveParagonPathClassFeaturePowers
 } from "../../rules/grantedPowersQuery";
 import { collectFeatModificationsByPowerId } from "../../rules/featPowerModifications";
@@ -153,7 +154,7 @@ import {
   wizardSpellbookRitualIdsUsedOutsideSlot,
   wizardSpellbookRitualSelectionKey
 } from "../../rules/wizardSpellbook";
-import { getClassTraitRows, getHybridClassTraitRows, type TraitDisplayRow } from "../../rules/supportTraits";
+import { getClassTraitRows, getEpicDestinyTraitRows, getHybridClassTraitRows, getParagonTraitRows, getThemeTraitRows, parseFeatureLevel, type TraitDisplayRow } from "../../rules/supportTraits";
 import { autoGrantedTrainedSkillIds, effectiveTrainedSkillIdSet } from "../../rules/grantedSkillsQuery";
 import { computeSkillSheetRows } from "../../rules/skillCalculator";
 import {
@@ -1817,15 +1818,32 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   }, [index, build]);
   const themeGrantedPowers = useMemo(() => {
     if (!build.themeId) return [];
-    const atk = getPowersForOwnerId(index, build.themeId, build.level, "attack");
-    const util = getPowersForOwnerId(index, build.themeId, build.level, "utility");
-    return [...atk, ...util].sort((a, b) => {
-      const la = a.level ?? 0;
-      const lb = b.level ?? 0;
-      if (la !== lb) return la - lb;
-      return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
-    });
+    return getThemeGrantedPowers(index, build.themeId, build.level);
   }, [index, build.themeId, build.level]);
+  const themeTraitRowsPreview = useMemo(
+    () => getThemeTraitRows(selectedTheme, index, build.level, { includeUnavailable: true }),
+    [selectedTheme, index, build.level]
+  );
+  const themeGrantedPowersPreview = useMemo(
+    () => (build.themeId ? getAllThemeGrantedPowers(index, build.themeId, build.level) : []),
+    [index, build.themeId, build.level]
+  );
+  const paragonTraitRowsPreview = useMemo(
+    () => getParagonTraitRows(selectedParagonPath, index, build.level, { includeUnavailable: true }),
+    [selectedParagonPath, index, build.level]
+  );
+  const paragonPathGrantedPowersPreview = useMemo(
+    () => (build.paragonPathId ? getAllParagonPathGrantedPowers(index, build.paragonPathId, build.level) : []),
+    [index, build.paragonPathId, build.level]
+  );
+  const epicDestinyTraitRowsPreview = useMemo(
+    () => getEpicDestinyTraitRows(selectedEpicDestiny, index, build.level, { includeUnavailable: true }),
+    [selectedEpicDestiny, index, build.level]
+  );
+  const epicDestinyGrantedPowersPreview = useMemo(
+    () => (build.epicDestinyId ? getAllEpicDestinyGrantedPowers(index, build.epicDestinyId, build.level) : []),
+    [index, build.epicDestinyId, build.level]
+  );
   const upcomingPowerSlotMilestones = useMemo(() => upcomingClassPowerSlotMilestones(build.level), [build.level]);
   const bonusClassAtWill = useMemo(() => bonusClassAtWillSlotFromRaceBuild(index, build), [index, build.raceId, build.raceSelections]);
 
@@ -1891,17 +1909,21 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     [selectedRace, racialTraitById, raceExtraTraitIds]
   );
   const classAutoGrantedPowers = useMemo(() => {
+    const byId = new Map<string, Power>();
+    const add = (list: Power[]) => {
+      for (const p of list) byId.set(p.id, p);
+    };
     if (isHybridBuild && hybridBaseClassAId && hybridBaseClassBId) {
-      const a = autoGrantedClassPowers(index, hybridBaseClassAId);
-      const b = autoGrantedClassPowers(index, hybridBaseClassBId);
-      const byId = new Map<string, Power>();
-      for (const p of [...a, ...b]) byId.set(p.id, p);
-      return [...byId.values()].sort((x, y) =>
-        x.name.localeCompare(y.name, undefined, { sensitivity: "base" })
-      );
+      add(autoGrantedClassPowers(index, hybridBaseClassAId));
+      add(autoGrantedClassPowers(index, hybridBaseClassBId));
+    } else {
+      add(autoGrantedClassPowers(index, build.classId));
     }
-    return autoGrantedClassPowers(index, build.classId);
-  }, [index, build.classId, isHybridBuild, hybridBaseClassAId, hybridBaseClassBId]);
+    add(resolveGrantedPowersFromActiveClassFeatures(index, build));
+    return [...byId.values()].sort((x, y) =>
+      x.name.localeCompare(y.name, undefined, { sensitivity: "base" })
+    );
+  }, [index, build, isHybridBuild, hybridBaseClassAId, hybridBaseClassBId]);
   const characterPowerIds = useMemo(
     () => collectCharacterPowerIdsForSelections(index, build),
     [index, build]

@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { getClassPowersForLevelRange, getDilettanteCandidatePowers, getPowersForOwnerId } from "../../src/rules/classPowersQuery";
+import index from "../../generated/rules_index.json";
+import {
+  effectivePowerLevel,
+  getClassPowersForLevelRange,
+  getDilettanteCandidatePowers,
+  getPowersForOwnerId,
+  getThemeGrantedPowers
+} from "../../src/rules/classPowersQuery";
 import type { Power, RulesIndex } from "../../src/rules/models";
+
+const rules = index as RulesIndex;
 
 function power(id: string, owner: string, lv: number, powerType: string, usage: string): Power {
   return {
@@ -109,5 +118,33 @@ describe("getPowersForOwnerId", () => {
   it("returns empty without owner or below level 1", () => {
     expect(getPowersForOwnerId(miniIndex, undefined, 20, "attack")).toEqual([]);
     expect(getPowersForOwnerId(miniIndex, "ID_FMP_PARAGON_PATH_99", 0, "attack")).toEqual([]);
+  });
+});
+
+describe("effectivePowerLevel", () => {
+  it("uses parent class feature level when the power row omits Level", () => {
+    const powerRow = rules.powers.find((p) => p.id === "ID_FMP_POWER_16429");
+    expect(powerRow?.name).toBe("Bloodied Determination");
+    expect(effectivePowerLevel(rules, powerRow!)).toBe(1);
+  });
+});
+
+describe("getThemeGrantedPowers", () => {
+  it("includes Bloodied Determination for Bloodsworn at level 1", () => {
+    const bloodsworn = rules.themes.find((t) => t.slug === "bloodsworn");
+    expect(bloodsworn).toBeDefined();
+    const granted = getThemeGrantedPowers(rules, bloodsworn!.id, 1);
+    expect(granted.map((p) => p.id)).toContain("ID_FMP_POWER_16429");
+  });
+
+  it("includes Forced Advantage at level 2 but not at level 1", () => {
+    const bloodsworn = rules.themes.find((t) => t.slug === "bloodsworn");
+    expect(bloodsworn).toBeDefined();
+    expect(getThemeGrantedPowers(rules, bloodsworn!.id, 1).map((p) => p.id)).not.toContain(
+      "ID_FMP_POWER_16430"
+    );
+    expect(getThemeGrantedPowers(rules, bloodsworn!.id, 2).map((p) => p.id)).toContain(
+      "ID_FMP_POWER_16430"
+    );
   });
 });

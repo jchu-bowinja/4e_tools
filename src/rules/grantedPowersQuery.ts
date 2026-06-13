@@ -1,3 +1,4 @@
+import { collectClassFeatureIdsFromClass } from "./characterClassFeatures";
 import type { CharacterBuild, ClassFeature, Feat, Power, Race, RacialTrait, RulesIndex } from "./models";
 import {
   categoryGrantsBonusClassAtWill,
@@ -38,6 +39,101 @@ export function collectPowerIdsFromClassFeature(feature: ClassFeature): string[]
     }
   }
   return [...ids];
+}
+
+/** Power ids listed on a class feature `rules.select` type Power (player must pick, not auto-grant). */
+export function powerSelectableIdsFromClassFeature(feature: ClassFeature): Set<string> {
+  const out = new Set<string>();
+  const rules = feature.raw?.rules as Record<string, unknown> | undefined;
+  const selects = (rules?.select as Array<{ attrs?: Record<string, unknown> }> | undefined) ?? [];
+  for (const sel of selects) {
+    const attrs = sel.attrs ?? {};
+    if (String(attrs.type) !== "Power") continue;
+    const cat = String(attrs.Category ?? attrs.category ?? "").trim();
+    for (const part of cat.split("|")) {
+      const pid = part.trim();
+      if (pid.startsWith("ID_FMP_POWER")) out.add(pid);
+    }
+  }
+  return out;
+}
+
+/**
+ * Auto-granted power ids from a class feature's `grant` rules, excluding powers that are
+ * only obtained via a same-feature `select` list (mirrors ETL `_granted_power_ids_from_class_feature`).
+ */
+export function grantedPowerIdsFromClassFeatureGrants(
+  feature: ClassFeature,
+  classIds: string[]
+): string[] {
+  const selectable = powerSelectableIdsFromClassFeature(feature);
+  const classIdSet = new Set(classIds.filter(Boolean));
+  const rules = feature.raw?.rules as Record<string, unknown> | undefined;
+  const grants = (rules?.grant as Array<{ attrs?: Record<string, unknown> }> | undefined) ?? [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const g of grants) {
+    const a = g.attrs ?? {};
+    if (String(a.type) !== "Power") continue;
+    const pid = String(a.name ?? "");
+    if (!pid.startsWith("ID_FMP_POWER")) continue;
+    if (selectable.has(pid)) continue;
+    const req = String(a.requires ?? "").trim();
+    if (req && classIdSet.size > 0 && !classIdSet.has(req)) continue;
+    if (seen.has(pid)) continue;
+    seen.add(pid);
+    out.push(pid);
+  }
+  return out;
+}
+
+function buildSupportClassIds(index: RulesIndex, build: CharacterBuild): string[] {
+  const ids: string[] = [];
+  if (build.characterStyle === "hybrid") {
+    const ha = index.hybridClasses?.find((h) => h.id === build.hybridClassIdA);
+    const hb = index.hybridClasses?.find((h) => h.id === build.hybridClassIdB);
+    if (ha?.baseClassId) ids.push(ha.baseClassId);
+    if (hb?.baseClassId) ids.push(hb.baseClassId);
+    if (build.hybridClassIdA) ids.push(build.hybridClassIdA);
+    if (build.hybridClassIdB) ids.push(build.hybridClassIdB);
+  } else if (build.classId) {
+    ids.push(build.classId);
+  }
+  return ids;
+}
+
+/**
+ * Powers granted by class/hybrid features (grants and player picks).
+ * Excludes theme, paragon path, epic destiny, and feat-granted features — those use their own pipelines.
+ */
+export function collectGrantedPowerIdsFromActiveClassFeatures(
+  index: RulesIndex,
+  build: CharacterBuild
+): string[] {
+  const byId = new Map((index.classFeatures ?? []).map((f) => [f.id, f]));
+  const classIds = buildSupportClassIds(index, build);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const fid of collectClassFeatureIdsFromClass(index, build)) {
+    const feature = byId.get(fid);
+    if (!feature || !featureIsAvailableAtLevel(feature, build.level)) continue;
+    for (const pid of grantedPowerIdsFromClassFeatureGrants(feature, classIds)) {
+      if (seen.has(pid)) continue;
+      seen.add(pid);
+      out.push(pid);
+    }
+  }
+  return out;
+}
+
+export function resolveGrantedPowersFromActiveClassFeatures(
+  index: RulesIndex,
+  build: CharacterBuild
+): Power[] {
+  const byId = new Map(index.powers.map((p) => [p.id, p]));
+  return collectGrantedPowerIdsFromActiveClassFeatures(index, build)
+    .map((id) => byId.get(id))
+    .filter((p): p is Power => !!p);
 }
 
 /** Fallback when `rules_index.json` predates ETL export of `paragonPathClassFeaturePowerIds`. */

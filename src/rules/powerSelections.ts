@@ -1,6 +1,7 @@
-import { getPowersForOwnerId } from "./classPowersQuery";
+import { getPowersForOwnerId, getThemeGrantedPowers } from "./classPowersQuery";
 import {
   autoGrantedClassPowers,
+  collectGrantedPowerIdsFromActiveClassFeatures,
   collectParagonPathClassFeaturePowerIds,
   racePowerGroupsForRace,
   racePowerSelectSelectionKey,
@@ -42,8 +43,7 @@ export function collectCharacterPowerIdsForSelections(index: RulesIndex, build: 
 
   const theme = index.themes.find((t) => t.id === build.themeId);
   if (theme) {
-    for (const p of getPowersForOwnerId(index, theme.id, build.level, "attack")) ids.add(p.id);
-    for (const p of getPowersForOwnerId(index, theme.id, build.level, "utility")) ids.add(p.id);
+    for (const p of getThemeGrantedPowers(index, theme.id, build.level)) ids.add(p.id);
   }
   const paragon = index.paragonPaths.find((p) => p.id === build.paragonPathId);
   if (paragon) {
@@ -68,6 +68,8 @@ export function collectCharacterPowerIdsForSelections(index: RulesIndex, build: 
   for (const pid of collectParagonMulticlassPowerIds(build)) ids.add(pid);
 
   for (const pid of collectClassFeaturePowerChoiceIds(index, build)) ids.add(pid);
+
+  for (const pid of collectGrantedPowerIdsFromActiveClassFeatures(index, build)) ids.add(pid);
 
   return ids;
 }
