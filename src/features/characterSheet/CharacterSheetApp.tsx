@@ -143,6 +143,7 @@ import { useDelayedHoverPanel } from "../../ui/useDelayedHoverPanel";
 import { AdjustableNumberInput } from "../../ui/AdjustableNumberInput";
 import { JsonCollapsiblePanel } from "../../ui/JsonCollapsiblePanel";
 import { weaponAttackAbilityForCharacter } from "../../rules/classFeatureProficiencies";
+import { collectActiveClassFeatureMechanicalEffects } from "../../rules/mechanicalEffects";
 import { summarizeImplementAttack, summarizeMainWeaponAttack } from "../../rules/weaponAttack";
 
 type SheetTab = "overview" | "items";
@@ -1143,6 +1144,10 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     () => collectCharacterProficiencyGrants(index, sheetBuildForProficiencies),
     [index, sheetBuildForProficiencies]
   );
+  const classFeatureMechanicalEffects = useMemo(
+    () => collectActiveClassFeatureMechanicalEffects(index, sheetBuildForProficiencies),
+    [index, sheetBuildForProficiencies]
+  );
   const proficiencyDisplayRows = useMemo(
     () => collectCharacterProficiencyDisplayRows(index, toBuildLikeState(sheet, index)),
     [index, sheet, sheet.featIds, sheet.raceId, sheet.raceSelections]
@@ -1293,7 +1298,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         sheet.equipment,
         mainHandWeapon
           ? weaponAttackAbilityForCharacter(mainHandWeapon, index, sheetBuildForProficiencies)
-          : undefined
+          : undefined,
+        classFeatureMechanicalEffects
       ),
     [
       sheet.level,
@@ -1304,7 +1310,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
       proficiencyGrants,
       sheet.equipment,
       index,
-      sheetBuildForProficiencies
+      sheetBuildForProficiencies,
+      classFeatureMechanicalEffects
     ]
   );
   const offHandWeaponSummary = useMemo(
@@ -1320,7 +1327,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
         sheet.equipment,
         offHandWeapon
           ? weaponAttackAbilityForCharacter(offHandWeapon, index, sheetBuildForProficiencies)
-          : undefined
+          : undefined,
+        classFeatureMechanicalEffects
       ),
     [
       sheet.level,
@@ -1331,7 +1339,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
       proficiencyGrants,
       sheet.equipment,
       index,
-      sheetBuildForProficiencies
+      sheetBuildForProficiencies,
+      classFeatureMechanicalEffects
     ]
   );
   const implementAttackSummary = useMemo(

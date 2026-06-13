@@ -279,7 +279,30 @@ export type RacialTraitPowerBundleMode = "subtraitFirst";
 /** ETL: class-feature mechanical overrides (Archer Warlord, …). */
 export type ClassFeatureMechanicalEffect =
   | { type: "removeArmorProficiencyPhrases"; phrases: string[] }
-  | { type: "weaponKeyAbility"; weaponGroup: string; ability: "STR" | "DEX" };
+  | { type: "weaponKeyAbility"; weaponGroup: string; ability: "STR" | "DEX" }
+  | { type: "weaponDamageOverride"; weaponName: string; damage: string }
+  | { type: "weaponDamageDieIncrease"; weaponName: string; steps: number };
+
+/** ETL: automatic power id swap when a class feature is active (`rules.replace` power-replace). */
+export interface ClassFeaturePowerReplacementRule {
+  replacementPowerId: string;
+  originalPowerId: string;
+}
+
+/** DMG2 class role bucket for milestone features. */
+export type ClassRoleBucket = "defender" | "leader" | "striker" | "controller";
+
+/** ETL: pick one power to fill a class slot when a progression feature is active. */
+export interface ClassFeaturePowerSwapRule {
+  usageBucket: "atWill" | "encounter" | "daily" | "utility";
+  slotGainLevel: number;
+  /** When set, swap applies only when `build.classId` is listed. */
+  classIds?: string[];
+  /** Fixed pick list; when empty, resolve from the character class `{usageBucket}` pool at `{slotGainLevel}`. */
+  powerIds: string[];
+  /** DMG2 role milestone row (Defender / Leader / …). */
+  roleBucket?: ClassRoleBucket;
+}
 
 /** Racial trait (from Racial Trait compendium; referenced by races). */
 export interface RacialTrait extends RulesEntity {
@@ -306,6 +329,16 @@ export interface ClassFeature extends RulesEntity {
   body?: string | null;
   /** ETL: parsed mechanical overrides when the feature is active. */
   mechanicalEffects?: ClassFeatureMechanicalEffect[];
+  /** ETL: power ids augmented by this feature (style / domain / cantrip patches). */
+  modifiedPowerIds?: string[];
+  /** ETL: structured `rules.modify type=Power` rows. */
+  powerModifications?: FeatPowerModification[];
+  /** ETL: `rules.grant type=Class Feature` child ids on this feature. */
+  grantedClassFeatureIds?: string[];
+  /** ETL: automatic `power-replace: NEW:OLD` swaps while this feature is active. */
+  powerReplacementRules?: ClassFeaturePowerReplacementRule[];
+  /** ETL: player picks one listed power for a class slot (`powerswap`). */
+  powerSwapRules?: ClassFeaturePowerSwapRule[];
   raw: Record<string, unknown>;
 }
 
@@ -551,6 +584,8 @@ export interface RulesIndex {
   autoGrantedSkillTrainingNamesBySupportId?: Record<string, string[]>;
   /** Class feature names granted via Grants rows, keyed by supported entity id. */
   grantedClassFeatureNamesBySupportId?: Record<string, string[]>;
+  /** Essentials pact/domain/school picks → trait package internal id (for `requires` on grant chains). */
+  traitPackageIdByClassFeatureId?: Record<string, string>;
   /** Class build options (choice features) with description/rules/powers, keyed by class id. */
   classBuildOptionsByClassId?: Record<
     string,

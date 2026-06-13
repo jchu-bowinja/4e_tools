@@ -78,6 +78,48 @@ export function weaponAttackAbilityFromMechanicalEffects(
   return defaultAbility;
 }
 
+function weaponNameMatches(weapon: Weapon, targetName: string): boolean {
+  const name = norm(String(weapon.name || ""));
+  const want = norm(targetName);
+  return name === want || name.startsWith(`${want} `);
+}
+
+const DIE_STEPS = [4, 6, 8, 10, 12] as const;
+
+function increaseDamageDie(notation: string, steps: number): string {
+  const m = /(\d+)d(\d+)/i.exec(notation.trim());
+  if (!m || steps <= 0) return notation;
+  let sides = Number(m[2]);
+  for (let i = 0; i < steps; i++) {
+    const idx = DIE_STEPS.indexOf(sides as (typeof DIE_STEPS)[number]);
+    if (idx >= 0 && idx < DIE_STEPS.length - 1) {
+      sides = DIE_STEPS[idx + 1]!;
+    } else {
+      break;
+    }
+  }
+  return `${m[1]}d${sides}`;
+}
+
+export function weaponDamageFromMechanicalEffects(
+  weapon: Weapon,
+  effects: MechanicalEffect[],
+  defaultDamage: string | null | undefined
+): string {
+  let damage = String(defaultDamage ?? "").trim() || "—";
+  for (const effect of effects) {
+    if (effect.type === "weaponDamageOverride" && weaponNameMatches(weapon, effect.weaponName)) {
+      damage = effect.damage;
+    }
+  }
+  for (const effect of effects) {
+    if (effect.type === "weaponDamageDieIncrease" && weaponNameMatches(weapon, effect.weaponName)) {
+      damage = increaseDamageDie(damage, effect.steps);
+    }
+  }
+  return damage;
+}
+
 /** Proficiency grants from active class features (ETL `mechanicalEffects` + raw `rules.grant`). */
 export function proficiencyGrantsFromActiveClassFeatures(
   index: RulesIndex,

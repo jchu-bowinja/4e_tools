@@ -1,5 +1,9 @@
 import type { Ability, ClassDef, Implement, ProficiencyGrant, Weapon } from "./models";
 import {
+  collectActiveClassFeatureMechanicalEffects,
+  weaponDamageFromMechanicalEffects
+} from "./mechanicalEffects";
+import {
   formatWeaponDamageNotation,
   offHandWeaponAttackPenalty,
   versatileTwoHandedDamageBonus,
@@ -97,7 +101,8 @@ export function summarizeMainWeaponAttack(
   featProficiencyGrants: ProficiencyGrant[] = [],
   handSlot?: WeaponHandSlot,
   equippedSlots?: Partial<Record<EquippedSlotKey, string>>,
-  abilityCodeOverride?: "STR" | "DEX"
+  abilityCodeOverride?: "STR" | "DEX",
+  mechanicalEffects: ReturnType<typeof collectActiveClassFeatureMechanicalEffects> = []
 ): WeaponAttackSummary | null {
   if (!weapon) return null;
   const abilityCode = abilityCodeOverride ?? weaponAttackAbility(weapon);
@@ -111,11 +116,12 @@ export function summarizeMainWeaponAttack(
   const attackBonus = half + mod + (prof ? pb : -2) + itemBonus + wieldPenalty;
   const versatileDamageBonus =
     handSlot && equippedSlots ? versatileTwoHandedDamageBonus(weapon, handSlot, equippedSlots) : 0;
+  const baseDamage = weaponDamageFromMechanicalEffects(weapon, mechanicalEffects, weapon.damage);
   return {
     attackBonus,
     abilityCode,
     proficient: prof,
-    damageNotation: formatWeaponDamageNotation(weapon.damage, versatileDamageBonus)
+    damageNotation: formatWeaponDamageNotation(baseDamage, versatileDamageBonus)
   };
 }
 

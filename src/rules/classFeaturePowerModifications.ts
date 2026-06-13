@@ -1,6 +1,9 @@
 import { collectCharacterClassFeatureIds } from "./characterClassFeatures";
 import {
   collectFeatModificationsByPowerId,
+  isFeatPowerAugmentation,
+  isFeatPowerMetadataField,
+  resolveAugmentationText,
   type PowerFeatModifications
 } from "./featPowerModifications";
 import type { CharacterBuild, ClassFeature, FeatPowerModification, RulesIndex } from "./models";
@@ -20,7 +23,7 @@ function resolveClassFeaturePowerModifications(feature: ClassFeature): FeatPower
     if (!value && field === "Keywords" && attrs["list-addition"]) {
       value = String(attrs["list-addition"]).trim();
     }
-    if (!value) continue;
+    if (!value && isFeatPowerMetadataField(field)) continue;
     out.push({
       powerName,
       powerId: powerName.startsWith("ID_FMP_POWER") ? powerName : null,
@@ -44,6 +47,14 @@ function resolveModificationPowerId(
   return resolvePowerReference(mod.powerName, lookups);
 }
 
+function resolveClassFeatureAugmentationText(mod: FeatPowerModification, feature: ClassFeature): string {
+  const explicit = String(mod.value ?? "").trim();
+  if (explicit) return explicit;
+  const body = typeof feature.raw?.body === "string" ? feature.raw.body.trim() : "";
+  if (body) return body;
+  return String(feature.shortDescription ?? "").trim();
+}
+
 /** Class-feature `rules.modify type=Power` patches keyed by target power id. */
 export function collectClassFeatureModificationsByPowerId(
   index: RulesIndex,
@@ -62,14 +73,26 @@ export function collectClassFeatureModificationsByPowerId(
       if (!powerId) continue;
 
       const bucket = byPower.get(powerId) ?? { augmentations: [], metadata: [] };
-      const value = String(mod.value ?? "").trim();
-      if (!value) continue;
-      bucket.metadata.push({
-        featId: feature.id,
-        featName: feature.name,
-        field: mod.field.trim(),
-        value
-      });
+
+      if (isFeatPowerMetadataField(mod.field)) {
+        const value = String(mod.value ?? "").trim();
+        if (!value) continue;
+        bucket.metadata.push({
+          featId: feature.id,
+          featName: feature.name,
+          field: mod.field.trim(),
+          value
+        });
+      } else if (isFeatPowerAugmentation(mod)) {
+        const text = resolveClassFeatureAugmentationText(mod, feature);
+        if (!text) continue;
+        bucket.augmentations.push({
+          featId: feature.id,
+          featName: feature.name,
+          text
+        });
+      }
+
       byPower.set(powerId, bucket);
     }
   }

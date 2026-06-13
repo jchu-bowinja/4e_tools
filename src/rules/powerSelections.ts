@@ -1,5 +1,9 @@
 import { getPowersForOwnerId, getThemeGrantedPowers } from "./classPowersQuery";
 import {
+  applyClassFeaturePowerIdReplacementsToSet,
+  collectClassFeaturePowerReplacementMap
+} from "./classFeaturePowerReplace";
+import {
   autoGrantedClassPowers,
   collectGrantedPowerIdsFromActiveClassFeatures,
   collectParagonPathClassFeaturePowerIds,
@@ -70,6 +74,8 @@ export function collectCharacterPowerIdsForSelections(index: RulesIndex, build: 
   for (const pid of collectClassFeaturePowerChoiceIds(index, build)) ids.add(pid);
 
   for (const pid of collectGrantedPowerIdsFromActiveClassFeatures(index, build)) ids.add(pid);
+
+  applyClassFeaturePowerIdReplacementsToSet(ids, collectClassFeaturePowerReplacementMap(index, build));
 
   return ids;
 }

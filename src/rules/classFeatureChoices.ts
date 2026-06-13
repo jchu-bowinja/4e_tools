@@ -1,4 +1,9 @@
 import {
+  classFeaturePowerSwapChoiceGroups,
+  classPowerSwapSelectionKey,
+  CLASS_POWER_SWAP_SELECTION_PREFIX
+} from "./classFeaturePowerReplace";
+import {
   featGrantedPowerIdsExcludedFromClassFeaturePicks,
   paragonPathClassFeaturePowerIds
 } from "./grantedPowersQuery";
@@ -470,6 +475,30 @@ export function appendNestedChildClassFeatureChoiceGroups(
   return out;
 }
 
+function appendClassFeaturePowerSwapChoiceGroups(
+  index: RulesIndex,
+  classId: string | undefined,
+  groups: ClassFeatureChoiceGroup[]
+): ClassFeatureChoiceGroup[] {
+  const existing = new Set(groups.map((g) => g.key));
+  const out = [...groups];
+  for (const swap of classFeaturePowerSwapChoiceGroups(index, classId)) {
+    const key = classPowerSwapSelectionKey(swap.parentFeatureId);
+    if (existing.has(key)) continue;
+    existing.add(key);
+    out.push({
+      key,
+      kind: "power",
+      parentFeatureId: swap.parentFeatureId,
+      parentFeatureName: swap.parentFeatureName,
+      pickCount: 1,
+      powerIds: swap.powerIds,
+      minLevel: swap.minLevel
+    });
+  }
+  return out;
+}
+
 export function getClassFeatureChoiceGroups(
   index: RulesIndex,
   cls: ClassDef | undefined
@@ -514,6 +543,7 @@ export function getClassFeatureChoiceGroups(
 
   groups = appendNestedChildPowerChoiceGroups(index, cls.id, groups);
   groups = appendNestedChildClassFeatureChoiceGroups(index, groups);
+  groups = appendClassFeaturePowerSwapChoiceGroups(index, cls.id, groups);
   const expanded = expandClassFeaturePowerChoiceGroups(index, cls.id, groups);
   const poolCounts = new Map<string, number>();
   for (const g of expanded) {
@@ -1022,6 +1052,11 @@ function collectClassFeaturePowerChoiceIdsForClass(
   const ids: string[] = [];
   for (const g of filterVisibleClassFeatureChoiceGroups(groups, rs, characterLevel)) {
     if (g.kind !== "power") continue;
+    if (g.key.startsWith(CLASS_POWER_SWAP_SELECTION_PREFIX)) {
+      const pick = rs[g.key]?.trim();
+      if (pick?.startsWith("ID_FMP_POWER")) ids.push(pick);
+      continue;
+    }
     ids.push(...resolveClassPowerChoiceIdsForGroup(index, g, classId, rs, characterLevel));
   }
   return ids;

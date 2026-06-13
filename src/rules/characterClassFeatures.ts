@@ -6,6 +6,7 @@ import {
 } from "./classFeatureChoices";
 import { selectedClassBuildOptionId } from "./classBuildOptions";
 import type { CharacterBuild, ClassFeature, RulesIndex } from "./models";
+import { collectRoleProgressionClassFeatureIds } from "./roleProgressionFeatures";
 import {
   buildClassFeatureLookups,
   featureIsAvailableAtLevel,
@@ -18,6 +19,94 @@ import {
   traitNameForDisplay,
   type TraitDisplayRow
 } from "./supportTraits";
+import { collectActiveTraitPackageIds } from "./traitPackageIds";
+
+function grantRequirementMet(
+  requires: string | undefined,
+  activeIds: Set<string>,
+  activeTraitPackages: Set<string>,
+  classSelections: Record<string, string> | undefined
+): boolean {
+  if (!requires?.trim()) return true;
+  const parts = requires.includes("|")
+    ? requires.split("|").map((p) => p.trim()).filter(Boolean)
+    : [requires.trim()];
+  for (const req of parts) {
+    if (activeIds.has(req)) return true;
+    if (activeTraitPackages.has(req)) return true;
+    if (classSelections && Object.values(classSelections).includes(req)) return true;
+  }
+  return false;
+}
+
+/** Follow `rules.grant type=Class Feature` chains from active features (pact progressions, …). */
+export function expandClassFeatureIdsWithGrants(
+  index: RulesIndex,
+  seedIds: readonly string[],
+  characterLevel: number,
+  classSelections?: Record<string, string>
+): string[] {
+  const { byId } = buildClassFeatureLookups(index);
+  const seen = new Set<string>();
+  for (const fid of seedIds) {
+    const feature = byId.get(fid);
+    if (feature && featureIsAvailableAtLevel(feature, characterLevel)) seen.add(fid);
+  }
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const traitPackages = collectActiveTraitPackageIds(index, seen);
+    for (const fid of [...seen]) {
+      const feature = byId.get(fid);
+      if (!feature) continue;
+      const childIds = [
+        ...(feature.grantedClassFeatureIds ?? []),
+        ...grantedClassFeatureIdsFromRaw(feature)
+      ];
+      for (const childId of childIds) {
+        if (!childId.startsWith("ID_") || seen.has(childId)) continue;
+        const child = byId.get(childId);
+        if (!child || !featureIsAvailableAtLevel(child, characterLevel)) continue;
+        const requires = grantRequiresForChild(feature, childId);
+        if (!grantRequirementMet(requires, seen, traitPackages, classSelections)) continue;
+        seen.add(childId);
+        changed = true;
+      }
+    }
+  }
+
+  return sortClassFeatureIdsByLevel(index, [...seen]);
+}
+
+function grantedClassFeatureIdsFromRaw(feature: ClassFeature): string[] {
+  const rules = feature.raw?.rules as
+    | { grant?: Array<{ attrs?: Record<string, string> }> }
+    | undefined;
+  const out: string[] = [];
+  for (const gr of rules?.grant ?? []) {
+    const attrs = gr.attrs ?? {};
+    if (attrs.type !== "Class Feature") continue;
+    const cid = String(attrs.name ?? "").trim();
+    if (cid.startsWith("ID_")) out.push(cid);
+  }
+  return out;
+}
+
+function grantRequiresForChild(feature: ClassFeature, childId: string): string | undefined {
+  const rules = feature.raw?.rules as
+    | { grant?: Array<{ attrs?: Record<string, string> }> }
+    | undefined;
+  for (const gr of rules?.grant ?? []) {
+    const attrs = gr.attrs ?? {};
+    if (attrs.type !== "Class Feature") continue;
+    if (String(attrs.name ?? "").trim() === childId) {
+      const req = String(attrs.requires ?? "").trim();
+      return req || undefined;
+    }
+  }
+  return undefined;
+}
 
 /** Support ids for class/hybrid grants only (excludes race, theme, path, destiny). */
 function classSupportIds(index: RulesIndex, build: CharacterBuild): string[] {
@@ -95,6 +184,9 @@ export function collectClassFeatureIdsFromClass(
     applyClassFeatureChoiceGroups(hb?.baseClassId);
   } else {
     applyClassFeatureChoiceGroups(build.classId);
+    for (const fid of collectRoleProgressionClassFeatureIds(index, build.classId, build.level)) {
+      add(byId.get(fid));
+    }
   }
 
   return sortClassFeatureIdsByLevel(index, ids);
@@ -103,7 +195,8 @@ export function collectClassFeatureIdsFromClass(
 /** Class feature ids the character currently has (build options, grants, path features, …). */
 export function collectCharacterClassFeatureIds(index: RulesIndex, build: CharacterBuild): string[] {
   const { byId, byName } = buildClassFeatureLookups(index);
-  const ids = collectClassFeatureIdsFromClass(index, build);
+  const base = collectClassFeatureIdsFromClass(index, build);
+  const ids = expandClassFeatureIdsWithGrants(index, base, build.level, build.classSelections);
   const seen = new Set(ids);
 
   const add = (feature: ClassFeature | undefined) => {
@@ -150,7 +243,7 @@ export function collectCharacterClassFeatureIds(index: RulesIndex, build: Charac
     }
   }
 
-  return ids;
+  return expandClassFeatureIdsWithGrants(index, ids, build.level, build.classSelections);
 }
 
 /** Trait rows for class/hybrid features on the sheet (excludes path, destiny, theme, feats). */

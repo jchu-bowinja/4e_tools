@@ -231,6 +231,7 @@ import { CharacterEquippedSlotsPanel } from "../characterSheet/CharacterEquipped
 import { CharacterProficienciesBlock } from "../characterSheet/CharacterProficienciesBlock";
 import type { EquipmentPriceSlot } from "../../rules/equipmentItemPrice";
 import { weaponAttackAbilityForCharacter } from "../../rules/classFeatureProficiencies";
+import { collectActiveClassFeatureMechanicalEffects } from "../../rules/mechanicalEffects";
 import { summarizeImplementAttack, summarizeMainWeaponAttack } from "../../rules/weaponAttack";
 import { BuilderSidebarItemsPanel } from "./BuilderSidebarItemsPanel";
 import { EquipmentTab, type EquipmentEditorSlot } from "./EquipmentTab";
@@ -1531,6 +1532,10 @@ export function CharacterBuilderApp({
     () => collectCharacterProficiencyGrants(index, build),
     [index, build]
   );
+  const classFeatureMechanicalEffects = useMemo(
+    () => collectActiveClassFeatureMechanicalEffects(index, build),
+    [index, build]
+  );
   const proficiencyDisplayRows = useMemo(
     () => collectCharacterProficiencyDisplayRows(index, build),
     [index, build.featIds, build.raceId, build.raceSelections]
@@ -1619,7 +1624,8 @@ export function CharacterBuilderApp({
         wieldSlotsForPreview,
         selectedMainWeapon
           ? weaponAttackAbilityForCharacter(selectedMainWeapon, index, build)
-          : undefined
+          : undefined,
+        classFeatureMechanicalEffects
       ),
     [
       build,
@@ -1630,7 +1636,8 @@ export function CharacterBuilderApp({
       classWeaponProfText,
       magicCombat.mainWeaponAttack,
       proficiencyGrants,
-      wieldSlotsForPreview
+      wieldSlotsForPreview,
+      classFeatureMechanicalEffects
     ]
   );
   const offHandWeaponSummary = useMemo(
@@ -1646,7 +1653,8 @@ export function CharacterBuilderApp({
         wieldSlotsForPreview,
         selectedOffHandWeapon
           ? weaponAttackAbilityForCharacter(selectedOffHandWeapon, index, build)
-          : undefined
+          : undefined,
+        classFeatureMechanicalEffects
       ),
     [
       build,
@@ -1657,7 +1665,8 @@ export function CharacterBuilderApp({
       classWeaponProfText,
       magicCombat.offHandWeaponAttack,
       proficiencyGrants,
-      wieldSlotsForPreview
+      wieldSlotsForPreview,
+      classFeatureMechanicalEffects
     ]
   );
   const implementAttackSummary = useMemo(

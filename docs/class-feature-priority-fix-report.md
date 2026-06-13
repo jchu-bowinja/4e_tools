@@ -6,19 +6,21 @@ Generated from `generated/rules_index.json`. Regenerate: `python tools/etl/gener
 
 | Step | Status | Classes | Items | Compendium features (global) |
 |------|--------|---------|-------|------------------------------|
-| P0 — Class-feature granted powers | Fixed (`5609f82`) | 63 | 156 | — |
+| P0 — Class-feature granted powers | Fixed (`5609f82`) | 63 | 164 | — |
 | P0 — Theme / path power level resolution | Fixed (`5609f82`) | — | — | — |
 | P1a — Nested power choice groups | Fixed (`9b4c41e`) | 2 | 2 | — |
 | P1b — Nested class-feature choice groups | Fixed (`9b4c41e`) | 2 | 5 | — |
-| P1c — `rules.modify Power` (power cards) | Partial (`9b4c41e`) | 27 | 99 | 183 |
-| P1d — `rules.modify Weapon` | Open | 3 | 3 | 127 |
+| P1c — `rules.modify Power` (power cards) | Fixed | 27 | 99 | 183 |
+| P1d — `rules.modify Weapon` | Fixed | 3 | 3 | 127 |
 | P1e — Essentials build suggested powers | Fixed (`9b4c41e`) | 24 | 77 | — |
-| P1f — `rules.replace` | Open | 7 | 36 | 66 |
+| P1f — `rules.replace` | Fixed | 7 | 36 | 66 |
 
 **Notes:**
 
 - **P1a/P1b** counts are *player-visible* nested picks (parent option in an indexed `classFeature` group). Hybrid/internal-only Power selects (~90 in the audit) are excluded.
-- **P1d** compendium has 127 `modify Weapon` rows; most are internal Arena Weapon entries without a `Class` field — see [unmapped section](#p1d-unmapped-weapon-modify-features).
+- **P1d** compendium has 127 `modify Weapon` rows; class-mapped features (Rogue Weapon Talent, Druid of Summer, …) apply in attack preview. Internal Arena Weapon rows without a `Class` field remain unmapped — see [unmapped section](#p1d-unmapped-weapon-modify-features).
+- **P1c/P1f follow-ups:** trait-package pact chains and DMG2 role-bucket powerswaps are fixed; see [follow-ups](#follow-ups).
+- **Trait package map:** 100 selectable class features indexed in `traitPackageIdByClassFeatureId`.
 - **Indexed choice groups** exist for 46 classes; full list in [appendix](#appendix-indexed-choice-groups-by-class).
 
 ## P0 — Class-feature granted powers
@@ -139,6 +141,14 @@ _When the player selects a class-feature option, `rules.grant type=Power` on tha
 
 | Choice path | Feature | Detail |
 | --- | --- | --- |
+| Elemental Specialty → Howling Zephyr | Howling Zephyr | 1 |
+| Elemental Specialty → Static Charge | Static Charge | 1 |
+| Elemental Specialty → Erupting Earth | Erupting Earth | 1 |
+| Elemental Specialty → Seismic Shock | Seismic Shock | 1 |
+| Elemental Specialty → Blazing Cloud | Blazing Cloud | 1 |
+| Elemental Specialty → Ignition | Ignition | 1 |
+| Elemental Specialty → Deluge | Deluge | 1 |
+| Elemental Specialty → Ice Prison | Ice Prison | 1 |
 | Auto-granted: Elemental Bolt | Elemental Bolt | 1 |
 | Auto-granted: Escalating Elements | Escalating Elements | 4 |
 
@@ -540,7 +550,7 @@ _After picking a parent option, expose a dependent class-feature pick (`classFea
 
 _Apply compendium power patches (Usage, Display, Keywords, …) on power cards from active class features._
 
-**Status:** Partial (9b4c41e)
+**Status:** Fixed
 
 ### Binder (Essentials, parent: Warlock)
 
@@ -781,7 +791,7 @@ _Apply compendium power patches (Usage, Display, Keywords, …) on power cards f
 
 _Weapon key ability, damage die, off-hand/load properties — only features with explicit `Class` in compendium._
 
-**Status:** Open
+**Status:** Fixed
 
 ### Druid
 
@@ -1010,7 +1020,7 @@ _Pre-fill empty PHB power slots when player selects an `ID_FMP_BUILD_*` Essentia
 
 _Swap granted powers at higher levels (pact upgrades, Warpriest dailies, etc.)._
 
-**Status:** Open
+**Status:** Fixed
 
 ### Binder (Essentials, parent: Warlock)
 
@@ -1083,6 +1093,17 @@ _Swap granted powers at higher levels (pact upgrades, Warpriest dailies, etc.)._
 | Level 25 Warpriest Daily Power | 1 |
 | Level 29 Warpriest Daily Power | 1 |
 
+
+## Follow-ups
+
+_Additional gaps discovered during P1 implementation._
+
+| Item | Status | Detail |
+|------|--------|--------|
+| Tome Of Readiness Level Pool | Fixed (09d47f3) | `$$LEVEL,<class>,<usage>` power-select categories; builder passes character level into choice pools. |
+| Trait Package Pact Chains | Fixed | `traitPackageIdByClassFeatureId` ETL map; grant expansion follows pact/domain progression when the matching trait package is active (e.g. Binder Star Pact L13 upgrade). |
+| Dmg2 Role Bucket Powerswaps | Fixed | DMG2 milestone features (Level 03 Defender Encounter Power, …) index `powerswap` without fixed power lists; runtime resolves class usage pools and filters by class role. |
+| Warpriest Domain String Requires | Open | Warpriest domain progression grants use string `requires` (e.g. Storm Domain) rather than trait package ids. |
 
 ## P0 — Theme / path power level resolution
 
@@ -1217,6 +1238,10 @@ _Existing L1 `classFeatureChoiceGroupsByClassId` before runtime nested append._
 ### Elementalist (Essentials, parent: Sorcerer)
 
 - **Elemental Specialty** — pick 1: Air Elementalist, Earth Elementalist, Fire Elementalist, Water Elementalist
+- **Elemental Specialty** — pick 1: Howling Zephyr, Static Charge _(visible when classFeature:ID_FMP_CLASS_FEATURE_4335 = option)_
+- **Elemental Specialty** — pick 1: Erupting Earth, Seismic Shock _(visible when classFeature:ID_FMP_CLASS_FEATURE_4335 = option)_
+- **Elemental Specialty** — pick 1: Blazing Cloud, Ignition _(visible when classFeature:ID_FMP_CLASS_FEATURE_4335 = option)_
+- **Elemental Specialty** — pick 1: Deluge, Ice Prison _(visible when classFeature:ID_FMP_CLASS_FEATURE_4335 = option)_
 - **Elemental Magic** — power pick 2 (pool 10)
 - **Elemental Magic** — power pick 2 (pool 10)
 
@@ -1422,6 +1447,7 @@ _Existing L1 `classFeatureChoiceGroupsByClassId` before runtime nested append._
 
 - **Eldritch Blast** — power pick 1 (pool 2)
 - **Eldritch Pact** — pick 1: Dark Pact, Elemental Pact, Fey Pact, Infernal Pact, Sorcerer-King Pact, Star Pact, Vestige Pact
+- **Infernal Pact** — power pick 1 (pool 3) _(visible when classFeature:ID_FMP_CLASS_FEATURE_777 = option)_
 
 ### Warlord
 

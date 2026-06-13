@@ -300,6 +300,7 @@ def main() -> None:
             "source": str(INDEX_PATH.relative_to(ROOT)),
             "total_classes_with_choice_groups": len(choice_groups_by_class),
             "feature_totals": {"modify_weapon": total_w, "modify_power": total_p, "replace": total_r},
+            "trait_package_mappings": len(data.get("traitPackageIdByClassFeatureId") or {}),
         },
         "steps": {
             "P0_class_feature_granted_powers": {
@@ -318,12 +319,12 @@ def main() -> None:
                 "counts": (len(p1b), sum(len(v) for v in p1b.values())),
             },
             "P1c_modify_power": {
-                "status": "Partial (9b4c41e)",
+                "status": "Fixed",
                 "classes": {cls_label(k): v for k, v in sorted(p1c.items(), key=lambda x: cls_label(x[0]))},
                 "counts": (len(p1c), sum(len(v) for v in p1c.values())),
             },
             "P1d_modify_weapon": {
-                "status": "Open",
+                "status": "Fixed",
                 "classes": {cls_label(k): v for k, v in sorted(p1d.items(), key=lambda x: cls_label(x[0]))},
                 "counts": (len(p1d), sum(len(v) for v in p1d.values())),
             },
@@ -333,9 +334,33 @@ def main() -> None:
                 "counts": (len(p1e), sum(len(v) for v in p1e.values())),
             },
             "P1f_rules_replace": {
-                "status": "Open",
+                "status": "Fixed",
                 "classes": {cls_label(k): v for k, v in sorted(p1f.items(), key=lambda x: cls_label(x[0]))},
                 "counts": (len(p1f), sum(len(v) for v in p1f.values())),
+            },
+        },
+        "followups": {
+            "tome_of_readiness_level_pool": {
+                "status": "Fixed (09d47f3)",
+                "detail": "`$$LEVEL,<class>,<usage>` power-select categories; builder passes character level into choice pools.",
+            },
+            "trait_package_pact_chains": {
+                "status": "Fixed",
+                "detail": (
+                    "`traitPackageIdByClassFeatureId` ETL map; grant expansion follows pact/domain "
+                    "progression when the matching trait package is active (e.g. Binder Star Pact L13 upgrade)."
+                ),
+            },
+            "dmg2_role_bucket_powerswaps": {
+                "status": "Fixed",
+                "detail": (
+                    "DMG2 milestone features (Level 03 Defender Encounter Power, …) index `powerswap` without "
+                    "fixed power lists; runtime resolves class usage pools and filters by class role."
+                ),
+            },
+            "warpriest_domain_string_requires": {
+                "status": "Open",
+                "detail": "Warpriest domain progression grants use string `requires` (e.g. Storm Domain) rather than trait package ids.",
             },
         },
         "indexed_choice_groups_by_class": choice_summary,
@@ -372,10 +397,10 @@ def main() -> None:
         ("P0 — Theme / path power level resolution", "Fixed (`5609f82`)", None, "—"),
         ("P1a — Nested power choice groups", "Fixed (`9b4c41e`)", "P1a_nested_power_choices", "—"),
         ("P1b — Nested class-feature choice groups", "Fixed (`9b4c41e`)", "P1b_nested_class_feature_choices", "—"),
-        ("P1c — `rules.modify Power` (power cards)", "Partial (`9b4c41e`)", "P1c_modify_power", str(ft["modify_power"])),
-        ("P1d — `rules.modify Weapon`", "Open", "P1d_modify_weapon", str(ft["modify_weapon"])),
+        ("P1c — `rules.modify Power` (power cards)", "Fixed", "P1c_modify_power", str(ft["modify_power"])),
+        ("P1d — `rules.modify Weapon`", "Fixed", "P1d_modify_weapon", str(ft["modify_weapon"])),
         ("P1e — Essentials build suggested powers", "Fixed (`9b4c41e`)", "P1e_essentials_build_powers", "—"),
-        ("P1f — `rules.replace`", "Open", "P1f_rules_replace", str(ft["replace"])),
+        ("P1f — `rules.replace`", "Fixed", "P1f_rules_replace", str(ft["replace"])),
     ]:
         if key:
             cc, ic = report["steps"][key]["counts"]
@@ -389,8 +414,17 @@ def main() -> None:
         "Hybrid/internal-only Power selects (~90 in the audit) are excluded.\n"
     )
     lines.append(
-        "- **P1d** compendium has 127 `modify Weapon` rows; most are internal Arena Weapon entries without a `Class` field — "
+        "- **P1d** compendium has 127 `modify Weapon` rows; class-mapped features (Rogue Weapon Talent, Druid of Summer, …) "
+        "apply in attack preview. Internal Arena Weapon rows without a `Class` field remain unmapped — "
         "see [unmapped section](#p1d-unmapped-weapon-modify-features).\n"
+    )
+    lines.append(
+        "- **P1c/P1f follow-ups:** trait-package pact chains and DMG2 role-bucket powerswaps are fixed; "
+        "see [follow-ups](#follow-ups).\n"
+    )
+    lines.append(
+        f"- **Trait package map:** {report['meta']['trait_package_mappings']} selectable class features "
+        "indexed in `traitPackageIdByClassFeatureId`.\n"
     )
     lines.append(
         "- **Indexed choice groups** exist for 46 classes; full list in "
@@ -483,6 +517,16 @@ def main() -> None:
             elif fmt == "p1f":
                 rows = [{"Feature": i["feature"], "Replace rules": i["count"]} for i in items]
                 lines.append(md_table(["Feature", "Replace rules"], rows))
+
+    lines.append(
+        "\n## Follow-ups\n\n"
+        "_Additional gaps discovered during P1 implementation._\n\n"
+    )
+    lines.append("| Item | Status | Detail |\n")
+    lines.append("|------|--------|--------|\n")
+    for key, row in report["followups"].items():
+        title = key.replace("_", " ").title()
+        lines.append(f"| {title} | {row['status']} | {row['detail']} |\n")
 
     lines.append("\n## P0 — Theme / path power level resolution\n\n")
     lines.append(

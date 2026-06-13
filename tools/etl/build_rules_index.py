@@ -450,15 +450,199 @@ def _extract_racial_trait_index_fields(
 
 def _extract_class_feature_mechanical_effects(row: Dict[str, Any]) -> List[Dict[str, Any]]:
     fid = str(row.get("internal_id") or "")
+    out: List[Dict[str, Any]] = []
     if fid == ARCHER_WARLORD_CLASS_FEATURE_ID:
-        return [
-            {
-                "type": "removeArmorProficiencyPhrases",
-                "phrases": ["chainmail", "light shields"],
-            },
-            {"type": "weaponKeyAbility", "weaponGroup": "bow", "ability": "STR"},
-        ]
-    return []
+        out.extend(
+            [
+                {
+                    "type": "removeArmorProficiencyPhrases",
+                    "phrases": ["chainmail", "light shields"],
+                },
+                {"type": "weaponKeyAbility", "weaponGroup": "bow", "ability": "STR"},
+            ]
+        )
+    for mod in (row.get("rules") or {}).get("modify") or []:
+        if not isinstance(mod, dict):
+            continue
+        attrs = mod.get("attrs") or {}
+        if str(attrs.get("type") or "").strip().lower() != "weapon":
+            continue
+        weapon_name = str(attrs.get("name") or "").strip()
+        if not weapon_name:
+            continue
+        field = str(attrs.get("Field") or attrs.get("field") or "").strip()
+        if field != "Damage":
+            continue
+        value = str(attrs.get("value") or "").strip()
+        die_inc = attrs.get("die-increase")
+        if value:
+            out.append({"type": "weaponDamageOverride", "weaponName": weapon_name, "damage": value})
+        elif die_inc is not None:
+            die_text = str(die_inc).strip()
+            if re.match(r"^\d+d\d+$", die_text, re.I):
+                out.append({"type": "weaponDamageOverride", "weaponName": weapon_name, "damage": die_text})
+            elif die_text.isdigit():
+                out.append(
+                    {
+                        "type": "weaponDamageDieIncrease",
+                        "weaponName": weapon_name,
+                        "steps": int(die_text),
+                    }
+                )
+    return out
+
+
+def _granted_class_feature_ids_from_row(row: Dict[str, Any]) -> List[str]:
+    out: List[str] = []
+    seen: Set[str] = set()
+    for gr in (row.get("rules") or {}).get("grant") or []:
+        if not isinstance(gr, dict):
+            continue
+        attrs = gr.get("attrs") or {}
+        if str(attrs.get("type") or "").strip() != "Class Feature":
+            continue
+        cid = str(attrs.get("name") or "").strip()
+        if cid.startswith("ID_") and cid not in seen:
+            seen.add(cid)
+            out.append(cid)
+    return out
+
+
+def _parse_powerswap_spec(raw: str) -> Optional[Dict[str, Any]]:
+    text = raw.strip()
+    if not text:
+        return None
+    exclude_category_ids: List[str] = []
+    if "!" in text:
+        text, excl = text.split("!", 1)
+        exclude_category_ids = [x.strip() for x in excl.split(",") if x.strip().startswith("ID_")]
+    parts = [p.strip() for p in text.split(",")]
+    if len(parts) < 3:
+        return None
+    class_token = parts[0]
+    usage = _normalize_power_replace_bucket(parts[1])
+    if not usage:
+        return None
+    try:
+        slot_level = int(re.sub(r"\++$", "", parts[2]))
+    except ValueError:
+        return None
+    class_ids: Optional[List[str]] = None
+    if class_token.upper() != "$$CLASS":
+        class_ids = [c.strip() for c in class_token.split("|") if c.strip().startswith("ID_FMP_CLASS_")]
+        if not class_ids:
+            return None
+    return {
+        "usageBucket": usage,
+        "slotGainLevel": slot_level,
+        **({"classIds": class_ids} if class_ids else {}),
+        **({"excludeCategoryIds": exclude_category_ids} if exclude_category_ids else {}),
+    }
+
+
+def _power_ids_from_class_feature_spec(row: Dict[str, Any]) -> List[str]:
+    spec = row.get("specific") if isinstance(row.get("specific"), dict) else {}
+    raw = str(spec.get("Powers") or spec.get("_DisplayPowers") or "").strip()
+    if not raw:
+        return []
+    return [p.strip() for p in raw.split(",") if p.strip().startswith("ID_FMP_POWER_")]
+
+
+def _role_bucket_from_feature_name(name: str) -> Optional[str]:
+    m = re.match(
+        r"^Level\s+\d+\s+(Defender|Leader|Striker|Controller)\s+(Encounter|Utility)\s+Power$",
+        str(name or "").strip(),
+        re.I,
+    )
+    if not m:
+        return None
+    return m.group(1).lower()
+
+
+def build_trait_package_id_by_class_feature_id(
+    features_by_id: Dict[str, Dict[str, Any]],
+) -> Dict[str, str]:
+    """Map selectable pact/domain/school class feature ids to trait package ids."""
+    progression_child_re = re.compile(
+        r"^Level\s+\d+\s+(.+?)\s+(Encounter|Daily|Utility)\s+Power",
+        re.I,
+    )
+    label_to_package: Dict[str, str] = {}
+    for cf in features_by_id.values():
+        for gr in (cf.get("rules") or {}).get("grant") or []:
+            if not isinstance(gr, dict):
+                continue
+            attrs = gr.get("attrs") or {}
+            if attrs.get("type") != "Class Feature":
+                continue
+            req = str(attrs.get("requires") or "").strip()
+            if not req or "TRAIT_PACKAGE" not in req:
+                continue
+            pkg = req.split("|")[0].strip()
+            if not pkg.startswith("ID_"):
+                continue
+            child_id = str(attrs.get("name") or "").strip()
+            child = features_by_id.get(child_id)
+            if not child:
+                continue
+            child_name = str(child.get("name") or "")
+            match = progression_child_re.match(child_name)
+            if match:
+                label_to_package[match.group(1).strip().lower()] = pkg
+
+    out: Dict[str, str] = {}
+    if not label_to_package:
+        return out
+    labels_sorted = sorted(label_to_package.keys(), key=len, reverse=True)
+    for cf in features_by_id.values():
+        fid = str(cf.get("internal_id") or "")
+        name_lower = str(cf.get("name") or "").lower()
+        if not fid.startswith("ID_"):
+            continue
+        for label in labels_sorted:
+            if label in name_lower:
+                out[fid] = label_to_package[label]
+                break
+    return out
+
+
+def extract_class_feature_power_rules(row: Dict[str, Any]) -> Dict[str, Any]:
+    rules = row.get("rules") if isinstance(row.get("rules"), dict) else {}
+    replacements: List[Dict[str, str]] = []
+    swap_rules: List[Dict[str, Any]] = []
+    for rep in rules.get("replace") or []:
+        if not isinstance(rep, dict):
+            continue
+        attrs = rep.get("attrs") or {}
+        pr = attrs.get("power-replace")
+        if isinstance(pr, str) and pr.strip():
+            parts = pr.split(":", 1)
+            if len(parts) == 2 and parts[0].startswith("ID_") and parts[1].startswith("ID_"):
+                replacements.append(
+                    {
+                        "replacementPowerId": parts[0].strip(),
+                        "originalPowerId": parts[1].strip(),
+                    }
+                )
+            continue
+        ps = attrs.get("powerswap")
+        if isinstance(ps, str) and ps.strip():
+            parsed = _parse_powerswap_spec(ps)
+            if not parsed:
+                continue
+            power_ids = _power_ids_from_class_feature_spec(row)
+            entry: Dict[str, Any] = {**parsed, "powerIds": power_ids}
+            role = _role_bucket_from_feature_name(str(row.get("name") or ""))
+            if role:
+                entry["roleBucket"] = role
+            swap_rules.append(entry)
+            continue
+    out: Dict[str, Any] = {}
+    if replacements:
+        out["powerReplacementRules"] = replacements
+    if swap_rules:
+        out["powerSwapRules"] = swap_rules
+    return out
 
 
 def _feat_append_heritage_internal_key(feat_grants: Dict[str, Any], feat_name: str) -> Dict[str, Any]:
@@ -3405,14 +3589,14 @@ def extract_feat_power_modifications(
         pname = str(attrs.get("name") or "").strip()
         if not pname:
             continue
-        key = pname.lower()
-        if key in seen_names:
-            continue
-        seen_names.add(key)
         field = str(attrs.get("Field") or attrs.get("field") or feat_name).strip()
         value = str(attrs.get("value") or "").strip()
         if not value and field == "Keywords":
             value = str(attrs.get("list-addition") or "").strip()
+        key = f"{pname.lower()}::{field.lower()}"
+        if key in seen_names:
+            continue
+        seen_names.add(key)
         pid = _resolve_power_id(pname, power_name_to_id, power_normalized_to_id, power_id_to_name)
         cfid = None
         if not pid and class_feature_id_by_name:
@@ -4328,21 +4512,6 @@ def build_index(input_path: Path, output_dir: Path) -> None:
         )
 
     class_features: List[Dict[str, Any]] = []
-    for row in class_features_raw:
-        spec = row.get("specific") or {}
-        mechanical = _extract_class_feature_mechanical_effects(row)
-        class_features.append(
-            {
-                "id": row.get("internal_id"),
-                "name": row.get("name"),
-                "slug": normalize_name(row.get("name", "")),
-                "source": row.get("source"),
-                "shortDescription": spec.get("Short Description"),
-                "body": row.get("body"),
-                "raw": row,
-                **({"mechanicalEffects": mechanical} if mechanical else {}),
-            }
-        )
 
     classes: List[Dict[str, Any]] = []
     for cls in classes_raw:
@@ -4396,6 +4565,42 @@ def build_index(input_path: Path, output_dir: Path) -> None:
     power_name_to_id = _build_power_name_to_id(powers_raw)
     power_normalized_to_id = _build_power_normalized_name_to_id(powers_raw)
     power_id_to_name = _build_power_id_to_name(powers_raw)
+
+    for row in class_features_raw:
+        spec = row.get("specific") or {}
+        mechanical = _extract_class_feature_mechanical_effects(row)
+        power_mods = extract_feat_power_modifications(
+            row,
+            power_name_to_id,
+            power_normalized_to_id,
+            power_id_to_name,
+            class_feature_id_by_name,
+        )
+        power_rules = extract_class_feature_power_rules(row)
+        granted_cf_ids = _granted_class_feature_ids_from_row(row)
+        entry: Dict[str, Any] = {
+            "id": row.get("internal_id"),
+            "name": row.get("name"),
+            "slug": normalize_name(row.get("name", "")),
+            "source": row.get("source"),
+            "shortDescription": spec.get("Short Description"),
+            "body": row.get("body"),
+            "raw": row,
+        }
+        if mechanical:
+            entry["mechanicalEffects"] = mechanical
+        if power_mods.get("modifiedPowerIds"):
+            entry["modifiedPowerIds"] = power_mods["modifiedPowerIds"]
+        if power_mods.get("powerModifications"):
+            entry["powerModifications"] = power_mods["powerModifications"]
+        if granted_cf_ids:
+            entry["grantedClassFeatureIds"] = granted_cf_ids
+        entry.update(power_rules)
+        class_features.append(entry)
+
+    trait_package_id_by_class_feature_id = build_trait_package_id_by_class_feature_id(
+        {str(r.get("internal_id")): r for r in class_features_raw if r.get("internal_id")}
+    )
 
     feats: List[Dict[str, Any]] = []
     for feat in feats_raw:
@@ -4768,6 +4973,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
         "grantedClassFeatureNamesBySupportId": granted_class_feature_names_by_support_id,
         "classBuildOptionsByClassId": class_build_options_by_class,
         "classFeatureChoiceGroupsByClassId": class_feature_choice_groups_by_class,
+        "traitPackageIdByClassFeatureId": trait_package_id_by_class_feature_id,
         "paragonPathClassFeaturePowerIds": paragon_path_class_feature_power_ids,
         "featGrantedPowerIdsExcludedFromClassFeaturePicks": (
             feat_granted_power_ids_excluded_from_class_feature_picks

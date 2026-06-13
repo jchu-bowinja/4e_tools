@@ -6,7 +6,8 @@
       "modify_weapon": 127,
       "modify_power": 183,
       "replace": 66
-    }
+    },
+    "trait_package_mappings": 100
   },
   "steps": {
     "P0_class_feature_granted_powers": {
@@ -231,6 +232,46 @@
           }
         ],
         "Elementalist (Essentials, parent: Sorcerer)": [
+          {
+            "choice_path": "Elemental Specialty \u2192 Howling Zephyr",
+            "feature": "Howling Zephyr",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Elemental Specialty \u2192 Static Charge",
+            "feature": "Static Charge",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Elemental Specialty \u2192 Erupting Earth",
+            "feature": "Erupting Earth",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Elemental Specialty \u2192 Seismic Shock",
+            "feature": "Seismic Shock",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Elemental Specialty \u2192 Blazing Cloud",
+            "feature": "Blazing Cloud",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Elemental Specialty \u2192 Ignition",
+            "feature": "Ignition",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Elemental Specialty \u2192 Deluge",
+            "feature": "Deluge",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Elemental Specialty \u2192 Ice Prison",
+            "feature": "Ice Prison",
+            "powers_granted": 1
+          },
           {
             "choice_path": "Auto-granted: Elemental Bolt",
             "feature": "Elemental Bolt",
@@ -921,7 +962,7 @@
       },
       "counts": [
         63,
-        156
+        164
       ]
     },
     "P1a_nested_power_choices": {
@@ -1006,7 +1047,7 @@
       ]
     },
     "P1c_modify_power": {
-      "status": "Partial (9b4c41e)",
+      "status": "Fixed",
       "classes": {
         "Binder (Essentials, parent: Warlock)": [
           {
@@ -1830,7 +1871,7 @@
       ]
     },
     "P1d_modify_weapon": {
-      "status": "Open",
+      "status": "Fixed",
       "classes": {
         "Druid": [
           {
@@ -2231,7 +2272,7 @@
       ]
     },
     "P1f_rules_replace": {
-      "status": "Open",
+      "status": "Fixed",
       "classes": {
         "Binder (Essentials, parent: Warlock)": [
           {
@@ -2396,6 +2437,24 @@
         7,
         36
       ]
+    }
+  },
+  "followups": {
+    "tome_of_readiness_level_pool": {
+      "status": "Fixed (09d47f3)",
+      "detail": "`$$LEVEL,<class>,<usage>` power-select categories; builder passes character level into choice pools."
+    },
+    "trait_package_pact_chains": {
+      "status": "Fixed",
+      "detail": "`traitPackageIdByClassFeatureId` ETL map; grant expansion follows pact/domain progression when the matching trait package is active (e.g. Binder Star Pact L13 upgrade)."
+    },
+    "dmg2_role_bucket_powerswaps": {
+      "status": "Fixed",
+      "detail": "DMG2 milestone features (Level 03 Defender Encounter Power, \u2026) index `powerswap` without fixed power lists; runtime resolves class usage pools and filters by class role."
+    },
+    "warpriest_domain_string_requires": {
+      "status": "Open",
+      "detail": "Warpriest domain progression grants use string `requires` (e.g. Storm Domain) rather than trait package ids."
     }
   },
   "indexed_choice_groups_by_class": {
@@ -2565,6 +2624,17 @@
           "Star Pact",
           "Vestige Pact"
         ]
+      },
+      {
+        "group": "Infernal Pact",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_773",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": {
+          "groupKey": "classFeature:ID_FMP_CLASS_FEATURE_777",
+          "optionId": "ID_FMP_CLASS_FEATURE_773"
+        },
+        "power_pool_size": 3
       }
     ],
     "Warlord": [
@@ -4347,6 +4417,62 @@
           "Earth Elementalist",
           "Fire Elementalist",
           "Water Elementalist"
+        ]
+      },
+      {
+        "group": "Elemental Specialty",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_4336",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": {
+          "groupKey": "classFeature:ID_FMP_CLASS_FEATURE_4335",
+          "optionId": "ID_FMP_CLASS_FEATURE_4336"
+        },
+        "options": [
+          "Howling Zephyr",
+          "Static Charge"
+        ]
+      },
+      {
+        "group": "Elemental Specialty",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_4337",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": {
+          "groupKey": "classFeature:ID_FMP_CLASS_FEATURE_4335",
+          "optionId": "ID_FMP_CLASS_FEATURE_4337"
+        },
+        "options": [
+          "Erupting Earth",
+          "Seismic Shock"
+        ]
+      },
+      {
+        "group": "Elemental Specialty",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_4338",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": {
+          "groupKey": "classFeature:ID_FMP_CLASS_FEATURE_4335",
+          "optionId": "ID_FMP_CLASS_FEATURE_4338"
+        },
+        "options": [
+          "Blazing Cloud",
+          "Ignition"
+        ]
+      },
+      {
+        "group": "Elemental Specialty",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_4339",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": {
+          "groupKey": "classFeature:ID_FMP_CLASS_FEATURE_4335",
+          "optionId": "ID_FMP_CLASS_FEATURE_4339"
+        },
+        "options": [
+          "Deluge",
+          "Ice Prison"
         ]
       },
       {

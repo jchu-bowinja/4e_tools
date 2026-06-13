@@ -8,6 +8,11 @@ import {
 } from "./advancement";
 import { getClassPowersForLevelRange, powerTypeCategory } from "./classPowersQuery";
 import { applyEssentialsBuildSuggestedPowerSlots } from "./classBuildOptions";
+import {
+  applyClassFeaturePowerReplacementsToSlots,
+  applyClassFeaturePowerSwapSelections,
+  collectClassFeaturePowerReplacementMap
+} from "./classFeaturePowerReplace";
 import { activeFeatReplacementPowerIds } from "./featPowerReplace";
 import { activeParagonAtWillSwapPowerId } from "./paragonMulticlassing";
 import { paragonMulticlassPrimaryAtWillSlotPenalty } from "./psionicPowerPoints";
@@ -154,6 +159,9 @@ export function reconcileClassPowerSlotsForBuild(
   for (const id of activeFeatReplacementPowerIds(index, build)) allowed.add(id);
   const paragonAw = activeParagonAtWillSwapPowerId(build);
   if (paragonAw) allowed.add(paragonAw);
+  for (const replId of collectClassFeaturePowerReplacementMap(index, build).values()) {
+    allowed.add(replId);
+  }
 
   const defByKey = new Map(defs.map((d) => [d.key, d]));
   const next: Record<string, string> = { ...(build.classPowerSlots || {}) };
@@ -212,7 +220,15 @@ export function reconcileClassPowerSlotsForBuild(
     level,
     bonusThirdClassAtWill
   );
-  const finalSlots = withSuggested ?? cleaned;
+  merged = {
+    ...merged,
+    classPowerSlots: withSuggested ?? cleaned
+  };
+  const withSwap = applyClassFeaturePowerSwapSelections(merged, index, defs);
+  merged = { ...merged, classPowerSlots: withSwap };
+  const replacements = collectClassFeaturePowerReplacementMap(index, merged);
+  const withReplace = applyClassFeaturePowerReplacementsToSlots(merged.classPowerSlots, replacements);
+  const finalSlots = withReplace ?? merged.classPowerSlots;
   return {
     classPowerSlots: finalSlots,
     powerIds: orderedPowerIdsFromSlots(defs, finalSlots)
