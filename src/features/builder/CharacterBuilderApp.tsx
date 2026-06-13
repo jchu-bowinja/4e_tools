@@ -1392,6 +1392,10 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     });
   }, [build.level]);
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0 });
+  }, [activeTab]);
+
   function glossaryContent(key: BuilderGlossaryKey): JSX.Element {
     const resolved = resolveUiGlossaryHoverPlainText(
       key,
