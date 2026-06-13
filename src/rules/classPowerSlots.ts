@@ -7,6 +7,7 @@ import {
   expectedClassUtilityPowerCount
 } from "./advancement";
 import { getClassPowersForLevelRange, powerTypeCategory } from "./classPowersQuery";
+import { applyEssentialsBuildSuggestedPowerSlots } from "./classBuildOptions";
 import { activeFeatReplacementPowerIds } from "./featPowerReplace";
 import { activeParagonAtWillSwapPowerId } from "./paragonMulticlassing";
 import { paragonMulticlassPrimaryAtWillSlotPenalty } from "./psionicPowerPoints";
@@ -205,9 +206,16 @@ export function reconcileClassPowerSlotsForBuild(
     };
   }
   const cleaned = merged.classPowerSlots;
+  const withSuggested = applyEssentialsBuildSuggestedPowerSlots(
+    merged,
+    index,
+    level,
+    bonusThirdClassAtWill
+  );
+  const finalSlots = withSuggested ?? cleaned;
   return {
-    classPowerSlots: cleaned,
-    powerIds: orderedPowerIdsFromSlots(defs, cleaned)
+    classPowerSlots: finalSlots,
+    powerIds: orderedPowerIdsFromSlots(defs, finalSlots)
   };
 }
 

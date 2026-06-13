@@ -28,7 +28,7 @@ import {
   collectCharacterProficiencyDisplayRows,
   collectCharacterProficiencyGrants
 } from "../../rules/featProficiencies";
-import { collectFeatModificationsByPowerId } from "../../rules/featPowerModifications";
+import { collectPowerModificationsByPowerId } from "../../rules/classFeaturePowerModifications";
 import { collectFeatGrantedPowersForBuild } from "../../rules/grantedPowersQuery";
 import { multiclassEntryClassId } from "../../rules/paragonMulticlassing";
 import {
@@ -1127,8 +1127,8 @@ export function CharacterSheetApp({ index, tooltipGlossary }: { index: RulesInde
     [index, sheet.featIds]
   );
   const featModsByPowerId = useMemo(
-    () => collectFeatModificationsByPowerId(index, sheet.featIds ?? []),
-    [index, sheet.featIds]
+    () => collectPowerModificationsByPowerId(index, sheet),
+    [index, sheet]
   );
   const psionicPowerPointSummary = useMemo(
     () => summarizePsionicPowerPointAdjustments(index, toBuildLikeState(sheet, index)),

@@ -1704,6 +1704,165 @@ def _power_select_category_ids_from_class_feature(
     return out
 
 
+def _append_nested_child_power_choice_groups(
+    class_id: str,
+    cls: Dict[str, Any],
+    groups: List[Dict[str, Any]],
+    features_by_id: Dict[str, Dict[str, Any]],
+    *,
+    exclude_power_ids: Optional[Set[str]] = None,
+    powers_by_name: Optional[Dict[str, Dict[str, Any]]] = None,
+    powers_by_class_id: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+) -> List[Dict[str, Any]]:
+    """
+    When a class-feature pick option (e.g. Infernal Pact) has its own Power `select`, expose a
+    dependent power choice group visible after that option is selected.
+    """
+    existing_keys = {str(g.get("key") or "") for g in groups}
+    out = list(groups)
+    for g in groups:
+        if g.get("kind") != "classFeature":
+            continue
+        parent_key = str(g.get("key") or "")
+        for opt in g.get("options") or []:
+            opt_id = str(opt.get("id") or "")
+            if not opt_id.startswith("ID_"):
+                continue
+            child = features_by_id.get(opt_id)
+            if not child:
+                continue
+            has_pow, pick_n = _class_feature_has_select(child, "Power")
+            if not has_pow:
+                continue
+            pick_key = f"classPower:{opt_id}"
+            if pick_key in existing_keys:
+                continue
+            power_ids = _power_ids_from_class_feature_power_select(
+                child,
+                features_by_id,
+                class_id=class_id,
+                cls=cls,
+                exclude_power_ids=exclude_power_ids,
+                powers_by_name=powers_by_name,
+                powers_by_class_id=powers_by_class_id,
+            )
+            if not power_ids:
+                continue
+            if len(power_ids) == 1 and pick_n <= 1:
+                continue
+            child_name = str(child.get("name") or opt_id)
+            out.append(
+                {
+                    "key": pick_key,
+                    "kind": "power",
+                    "parentFeatureId": opt_id,
+                    "parentFeatureName": child_name,
+                    "pickCount": pick_n or 1,
+                    "powerIds": power_ids,
+                    "options": [],
+                    "visibleWhen": {"groupKey": parent_key, "optionId": opt_id},
+                }
+            )
+            existing_keys.add(pick_key)
+    return out
+
+
+def _l1_nested_class_feature_select_options(
+    child: Dict[str, Any],
+    features_by_id: Dict[str, Dict[str, Any]],
+) -> Tuple[List[Dict[str, Any]], int, str]:
+    """
+    Dependent class-feature options on a selected option (e.g. Air Elementalist → Howling Zephyr).
+    Skips features with `_PARSED_SUB_FEATURES` (indexed as their own parent groups).
+    """
+    spec = child.get("specific") or {}
+    if _parse_internal_id_list(spec.get("_PARSED_SUB_FEATURES")):
+        return [], 1, ""
+    parent_id = str(child.get("internal_id") or "")
+    parent_name = str(child.get("name") or parent_id)
+    options: List[Dict[str, Any]] = []
+    seen_ids: Set[str] = set()
+    pick_n = 1
+    pick_label = parent_name
+    rules = child.get("rules") or {}
+    for item in rules.get("select") or []:
+        attrs = item.get("attrs") or {}
+        if attrs.get("type") != "Class Feature":
+            continue
+        if not _class_feature_select_requires_default_branch(attrs):
+            continue
+        level = parse_int_from_text(attrs.get("Level")) or 1
+        if level > 1:
+            continue
+        pick_n = max(pick_n, parse_int_from_text(attrs.get("number")) or 1)
+        name = str(attrs.get("name") or "").strip()
+        if name:
+            pick_label = name
+        cat = _select_category(attrs)
+        for token in cat.split("|"):
+            tid = token.strip()
+            if not tid.startswith("ID_") or tid == parent_id:
+                continue
+            if re.match(r"^ID_(?:FMP|DBB)_CLASS_\d+$", tid):
+                continue
+            for row in _options_from_select_category_feature_id(
+                tid, parent_id, parent_name, features_by_id
+            ):
+                cid = str(row.get("id") or "")
+                if not cid or cid in seen_ids:
+                    continue
+                seen_ids.add(cid)
+                options.append(row)
+    return options, pick_n, pick_label
+
+
+def _append_nested_child_class_feature_choice_groups(
+    groups: List[Dict[str, Any]],
+    features_by_id: Dict[str, Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """
+    When a class-feature pick option (e.g. Air Elementalist) has its own Class Feature `select`,
+    expose a dependent pick visible after that option is selected.
+    """
+    existing_keys = {str(g.get("key") or "") for g in groups}
+    out = list(groups)
+    for g in groups:
+        if g.get("kind") != "classFeature":
+            continue
+        parent_key = str(g.get("key") or "")
+        for opt in g.get("options") or []:
+            opt_id = str(opt.get("id") or "")
+            if not opt_id.startswith("ID_"):
+                continue
+            child = features_by_id.get(opt_id)
+            if not child:
+                continue
+            pick_key = f"classFeature:{opt_id}"
+            if pick_key in existing_keys:
+                continue
+            nested_options, pick_n, pick_label = _l1_nested_class_feature_select_options(
+                child, features_by_id
+            )
+            if len(nested_options) < 2:
+                continue
+            out.append(
+                {
+                    "key": pick_key,
+                    "kind": "classFeature",
+                    "parentFeatureId": opt_id,
+                    "parentFeatureName": pick_label,
+                    "pickCount": pick_n or 1,
+                    "options": sorted(
+                        nested_options,
+                        key=lambda r: str(r.get("name") or "").lower(),
+                    ),
+                    "visibleWhen": {"groupKey": parent_key, "optionId": opt_id},
+                }
+            )
+            existing_keys.add(pick_key)
+    return out
+
+
 def _append_ungranted_power_choice_groups(
     class_id: str,
     cls: Dict[str, Any],
@@ -2493,6 +2652,19 @@ def build_class_feature_choice_groups_by_class(
         )
         groups = _append_missing_trait_package_parent_groups(
             class_id, cls, groups, features_by_name, features_by_id, classes_by_id
+        )
+        groups = _append_nested_child_power_choice_groups(
+            class_id,
+            cls,
+            groups,
+            features_by_id,
+            exclude_power_ids=class_feature_pick_exclusions,
+            powers_by_name=powers_by_name,
+            powers_by_class_id=powers_by_class_id,
+        )
+        groups = _append_nested_child_class_feature_choice_groups(
+            groups,
+            features_by_id,
         )
         if groups:
             out[class_id] = sorted(

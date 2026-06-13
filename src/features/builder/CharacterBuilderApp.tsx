@@ -64,7 +64,7 @@ import {
   resolveGrantedPowersFromActiveClassFeatures,
   resolveParagonPathClassFeaturePowers
 } from "../../rules/grantedPowersQuery";
-import { collectFeatModificationsByPowerId } from "../../rules/featPowerModifications";
+import { collectPowerModificationsByPowerId } from "../../rules/classFeaturePowerModifications";
 import { collectFeatClassFeatureModificationsForBuild } from "../../rules/featClassFeatureModifications";
 import {
   collectMulticlassSlotSwapRows,
@@ -420,7 +420,7 @@ function renderPowerCard(
       leave: () => void;
     };
     renderRuleText?: (raw: string, keyPrefix: string) => JSX.Element;
-    featModsByPowerId?: ReturnType<typeof collectFeatModificationsByPowerId>;
+    featModsByPowerId?: ReturnType<typeof collectPowerModificationsByPowerId>;
   }
 ): JSX.Element {
   const featMods = options?.featModsByPowerId?.get(power.id);
@@ -1933,7 +1933,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     [index, build.featIds]
   );
   const featModsByPowerId = useMemo(
-    () => collectFeatModificationsByPowerId(index, build.featIds),
+    () => collectPowerModificationsByPowerId(index, build),
     [index, build.featIds]
   );
   const featModifiedPowers = useMemo(
@@ -3748,10 +3748,15 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                           const next = { ...(build.classSelections || {}) };
                           if (v) next[CLASS_BUILD_OPTION_SELECTION_KEY] = v;
                           else delete next[CLASS_BUILD_OPTION_SELECTION_KEY];
-                          updateBuild({
+                          const nextBase = {
                             ...build,
                             classSelections: Object.keys(next).length ? next : undefined
-                          });
+                          };
+                          const { classPowerSlots, powerIds } = reconcilePowerSlotsForBuild(
+                            nextBase,
+                            build.level
+                          );
+                          updateBuild({ ...nextBase, classPowerSlots, powerIds });
                         }}
                         style={{
                           width: "100%",

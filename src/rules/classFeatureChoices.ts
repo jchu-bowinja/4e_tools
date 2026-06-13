@@ -11,6 +11,7 @@ import {
 } from "./wizardSpellbook";
 import {
   buildClassFeatureLookups,
+  parseTraitIdsFromField,
   parseTraitNamesFromField,
   specOf
 } from "./supportTraits";
@@ -287,6 +288,156 @@ export function expandClassFeaturePowerChoiceGroups(
   return out;
 }
 
+function childFeaturePowerPickCount(feature: ClassFeature): number {
+  let pickCount = 1;
+  for (const item of classFeatureSelectRules(feature)) {
+    const attrs = item.attrs ?? {};
+    if (attrs.type !== "Power") continue;
+    pickCount = Math.max(pickCount, parsePositiveInt(attrs.number, 1));
+  }
+  return pickCount;
+}
+
+function childFeatureHasPowerSelect(feature: ClassFeature): boolean {
+  return classFeatureSelectRules(feature).some((item) => item.attrs?.type === "Power");
+}
+
+/**
+ * Dependent power picks on selected class-feature options (e.g. Infernal Pact → Hellish Rebuke variant).
+ * Mirrors ETL `_append_nested_child_power_choice_groups`; skips groups already in the index.
+ */
+export function appendNestedChildPowerChoiceGroups(
+  index: RulesIndex,
+  classId: string | undefined,
+  groups: ClassFeatureChoiceGroup[]
+): ClassFeatureChoiceGroup[] {
+  const existingKeys = new Set(groups.map((g) => g.key));
+  const out = [...groups];
+
+  for (const parent of groups) {
+    if (parent.kind !== "classFeature") continue;
+    for (const opt of parent.options) {
+      const childId = opt.id?.trim();
+      if (!childId?.startsWith("ID_") || childId === CLASS_FEATURE_CHOICE_NONE) continue;
+
+      const pickKey = `classPower:${childId}`;
+      if (existingKeys.has(pickKey)) continue;
+
+      const cf = index.classFeatures?.find((f) => f.id === childId);
+      if (!cf || !childFeatureHasPowerSelect(cf)) continue;
+
+      const draft: ClassFeatureChoiceGroup = {
+        key: pickKey,
+        kind: "power",
+        parentFeatureId: childId,
+        parentFeatureName: cf.name,
+        pickCount: childFeaturePowerPickCount(cf),
+        powerIds: [],
+        options: []
+      };
+      const legal = classFeaturePowerIdsForClass(index, draft, classId);
+      if (!legal.length) continue;
+      if (legal.length === 1 && draft.pickCount <= 1) continue;
+
+      out.push({
+        ...draft,
+        powerIds: legal,
+        visibleWhen: { groupKey: parent.key, optionId: childId }
+      });
+      existingKeys.add(pickKey);
+    }
+  }
+
+  return out;
+}
+
+function l1NestedClassFeatureSelectOptions(
+  index: RulesIndex,
+  feature: ClassFeature
+): { options: ClassFeatureChoiceOption[]; pickCount: number; label: string } | null {
+  if (parseTraitIdsFromField(specOf(feature), "_PARSED_SUB_FEATURES").length) return null;
+  const parentId = feature.id;
+  const parentName = feature.name;
+  const { byId } = buildClassFeatureLookups(index);
+  const options: ClassFeatureChoiceOption[] = [];
+  const seen = new Set<string>();
+  let pickCount = 1;
+  let label = parentName;
+  for (const item of classFeatureSelectRules(feature)) {
+    const attrs = item.attrs ?? {};
+    if (attrs.type !== "Class Feature") continue;
+    const minLevel = parsePositiveInt(attrs.Level, 1);
+    if (minLevel > 1) continue;
+    pickCount = Math.max(pickCount, parsePositiveInt(attrs.number, 1));
+    const selectName = String(attrs.name ?? "").trim();
+    if (selectName) label = selectName;
+    const cat = classFeatureSelectCategory(attrs);
+    for (const token of cat.split("|")) {
+      const tid = token.trim();
+      if (!tid.startsWith("ID_") || tid === parentId) continue;
+      if (/^ID_(?:FMP|DBB)_CLASS_\d+$/.test(tid)) continue;
+      const child = byId.get(tid);
+      if (!child || seen.has(child.id)) continue;
+      seen.add(child.id);
+      options.push({
+        id: child.id,
+        name: child.name,
+        parentFeatureId: parentId,
+        parentFeatureName: parentName,
+        shortDescription: child.shortDescription ?? null,
+        body: child.body ?? null,
+        powerIds: []
+      });
+    }
+  }
+  if (options.length < 2) return null;
+  options.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+  return { options, pickCount, label };
+}
+
+/**
+ * Dependent class-feature picks on selected options (e.g. Air Elementalist → Elemental Specialty).
+ * Mirrors ETL `_append_nested_child_class_feature_choice_groups`.
+ */
+export function appendNestedChildClassFeatureChoiceGroups(
+  index: RulesIndex,
+  groups: ClassFeatureChoiceGroup[]
+): ClassFeatureChoiceGroup[] {
+  const existingKeys = new Set(groups.map((g) => g.key));
+  const out = [...groups];
+
+  for (const parent of groups) {
+    if (parent.kind !== "classFeature") continue;
+    for (const opt of parent.options) {
+      const childId = opt.id?.trim();
+      if (!childId?.startsWith("ID_") || childId === CLASS_FEATURE_CHOICE_NONE) continue;
+
+      const pickKey = `classFeature:${childId}`;
+      if (existingKeys.has(pickKey)) continue;
+
+      const cf = index.classFeatures?.find((f) => f.id === childId);
+      if (!cf) continue;
+
+      const nested = l1NestedClassFeatureSelectOptions(index, cf);
+      if (!nested) continue;
+
+      out.push({
+        key: pickKey,
+        kind: "classFeature",
+        parentFeatureId: childId,
+        parentFeatureName: nested.label,
+        pickCount: nested.pickCount,
+        powerIds: [],
+        options: nested.options,
+        visibleWhen: { groupKey: parent.key, optionId: childId }
+      });
+      existingKeys.add(pickKey);
+    }
+  }
+
+  return out;
+}
+
 export function getClassFeatureChoiceGroups(
   index: RulesIndex,
   cls: ClassDef | undefined
@@ -329,6 +480,8 @@ export function getClassFeatureChoiceGroups(
     } satisfies ClassFeatureChoiceGroup;
   });
 
+  groups = appendNestedChildPowerChoiceGroups(index, cls.id, groups);
+  groups = appendNestedChildClassFeatureChoiceGroups(index, groups);
   const expanded = expandClassFeaturePowerChoiceGroups(index, cls.id, groups);
   const poolCounts = new Map<string, number>();
   for (const g of expanded) {

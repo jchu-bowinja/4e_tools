@@ -1,4 +1,9 @@
 import type { CharacterBuild, ClassDef, RulesIndex } from "./models";
+import {
+  buildClassPowerSlotDefinitions,
+  inferClassPowerSlotsFromPowerIds
+} from "./classPowerSlots";
+import { paragonMulticlassPrimaryAtWillSlotPenalty } from "./psionicPowerPoints";
 
 /** `classSelections` key for Essentials `ID_FMP_BUILD_*` picks. */
 export const CLASS_BUILD_OPTION_SELECTION_KEY = "buildOptionId";
@@ -104,5 +109,38 @@ export function getClassBuildOptions(index: RulesIndex, cls: ClassDef | undefine
     body: null,
     powerIds: []
   }));
+}
+
+/** Suggested powers from the selected Essentials build (`ID_FMP_BUILD_*`). */
+export function essentialsBuildSuggestedPowerIds(
+  index: RulesIndex,
+  classId: string | undefined,
+  classSelections?: Record<string, string>
+): string[] {
+  const picked = selectedClassBuildOptionId(classSelections);
+  if (!picked?.startsWith("ID_FMP_BUILD_")) return [];
+  const cls = index.classes.find((c) => c.id === classId);
+  const opt = getClassBuildOptions(index, cls).find((o) => o.id === picked);
+  return opt?.powerIds ?? [];
+}
+
+/** Pre-fill empty class power slots from Essentials build suggestions. */
+export function applyEssentialsBuildSuggestedPowerSlots(
+  build: CharacterBuild,
+  index: RulesIndex,
+  level: number,
+  bonusThirdClassAtWill: boolean
+): Record<string, string> | undefined {
+  const suggested = essentialsBuildSuggestedPowerIds(index, build.classId, build.classSelections);
+  if (!suggested.length || !build.classId) return build.classPowerSlots;
+  const penalty = paragonMulticlassPrimaryAtWillSlotPenalty(index, build);
+  const defs = buildClassPowerSlotDefinitions(level, bonusThirdClassAtWill, penalty);
+  const current = { ...(build.classPowerSlots || {}) };
+  const inferred = inferClassPowerSlotsFromPowerIds(defs, suggested, index, build.classId, level);
+  if (!inferred) return build.classPowerSlots;
+  for (const [key, powerId] of Object.entries(inferred)) {
+    if (!current[key]?.trim()) current[key] = powerId;
+  }
+  return Object.keys(current).length > 0 ? current : undefined;
 }
 

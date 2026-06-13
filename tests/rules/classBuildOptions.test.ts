@@ -1,14 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { validateCharacterBuild } from "../../src/rules/characterValidator";
 import {
+  applyEssentialsBuildSuggestedPowerSlots,
   CLASS_BUILD_OPTION_SELECTION_KEY,
   essentialsClassBuildOptions,
+  essentialsBuildSuggestedPowerIds,
   getClassBuildOptions,
   hasEssentialsClassBuildPicker,
   pruneClassBuildOptionSelection,
   selectedClassBuildOptionId
 } from "../../src/rules/classBuildOptions";
-import type { ClassDef, RulesIndex } from "../../src/rules/models";
+import type { CharacterBuild, ClassDef, RulesIndex } from "../../src/rules/models";
+import fullIndex from "../../generated/rules_index.json";
 
 const cleric: ClassDef = {
   id: "ID_FMP_CLASS_2",
@@ -115,5 +118,30 @@ describe("classBuildOptions", () => {
       "Devoted Cleric"
     ]);
     expect(essentialsClassBuildOptions(emptyIndex, cleric)).toHaveLength(0);
+  });
+
+  it("returns suggested power ids for selected Essentials build", () => {
+    const ids = essentialsBuildSuggestedPowerIds(index, cleric.id, {
+      [CLASS_BUILD_OPTION_SELECTION_KEY]: "ID_FMP_BUILD_6"
+    });
+    expect(ids).toContain("ID_FMP_POWER_1");
+  });
+
+  it("pre-fills empty class power slots from Battle Cleric build", () => {
+    const rules = fullIndex as RulesIndex;
+    const clericDef = rules.classes.find((c) => c.slug === "cleric");
+    expect(clericDef).toBeDefined();
+    const build: CharacterBuild = {
+      name: "test",
+      level: 1,
+      classId: clericDef!.id,
+      abilityScores: { STR: 10, CON: 10, DEX: 10, INT: 10, WIS: 16, CHA: 10 },
+      featIds: [],
+      powerIds: [],
+      trainedSkillIds: [],
+      classSelections: { [CLASS_BUILD_OPTION_SELECTION_KEY]: "ID_FMP_BUILD_6" }
+    };
+    const slots = applyEssentialsBuildSuggestedPowerSlots(build, rules, 1, false);
+    expect(slots && Object.keys(slots).length).toBeGreaterThan(0);
   });
 });

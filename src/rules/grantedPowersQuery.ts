@@ -87,6 +87,28 @@ export function grantedPowerIdsFromClassFeatureGrants(
   return out;
 }
 
+function parseClassPowerPickSelection(raw: string | undefined): string[] {
+  if (!raw?.trim()) return [];
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter((id) => id.startsWith("ID_FMP_POWER"));
+}
+
+/** Grant rules plus nested power picks when the player chose a variant list on the same feature. */
+export function grantedPowerIdsFromActiveClassFeature(
+  feature: ClassFeature,
+  classIds: string[],
+  classSelections?: Record<string, string>
+): string[] {
+  const selectable = powerSelectableIdsFromClassFeature(feature);
+  if (selectable.size > 0) {
+    const picked = parseClassPowerPickSelection(classSelections?.[`classPower:${feature.id}`]);
+    if (picked.length) return picked;
+  }
+  return grantedPowerIdsFromClassFeatureGrants(feature, classIds);
+}
+
 function buildSupportClassIds(index: RulesIndex, build: CharacterBuild): string[] {
   const ids: string[] = [];
   if (build.characterStyle === "hybrid") {
@@ -114,10 +136,11 @@ export function collectGrantedPowerIdsFromActiveClassFeatures(
   const classIds = buildSupportClassIds(index, build);
   const seen = new Set<string>();
   const out: string[] = [];
+  const rs = build.classSelections ?? {};
   for (const fid of collectClassFeatureIdsFromClass(index, build)) {
     const feature = byId.get(fid);
     if (!feature || !featureIsAvailableAtLevel(feature, build.level)) continue;
-    for (const pid of grantedPowerIdsFromClassFeatureGrants(feature, classIds)) {
+    for (const pid of grantedPowerIdsFromActiveClassFeature(feature, classIds, rs)) {
       if (seen.has(pid)) continue;
       seen.add(pid);
       out.push(pid);
