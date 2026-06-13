@@ -1,5 +1,5 @@
 import type { ClassPowerSlotDef } from "./classPowerSlots";
-import type { CharacterBuild, Feat, FeatPowerReplaceOffer, RulesIndex } from "./models";
+import type { CharacterBuild, Feat, FeatPowerReplaceOffer, FeatPowerReplaceState, RulesIndex } from "./models";
 
 export function getFeatPowerReplaceOffers(feat: Feat): FeatPowerReplaceOffer[] {
   return feat.powerReplaceOffers?.length ? [...feat.powerReplaceOffers] : [];
@@ -92,17 +92,24 @@ export function enableFeatPowerReplace(
   build: CharacterBuild,
   featId: string,
   slotKey: string,
-  replacementPowerId: string
+  replacementPowerId: string,
+  extra?: { replacementClassId?: string }
 ): CharacterBuild {
   const slots = { ...(build.classPowerSlots || {}) };
   const prior = slots[slotKey]?.trim() || undefined;
   slots[slotKey] = replacementPowerId;
+  const state: FeatPowerReplaceState = {
+    slotKey,
+    originalPowerId: prior,
+    replacementPowerId
+  };
+  if (extra?.replacementClassId) state.replacementClassId = extra.replacementClassId;
   return {
     ...build,
     classPowerSlots: slots,
     featPowerReplacements: {
       ...(build.featPowerReplacements || {}),
-      [featId]: { slotKey, originalPowerId: prior, replacementPowerId }
+      [featId]: state
     }
   };
 }

@@ -74,6 +74,15 @@ import {
   pruneMulticlassSlotSwaps
 } from "../../rules/featMulticlassSlotSwap";
 import {
+  collectNonClassSlotSwapRows,
+  nonClassPowersForSlotSwap,
+  nonClassSlotSwapSourceClassSelectionKey,
+  pruneNonClassSlotSwaps,
+  toggleNonClassSlotSwap,
+  updateNonClassSlotSwapReplacement,
+  updateNonClassSlotSwapSourceClass
+} from "../../rules/featNonClassSlotSwap";
+import {
   collectFeatPowerReplaceRows,
   disableFeatPowerReplace,
   enableFeatPowerReplace,
@@ -1880,6 +1889,7 @@ export function CharacterBuilderApp({
         : buildClassPowerSlotDefinitions(lv, bonus, atWillPenalty);
     let pruned = pruneFeatPowerReplacements(nextBase, index, defs);
     pruned = pruneMulticlassSlotSwaps(pruned, index, defs);
+    pruned = pruneNonClassSlotSwaps(pruned, index, defs);
     if (pruned.characterStyle === "hybrid") {
       const ha = index.hybridClasses?.find((h) => h.id === pruned.hybridClassIdA);
       const hb = index.hybridClasses?.find((h) => h.id === pruned.hybridClassIdB);
@@ -1976,6 +1986,10 @@ export function CharacterBuilderApp({
     () => collectMulticlassSlotSwapRows(index, build, powerSlotDefs),
     [index, build.featIds, build.level, build.featPowerReplacements, powerSlotDefs]
   );
+  const nonClassSlotSwapRows = useMemo(
+    () => collectNonClassSlotSwapRows(index, build, powerSlotDefs),
+    [index, build, build.featIds, build.featPowerReplacements, powerSlotDefs]
+  );
   const multiclassSwapRowsBySlotKey = useMemo(() => {
     const map = new Map<string, typeof multiclassSlotSwapRows>();
     for (const row of multiclassSlotSwapRows) {
@@ -1987,6 +2001,17 @@ export function CharacterBuilderApp({
     }
     return map;
   }, [multiclassSlotSwapRows]);
+  const nonClassSwapRowsBySlotKey = useMemo(() => {
+    const map = new Map<string, typeof nonClassSlotSwapRows>();
+    for (const row of nonClassSlotSwapRows) {
+      for (const slot of row.eligibleSlots) {
+        const list = map.get(slot.key) ?? [];
+        list.push(row);
+        map.set(slot.key, list);
+      }
+    }
+    return map;
+  }, [nonClassSlotSwapRows]);
   const featReplaceRowsBySlotKey = useMemo(() => {
     const map = new Map<string, typeof featPowerReplaceRows>();
     for (const row of featPowerReplaceRows) {
@@ -2844,6 +2869,56 @@ export function CharacterBuilderApp({
 
   function commitMulticlassSlotSwapPowerChange(featId: string, replacementPowerId: string): void {
     const nextBuild = updateMulticlassSlotSwapReplacement(build, featId, replacementPowerId);
+    const trimmed = nextBuild.classPowerSlots;
+    updateBuild({
+      ...nextBuild,
+      powerIds: orderedPowerIdsFromSlots(powerSlotDefs, trimmed)
+    });
+  }
+
+  function commitNonClassSlotSwapToggle(
+    featId: string,
+    slotKey: string,
+    sourceClassId: string,
+    replacementPowerId: string,
+    enabled: boolean
+  ): void {
+    let nextBuild = toggleNonClassSlotSwap(build, featId, slotKey, sourceClassId, replacementPowerId, enabled);
+    const pendingKey = nonClassSlotSwapSourceClassSelectionKey(featId);
+    if (enabled) {
+      const rs = { ...(nextBuild.classSelections || {}) };
+      delete rs[pendingKey];
+      nextBuild = { ...nextBuild, classSelections: Object.keys(rs).length > 0 ? rs : undefined };
+    }
+    const trimmed = nextBuild.classPowerSlots;
+    updateBuild({
+      ...nextBuild,
+      powerIds: orderedPowerIdsFromSlots(powerSlotDefs, trimmed)
+    });
+  }
+
+  function commitNonClassSlotSwapClassChange(featId: string, sourceClassId: string): void {
+    const nextBuild = updateNonClassSlotSwapSourceClass(build, index, featId, sourceClassId, powerSlotDefs);
+    const trimmed = nextBuild.classPowerSlots;
+    updateBuild({
+      ...nextBuild,
+      powerIds: orderedPowerIdsFromSlots(powerSlotDefs, trimmed)
+    });
+  }
+
+  function commitNonClassSlotSwapPendingClass(featId: string, sourceClassId: string): void {
+    const key = nonClassSlotSwapSourceClassSelectionKey(featId);
+    const rs = { ...(build.classSelections || {}) };
+    if (sourceClassId) rs[key] = sourceClassId;
+    else delete rs[key];
+    updateBuild({
+      ...build,
+      classSelections: Object.keys(rs).length > 0 ? rs : undefined
+    });
+  }
+
+  function commitNonClassSlotSwapPowerChange(featId: string, replacementPowerId: string): void {
+    const nextBuild = updateNonClassSlotSwapReplacement(build, featId, replacementPowerId);
     const trimmed = nextBuild.classPowerSlots;
     updateBuild({
       ...nextBuild,
@@ -5396,7 +5471,8 @@ export function CharacterBuilderApp({
 
                   const slotSwapActive =
                     featReplaceRowsBySlotKey.get(def.key)?.some((r) => r.activeSlotKey === def.key) ||
-                    multiclassSwapRowsBySlotKey.get(def.key)?.some((r) => r.activeSlotKey === def.key);
+                    multiclassSwapRowsBySlotKey.get(def.key)?.some((r) => r.activeSlotKey === def.key) ||
+                    nonClassSwapRowsBySlotKey.get(def.key)?.some((r) => r.activeSlotKey === def.key);
 
                   return (
                     <section key={def.key} style={{ marginBottom: "1rem" }}>
@@ -5610,6 +5686,120 @@ export function CharacterBuilderApp({
                               {active && replPow ? (
                                 <div style={{ marginTop: "0.35rem" }}>
                                   {renderPowerCardWithSelections(replPow, `mc-swap-${row.feat.id}-${def.key}`)}
+                                </div>
+                              ) : null}
+                            </div>
+                          );
+                        })}
+                        {(nonClassSwapRowsBySlotKey.get(def.key) || []).map((row) => {
+                          const active = row.activeSlotKey === def.key;
+                          const pendingClassId =
+                            build.classSelections?.[nonClassSlotSwapSourceClassSelectionKey(row.feat.id)]?.trim() || "";
+                          const selectedClassId = active ? row.activeSourceClassId || "" : pendingClassId;
+                          const selectedRepl = active ? row.activeReplacementPowerId || "" : "";
+                          const ncPowers = selectedClassId
+                            ? nonClassPowersForSlotSwap(index, selectedClassId, def, row.offer)
+                            : [];
+                          const replPow = selectedRepl ? index.powers.find((p) => p.id === selectedRepl) : undefined;
+                          const sourceClassName = selectedClassId
+                            ? (classNameById.get(selectedClassId) ?? "another class")
+                            : "another class";
+                          return (
+                            <div
+                              key={`nc-${row.feat.id}-${def.key}`}
+                              style={{
+                                marginTop: "0.45rem",
+                                padding: "0.4rem 0.5rem",
+                                borderRadius: "6px",
+                                border: "1px solid color-mix(in srgb, var(--status-info) 35%, var(--panel-border))",
+                                backgroundColor: "color-mix(in srgb, var(--status-info) 8%, var(--surface-1))"
+                              }}
+                            >
+                              <div style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "0.35rem" }}>
+                                {row.feat.name} — swap for non-class utility
+                              </div>
+                              <label style={{ display: "block", fontSize: "0.76rem", marginBottom: "0.35rem", color: "var(--text-secondary)" }}>
+                                Source class
+                                <select
+                                  value={selectedClassId}
+                                  onChange={(e) => {
+                                    const classId = e.target.value;
+                                    if (!classId) {
+                                      if (active) commitNonClassSlotSwapToggle(row.feat.id, def.key, "", "", false);
+                                      else commitNonClassSlotSwapPendingClass(row.feat.id, "");
+                                      return;
+                                    }
+                                    if (active) commitNonClassSlotSwapClassChange(row.feat.id, classId);
+                                    else commitNonClassSlotSwapPendingClass(row.feat.id, classId);
+                                  }}
+                                  style={{
+                                    display: "block",
+                                    width: "100%",
+                                    maxWidth: "28rem",
+                                    marginTop: "0.15rem",
+                                    padding: "0.35rem",
+                                    borderRadius: "6px",
+                                    border: "1px solid var(--panel-border)"
+                                  }}
+                                >
+                                  <option value="">— Choose a class —</option>
+                                  {row.sourceClasses.map((c) => (
+                                    <option key={c.id} value={c.id}>
+                                      {c.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                              {!selectedClassId ? (
+                                <p style={{ margin: 0, fontSize: "0.76rem", color: "var(--text-muted)" }}>
+                                  Choose a class you do not belong to, then pick a utility power at level {def.gainLevel} or lower.
+                                </p>
+                              ) : ncPowers.length === 0 ? (
+                                <p style={{ margin: 0, fontSize: "0.76rem", color: "var(--text-muted)" }}>
+                                  No utility powers from {sourceClassName} at printed level {def.gainLevel} or below.
+                                </p>
+                              ) : (
+                                <>
+                                  <label style={{ display: "block", fontSize: "0.76rem", marginBottom: "0.25rem", color: "var(--text-secondary)" }}>
+                                    Utility power
+                                    <select
+                                      value={selectedRepl}
+                                      onChange={(e) => {
+                                        const pid = e.target.value;
+                                        if (!pid || !selectedClassId) {
+                                          if (active) commitNonClassSlotSwapToggle(row.feat.id, def.key, "", "", false);
+                                          return;
+                                        }
+                                        if (active) commitNonClassSlotSwapPowerChange(row.feat.id, pid);
+                                        else commitNonClassSlotSwapToggle(row.feat.id, def.key, selectedClassId, pid, true);
+                                      }}
+                                      style={{
+                                        display: "block",
+                                        width: "100%",
+                                        maxWidth: "28rem",
+                                        marginTop: "0.15rem",
+                                        padding: "0.35rem",
+                                        borderRadius: "6px",
+                                        border: "1px solid var(--panel-border)"
+                                      }}
+                                    >
+                                      <option value="">— Choose utility power —</option>
+                                      {ncPowers.map((p) => (
+                                        <option key={p.id} value={p.id}>
+                                          {p.name} (Lv {p.level ?? "?"}, {p.usage || "?"})
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </label>
+                                  <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.74rem", color: "var(--text-muted)" }}>
+                                    Swap this utility slot for a power from {sourceClassName}
+                                    {row.offer.optional ? " (optional)" : ""}.
+                                  </p>
+                                </>
+                              )}
+                              {active && replPow ? (
+                                <div style={{ marginTop: "0.35rem" }}>
+                                  {renderPowerCardWithSelections(replPow, `nc-swap-${row.feat.id}-${def.key}`)}
                                 </div>
                               ) : null}
                             </div>

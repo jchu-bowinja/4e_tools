@@ -192,4 +192,37 @@ describe("CharacterBuilderApp render", () => {
     expect(firstSuggested).toBeDefined();
     expect(html).toContain(firstSuggested!.name);
   });
+
+  it("renders Secrets of Belial non-class utility swap on the Powers tab", () => {
+    stubBrowserGlobals();
+    const raw = JSON.parse(readFileSync(RULES_PATH, "utf8")) as RulesIndex;
+    const index = validateRulesIndexShape(raw);
+    const warlock = index.classes.find((c) => c.slug === "warlock");
+    const feat = index.feats.find((f) => f.id === "ID_FMP_FEAT_2311");
+    expect(warlock).toBeDefined();
+    expect(feat?.powerReplaceOffers?.[0]?.requireNonClassReplacement).toBe(true);
+
+    const build: CharacterBuild = {
+      ...baseBuild(),
+      level: 11,
+      classId: warlock!.id,
+      featIds: ["ID_FMP_FEAT_2311"],
+      classSelections: {
+        "classFeature:ID_FMP_CLASS_FEATURE_777": "ID_FMP_CLASS_FEATURE_773"
+      }
+    };
+
+    const html = renderToString(
+      <CharacterBuilderApp
+        index={index}
+        tooltipGlossary={{}}
+        initialBuild={build}
+        initialActiveTab="powers"
+      />
+    );
+
+    expect(html).toContain("Secrets of Belial");
+    expect(html).toContain("swap for non-class utility");
+    expect(html).toContain("Choose a class");
+  });
 });

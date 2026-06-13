@@ -193,6 +193,8 @@ export interface FeatPowerReplaceState {
   originalPowerId?: string;
   /** Multiclass swap: user-picked power from the multiclass class. */
   replacementPowerId?: string;
+  /** Non-class swap: user-picked source class (Secrets of Belial, …). */
+  replacementClassId?: string;
 }
 
 export interface Feat extends RulesEntity {
