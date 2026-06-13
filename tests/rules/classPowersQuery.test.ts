@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import index from "../../generated/rules_index.json";
 import {
   effectivePowerLevel,
+  getAllThemeGrantedPowers,
   getClassPowersForLevelRange,
   getDilettanteCandidatePowers,
   getPowersForOwnerId,
@@ -146,5 +147,17 @@ describe("getThemeGrantedPowers", () => {
     expect(getThemeGrantedPowers(rules, bloodsworn!.id, 2).map((p) => p.id)).toContain(
       "ID_FMP_POWER_16430"
     );
+  });
+
+  it("preview lists all theme powers with availability flags", () => {
+    const bloodsworn = rules.themes.find((t) => t.slug === "bloodsworn");
+    expect(bloodsworn).toBeDefined();
+    const preview = getAllThemeGrantedPowers(rules, bloodsworn!.id, 1);
+    const forced = preview.find((g) => g.power.id === "ID_FMP_POWER_16430");
+    expect(forced).toBeDefined();
+    expect(forced?.availableAtLevel).toBe(false);
+    expect(forced?.requiredLevel).toBe(2);
+    const bloodied = preview.find((g) => g.power.id === "ID_FMP_POWER_16429");
+    expect(bloodied?.availableAtLevel).toBe(true);
   });
 });

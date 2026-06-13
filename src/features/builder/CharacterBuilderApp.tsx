@@ -2360,6 +2360,139 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
     );
   }
 
+  function renderRequiredLevelBadge(requiredLevel: number): JSX.Element {
+    return (
+      <span
+        style={{
+          marginLeft: "0.35rem",
+          fontSize: "0.72rem",
+          fontWeight: 600,
+          color: "var(--text-muted)",
+          whiteSpace: "nowrap"
+        }}
+      >
+        Requires level {requiredLevel}
+      </span>
+    );
+  }
+
+  function renderSupportTraitList(rows: TraitDisplayRow[], heading = "Class features"): JSX.Element | null {
+    if (rows.length === 0) return null;
+    return (
+      <div style={{ marginTop: "0.75rem" }}>
+        <h5 style={subsectionTitleStyle}>{heading}</h5>
+        <p style={{ margin: "0 0 0.45rem 0", fontSize: "0.78rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
+          All features for this selection are listed below. Unavailable features stay readable but are dimmed until you
+          reach their level.
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
+          {rows.map((row) => {
+            const feature = classFeatureById.get(row.id);
+            const unavailable = row.availableAtLevel === false;
+            const requiredLevel = feature ? parseFeatureLevel(feature) : undefined;
+            return (
+              <CollapsibleDisclosure
+                key={row.id}
+                style={{
+                  backgroundColor: unavailable ? "var(--surface-2)" : "var(--surface-1)",
+                  border: unavailable ? "1px dashed var(--panel-border)" : "1px solid var(--panel-border)",
+                  borderRadius: "8px",
+                  padding: "0.45rem 0.55rem"
+                }}
+                summary={
+                  <>
+                    <span style={{ color: unavailable ? "var(--text-secondary)" : "var(--text-primary)" }}>{row.name}</span>
+                    {unavailable && requiredLevel != null ? renderRequiredLevelBadge(requiredLevel) : null}
+                    {row.shortDescription ? (
+                      <span style={{ fontWeight: 400, color: "var(--text-muted)" }}> — {row.shortDescription}</span>
+                    ) : null}
+                  </>
+                }
+                summaryStyle={{
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  fontSize: "0.88rem",
+                  lineHeight: 1.4
+                }}
+                bodyStyle={{ marginTop: "0.4rem", fontSize: "0.86rem", lineHeight: 1.45, color: "var(--text-secondary)" }}
+              >
+                {feature?.source && (
+                  <p style={{ margin: "0 0 0.35rem 0", color: "var(--text-muted)" }}>
+                    <strong>Source:</strong> {feature.source}
+                  </p>
+                )}
+                {!feature && row.id.startsWith("ID_") && (
+                  <p style={{ margin: 0, color: "var(--status-warning)" }}>
+                    This feature is listed but was not found in the loaded rules data ({row.id}).
+                  </p>
+                )}
+                {feature?.body ? (
+                  <RulesRichText
+                    text={feature.body}
+                    paragraphStyle={{ fontSize: "0.86rem", color: "var(--text-secondary)" }}
+                    listItemStyle={{ fontSize: "0.86rem", color: "var(--text-secondary)" }}
+                  />
+                ) : null}
+              </CollapsibleDisclosure>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  function renderGatedSupportPowerCard(gated: GatedPower, cardKey: string): JSX.Element {
+    const { power, availableAtLevel, requiredLevel } = gated;
+    if (availableAtLevel) {
+      return renderPowerCardWithSelections(power, cardKey);
+    }
+    return (
+      <div
+        key={cardKey}
+        style={{
+          marginBottom: "0.35rem",
+          padding: "0.35rem 0.4rem",
+          borderRadius: "8px",
+          border: "1px dashed var(--panel-border)",
+          backgroundColor: "var(--surface-2)"
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: "0.25rem", marginBottom: "0.25rem" }}>
+          <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--text-muted)" }}>Not yet available</span>
+          {renderRequiredLevelBadge(requiredLevel)}
+        </div>
+        {renderPowerCard(power, {
+          key: `${cardKey}-card`,
+          rulesIndex: index,
+          keywordTooltip: powerKeywordTooltip,
+          onKeywordMouseEnter: (event, keyword) => glossaryTooltipUi.startHover(event, `powerKeyword:${keyword}`),
+          onKeywordMouseLeave: glossaryTooltipUi.leaveHover,
+          glossaryHover: { start: glossaryTooltipUi.startHover, leave: glossaryTooltipUi.leaveHover },
+          renderRuleText: renderPowerGlossaryRuleText,
+          featModsByPowerId
+        })}
+      </div>
+    );
+  }
+
+  function renderSupportGatedPowerList(
+    gatedPowers: GatedPower[],
+    heading: string,
+    keyPrefix: string
+  ): JSX.Element | null {
+    if (gatedPowers.length === 0) return null;
+    return (
+      <div style={{ marginTop: "0.75rem" }}>
+        <h5 style={subsectionTitleStyle}>{heading}</h5>
+        <p style={{ margin: "0 0 0.45rem 0", fontSize: "0.78rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
+          All powers for this selection are listed below. Only powers you have reached by level appear on the Powers tab
+          and character sheet.
+        </p>
+        <div>{gatedPowers.map((gated) => renderGatedSupportPowerCard(gated, `${keyPrefix}-${gated.power.id}`))}</div>
+      </div>
+    );
+  }
+
   function renderPowerCardWithSelections(p: Power, cardKey: string, displayPower?: Power): JSX.Element {
     const cardPower = displayPower ?? p;
     return (
@@ -5583,15 +5716,9 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
           <RulesRichText text={String(selectedTheme.raw.body)} paragraphStyle={{ fontSize: "0.9rem" }} listItemStyle={{ fontSize: "0.9rem" }} />
         </CollapsibleDisclosure>
               )}
-              {themeGrantedPowers.length > 0 && (
-                <div style={{ marginTop: "0.75rem" }}>
-                  <h5 style={subsectionTitleStyle}>Powers from this theme</h5>
-                  <p style={{ margin: "0 0 0.45rem 0", fontSize: "0.78rem", color: "var(--text-muted)" }}>
-                    These are granted when your level reaches each power&apos;s printed level (same list as on the Powers tab).
-                  </p>
-                  <div>{themeGrantedPowers.map((p) => renderPowerCardWithSelections(p, `theme-tab-${p.id}`))}</div>
-                </div>
-              )}
+              {selectedTheme && renderSupportTraitList(themeTraitRowsPreview, "Theme features")}
+              {selectedTheme &&
+                renderSupportGatedPowerList(themeGrantedPowersPreview, "Powers from this theme", "theme-tab")}
             </section>
           </div>
         )}
@@ -5899,6 +6026,16 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     />
         </CollapsibleDisclosure>
               )}
+              {selectedParagonPath && !build.paragonMulticlassing && (
+                <>
+                  {renderSupportTraitList(paragonTraitRowsPreview, "Paragon path features")}
+                  {renderSupportGatedPowerList(
+                    paragonPathGrantedPowersPreview,
+                    "Powers from this paragon path",
+                    "paragon-tab"
+                  )}
+                </>
+              )}
             </section>
           </div>
         )}
@@ -6014,6 +6151,16 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                       listItemStyle={{ fontSize: "0.9rem" }}
                     />
         </CollapsibleDisclosure>
+              )}
+              {selectedEpicDestiny && (
+                <>
+                  {renderSupportTraitList(epicDestinyTraitRowsPreview, "Epic destiny features")}
+                  {renderSupportGatedPowerList(
+                    epicDestinyGrantedPowersPreview,
+                    "Powers from this epic destiny",
+                    "epic-tab"
+                  )}
+                </>
               )}
             </section>
           </div>

@@ -176,7 +176,7 @@ export function resolveTraitDisplayRows(
       id,
       name,
       shortDescription: feature ? traitDescriptionForDisplay(feature) : undefined,
-      availableAtLevel
+      ...(availableAtLevel ? {} : { availableAtLevel: false })
     });
   };
 

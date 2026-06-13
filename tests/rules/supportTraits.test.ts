@@ -213,6 +213,33 @@ describe("supportTraits", () => {
     ]);
   });
 
+  it("includes unavailable theme and epic traits when includeUnavailable is set", () => {
+    const level5: ClassFeature = {
+      id: "ID_THEME_5",
+      name: "Level 5 Cipher Feature",
+      slug: "cipher-5",
+      raw: { specific: { Level: 5 } }
+    };
+    const level10: ClassFeature = {
+      id: "ID_THEME_10",
+      name: "Level 10 Cipher Feature",
+      slug: "cipher-10",
+      raw: { specific: { Level: 10 } }
+    };
+    const theme: Theme = {
+      id: "ID_THEME",
+      name: "Cipher",
+      slug: "cipher",
+      prereqTokens: [],
+      raw: { specific: { _PARSED_SUB_FEATURES: "ID_THEME_5,ID_THEME_10" } }
+    };
+    const index = miniIndex([level5, level10]);
+    const rows = getThemeTraitRows(theme, index, 7, { includeUnavailable: true });
+    expect(rows.map((r) => r.name)).toEqual(["Level 5 Cipher Feature", "Level 10 Cipher Feature"]);
+    expect(rows[0]?.availableAtLevel).not.toBe(false);
+    expect(rows[1]?.availableAtLevel).toBe(false);
+  });
+
   it("dedupes rows when resolving by id and name", () => {
     const index = miniIndex();
     const { byId, byName } = {
