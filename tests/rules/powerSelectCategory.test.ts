@@ -39,6 +39,13 @@ describe("powerSelectCategory", () => {
     expect(parsePowerSelectCategory("$$Class,at-will").poolLevel).toBe(1);
   });
 
+  it("parses level-scoped class encounter pool ($$LEVEL)", () => {
+    const parsed = parsePowerSelectCategory("$$LEVEL,ID_FMP_CLASS_9,encounter");
+    expect(parsed.kind).toBe("levelScopedClassPowerPool");
+    expect(parsed.poolClassId).toBe("ID_FMP_CLASS_9");
+    expect(parsed.poolUsage).toBe("encounter");
+  });
+
   it("detects dynamic categories and bonus-at-will helpers", () => {
     expect(isDynamicPowerSelectCategory("$$CLASS,at-will,1")).toBe(true);
     expect(categoryGrantsBonusClassAtWill("$$CLASS,at-will,1")).toBe(true);

@@ -1,0 +1,4448 @@
+{
+  "meta": {
+    "source": "generated/rules_index.json",
+    "total_classes_with_choice_groups": 46,
+    "feature_totals": {
+      "modify_weapon": 127,
+      "modify_power": 183,
+      "replace": 66
+    }
+  },
+  "steps": {
+    "P0_class_feature_granted_powers": {
+      "status": "Fixed (5609f82)",
+      "classes": {
+        "Ardent": [
+          {
+            "choice_path": "Ardent Mantle \u2192 Mantle of Clarity",
+            "feature": "Mantle of Clarity",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Ardent Mantle \u2192 Mantle of Elation",
+            "feature": "Mantle of Elation",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Ardent Mantle \u2192 Mantle of Impulsiveness",
+            "feature": "Mantle of Impulsiveness",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Auto-granted: Ardent Surge",
+            "feature": "Ardent Surge",
+            "powers_granted": 1
+          }
+        ],
+        "Artificer": [
+          {
+            "choice_path": "Auto-granted: Healing Infusion",
+            "feature": "Healing Infusion",
+            "powers_granted": 1
+          }
+        ],
+        "Assassin": [
+          {
+            "choice_path": "Guild Training \u2192 Executioner's Guild",
+            "feature": "Executioner's Guild",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Shade Form \u2192 Shade Form",
+            "feature": "Shade Form",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Auto-granted: Assassin's Shroud",
+            "feature": "Assassin's Shroud",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Auto-granted: Shadow Step",
+            "feature": "Shadow Step",
+            "powers_granted": 1
+          }
+        ],
+        "Avenger": [
+          {
+            "choice_path": "Auto-granted: Channel Divinity",
+            "feature": "Channel Divinity",
+            "powers_granted": 5
+          },
+          {
+            "choice_path": "Auto-granted: Oath of Enmity",
+            "feature": "Oath of Enmity",
+            "powers_granted": 1
+          }
+        ],
+        "Barbarian": [
+          {
+            "choice_path": "Feral Might \u2192 Rageblood Vigor",
+            "feature": "Rageblood Vigor",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Feral Might \u2192 Thaneborn Triumph",
+            "feature": "Thaneborn Triumph",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Feral Might \u2192 Thunderborn Wrath",
+            "feature": "Thunderborn Wrath",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Feral Might \u2192 Whirling Slayer",
+            "feature": "Whirling Slayer",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Auto-granted: Rage Strike",
+            "feature": "Rage Strike",
+            "powers_granted": 1
+          }
+        ],
+        "Bard": [
+          {
+            "choice_path": "Auto-granted: Majestic Word",
+            "feature": "Majestic Word",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Auto-granted: Words of Friendship",
+            "feature": "Words of Friendship",
+            "powers_granted": 1
+          }
+        ],
+        "Battlemind": [
+          {
+            "choice_path": "Psionic Study \u2192 Battle Resilience",
+            "feature": "Battle Resilience",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Psionic Study \u2192 Persistent Harrier",
+            "feature": "Persistent Harrier",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Psionic Study \u2192 Speed of Thought",
+            "feature": "Speed of Thought",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Psionic Study \u2192 Wild Focus",
+            "feature": "Wild Focus",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Auto-granted: Psionic Defense",
+            "feature": "Psionic Defense",
+            "powers_granted": 3
+          }
+        ],
+        "Berserker (Essentials, parent: Barbarian)": [
+          {
+            "choice_path": "Defender Aura \u2192 Defender Aura",
+            "feature": "Defender Aura",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Auto-granted: Vengeful Guardian",
+            "feature": "Vengeful Guardian",
+            "powers_granted": 1
+          }
+        ],
+        "Binder (Essentials, parent: Warlock)": [
+          {
+            "choice_path": "Pact Boon (Binder) \u2192 Gloom Pact Boon (Binder)",
+            "feature": "Gloom Pact Boon (Binder)",
+            "powers_granted": 2
+          },
+          {
+            "choice_path": "Pact Boon (Binder) \u2192 Star Pact Boon (Binder)",
+            "feature": "Star Pact Boon (Binder)",
+            "powers_granted": 2
+          },
+          {
+            "choice_path": "Auto-granted: Shadow Claws",
+            "feature": "Shadow Claws",
+            "powers_granted": 1
+          }
+        ],
+        "Blackguard (Essentials, parent: Paladin)": [
+          {
+            "choice_path": "Auto-granted: Dread Smite",
+            "feature": "Dread Smite",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Auto-granted: Shroud of Shadow",
+            "feature": "Shroud of Shadow",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Auto-granted: Vengeance Strike",
+            "feature": "Vengeance Strike",
+            "powers_granted": 1
+          }
+        ],
+        "Bladesinger (Essentials, parent: Wizard)": [
+          {
+            "choice_path": "Auto-granted: Magic Missile",
+            "feature": "Magic Missile",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Auto-granted: Bladesong",
+            "feature": "Bladesong",
+            "powers_granted": 1
+          }
+        ],
+        "Cavalier (Essentials, parent: Paladin)": [
+          {
+            "choice_path": "Virtue At-Will Power \u2192 Sacrifice At-Will Power",
+            "feature": "Sacrifice At-Will Power",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Virtue At-Will Power \u2192 Valor At-Will Power",
+            "feature": "Valor At-Will Power",
+            "powers_granted": 1
+          }
+        ],
+        "Cleric": [
+          {
+            "choice_path": "Auto-granted: Healing Word",
+            "feature": "Healing Word",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Auto-granted: Channel Divinity",
+            "feature": "Channel Divinity",
+            "powers_granted": 5
+          }
+        ],
+        "Druid": [
+          {
+            "choice_path": "Auto-granted: Wild Shape",
+            "feature": "Wild Shape",
+            "powers_granted": 1
+          }
+        ],
+        "Elementalist (Essentials, parent: Sorcerer)": [
+          {
+            "choice_path": "Auto-granted: Elemental Bolt",
+            "feature": "Elemental Bolt",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Auto-granted: Escalating Elements",
+            "feature": "Escalating Elements",
+            "powers_granted": 4
+          }
+        ],
+        "Executioner (Essentials, parent: Assassin)": [
+          {
+            "choice_path": "Guild Attacks \u2192 League of Whispers",
+            "feature": "League of Whispers",
+            "powers_granted": 3
+          },
+          {
+            "choice_path": "Guild Attacks \u2192 Red Scales",
+            "feature": "Red Scales",
+            "powers_granted": 3
+          },
+          {
+            "choice_path": "Guild Attacks \u2192 Way of the Ninja",
+            "feature": "Way of the Ninja",
+            "powers_granted": 3
+          },
+          {
+            "choice_path": "Auto-granted: Assassin's Strike",
+            "feature": "Assassin's Strike",
+            "powers_granted": 1
+          }
+        ],
+        "Fighter": [
+          {
+            "choice_path": "Class feature \u2192 Combat Agility",
+            "feature": "Combat Agility",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Auto-granted: Combat Challenge",
+            "feature": "Combat Challenge",
+            "powers_granted": 1
+          }
+        ],
+        "Hexblade (Essentials, parent: Warlock)": [
+          {
+            "choice_path": "Pact Boon \u2192 Elemental Pact Boon",
+            "feature": "Elemental Pact Boon",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Pact Boon \u2192 Fey Pact Boon",
+            "feature": "Fey Pact Boon",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Pact Boon \u2192 Fey Pact of the White Well Boon",
+            "feature": "Fey Pact of the White Well Boon",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Pact Boon \u2192 Gloom Pact Boon (Hexblade)",
+            "feature": "Gloom Pact Boon (Hexblade)",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Pact Boon \u2192 Infernal Pact Boon",
+            "feature": "Infernal Pact Boon",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Pact Boon \u2192 Star Pact Boon",
+            "feature": "Star Pact Boon",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Pact Weapon \u2192 Elemental Pact Weapon",
+            "feature": "Elemental Pact Weapon",
+            "powers_granted": 2
+          },
+          {
+            "choice_path": "Pact Weapon \u2192 Fey Pact of the White Well Weapon",
+            "feature": "Fey Pact of the White Well Weapon",
+            "powers_granted": 2
+          },
+          {
+            "choice_path": "Pact Weapon \u2192 Fey Pact Weapon",
+            "feature": "Fey Pact Weapon",
+            "powers_granted": 2
+          },
+          {
+            "choice_path": "Pact Weapon \u2192 Gloom Pact Weapon",
+            "feature": "Gloom Pact Weapon",
+            "powers_granted": 2
+          },
+          {
+            "choice_path": "Pact Weapon \u2192 Infernal Pact Weapon",
+            "feature": "Infernal Pact Weapon",
+            "powers_granted": 2
+          },
+          {
+            "choice_path": "Pact Weapon \u2192 Star Pact Weapon",
+            "feature": "Star Pact Weapon",
+            "powers_granted": 2
+          }
+        ],
+        "Hunter (Essentials, parent: Ranger)": [
+          {
+            "choice_path": "Auto-granted: Disruptive Shot",
+            "feature": "Disruptive Shot",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Auto-granted: Expert Archer",
+            "feature": "Expert Archer",
+            "powers_granted": 3
+          }
+        ],
+        "Hybrid Ardent": [
+          {
+            "choice_path": "Auto-granted: Ardent Surge (Hybrid)",
+            "feature": "Ardent Surge (Hybrid)",
+            "powers_granted": 1
+          }
+        ],
+        "Hybrid Artificer": [
+          {
+            "choice_path": "Auto-granted: Healing Infusion (Hybrid)",
+            "feature": "Healing Infusion (Hybrid)",
+            "powers_granted": 2
+          }
+        ],
+        "Hybrid Assassin": [
+          {
+            "choice_path": "Auto-granted: Assassin's Shroud (Hybrid)",
+            "feature": "Assassin's Shroud (Hybrid)",
+            "powers_granted": 1
+          }
+        ],
+        "Hybrid Avenger": [
+          {
+            "choice_path": "Auto-granted: Oath of Enmity (Hybrid)",
+            "feature": "Oath of Enmity (Hybrid)",
+            "powers_granted": 2
+          }
+        ],
+        "Hybrid Bard": [
+          {
+            "choice_path": "Auto-granted: Majestic Word (Hybrid)",
+            "feature": "Majestic Word (Hybrid)",
+            "powers_granted": 1
+          }
+        ],
+        "Hybrid Battlemind": [
+          {
+            "choice_path": "Auto-granted: Psionic Defense (Hybrid)",
+            "feature": "Psionic Defense (Hybrid)",
+            "powers_granted": 1
+          }
+        ],
+        "Hybrid Cavalier": [
+          {
+            "choice_path": "Auto-granted: Righteous Radiance",
+            "feature": "Righteous Radiance",
+            "powers_granted": 1
+          }
+        ],
+        "Hybrid Cleric": [
+          {
+            "choice_path": "Auto-granted: Healing Word (Hybrid)",
+            "feature": "Healing Word (Hybrid)",
+            "powers_granted": 1
+          }
+        ],
+        "Hybrid Druid": [
+          {
+            "choice_path": "Auto-granted: Wild Shape",
+            "feature": "Wild Shape",
+            "powers_granted": 1
+          }
+        ],
+        "Hybrid Fighter": [
+          {
+            "choice_path": "Auto-granted: Combat Challenge (Hybrid)",
+            "feature": "Combat Challenge (Hybrid)",
+            "powers_granted": 1
+          }
+        ],
+        "Hybrid Paladin": [
+          {
+            "choice_path": "Auto-granted: Divine Challenge (Hybrid)",
+            "feature": "Divine Challenge (Hybrid)",
+            "powers_granted": 1
+          }
+        ],
+        "Hybrid Ranger": [
+          {
+            "choice_path": "Auto-granted: Hunter's Quarry (Hybrid)",
+            "feature": "Hunter's Quarry (Hybrid)",
+            "powers_granted": 1
+          }
+        ],
+        "Hybrid Runepriest": [
+          {
+            "choice_path": "Auto-granted: Rune of Mending (Hybrid)",
+            "feature": "Rune of Mending (Hybrid)",
+            "powers_granted": 1
+          }
+        ],
+        "Hybrid Seeker": [
+          {
+            "choice_path": "Auto-granted: Inevitable Shot (Hybrid)",
+            "feature": "Inevitable Shot (Hybrid)",
+            "powers_granted": 2
+          }
+        ],
+        "Hybrid Sentinel": [
+          {
+            "choice_path": "Auto-granted: Healing Word (Hybrid Sentinel)",
+            "feature": "Healing Word (Hybrid Sentinel)",
+            "powers_granted": 1
+          }
+        ],
+        "Hybrid Shaman": [
+          {
+            "choice_path": "Auto-granted: Speak with Spirits",
+            "feature": "Speak with Spirits",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Auto-granted: Companion Spirit (Hybrid)",
+            "feature": "Companion Spirit (Hybrid)",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Auto-granted: Healing Spirit (Hybrid)",
+            "feature": "Healing Spirit (Hybrid)",
+            "powers_granted": 1
+          }
+        ],
+        "Hybrid Warden": [
+          {
+            "choice_path": "Auto-granted: Nature's Wrath (Hybrid)",
+            "feature": "Nature's Wrath (Hybrid)",
+            "powers_granted": 2
+          }
+        ],
+        "Hybrid Warlock": [
+          {
+            "choice_path": "Auto-granted: Warlock's Curse (Hybrid)",
+            "feature": "Warlock's Curse (Hybrid)",
+            "powers_granted": 1
+          }
+        ],
+        "Hybrid Warlord": [
+          {
+            "choice_path": "Auto-granted: Inspiring Word (Hybrid)",
+            "feature": "Inspiring Word (Hybrid)",
+            "powers_granted": 1
+          }
+        ],
+        "Invoker": [
+          {
+            "choice_path": "Divine Covenant \u2192 Covenant of Malediction",
+            "feature": "Covenant of Malediction",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Divine Covenant \u2192 Covenant of Preservation",
+            "feature": "Covenant of Preservation",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Divine Covenant \u2192 Covenant of Wrath",
+            "feature": "Covenant of Wrath",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Auto-granted: Channel Divinity",
+            "feature": "Channel Divinity",
+            "powers_granted": 5
+          }
+        ],
+        "Knight (Essentials, parent: Fighter)": [
+          {
+            "choice_path": "Auto-granted: Power Strike",
+            "feature": "Power Strike",
+            "powers_granted": 1
+          }
+        ],
+        "Leader": [
+          {
+            "choice_path": "Auto-granted: Healing Word (Companion)",
+            "feature": "Healing Word (Companion)",
+            "powers_granted": 1
+          }
+        ],
+        "Mage (Essentials, parent: Wizard)": [
+          {
+            "choice_path": "Auto-granted: Mage's Spellbook",
+            "feature": "Mage's Spellbook",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Auto-granted: Magic Missile",
+            "feature": "Magic Missile",
+            "powers_granted": 1
+          }
+        ],
+        "Monk": [
+          {
+            "choice_path": "Monastic Tradition \u2192 Centered Breath",
+            "feature": "Centered Breath",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Monastic Tradition \u2192 Desert Wind",
+            "feature": "Desert Wind",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Monastic Tradition \u2192 Eternal Tide",
+            "feature": "Eternal Tide",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Monastic Tradition \u2192 Iron Soul",
+            "feature": "Iron Soul",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Monastic Tradition \u2192 Stone Fist",
+            "feature": "Stone Fist",
+            "powers_granted": 1
+          }
+        ],
+        "Paladin": [
+          {
+            "choice_path": "Auto-granted: Divine Challenge",
+            "feature": "Divine Challenge",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Auto-granted: Channel Divinity",
+            "feature": "Channel Divinity",
+            "powers_granted": 5
+          }
+        ],
+        "Protector (Essentials, parent: Druid)": [
+          {
+            "choice_path": "Auto-granted: Nature's Growth",
+            "feature": "Nature's Growth",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Auto-granted: Summon Natural Ally",
+            "feature": "Summon Natural Ally",
+            "powers_granted": 1
+          }
+        ],
+        "Psion": [
+          {
+            "choice_path": "Discipline Focus \u2192 Shaper Focus",
+            "feature": "Shaper Focus",
+            "powers_granted": 2
+          },
+          {
+            "choice_path": "Discipline Focus \u2192 Telekinesis Focus",
+            "feature": "Telekinesis Focus",
+            "powers_granted": 2
+          },
+          {
+            "choice_path": "Discipline Focus \u2192 Telepathy Focus",
+            "feature": "Telepathy Focus",
+            "powers_granted": 2
+          }
+        ],
+        "Ranger": [
+          {
+            "choice_path": "Auto-granted: Hunter's Quarry",
+            "feature": "Hunter's Quarry",
+            "powers_granted": 1
+          }
+        ],
+        "Runepriest": [
+          {
+            "choice_path": "Auto-granted: Rune of Mending",
+            "feature": "Rune of Mending",
+            "powers_granted": 1
+          }
+        ],
+        "Scout (Essentials, parent: Ranger)": [
+          {
+            "choice_path": "Auto-granted: Power Strike",
+            "feature": "Power Strike",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Auto-granted: Dual Weapon Attack",
+            "feature": "Dual Weapon Attack",
+            "powers_granted": 1
+          }
+        ],
+        "Seeker": [
+          {
+            "choice_path": "Seeker's Bond \u2192 Bloodbond",
+            "feature": "Bloodbond",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Seeker's Bond \u2192 Spiritbond",
+            "feature": "Spiritbond",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Auto-granted: Inevitable Shot",
+            "feature": "Inevitable Shot",
+            "powers_granted": 1
+          }
+        ],
+        "Sentinel (Essentials, parent: Druid)": [
+          {
+            "choice_path": "Auto-granted: Combined Attack",
+            "feature": "Combined Attack",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Auto-granted: Healing Word (Druid)",
+            "feature": "Healing Word (Druid)",
+            "powers_granted": 1
+          }
+        ],
+        "Shaman": [
+          {
+            "choice_path": "Companion Spirit \u2192 Elemental Spirit",
+            "feature": "Elemental Spirit",
+            "powers_granted": 2
+          },
+          {
+            "choice_path": "Companion Spirit \u2192 Protector Spirit",
+            "feature": "Protector Spirit",
+            "powers_granted": 2
+          },
+          {
+            "choice_path": "Companion Spirit \u2192 Stalker Spirit",
+            "feature": "Stalker Spirit",
+            "powers_granted": 2
+          },
+          {
+            "choice_path": "Companion Spirit \u2192 Watcher Spirit",
+            "feature": "Watcher Spirit",
+            "powers_granted": 2
+          },
+          {
+            "choice_path": "Companion Spirit \u2192 World Speaker Spirit",
+            "feature": "World Speaker Spirit",
+            "powers_granted": 2
+          },
+          {
+            "choice_path": "Auto-granted: Healing Spirit",
+            "feature": "Healing Spirit",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Auto-granted: Companion Spirit",
+            "feature": "Companion Spirit",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Auto-granted: Speak with Spirits",
+            "feature": "Speak with Spirits",
+            "powers_granted": 1
+          }
+        ],
+        "Skald (Essentials, parent: Bard)": [
+          {
+            "choice_path": "Auto-granted: Words of Friendship",
+            "feature": "Words of Friendship",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Auto-granted: Skald's Aura",
+            "feature": "Skald's Aura",
+            "powers_granted": 1
+          }
+        ],
+        "Slayer (Essentials, parent: Fighter)": [
+          {
+            "choice_path": "Auto-granted: Power Strike",
+            "feature": "Power Strike",
+            "powers_granted": 1
+          }
+        ],
+        "Swordmage": [
+          {
+            "choice_path": "Swordmage Aegis \u2192 Aegis of Assault",
+            "feature": "Aegis of Assault",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Swordmage Aegis \u2192 Aegis of Ensnarement",
+            "feature": "Aegis of Ensnarement",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Swordmage Aegis \u2192 Aegis of Shielding",
+            "feature": "Aegis of Shielding",
+            "powers_granted": 1
+          }
+        ],
+        "Thief (Essentials, parent: Rogue)": [
+          {
+            "choice_path": "Auto-granted: Backstab",
+            "feature": "Backstab",
+            "powers_granted": 1
+          }
+        ],
+        "Vampire": [
+          {
+            "choice_path": "Auto-granted: Vampire At-Will Attack Powers",
+            "feature": "Vampire At-Will Attack Powers",
+            "powers_granted": 3
+          },
+          {
+            "choice_path": "Auto-granted: Blood Drinker",
+            "feature": "Blood Drinker",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Auto-granted: Swarm of Shadows",
+            "feature": "Swarm of Shadows",
+            "powers_granted": 1
+          }
+        ],
+        "Warden": [
+          {
+            "choice_path": "Auto-granted: Nature's Wrath",
+            "feature": "Nature's Wrath",
+            "powers_granted": 2
+          }
+        ],
+        "Warlock": [
+          {
+            "choice_path": "Eldritch Pact \u2192 Dark Pact",
+            "feature": "Dark Pact",
+            "powers_granted": 2
+          },
+          {
+            "choice_path": "Eldritch Pact \u2192 Elemental Pact",
+            "feature": "Elemental Pact",
+            "powers_granted": 2
+          },
+          {
+            "choice_path": "Eldritch Pact \u2192 Fey Pact",
+            "feature": "Fey Pact",
+            "powers_granted": 2
+          },
+          {
+            "choice_path": "Eldritch Pact \u2192 Infernal Pact",
+            "feature": "Infernal Pact",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Eldritch Pact \u2192 Sorcerer-King Pact",
+            "feature": "Sorcerer-King Pact",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Eldritch Pact \u2192 Star Pact",
+            "feature": "Star Pact",
+            "powers_granted": 2
+          },
+          {
+            "choice_path": "Eldritch Pact \u2192 Vestige Pact",
+            "feature": "Vestige Pact",
+            "powers_granted": 2
+          },
+          {
+            "choice_path": "Auto-granted: Warlock's Curse",
+            "feature": "Warlock's Curse",
+            "powers_granted": 1
+          }
+        ],
+        "Warlord": [
+          {
+            "choice_path": "Leader \u2192 Battlefront Leader",
+            "feature": "Battlefront Leader",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Auto-granted: Inspiring Word",
+            "feature": "Inspiring Word",
+            "powers_granted": 1
+          }
+        ],
+        "Warpriest (Essentials, parent: Cleric)": [
+          {
+            "choice_path": "Domain Features \u2192 Corellon Domain Features and Powers",
+            "feature": "Corellon Domain Features and Powers",
+            "powers_granted": 4
+          },
+          {
+            "choice_path": "Domain Features \u2192 Death Domain Features and Powers",
+            "feature": "Death Domain Features and Powers",
+            "powers_granted": 4
+          },
+          {
+            "choice_path": "Domain Features \u2192 Earth Domain Features and Powers",
+            "feature": "Earth Domain Features and Powers",
+            "powers_granted": 4
+          },
+          {
+            "choice_path": "Domain Features \u2192 Oghma Domain Features and Powers",
+            "feature": "Oghma Domain Features and Powers",
+            "powers_granted": 4
+          },
+          {
+            "choice_path": "Domain Features \u2192 Sel\u00fbne Domain Features and Powers",
+            "feature": "Sel\u00fbne Domain Features and Powers",
+            "powers_granted": 4
+          },
+          {
+            "choice_path": "Domain Features \u2192 Storm Domain Features and Powers",
+            "feature": "Storm Domain Features and Powers",
+            "powers_granted": 4
+          },
+          {
+            "choice_path": "Domain Features \u2192 Sun Domain Features",
+            "feature": "Sun Domain Features",
+            "powers_granted": 4
+          },
+          {
+            "choice_path": "Domain Features \u2192 Torm Domain Features and Powers",
+            "feature": "Torm Domain Features and Powers",
+            "powers_granted": 4
+          },
+          {
+            "choice_path": "Auto-granted: Healing Word",
+            "feature": "Healing Word",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Auto-granted: Channel Divinity Powers",
+            "feature": "Channel Divinity Powers",
+            "powers_granted": 1
+          }
+        ],
+        "Witch (Essentials, parent: Wizard)": [
+          {
+            "choice_path": "Moon Coven \u2192 Dark Moon Coven",
+            "feature": "Dark Moon Coven",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Moon Coven \u2192 Full Moon Coven",
+            "feature": "Full Moon Coven",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Auto-granted: Augury",
+            "feature": "Augury",
+            "powers_granted": 1
+          }
+        ],
+        "Wizard": [
+          {
+            "choice_path": "Arcane Implement Mastery \u2192 Orb of Deception",
+            "feature": "Orb of Deception",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Arcane Implement Mastery \u2192 Orb of Imposition",
+            "feature": "Orb of Imposition",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Arcane Implement Mastery \u2192 Staff of Defense",
+            "feature": "Staff of Defense",
+            "powers_granted": 1
+          },
+          {
+            "choice_path": "Arcane Implement Mastery \u2192 Wand of Accuracy",
+            "feature": "Wand of Accuracy",
+            "powers_granted": 1
+          }
+        ]
+      },
+      "counts": [
+        63,
+        156
+      ]
+    },
+    "P1a_nested_power_choices": {
+      "status": "Fixed (9b4c41e)",
+      "classes": {
+        "Warlock": [
+          {
+            "choice_path": "Eldritch Pact \u2192 Infernal Pact \u2192 power variant",
+            "feature": "Infernal Pact",
+            "nested_key": "classPower:ID_FMP_CLASS_FEATURE_773"
+          }
+        ],
+        "Wizard": [
+          {
+            "choice_path": "Arcane Implement Mastery \u2192 Tome of Readiness \u2192 power variant",
+            "feature": "Tome of Readiness",
+            "nested_key": "classPower:ID_FMP_CLASS_FEATURE_1511"
+          }
+        ]
+      },
+      "counts": [
+        2,
+        2
+      ]
+    },
+    "P1b_nested_class_feature_choices": {
+      "status": "Fixed (9b4c41e)",
+      "classes": {
+        "Elementalist (Essentials, parent: Sorcerer)": [
+          {
+            "choice_path": "Elemental Specialty \u2192 Air Elementalist \u2192 Elemental Specialty",
+            "feature": "Air Elementalist",
+            "options": [
+              "Howling Zephyr",
+              "Static Charge"
+            ],
+            "nested_key": "classFeature:ID_FMP_CLASS_FEATURE_4336"
+          },
+          {
+            "choice_path": "Elemental Specialty \u2192 Earth Elementalist \u2192 Elemental Specialty",
+            "feature": "Earth Elementalist",
+            "options": [
+              "Erupting Earth",
+              "Seismic Shock"
+            ],
+            "nested_key": "classFeature:ID_FMP_CLASS_FEATURE_4337"
+          },
+          {
+            "choice_path": "Elemental Specialty \u2192 Fire Elementalist \u2192 Elemental Specialty",
+            "feature": "Fire Elementalist",
+            "options": [
+              "Blazing Cloud",
+              "Ignition"
+            ],
+            "nested_key": "classFeature:ID_FMP_CLASS_FEATURE_4338"
+          },
+          {
+            "choice_path": "Elemental Specialty \u2192 Water Elementalist \u2192 Elemental Specialty",
+            "feature": "Water Elementalist",
+            "options": [
+              "Deluge",
+              "Ice Prison"
+            ],
+            "nested_key": "classFeature:ID_FMP_CLASS_FEATURE_4339"
+          }
+        ],
+        "Rogue": [
+          {
+            "choice_path": "Class feature \u2192 Sharpshooter Talent \u2192 Class Feature",
+            "feature": "Sharpshooter Talent",
+            "options": [
+              "Sharpshooter Talent (Crossbow)",
+              "Sharpshooter Talent (Sling)"
+            ],
+            "nested_key": "classFeature:ID_FMP_CLASS_FEATURE_2238"
+          }
+        ]
+      },
+      "counts": [
+        2,
+        5
+      ]
+    },
+    "P1c_modify_power": {
+      "status": "Partial (9b4c41e)",
+      "classes": {
+        "Binder (Essentials, parent: Warlock)": [
+          {
+            "feature": "Summon Warlock's Ally (Binder)",
+            "fields": [
+              "Class",
+              "Display"
+            ],
+            "count": 2
+          }
+        ],
+        "Blackguard (Essentials, parent: Paladin)": [
+          {
+            "feature": "Level 3 Extra Dread Smite",
+            "fields": [
+              "Special"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Improved Shroud of Shadow (Domination)",
+            "fields": [
+              "Improved Shroud of Shadow"
+            ],
+            "count": 2
+          },
+          {
+            "feature": "Improved Shroud of Shadow (Fury)",
+            "fields": [
+              "Improved Shroud of Shadow"
+            ],
+            "count": 2
+          },
+          {
+            "feature": "Level 13 Extra Dread Smite",
+            "fields": [
+              "Special"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Shadow Leap",
+            "fields": [
+              "Shadow Leap"
+            ],
+            "count": 1
+          }
+        ],
+        "Bladesinger (Essentials, parent: Wizard)": [
+          {
+            "feature": "Instinctive Attack",
+            "fields": [
+              "Instinctive Attack"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Bladesinger Cantrips",
+            "fields": [
+              "Action Type",
+              "Class",
+              "Power Type",
+              "Power Usage"
+            ],
+            "count": 10
+          }
+        ],
+        "Cleric": [
+          {
+            "feature": "Healing Word",
+            "fields": [
+              "Display",
+              "Power Type"
+            ],
+            "count": 2
+          },
+          {
+            "feature": "Storm Domain Features and Powers",
+            "fields": [
+              "Storm Domain Feature"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Sun Domain Features",
+            "fields": [
+              "Sun Domain Feature"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Earth Domain Features and Powers",
+            "fields": [
+              "Earth Domain Feature"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Death Domain Features and Powers",
+            "fields": [
+              "Death Domain Features and Powers"
+            ],
+            "count": 3
+          },
+          {
+            "feature": "Corellon Domain Features and Powers",
+            "fields": [
+              "Corellon Domain Features and Powers"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Oghma Domain Features and Powers",
+            "fields": [
+              "Oghma Domain Features and Powers"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Sel\u00fbne Domain Features and Powers",
+            "fields": [
+              "Sel\u00fbne Domain Features and Powers"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Torm Domain Features and Powers",
+            "fields": [
+              "Torm Domain Features and Powers"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Domination Domain Features and Powers",
+            "fields": [
+              "Domination Domain Feature"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Healing Word (Druid)",
+            "fields": [
+              "Class",
+              "Display",
+              "Power Type",
+              "Power Usage"
+            ],
+            "count": 4
+          },
+          {
+            "feature": "Healing Word (Companion)",
+            "fields": [
+              "Class",
+              "Display",
+              "Effect",
+              "Power Type",
+              "Power Usage"
+            ],
+            "count": 5
+          },
+          {
+            "feature": "Healing Word (Hybrid Sentinel)",
+            "fields": [
+              "Class",
+              "Display",
+              "Power Type",
+              "Power Usage"
+            ],
+            "count": 4
+          }
+        ],
+        "Druid": [
+          {
+            "feature": "Circle of Renewal",
+            "fields": [
+              "Healing Growth"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Circle of Shelter",
+            "fields": [
+              "Unhindering Growth"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Healing Word (Hybrid Sentinel)",
+            "fields": [
+              "Class",
+              "Display",
+              "Power Type",
+              "Power Usage"
+            ],
+            "count": 4
+          }
+        ],
+        "Elementalist (Essentials, parent: Sorcerer)": [
+          {
+            "feature": "Air Elementalist",
+            "fields": [
+              "Air Elementalist",
+              "Keywords"
+            ],
+            "count": 2
+          },
+          {
+            "feature": "Earth Elementalist",
+            "fields": [
+              "Earth Elementalist",
+              "Keywords"
+            ],
+            "count": 2
+          },
+          {
+            "feature": "Fire Elementalist",
+            "fields": [
+              "Fire Elementalist",
+              "Keywords"
+            ],
+            "count": 2
+          },
+          {
+            "feature": "Water Elementalist",
+            "fields": [
+              "Keywords",
+              "Water Elementalist"
+            ],
+            "count": 2
+          }
+        ],
+        "Fighter": [
+          {
+            "feature": "Bladed Step",
+            "fields": [
+              "Bladed Step"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Staggering Hammer",
+            "fields": [
+              "Staggering Hammer"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Brutal Axe",
+            "fields": [
+              "Brutal Axe"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Sweeping Sword",
+            "fields": [
+              "Sweeping Sword"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Rapid Quarterstaff",
+            "fields": [
+              "Rapid Quarterstaff"
+            ],
+            "count": 1
+          }
+        ],
+        "Hunter (Essentials, parent: Ranger)": [
+          {
+            "feature": "Level 3 Improved Disruptive Shot",
+            "fields": [
+              "?"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Level 7 Improved Disruptive Shot",
+            "fields": [
+              "?"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Level 13 Improved Disruptive Shot",
+            "fields": [
+              "?"
+            ],
+            "count": 1
+          }
+        ],
+        "Hybrid Paladin": [
+          {
+            "feature": "Divine Challenge (Hybrid)",
+            "fields": [
+              "Effect"
+            ],
+            "count": 1
+          }
+        ],
+        "Hybrid Sentinel": [
+          {
+            "feature": "Healing Word (Hybrid Sentinel)",
+            "fields": [
+              "Class",
+              "Display",
+              "Power Type",
+              "Power Usage"
+            ],
+            "count": 4
+          }
+        ],
+        "Hybrid Wizard": [
+          {
+            "feature": "Hybrid Cantrips",
+            "fields": [
+              "Action Type",
+              "Class",
+              "Power Type",
+              "Power Usage"
+            ],
+            "count": 10
+          }
+        ],
+        "Knight (Essentials, parent: Fighter)": [
+          {
+            "feature": "Level 3 Improved Power Strike",
+            "fields": [
+              "?"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Bladed Step",
+            "fields": [
+              "Bladed Step"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Staggering Hammer",
+            "fields": [
+              "Staggering Hammer"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Level 13 Improved Power Strike",
+            "fields": [
+              "?"
+            ],
+            "count": 1
+          }
+        ],
+        "Leader": [
+          {
+            "feature": "Healing Word (Companion)",
+            "fields": [
+              "Class",
+              "Display",
+              "Effect",
+              "Power Type",
+              "Power Usage"
+            ],
+            "count": 5
+          }
+        ],
+        "Mage (Essentials, parent: Wizard)": [
+          {
+            "feature": "Mage Cantrips",
+            "fields": [
+              "Action Type",
+              "Class",
+              "Power Type",
+              "Power Usage"
+            ],
+            "count": 10
+          }
+        ],
+        "Monk": [
+          {
+            "feature": "Centered Breath",
+            "fields": [
+              "_ExtraKeywords"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Stone Fist",
+            "fields": [
+              "_ExtraKeywords"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Centered Breath (Hybrid)",
+            "fields": [
+              "_ExtraKeywords"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Stone Fist (Hybrid)",
+            "fields": [
+              "_ExtraKeywords"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Iron Soul",
+            "fields": [
+              "_ExtraKeywords"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Iron Soul (Hybrid)",
+            "fields": [
+              "_ExtraKeywords"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Desert Wind (Hybrid)",
+            "fields": [
+              "_ExtraKeywords"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Eternal Tide (Hybrid)",
+            "fields": [
+              "_ExtraKeywords"
+            ],
+            "count": 1
+          }
+        ],
+        "Paladin": [
+          {
+            "feature": "Divine Challenge (Hybrid)",
+            "fields": [
+              "Effect"
+            ],
+            "count": 1
+          }
+        ],
+        "Protector (Essentials, parent: Druid)": [
+          {
+            "feature": "Circle of Renewal",
+            "fields": [
+              "Healing Growth"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Circle of Shelter",
+            "fields": [
+              "Unhindering Growth"
+            ],
+            "count": 1
+          }
+        ],
+        "Scout (Essentials, parent: Ranger)": [
+          {
+            "feature": "Level 3 Improved Power Strike",
+            "fields": [
+              "?"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Enhanced Power Strike",
+            "fields": [
+              "?"
+            ],
+            "count": 3
+          }
+        ],
+        "Sentinel (Essentials, parent: Druid)": [
+          {
+            "feature": "Level 3 Improved Combined Attack",
+            "fields": [
+              "?"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Level 7 Improved Combined Attack",
+            "fields": [
+              "?"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Paragon of the Natural Cycle (Spring)",
+            "fields": [
+              "Hit"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Paragon of the Natural Cycle (Summer)",
+            "fields": [
+              "Hit"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Timeless Body",
+            "fields": [
+              "Hit"
+            ],
+            "count": 2
+          },
+          {
+            "feature": "Healing Word (Druid)",
+            "fields": [
+              "Class",
+              "Display",
+              "Power Type",
+              "Power Usage"
+            ],
+            "count": 4
+          }
+        ],
+        "Slayer (Essentials, parent: Fighter)": [
+          {
+            "feature": "Level 3 Improved Power Strike",
+            "fields": [
+              "?"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Level 13 Improved Power Strike",
+            "fields": [
+              "?"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Brutal Axe",
+            "fields": [
+              "Brutal Axe"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Sweeping Sword",
+            "fields": [
+              "Sweeping Sword"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Rapid Quarterstaff",
+            "fields": [
+              "Rapid Quarterstaff"
+            ],
+            "count": 1
+          }
+        ],
+        "Sorcerer": [
+          {
+            "feature": "Air Elementalist",
+            "fields": [
+              "Air Elementalist",
+              "Keywords"
+            ],
+            "count": 2
+          },
+          {
+            "feature": "Earth Elementalist",
+            "fields": [
+              "Earth Elementalist",
+              "Keywords"
+            ],
+            "count": 2
+          },
+          {
+            "feature": "Fire Elementalist",
+            "fields": [
+              "Fire Elementalist",
+              "Keywords"
+            ],
+            "count": 2
+          },
+          {
+            "feature": "Water Elementalist",
+            "fields": [
+              "Keywords",
+              "Water Elementalist"
+            ],
+            "count": 2
+          }
+        ],
+        "Thief (Essentials, parent: Rogue)": [
+          {
+            "feature": "Level 3 Improved Backstab",
+            "fields": [
+              "?"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Level 13 Improved Backstab",
+            "fields": [
+              "?"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Evasive Backstab",
+            "fields": [
+              "Evasive Backstab"
+            ],
+            "count": 1
+          }
+        ],
+        "Vampire": [
+          {
+            "feature": "Improved Blood Drinker",
+            "fields": [
+              "Special"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Energized Blood Drinker",
+            "fields": [
+              "Special"
+            ],
+            "count": 1
+          }
+        ],
+        "Warlock": [
+          {
+            "feature": "Fey Pact (Binding Initate)",
+            "fields": [
+              "Power Usage"
+            ],
+            "count": 2
+          },
+          {
+            "feature": "Gloom Pact (Binding Initate)",
+            "fields": [
+              "Power Usage"
+            ],
+            "count": 2
+          },
+          {
+            "feature": "Star Pact (Binding Initate)",
+            "fields": [
+              "Power Usage"
+            ],
+            "count": 2
+          }
+        ],
+        "Warpriest (Essentials, parent: Cleric)": [
+          {
+            "feature": "Healing Word",
+            "fields": [
+              "Display",
+              "Power Type"
+            ],
+            "count": 2
+          },
+          {
+            "feature": "Storm Domain Features and Powers",
+            "fields": [
+              "Storm Domain Feature"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Sun Domain Features",
+            "fields": [
+              "Sun Domain Feature"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Earth Domain Features and Powers",
+            "fields": [
+              "Earth Domain Feature"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Death Domain Features and Powers",
+            "fields": [
+              "Death Domain Features and Powers"
+            ],
+            "count": 3
+          },
+          {
+            "feature": "Corellon Domain Features and Powers",
+            "fields": [
+              "Corellon Domain Features and Powers"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Oghma Domain Features and Powers",
+            "fields": [
+              "Oghma Domain Features and Powers"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Sel\u00fbne Domain Features and Powers",
+            "fields": [
+              "Sel\u00fbne Domain Features and Powers"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Torm Domain Features and Powers",
+            "fields": [
+              "Torm Domain Features and Powers"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Domination Domain Features and Powers",
+            "fields": [
+              "Domination Domain Feature"
+            ],
+            "count": 1
+          },
+          {
+            "feature": "Healing Word (Druid)",
+            "fields": [
+              "Class",
+              "Display",
+              "Power Type",
+              "Power Usage"
+            ],
+            "count": 4
+          },
+          {
+            "feature": "Healing Word (Companion)",
+            "fields": [
+              "Class",
+              "Display",
+              "Effect",
+              "Power Type",
+              "Power Usage"
+            ],
+            "count": 5
+          },
+          {
+            "feature": "Healing Word (Hybrid Sentinel)",
+            "fields": [
+              "Class",
+              "Display",
+              "Power Type",
+              "Power Usage"
+            ],
+            "count": 4
+          }
+        ],
+        "Witch (Essentials, parent: Wizard)": [
+          {
+            "feature": "Witch Cantrips",
+            "fields": [
+              "Action Type",
+              "Class",
+              "Power Type",
+              "Power Usage"
+            ],
+            "count": 10
+          }
+        ],
+        "Wizard": [
+          {
+            "feature": "Arcanist Cantrips",
+            "fields": [
+              "Action Type",
+              "Class",
+              "Power Type",
+              "Power Usage"
+            ],
+            "count": 10
+          },
+          {
+            "feature": "Mage Cantrips",
+            "fields": [
+              "Action Type",
+              "Class",
+              "Power Type",
+              "Power Usage"
+            ],
+            "count": 10
+          },
+          {
+            "feature": "Bladesinger Cantrips",
+            "fields": [
+              "Action Type",
+              "Class",
+              "Power Type",
+              "Power Usage"
+            ],
+            "count": 10
+          },
+          {
+            "feature": "Witch Cantrips",
+            "fields": [
+              "Action Type",
+              "Class",
+              "Power Type",
+              "Power Usage"
+            ],
+            "count": 10
+          }
+        ]
+      },
+      "counts": [
+        27,
+        99
+      ]
+    },
+    "P1d_modify_weapon": {
+      "status": "Open",
+      "classes": {
+        "Druid": [
+          {
+            "feature": "Druid of Summer",
+            "fields": [
+              "Damage"
+            ],
+            "count": 8
+          }
+        ],
+        "Rogue": [
+          {
+            "feature": "Rogue Weapon Talent",
+            "fields": [
+              "Damage"
+            ],
+            "count": 2
+          }
+        ],
+        "Sentinel (Essentials, parent: Druid)": [
+          {
+            "feature": "Druid of Summer",
+            "fields": [
+              "Damage"
+            ],
+            "count": 8
+          }
+        ]
+      },
+      "counts": [
+        3,
+        3
+      ]
+    },
+    "P1e_essentials_build_powers": {
+      "status": "Fixed (9b4c41e)",
+      "classes": {
+        "Ardent": [
+          {
+            "build": "Enlightened Ardent",
+            "suggested_powers": 3
+          },
+          {
+            "build": "Euphoric Ardent",
+            "suggested_powers": 3
+          },
+          {
+            "build": "Impetuous Ardent",
+            "suggested_powers": 3
+          }
+        ],
+        "Artificer": [
+          {
+            "build": "Battlesmith Artificer",
+            "suggested_powers": 4
+          },
+          {
+            "build": "Tinkerer Artificer",
+            "suggested_powers": 4
+          },
+          {
+            "build": "Warrior Forge Artificer",
+            "suggested_powers": 3
+          }
+        ],
+        "Avenger": [
+          {
+            "build": "Isolating Avenger",
+            "suggested_powers": 7
+          },
+          {
+            "build": "Pursuing Avenger",
+            "suggested_powers": 8
+          }
+        ],
+        "Barbarian": [
+          {
+            "build": "Rageblood Barbarian",
+            "suggested_powers": 5
+          },
+          {
+            "build": "Thunderborn Barbarian",
+            "suggested_powers": 1
+          },
+          {
+            "build": "Whirling Barbarian",
+            "suggested_powers": 1
+          }
+        ],
+        "Bard": [
+          {
+            "build": "Cunning Bard",
+            "suggested_powers": 6
+          },
+          {
+            "build": "Prescient Bard",
+            "suggested_powers": 4
+          },
+          {
+            "build": "Valorous Bard",
+            "suggested_powers": 20
+          }
+        ],
+        "Battlemind": [
+          {
+            "build": "Harrier Battlemind",
+            "suggested_powers": 3
+          },
+          {
+            "build": "Quick Battlemind",
+            "suggested_powers": 4
+          },
+          {
+            "build": "Resilient Battlemind",
+            "suggested_powers": 3
+          },
+          {
+            "build": "Wild Battlemind",
+            "suggested_powers": 3
+          }
+        ],
+        "Cleric": [
+          {
+            "build": "Battle Cleric",
+            "suggested_powers": 15
+          },
+          {
+            "build": "Devoted Cleric",
+            "suggested_powers": 19
+          }
+        ],
+        "Druid": [
+          {
+            "build": "Guardian Druid",
+            "suggested_powers": 2
+          },
+          {
+            "build": "Predator Druid",
+            "suggested_powers": 2
+          }
+        ],
+        "Fighter": [
+          {
+            "build": "Arena Fighter",
+            "suggested_powers": 3
+          },
+          {
+            "build": "Battlerager Fighter",
+            "suggested_powers": 4
+          },
+          {
+            "build": "Brawling Fighter",
+            "suggested_powers": 4
+          },
+          {
+            "build": "Great Weapon Fighter",
+            "suggested_powers": 14
+          },
+          {
+            "build": "Guardian Fighter",
+            "suggested_powers": 13
+          },
+          {
+            "build": "Tempest Fighter",
+            "suggested_powers": 4
+          }
+        ],
+        "Invoker": [
+          {
+            "build": "Preserving Invoker",
+            "suggested_powers": 6
+          },
+          {
+            "build": "Wrathful Invoker",
+            "suggested_powers": 6
+          }
+        ],
+        "Monk": [
+          {
+            "build": "Centered Breath Monk",
+            "suggested_powers": 4
+          },
+          {
+            "build": "Iron Soul Monk",
+            "suggested_powers": 4
+          },
+          {
+            "build": "Stone Fist Monk",
+            "suggested_powers": 4
+          }
+        ],
+        "Paladin": [
+          {
+            "build": "Avenging Paladin",
+            "suggested_powers": 13
+          },
+          {
+            "build": "Protecting Paladin",
+            "suggested_powers": 15
+          }
+        ],
+        "Psion": [
+          {
+            "build": "Shaper Psion",
+            "suggested_powers": 3
+          },
+          {
+            "build": "Telekinetic Psion",
+            "suggested_powers": 3
+          },
+          {
+            "build": "Telepathic Psion",
+            "suggested_powers": 3
+          }
+        ],
+        "Ranger": [
+          {
+            "build": "Archer Ranger",
+            "suggested_powers": 15
+          },
+          {
+            "build": "Beastmaster Ranger",
+            "suggested_powers": 4
+          },
+          {
+            "build": "Hunter Ranger",
+            "suggested_powers": 3
+          },
+          {
+            "build": "Marauder Ranger",
+            "suggested_powers": 4
+          },
+          {
+            "build": "Two-Blade Ranger",
+            "suggested_powers": 14
+          }
+        ],
+        "Rogue": [
+          {
+            "build": "Aerialist Rogue",
+            "suggested_powers": 2
+          },
+          {
+            "build": "Brawny Rogue",
+            "suggested_powers": 14
+          },
+          {
+            "build": "Cutthroat Rogue",
+            "suggested_powers": 3
+          },
+          {
+            "build": "Shadowy Rogue",
+            "suggested_powers": 3
+          },
+          {
+            "build": "Trickster Rogue",
+            "suggested_powers": 16
+          }
+        ],
+        "Runepriest": [
+          {
+            "build": "Defiant Runepriest",
+            "suggested_powers": 4
+          },
+          {
+            "build": "Wrathful Runepriest",
+            "suggested_powers": 4
+          }
+        ],
+        "Seeker": [
+          {
+            "build": "Protecting Seeker",
+            "suggested_powers": 3
+          },
+          {
+            "build": "Vengeful Seeker",
+            "suggested_powers": 3
+          }
+        ],
+        "Shaman": [
+          {
+            "build": "Animist Shaman",
+            "suggested_powers": 4
+          },
+          {
+            "build": "Bear Shaman",
+            "suggested_powers": 6
+          },
+          {
+            "build": "Panther Shaman",
+            "suggested_powers": 7
+          }
+        ],
+        "Sorcerer": [
+          {
+            "build": "Chaos Sorcerer",
+            "suggested_powers": 14
+          },
+          {
+            "build": "Cosmic Sorcerer",
+            "suggested_powers": 7
+          },
+          {
+            "build": "Dragon Sorcerer",
+            "suggested_powers": 19
+          },
+          {
+            "build": "Storm Sorcerer",
+            "suggested_powers": 4
+          }
+        ],
+        "Swordmage": [
+          {
+            "build": "Assault Swordmage",
+            "suggested_powers": 22
+          },
+          {
+            "build": "Ensnaring Swordmage",
+            "suggested_powers": 8
+          },
+          {
+            "build": "Shielding Swordmage",
+            "suggested_powers": 19
+          }
+        ],
+        "Warden": [
+          {
+            "build": "Earth Warden",
+            "suggested_powers": 5
+          },
+          {
+            "build": "Wild Warden",
+            "suggested_powers": 4
+          }
+        ],
+        "Warlock": [
+          {
+            "build": "Deceptive Warlock",
+            "suggested_powers": 31
+          },
+          {
+            "build": "Scourge Warlock",
+            "suggested_powers": 18
+          },
+          {
+            "build": "Sorcerer-King Pact",
+            "suggested_powers": 3
+          }
+        ],
+        "Warlord": [
+          {
+            "build": "Bravura Warlord",
+            "suggested_powers": 11
+          },
+          {
+            "build": "Insightful Warlord",
+            "suggested_powers": 4
+          },
+          {
+            "build": "Inspiring Warlord",
+            "suggested_powers": 17
+          },
+          {
+            "build": "Resourceful Warlord",
+            "suggested_powers": 19
+          },
+          {
+            "build": "Skirmishing Warlord",
+            "suggested_powers": 4
+          },
+          {
+            "build": "Tactical Warlord",
+            "suggested_powers": 15
+          }
+        ],
+        "Wizard": [
+          {
+            "build": "Control Wizard",
+            "suggested_powers": 24
+          },
+          {
+            "build": "Illusionist Wizard",
+            "suggested_powers": 4
+          },
+          {
+            "build": "Summoner Wizard",
+            "suggested_powers": 4
+          },
+          {
+            "build": "War Wizard",
+            "suggested_powers": 23
+          }
+        ]
+      },
+      "counts": [
+        24,
+        77
+      ]
+    },
+    "P1f_rules_replace": {
+      "status": "Open",
+      "classes": {
+        "Binder (Essentials, parent: Warlock)": [
+          {
+            "feature": "Level 15 Binder Daily Power",
+            "count": 1
+          },
+          {
+            "feature": "Level 19 Binder Daily Power",
+            "count": 1
+          },
+          {
+            "feature": "Level 29 Binder Daily Power",
+            "count": 1
+          }
+        ],
+        "Blackguard (Essentials, parent: Paladin)": [
+          {
+            "feature": "Level 19 Blackguard Daily Power",
+            "count": 1
+          },
+          {
+            "feature": "Level 25 Blackguard Daily Power",
+            "count": 1
+          },
+          {
+            "feature": "Avatar of Vice",
+            "count": 1
+          }
+        ],
+        "Cleric": [
+          {
+            "feature": "Level 15 Warpriest Daily Power",
+            "count": 1
+          },
+          {
+            "feature": "Level 19 Warpriest Daily Power",
+            "count": 1
+          },
+          {
+            "feature": "Level 25 Warpriest Daily Power",
+            "count": 1
+          },
+          {
+            "feature": "Level 29 Warpriest Daily Power",
+            "count": 1
+          }
+        ],
+        "Paladin": [
+          {
+            "feature": "Level 19 Blackguard Daily Power",
+            "count": 1
+          },
+          {
+            "feature": "Level 25 Blackguard Daily Power",
+            "count": 1
+          },
+          {
+            "feature": "Avatar of Vice",
+            "count": 1
+          }
+        ],
+        "Sentinel (Essentials, parent: Druid)": [
+          {
+            "feature": "Level 15 Sentinel Daily Power",
+            "count": 1
+          },
+          {
+            "feature": "Level 19 Sentinel Daily Power",
+            "count": 1
+          },
+          {
+            "feature": "Level 25 Sentinel Daily Power",
+            "count": 1
+          },
+          {
+            "feature": "Level 29 Sentinel Daily Power",
+            "count": 1
+          }
+        ],
+        "Warlock": [
+          {
+            "feature": "Level 13 Gloom Pact Encounter Power",
+            "count": 1
+          },
+          {
+            "feature": "Level 13 Star Pact Encounter Power",
+            "count": 1
+          },
+          {
+            "feature": "Level 13 Fey Pact Encounter Power",
+            "count": 1
+          },
+          {
+            "feature": "Level 15 Binder Daily Power",
+            "count": 1
+          },
+          {
+            "feature": "Level 17 Gloom Pact Encounter Power",
+            "count": 1
+          },
+          {
+            "feature": "Level 17 Star Pact Encounter Power",
+            "count": 1
+          },
+          {
+            "feature": "Level 17 Fey Pact Encounter Power",
+            "count": 1
+          },
+          {
+            "feature": "Level 19 Binder Daily Power",
+            "count": 1
+          },
+          {
+            "feature": "Level 23 Gloom Pact Encounter Power",
+            "count": 1
+          },
+          {
+            "feature": "Level 23 Star Pact Encounter Power",
+            "count": 1
+          },
+          {
+            "feature": "Level 23 Fey Pact Encounter Power",
+            "count": 1
+          },
+          {
+            "feature": "Level 27 Gloom Pact Encounter Power",
+            "count": 1
+          },
+          {
+            "feature": "Level 27 Star Pact Encounter Power",
+            "count": 1
+          },
+          {
+            "feature": "Level 27 Fey Pact Encounter Power",
+            "count": 1
+          },
+          {
+            "feature": "Level 29 Binder Daily Power",
+            "count": 1
+          }
+        ],
+        "Warpriest (Essentials, parent: Cleric)": [
+          {
+            "feature": "Level 15 Warpriest Daily Power",
+            "count": 1
+          },
+          {
+            "feature": "Level 19 Warpriest Daily Power",
+            "count": 1
+          },
+          {
+            "feature": "Level 25 Warpriest Daily Power",
+            "count": 1
+          },
+          {
+            "feature": "Level 29 Warpriest Daily Power",
+            "count": 1
+          }
+        ]
+      },
+      "counts": [
+        7,
+        36
+      ]
+    }
+  },
+  "indexed_choice_groups_by_class": {
+    "Cleric": [
+      {
+        "group": "Channel Divinity",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_324:0",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 2
+      },
+      {
+        "group": "Channel Divinity",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_324:1",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 3
+      },
+      {
+        "group": "Healer's Lore",
+        "key": "classFeatureOptional:ID_FMP_CLASS_FEATURE_395",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Standard (default class proficiencies)",
+          "Healer's Lore"
+        ]
+      }
+    ],
+    "Fighter": [
+      {
+        "group": "Class feature",
+        "key": "classFeaturePair:ID_FMP_CLASS_FEATURE_2183:ID_FMP_CLASS_FEATURE_401",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Combat Agility",
+          "Combat Superiority"
+        ]
+      },
+      {
+        "group": "Fighter Talents",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_1064",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Arena Training",
+          "Battlerager Vigor",
+          "Brawler Style",
+          "One-handed Weapon Talent",
+          "Tempest Technique",
+          "Two-handed Weapon Talent"
+        ]
+      }
+    ],
+    "Paladin": [
+      {
+        "group": "Channel Divinity",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_324",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 12
+      },
+      {
+        "group": "Lay on Hands",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_434",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 3
+      }
+    ],
+    "Ranger": [
+      {
+        "group": "Class feature",
+        "key": "classFeaturePair:ID_FMP_CLASS_FEATURE_2209:ID_FMP_CLASS_FEATURE_603",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Prime Shot",
+          "Running Attack"
+        ]
+      },
+      {
+        "group": "Fighting Style",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_321",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Archer Fighting Style",
+          "Beast Mastery",
+          "Hunter Fighting Style",
+          "Marauder Fighting Style",
+          "Two-Blade Fighting Style"
+        ]
+      }
+    ],
+    "Rogue": [
+      {
+        "group": "Class feature",
+        "key": "classFeaturePair:ID_FMP_CLASS_FEATURE_2238:ID_FMP_CLASS_FEATURE_391",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Rogue Weapon Talent",
+          "Sharpshooter Talent"
+        ]
+      },
+      {
+        "group": "Rogue Tactics",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_547",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Artful Dodger",
+          "Brutal Scoundrel",
+          "Cunning Sneak",
+          "Ruthless Ruffian"
+        ]
+      },
+      {
+        "group": "Sharpshooter Talent",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_2238",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": {
+          "groupKey": "classFeaturePair:ID_FMP_CLASS_FEATURE_2238:ID_FMP_CLASS_FEATURE_391",
+          "optionId": "ID_FMP_CLASS_FEATURE_2238"
+        },
+        "options": [
+          "Sharpshooter Talent (Crossbow)",
+          "Sharpshooter Talent (Sling)"
+        ]
+      }
+    ],
+    "Warlock": [
+      {
+        "group": "Eldritch Blast",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_606",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 2
+      },
+      {
+        "group": "Eldritch Pact",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_777",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Dark Pact",
+          "Elemental Pact",
+          "Fey Pact",
+          "Infernal Pact",
+          "Sorcerer-King Pact",
+          "Star Pact",
+          "Vestige Pact"
+        ]
+      }
+    ],
+    "Warlord": [
+      {
+        "group": "Archer Warlord",
+        "key": "classFeatureOptional:ID_FMP_CLASS_FEATURE_2286",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Standard (default class proficiencies)",
+          "Archer Warlord"
+        ]
+      },
+      {
+        "group": "Archer Warlord Optional Choice",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_2286_FIX",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Archer Warlord",
+          "Standard Warlord Armor Features"
+        ]
+      },
+      {
+        "group": "Commanding Presence",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_316",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Bravura Presence",
+          "Insightful Presence",
+          "Inspiring Presence",
+          "Resourceful Presence",
+          "Skirmishing Presence",
+          "Tactical Presence"
+        ]
+      },
+      {
+        "group": "Leader",
+        "key": "classFeaturePair:ID_FMP_CLASS_FEATURE_2285:ID_FMP_CLASS_FEATURE_2287:ID_FMP_CLASS_FEATURE_443",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Battlefront Leader",
+          "Canny Leader",
+          "Combat Leader"
+        ]
+      }
+    ],
+    "Wizard": [
+      {
+        "group": "Arcane Implement Mastery",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_444",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Orb of Deception",
+          "Orb of Imposition",
+          "Staff of Defense",
+          "Tome of Binding",
+          "Tome of Readiness",
+          "Wand of Accuracy"
+        ]
+      },
+      {
+        "group": "Arcanist Cantrips",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_130",
+        "kind": "power",
+        "pick_count": 4,
+        "visible_when": null,
+        "power_pool_size": 10
+      },
+      {
+        "group": "Spellbook",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_318:0",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 21
+      },
+      {
+        "group": "Spellbook",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_318:7",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 23
+      },
+      {
+        "group": "Spellbook",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_318:1",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 20
+      },
+      {
+        "group": "Spellbook",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_318:8",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 23
+      },
+      {
+        "group": "Spellbook",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_318:2",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 23
+      },
+      {
+        "group": "Spellbook",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_318:9",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 22
+      },
+      {
+        "group": "Spellbook",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_318:3",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 24
+      },
+      {
+        "group": "Spellbook",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_318:10",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 20
+      },
+      {
+        "group": "Spellbook",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_318:4",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 19
+      },
+      {
+        "group": "Spellbook",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_318:11",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 17
+      },
+      {
+        "group": "Spellbook",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_318:5",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 19
+      },
+      {
+        "group": "Spellbook",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_318:6",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 16
+      }
+    ],
+    "Swordmage": [
+      {
+        "group": "Swordmage Aegis",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_518",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Aegis of Assault",
+          "Aegis of Ensnarement",
+          "Aegis of Shielding"
+        ]
+      }
+    ],
+    "Bard": [
+      {
+        "group": "Bardic Virtue",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_700",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Virtue of Cunning",
+          "Virtue of Prescience",
+          "Virtue of Valor"
+        ]
+      },
+      {
+        "group": "Signs of Influence",
+        "key": "classFeatureOptional:ID_FMP_CLASS_FEATURE_4139",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "No Signs of Influence",
+          "Signs of Influence"
+        ]
+      },
+      {
+        "group": "Signs of Influence",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_4139",
+        "kind": "classFeature",
+        "pick_count": 2,
+        "visible_when": {
+          "groupKey": "classFeatureOptional:ID_FMP_CLASS_FEATURE_4139",
+          "optionId": "ID_FMP_CLASS_FEATURE_4139"
+        },
+        "options": [
+          "Attract Attendants",
+          "Demand Audience",
+          "Ritual Beneficiary",
+          "Travel in Style",
+          "Welcome Guest"
+        ]
+      },
+      {
+        "group": "Signs of Influence (level 13)",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_4139:13",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": {
+          "groupKey": "classFeatureOptional:ID_FMP_CLASS_FEATURE_4139",
+          "optionId": "ID_FMP_CLASS_FEATURE_4139"
+        },
+        "options": [
+          "Attract Attendants",
+          "Demand Audience",
+          "Ritual Beneficiary",
+          "Travel in Style",
+          "Welcome Guest"
+        ]
+      },
+      {
+        "group": "Signs of Influence (level 17)",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_4139:17",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": {
+          "groupKey": "classFeatureOptional:ID_FMP_CLASS_FEATURE_4139",
+          "optionId": "ID_FMP_CLASS_FEATURE_4139"
+        },
+        "options": [
+          "Attract Attendants",
+          "Demand Audience",
+          "Ritual Beneficiary",
+          "Travel in Style",
+          "Welcome Guest"
+        ]
+      }
+    ],
+    "Battlemind": [
+      {
+        "group": "Psionic Study",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_2175",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Battle Resilience",
+          "Persistent Harrier",
+          "Speed of Thought",
+          "Wild Focus"
+        ]
+      }
+    ],
+    "Artificer": [
+      {
+        "group": "Healing Infusion",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_862",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 2
+      }
+    ],
+    "Druid": [
+      {
+        "group": "Primal Aspect",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_784",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Primal Guardian",
+          "Primal Predator",
+          "Primal Swarm",
+          "Primal Wrath"
+        ]
+      }
+    ],
+    "Invoker": [
+      {
+        "group": "Channel Divinity",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_324",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 12
+      },
+      {
+        "group": "Divine Covenant",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_1156",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Covenant of Malediction",
+          "Covenant of Preservation",
+          "Covenant of Wrath"
+        ]
+      }
+    ],
+    "Sorcerer": [
+      {
+        "group": "Spell Source",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_850",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Cosmic Magic",
+          "Dragon Magic",
+          "Storm Magic",
+          "Wild Magic"
+        ]
+      }
+    ],
+    "Avenger": [
+      {
+        "group": "Avenger's Censure",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_1192",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Censure of Pursuit",
+          "Censure of Retribution",
+          "Censure of Unity"
+        ]
+      },
+      {
+        "group": "Channel Divinity",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_324",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 12
+      }
+    ],
+    "Warden": [
+      {
+        "group": "Guardian Might",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_1281",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Earthstrength",
+          "Lifespirit",
+          "Stormheart",
+          "Wildblood"
+        ]
+      }
+    ],
+    "Shaman": [
+      {
+        "group": "Companion Spirit",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_855",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Elemental Spirit",
+          "Protector Spirit",
+          "Stalker Spirit",
+          "Watcher Spirit",
+          "World Speaker Spirit"
+        ]
+      }
+    ],
+    "Barbarian": [
+      {
+        "group": "Feral Might",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_1051",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Rageblood Vigor",
+          "Thaneborn Triumph",
+          "Thunderborn Wrath",
+          "Whirling Slayer"
+        ]
+      }
+    ],
+    "Monk": [
+      {
+        "group": "Monastic Tradition",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_1543",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Centered Breath",
+          "Desert Wind",
+          "Eternal Tide",
+          "Iron Soul",
+          "Stone Fist"
+        ]
+      }
+    ],
+    "Psion": [
+      {
+        "group": "Discipline Focus",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_1810",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Shaper Focus",
+          "Telekinesis Focus",
+          "Telepathy Focus"
+        ]
+      }
+    ],
+    "Assassin": [
+      {
+        "group": "Guild Training",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_1921",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Bleak Disciple",
+          "Executioner's Guild",
+          "Night Stalker"
+        ]
+      },
+      {
+        "group": "Shade Form",
+        "key": "classFeatureOptional:ID_FMP_CLASS_FEATURE_1922",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Standard (default class proficiencies)",
+          "Shade Form"
+        ]
+      }
+    ],
+    "Seeker": [
+      {
+        "group": "Seeker's Bond",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_1944",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Bloodbond",
+          "Spiritbond"
+        ]
+      }
+    ],
+    "Ardent": [
+      {
+        "group": "Ardent Mantle",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_2136",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Mantle of Clarity",
+          "Mantle of Elation",
+          "Mantle of Impulsiveness"
+        ]
+      }
+    ],
+    "Runepriest": [
+      {
+        "group": "Runic Artistry",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_2388",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Defiant Word",
+          "Serene Blade",
+          "Wrathful Hammer"
+        ]
+      }
+    ],
+    "Warpriest (Essentials, parent: Cleric)": [
+      {
+        "group": "Domain Features",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_2988",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Corellon Domain Features and Powers",
+          "Death Domain Features and Powers",
+          "Domination Domain Features and Powers",
+          "Earth Domain Features and Powers",
+          "Oghma Domain Features and Powers",
+          "Sel\u00fbne Domain Features and Powers",
+          "Storm Domain Features and Powers",
+          "Sun Domain Features",
+          "Torm Domain Features and Powers"
+        ]
+      },
+      {
+        "group": "Level 1 Warpriest Daily Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_2953",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 17
+      },
+      {
+        "group": "Level 2 Warpriest Utility Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_2954:2",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 15
+      },
+      {
+        "group": "Level 5 Warpriest Daily Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_2955:5",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 15
+      },
+      {
+        "group": "Level 6 Warpriest Utility Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_2956:6",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 16
+      },
+      {
+        "group": "Level 9 Warpriest Daily Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_2957:9",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 14
+      },
+      {
+        "group": "Level 10 Warpriest Utility Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_2958:10",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 17
+      },
+      {
+        "group": "Level 16 Warpriest Utility Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_2960:16",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 13
+      },
+      {
+        "group": "Level 22 Warpriest Utility Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_2962:22",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 15
+      }
+    ],
+    "Knight (Essentials, parent: Fighter)": [
+      {
+        "group": "Battle Guardian",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3071",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 2
+      },
+      {
+        "group": "Class feature",
+        "key": "classFeaturePair:ID_FMP_CLASS_FEATURE_2849:ID_FMP_CLASS_FEATURE_3225",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Shield Finesse",
+          "Spinning Deflection"
+        ]
+      },
+      {
+        "group": "Knight Fighter Stances",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_2850",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 6
+      },
+      {
+        "group": "Level 2 Knight Utility Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3003:2",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 27
+      },
+      {
+        "group": "Level 6 Knight Utility Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3004:6",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 26
+      },
+      {
+        "group": "Knight Weapon Specialization",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_2755:7",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Bladed Step",
+          "Bludgeoning Staff",
+          "Staggering Hammer"
+        ]
+      },
+      {
+        "group": "Level 7 Extra Knight Stance",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3005:7",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 6
+      },
+      {
+        "group": "Level 10 Knight Utility Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3007:10",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 27
+      },
+      {
+        "group": "Level 17 Extra Knight Stance",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3012:17",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 6
+      }
+    ],
+    "Slayer (Essentials, parent: Fighter)": [
+      {
+        "group": "Slayer Fighter Stances",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_2854",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 6
+      },
+      {
+        "group": "Level 2 Slayer Utility Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3015:2",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 27
+      },
+      {
+        "group": "Level 6 Slayer Utility Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3016:6",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 26
+      },
+      {
+        "group": "Level 7 Extra Slayer Stance",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_2852:7",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 6
+      },
+      {
+        "group": "Slayer Weapon Specialization",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_2856:7",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Brutal Axe",
+          "Rapid Quarterstaff",
+          "Sweeping Sword"
+        ]
+      },
+      {
+        "group": "Level 10 Slayer Utility Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3018:10",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 27
+      },
+      {
+        "group": "Level 17 Extra Slayer Stance",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3026:17",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 6
+      }
+    ],
+    "Cavalier (Essentials, parent: Paladin)": [
+      {
+        "group": "Spirit of Virtue",
+        "key": "classFeature:ID_WOG_CAVALIER_CLASS_FEATURE_1",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Spirit of Sacrifice",
+          "Spirit of Valor"
+        ]
+      },
+      {
+        "group": "Virtue At-Will Power",
+        "key": "classFeature:ID_WOG_CAVALIER_CLASS_FEATURE_2",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Sacrifice At-Will Power",
+          "Valor At-Will Power"
+        ]
+      }
+    ],
+    "Blackguard (Essentials, parent: Paladin)": [
+      {
+        "group": "Spirit of Vice",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_3566",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Spirit of Vice (Domination)",
+          "Spirit of Vice (Fury)"
+        ]
+      },
+      {
+        "group": "Level 5 Blackguard Daily Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3572:5",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 13
+      },
+      {
+        "group": "Level 6 Blackguard Utility Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3573:6",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 14
+      },
+      {
+        "group": "Level 9 Blackguard Daily Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3575:9",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 16
+      },
+      {
+        "group": "Level 10 Blackguard Utility Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3576:10",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 14
+      },
+      {
+        "group": "Level 15 Blackguard Daily Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3582:15",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 14
+      },
+      {
+        "group": "Level 16 Blackguard Utility Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3584:16",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 11
+      }
+    ],
+    "Hunter (Essentials, parent: Ranger)": [
+      {
+        "group": "Archery Style",
+        "key": "classFeature:ID_DBB_CLASS_FEATURE_100010",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Bow Hunter",
+          "Crossbow Hunter"
+        ]
+      },
+      {
+        "group": "Aspects of the Wild (Hunter)",
+        "key": "classPower:ID_DBB_CLASS_FEATURE_100014",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 8
+      },
+      {
+        "group": "Ranger Wilderness Knacks",
+        "key": "classFeature:ID_DBB_CLASS_FEATURE_100015",
+        "kind": "classFeature",
+        "pick_count": 2,
+        "visible_when": null,
+        "options": [
+          "Ambush Expertise",
+          "Beast Empathy",
+          "Mountain Guide",
+          "Watchful Rest",
+          "Wilderness Tracker"
+        ]
+      },
+      {
+        "group": "Level 2 Hunter Utility Power",
+        "key": "classPower:ID_DBB_CLASS_FEATURE_100060:2",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 29
+      },
+      {
+        "group": "Level 6 Hunter Utility Power",
+        "key": "classPower:ID_DBB_CLASS_FEATURE_100061:6",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 20
+      },
+      {
+        "group": "Level 7 Aspect of the Wild (Hunter)",
+        "key": "classPower:ID_DBB_CLASS_FEATURE_100020:7",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 3
+      },
+      {
+        "group": "Level 10 Hunter Utility Power",
+        "key": "classPower:ID_DBB_CLASS_FEATURE_100062:10",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 18
+      },
+      {
+        "group": "Level 16 Hunter Utility Power",
+        "key": "classPower:ID_DBB_CLASS_FEATURE_100063:16",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 20
+      },
+      {
+        "group": "Level 17 Aspect of the Wild (Hunter)",
+        "key": "classPower:ID_DBB_CLASS_FEATURE_10000030:17",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 3
+      },
+      {
+        "group": "Level 22 Hunter Utility Power",
+        "key": "classPower:ID_DBB_CLASS_FEATURE_100064:22",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 20
+      }
+    ],
+    "Scout (Essentials, parent: Ranger)": [
+      {
+        "group": "Aspects of the Wild (Scout)",
+        "key": "classPower:ID_DBB_CLASS_FEATURE_123443216",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 8
+      },
+      {
+        "group": "Ranger Wilderness Knacks",
+        "key": "classFeature:ID_DBB_CLASS_FEATURE_100015",
+        "kind": "classFeature",
+        "pick_count": 2,
+        "visible_when": null,
+        "options": [
+          "Ambush Expertise",
+          "Beast Empathy",
+          "Mountain Guide",
+          "Watchful Rest",
+          "Wilderness Tracker"
+        ]
+      },
+      {
+        "group": "Two-Weapon Style",
+        "key": "classFeature:ID_DBB_CLASS_FEATURE_123443211",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Flashing Blade Mastery",
+          "Spinning Axe Mastery"
+        ]
+      },
+      {
+        "group": "Level 2 Scout Utility Power",
+        "key": "classPower:ID_DBB_CLASS_FEATURE_123443219:2",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 29
+      },
+      {
+        "group": "Level 6 Scout Utility Power",
+        "key": "classPower:ID_DBB_CLASS_FEATURE_1234432110:6",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 20
+      },
+      {
+        "group": "Level 7 Aspect of the Wild (Scout)",
+        "key": "classPower:ID_DBB_CLASS_FEATURE_123443217:7",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 3
+      },
+      {
+        "group": "Level 10 Scout Utility Power",
+        "key": "classPower:ID_DBB_CLASS_FEATURE_1234432111:10",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 18
+      },
+      {
+        "group": "Level 16 Scout Utility Power",
+        "key": "classPower:ID_DBB_CLASS_FEATURE_1234432112:16",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 20
+      },
+      {
+        "group": "Level 22 Scout Utility Power",
+        "key": "classPower:ID_DBB_CLASS_FEATURE_1234432113:22",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 20
+      }
+    ],
+    "Thief (Essentials, parent: Rogue)": [
+      {
+        "group": "Rogue's Trick",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_2860",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 9
+      },
+      {
+        "group": "Level 2 Thief Utility Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3028:2",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 18
+      },
+      {
+        "group": "Level 4 Extra Rogue's Trick",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_2862:4",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 9
+      },
+      {
+        "group": "Level 6 Thief Utility Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3029:6",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 17
+      },
+      {
+        "group": "Level 7 Extra Rogue's Trick",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3030:7",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 9
+      },
+      {
+        "group": "Level 10 Thief Utility Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3031:10",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 15
+      },
+      {
+        "group": "Level 17 Extra Rogue's Trick",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3035:17",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 9
+      }
+    ],
+    "Hexblade (Essentials, parent: Warlock)": [
+      {
+        "group": "Level 1 Hexblade Daily Power",
+        "key": "classPower:ID_WOG_HEXBLADE_CLASS_FEATURE_5",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 25
+      },
+      {
+        "group": "Pact Boon",
+        "key": "classFeature:ID_WOG_HEXBLADE_CLASS_FEATURE_1",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Elemental Pact Boon",
+          "Fey Pact Boon",
+          "Fey Pact of the White Well Boon",
+          "Gloom Pact Boon (Hexblade)",
+          "Infernal Pact Boon",
+          "Star Pact Boon"
+        ]
+      },
+      {
+        "group": "Pact Reward",
+        "key": "classFeature:ID_WOG_HEXBLADE_CLASS_FEATURE_2",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Elemental Pact Reward",
+          "Fey Pact of the White Well Reward",
+          "Fey Pact Reward",
+          "Gloom Pact Reward",
+          "Infernal Pact Reward",
+          "Star Pact Reward"
+        ]
+      },
+      {
+        "group": "Pact Weapon",
+        "key": "classFeature:ID_WOG_HEXBLADE_CLASS_FEATURE_3",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Elemental Pact Weapon",
+          "Fey Pact of the White Well Weapon",
+          "Fey Pact Weapon",
+          "Gloom Pact Weapon",
+          "Infernal Pact Weapon",
+          "Star Pact Weapon"
+        ]
+      }
+    ],
+    "Binder (Essentials, parent: Warlock)": [
+      {
+        "group": "Level 1 Binder Daily Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3657",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 25
+      },
+      {
+        "group": "Pact Boon (Binder)",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_3652",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Fey Pact Boon (Binder)",
+          "Gloom Pact Boon (Binder)",
+          "Star Pact Boon (Binder)"
+        ]
+      },
+      {
+        "group": "Level 2 Binder Utility Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3658:2",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 18
+      },
+      {
+        "group": "Level 5 Binder Daily Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3661:5",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 25
+      },
+      {
+        "group": "Level 6 Binder Utility Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3662:6",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 20
+      },
+      {
+        "group": "Level 10 Binder Utility Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3665:10",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 21
+      },
+      {
+        "group": "Level 16 Binder Utility Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3673:16",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 18
+      }
+    ],
+    "Mage (Essentials, parent: Wizard)": [
+      {
+        "group": "Level 1 Apprentice Mage",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_2867",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Enchantment Apprentice",
+          "Evocation Apprentice",
+          "Illusion Apprentice",
+          "Necromancy Apprentice",
+          "Nethermancy Apprentice",
+          "Pyromancy Apprentice"
+        ]
+      },
+      {
+        "group": "Level 1 Mage Daily Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3040:0",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 21
+      },
+      {
+        "group": "Level 1 Mage Daily Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3040:1",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 21
+      },
+      {
+        "group": "Level 1 Mage Encounter Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3039:0",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 19
+      },
+      {
+        "group": "Level 1 Mage Encounter Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3039:1",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 19
+      },
+      {
+        "group": "Mage Cantrips",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_2870",
+        "kind": "power",
+        "pick_count": 3,
+        "visible_when": null,
+        "power_pool_size": 10
+      },
+      {
+        "group": "Level 2 Mage Utility Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3041:2",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 23
+      },
+      {
+        "group": "Level 3 Mage Encounter Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3042:3",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 18
+      },
+      {
+        "group": "Level 4 Apprentice Mage",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_3043:4",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Enchantment Apprentice",
+          "Evocation Apprentice",
+          "Illusion Apprentice",
+          "Necromancy Apprentice",
+          "Nethermancy Apprentice",
+          "Pyromancy Apprentice"
+        ]
+      },
+      {
+        "group": "Level 5 Expert Mage",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_2871:5",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Enchantment Expert",
+          "Evocation Expert",
+          "Illusion Expert",
+          "Necromancy Expert",
+          "Nethermancy Expert",
+          "Pyromancy Expert"
+        ]
+      },
+      {
+        "group": "Level 5 Mage Daily Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3047:5",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 20
+      },
+      {
+        "group": "Level 6 Mage Utility Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3048:6",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 23
+      },
+      {
+        "group": "Level 7 Mage Encounter Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3049:7",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 19
+      },
+      {
+        "group": "Level 8 Expert Mage",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_3050:8",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Enchantment Expert",
+          "Evocation Expert",
+          "Illusion Expert",
+          "Necromancy Expert",
+          "Nethermancy Expert",
+          "Pyromancy Expert"
+        ]
+      },
+      {
+        "group": "Level 9 Mage Daily Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3054:9",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 23
+      },
+      {
+        "group": "Level 10 Mage Utility Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3055:10",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 22
+      },
+      {
+        "group": "Master Mage",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_2872:10",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Enchantment Master",
+          "Evocation Master",
+          "Illusion Master",
+          "Necromancy Master",
+          "Nethermancy Master",
+          "Pyromancy Master"
+        ]
+      },
+      {
+        "group": "Level 13 Mage Encounter Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3056:13",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 18
+      },
+      {
+        "group": "Level 15 Mage Daily Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3057:15",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 24
+      },
+      {
+        "group": "Level 16 Mage Utility Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3058:16",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 20
+      },
+      {
+        "group": "Level 17 Mage Encounter Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3059:17",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 18
+      },
+      {
+        "group": "Level 19 Mage Daily Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3060:19",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 19
+      },
+      {
+        "group": "Level 22 Mage Utility Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3061:22",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 17
+      },
+      {
+        "group": "Level 23 Mage Encounter Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3062:23",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 16
+      },
+      {
+        "group": "Level 25 Mage Daily Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3063:25",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 19
+      },
+      {
+        "group": "Level 27 Mage Encounter Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3064:27",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 16
+      },
+      {
+        "group": "Level 29 Mage Daily Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3065:29",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 16
+      }
+    ],
+    "Bladesinger (Essentials, parent: Wizard)": [
+      {
+        "group": "Bladesinger Cantrips",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_4036",
+        "kind": "power",
+        "pick_count": 3,
+        "visible_when": null,
+        "power_pool_size": 10
+      },
+      {
+        "group": "Bladespells",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_4034",
+        "kind": "power",
+        "pick_count": 3,
+        "visible_when": null,
+        "power_pool_size": 6
+      },
+      {
+        "group": "Level 1 Bladesinger Daily Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_4035:0",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 19
+      },
+      {
+        "group": "Level 1 Bladesinger Daily Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_4035:1",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 19
+      },
+      {
+        "group": "Level 2 Bladesinger Utility Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_4037:2",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 23
+      },
+      {
+        "group": "Level 5 Bladesinger Daily Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_4039:5",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 18
+      },
+      {
+        "group": "Level 6 Bladesinger Utility Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_4040:6",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 23
+      },
+      {
+        "group": "Level 9 Bladesinger Daily Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_4042:9",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 19
+      },
+      {
+        "group": "Level 10 Bladesinger Utility Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_4043:10",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 22
+      },
+      {
+        "group": "Level 15 Bladesinger Daily Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_4048:15",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 18
+      },
+      {
+        "group": "Level 16 Bladesinger Utility Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_4050:16",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 20
+      },
+      {
+        "group": "Level 19 Bladesinger Daily Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_4051:19",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 18
+      },
+      {
+        "group": "Level 22 Bladesinger Utility Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_4054:22",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 17
+      },
+      {
+        "group": "Level 25 Bladesinger Daily Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_4056:25",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 16
+      },
+      {
+        "group": "Level 29 Bladesinger Daily Powers",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_4057:29",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 16
+      }
+    ],
+    "Witch (Essentials, parent: Wizard)": [
+      {
+        "group": "Moon Coven",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_4148",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Dark Moon Coven",
+          "Full Moon Coven"
+        ]
+      },
+      {
+        "group": "Witch Cantrips",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_4147",
+        "kind": "power",
+        "pick_count": 3,
+        "visible_when": null,
+        "power_pool_size": 10
+      }
+    ],
+    "Sha'ir (Essentials, parent: Wizard)": [
+      {
+        "group": "Sha'ir Cantrips",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_4349",
+        "kind": "power",
+        "pick_count": 4,
+        "visible_when": null,
+        "power_pool_size": 10
+      }
+    ],
+    "Berserker (Essentials, parent: Barbarian)": [
+      {
+        "group": "Defender Aura",
+        "key": "classFeatureOptional:ID_FMP_CLASS_FEATURE_3070",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Standard (default class proficiencies)",
+          "Defender Aura"
+        ]
+      },
+      {
+        "group": "Heartland",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_4127",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Arid Desert",
+          "Frozen Land",
+          "Temperate Land"
+        ]
+      }
+    ],
+    "Skald (Essentials, parent: Bard)": [
+      {
+        "group": "Master of Story and Song",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_4137:0",
+        "kind": "power",
+        "pick_count": 5,
+        "visible_when": null,
+        "power_pool_size": 14
+      },
+      {
+        "group": "Master of Story and Song",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_4137:1",
+        "kind": "power",
+        "pick_count": 5,
+        "visible_when": null,
+        "power_pool_size": 15
+      },
+      {
+        "group": "Master of Story and Song",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_4137:2",
+        "kind": "power",
+        "pick_count": 5,
+        "visible_when": null,
+        "power_pool_size": 13
+      },
+      {
+        "group": "Master of Story and Song",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_4137:3",
+        "kind": "power",
+        "pick_count": 5,
+        "visible_when": null,
+        "power_pool_size": 10
+      },
+      {
+        "group": "Master of Story and Song",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_4137:4",
+        "kind": "power",
+        "pick_count": 5,
+        "visible_when": null,
+        "power_pool_size": 10
+      }
+    ],
+    "Sentinel (Essentials, parent: Druid)": [
+      {
+        "group": "Druid Wilderness Knacks",
+        "key": "classFeature:ID_WOG_SENTINEL_CLASS_FEATURE_4",
+        "kind": "classFeature",
+        "pick_count": 2,
+        "visible_when": null,
+        "options": [
+          "Beast Empathy",
+          "Herb Lore",
+          "Mountain Guide",
+          "Watchful Rest",
+          "Wilderness Tracker"
+        ]
+      },
+      {
+        "group": "Level 1 Sentinel At-Will Power",
+        "key": "classPower:ID_WOG_SENTINEL_CLASS_FEATURE_5",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 3
+      },
+      {
+        "group": "Level 1 Sentinel Daily Power",
+        "key": "classPower:ID_WOG_SENTINEL_CLASS_FEATURE_6",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 18
+      },
+      {
+        "group": "Season Choice",
+        "key": "classFeature:ID_WOG_SENTINEL_CLASS_FEATURE_0",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Druid of Spring",
+          "Druid of Summer"
+        ]
+      },
+      {
+        "group": "Level 2 Sentinel Utility Power",
+        "key": "classPower:ID_WOG_SENTINEL_CLASS_FEATURE_8:2",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 17
+      },
+      {
+        "group": "Level 5 Sentinel Daily Power",
+        "key": "classPower:ID_WOG_SENTINEL_CLASS_FEATURE_10:5",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 18
+      },
+      {
+        "group": "Level 6 Sentinel Utility Power",
+        "key": "classPower:ID_WOG_SENTINEL_CLASS_FEATURE_11:6",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 18
+      },
+      {
+        "group": "Level 9 Sentinel Daily Power",
+        "key": "classPower:ID_WOG_SENTINEL_CLASS_FEATURE_15:9",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 19
+      },
+      {
+        "group": "Level 10 Sentinel Utility Power",
+        "key": "classPower:ID_WOG_SENTINEL_CLASS_FEATURE_16:10",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 15
+      },
+      {
+        "group": "Level 16 Sentinel Utility Power",
+        "key": "classPower:ID_WOG_SENTINEL_CLASS_FEATURE_21:16",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 13
+      },
+      {
+        "group": "Level 22 Sentinel Utility Power",
+        "key": "classPower:ID_WOG_SENTINEL_CLASS_FEATURE_24:22",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 13
+      }
+    ],
+    "Protector (Essentials, parent: Druid)": [
+      {
+        "group": "Balance of Nature",
+        "key": "classFeatureOptional:ID_FMP_CLASS_FEATURE_1493",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Standard (default class proficiencies)",
+          "Balance of Nature"
+        ]
+      },
+      {
+        "group": "Druid Circle",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_4155",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Circle of Renewal",
+          "Circle of Shelter"
+        ]
+      },
+      {
+        "group": "Primal Attunement",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_4153",
+        "kind": "power",
+        "pick_count": 3,
+        "visible_when": null,
+        "power_pool_size": 5
+      }
+    ],
+    "Elementalist (Essentials, parent: Sorcerer)": [
+      {
+        "group": "Elemental Specialty",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_4335",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Air Elementalist",
+          "Earth Elementalist",
+          "Fire Elementalist",
+          "Water Elementalist"
+        ]
+      },
+      {
+        "group": "Elemental Magic",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_4334:0",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 10
+      },
+      {
+        "group": "Elemental Magic",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_4334:1",
+        "kind": "power",
+        "pick_count": 2,
+        "visible_when": null,
+        "power_pool_size": 10
+      }
+    ],
+    "Executioner (Essentials, parent: Assassin)": [
+      {
+        "group": "Attack Finesse (Executioner)",
+        "key": "classFeatureOptional:ID_FMP_CLASS_FEATURE_3533",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Standard (default class proficiencies)",
+          "Attack Finesse (Executioner)"
+        ]
+      },
+      {
+        "group": "Guild Attacks",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_3534",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "League of Whispers",
+          "Red Scales",
+          "Way of the Ninja"
+        ]
+      },
+      {
+        "group": "Versatile Defense",
+        "key": "classFeature:ID_FMP_CLASS_FEATURE_3531",
+        "kind": "classFeature",
+        "pick_count": 1,
+        "visible_when": null,
+        "options": [
+          "Executioner Shield Proficiency",
+          "Executioner Two-Weapon Defense"
+        ]
+      },
+      {
+        "group": "Level 2 Executioner Utility Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3539:2",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 10
+      },
+      {
+        "group": "Level 6 Executioner Utility Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3543:6",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 9
+      },
+      {
+        "group": "Level 10 Executioner Utility Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3547:10",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 10
+      }
+    ],
+    "Vampire": [
+      {
+        "group": "Level 2 Vampire Utility Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3619:2",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 2
+      },
+      {
+        "group": "Level 22 Vampire Utility Power",
+        "key": "classPower:ID_FMP_CLASS_FEATURE_3639:22",
+        "kind": "power",
+        "pick_count": 1,
+        "visible_when": null,
+        "power_pool_size": 2
+      }
+    ]
+  }
+}

@@ -4,6 +4,10 @@ import {
 } from "./grantedPowersQuery";
 import type { CharacterBuild, ClassDef, ClassFeature, Power, RulesIndex } from "./models";
 import {
+  isDynamicPowerSelectCategory,
+  resolvePowerIdsFromCategory
+} from "./powerSelectCategory";
+import {
   applyMageSpellbookPowerGroupRules,
   applyWizardSpellbookPowerGroupRules,
   isWizardSpellbookPowerGroup,
@@ -174,7 +178,8 @@ function optionsFromClassFeatureSelect(
 export function classFeatureSelectablePowerIds(
   index: RulesIndex,
   parentFeatureId: string,
-  visiting: Set<string> = new Set()
+  visiting: Set<string> = new Set(),
+  ctx: { classId?: string; characterLevel?: number } = {}
 ): Set<string> {
   if (visiting.has(parentFeatureId)) return new Set();
   visiting.add(parentFeatureId);
@@ -200,7 +205,18 @@ export function classFeatureSelectablePowerIds(
       cat.includes("_CLASS_FEATURE_") &&
       cat !== parentFeatureId
     ) {
-      for (const pid of classFeatureSelectablePowerIds(index, cat, visiting)) ids.add(pid);
+      for (const pid of classFeatureSelectablePowerIds(index, cat, visiting, ctx)) ids.add(pid);
+    } else if (isDynamicPowerSelectCategory(cat) || /^ID_FMP_CLASS_\d+,/.test(cat)) {
+      const req = String(attrs.requires ?? "").trim();
+      const classId =
+        req.startsWith("ID_FMP_CLASS_") && !req.includes("_CLASS_FEATURE_") ? req : ctx.classId;
+      const resolved = resolvePowerIdsFromCategory(cat, index, {
+        classId,
+        characterLevel: ctx.characterLevel ?? 1
+      });
+      if (Array.isArray(resolved)) {
+        for (const pid of resolved) ids.add(pid);
+      }
     }
   }
 
@@ -210,21 +226,26 @@ export function classFeatureSelectablePowerIds(
 /** Power ids listed for this feature's power pick (used for feat/paragon exclusion bypass). */
 export function classFeaturePowerSelectCategoryIds(
   index: RulesIndex,
-  parentFeatureId: string
+  parentFeatureId: string,
+  ctx: { classId?: string; characterLevel?: number } = {}
 ): Set<string> {
-  return classFeatureSelectablePowerIds(index, parentFeatureId);
+  return classFeatureSelectablePowerIds(index, parentFeatureId, new Set(), ctx);
 }
 
 /** Compendium power-select pools for a class feature scoped to one class (`requires` on select). */
 export function classFeaturePowerSelectPoolsForClass(
   index: RulesIndex,
   parentFeatureId: string,
-  classId: string
+  classId: string,
+  characterLevel: number = 1
 ): string[][] {
   const cf = index.classFeatures?.find((f) => f.id === parentFeatureId);
   if (!cf) return [];
   const paragonExclude = paragonPathClassFeaturePowerIds(index);
-  const ownSelect = classFeaturePowerSelectCategoryIds(index, parentFeatureId);
+  const ownSelect = classFeaturePowerSelectCategoryIds(index, parentFeatureId, {
+    classId,
+    characterLevel
+  });
   const pools: string[][] = [];
   for (const item of classFeatureSelectRules(cf)) {
     const attrs = item.attrs ?? {};
@@ -234,7 +255,10 @@ export function classFeaturePowerSelectPoolsForClass(
     const cat = classFeatureSelectCategory(attrs);
     const pool: string[] = [];
     if (cat.startsWith("ID_") && cat.includes("_CLASS_FEATURE_")) {
-      for (const pid of classFeatureSelectablePowerIds(index, cat)) {
+      for (const pid of classFeatureSelectablePowerIds(index, cat, new Set(), {
+        classId,
+        characterLevel
+      })) {
         if (paragonExclude.has(pid) && !ownSelect.has(pid)) continue;
         pool.push(pid);
       }
@@ -244,6 +268,14 @@ export function classFeaturePowerSelectPoolsForClass(
         if (!pid.startsWith("ID_FMP_POWER")) continue;
         if (paragonExclude.has(pid) && !ownSelect.has(pid)) continue;
         pool.push(pid);
+      }
+    } else if (isDynamicPowerSelectCategory(cat) || /^ID_FMP_CLASS_\d+,/.test(cat)) {
+      const resolved = resolvePowerIdsFromCategory(cat, index, { classId, characterLevel });
+      if (Array.isArray(resolved)) {
+        for (const pid of resolved) {
+          if (paragonExclude.has(pid) && !ownSelect.has(pid)) continue;
+          pool.push(pid);
+        }
       }
     }
     if (pool.length) pools.push(pool);
@@ -335,7 +367,7 @@ export function appendNestedChildPowerChoiceGroups(
         powerIds: [],
         options: []
       };
-      const legal = classFeaturePowerIdsForClass(index, draft, classId);
+      const legal = classFeaturePowerIdsForClass(index, draft, classId, 1);
       if (!legal.length) continue;
       if (legal.length === 1 && draft.pickCount <= 1) continue;
 
@@ -899,13 +931,17 @@ export function classFeaturePowerChoiceLabel(
 export function classFeaturePowerIdsForClass(
   index: RulesIndex,
   group: ClassFeatureChoiceGroup,
-  classId: string | undefined
+  classId: string | undefined,
+  characterLevel: number = 1
 ): string[] {
   if (group.kind !== "power") return [];
   const byId = new Map(index.powers.map((p) => [p.id, p]));
   const paragonFeaturePowers = paragonPathClassFeaturePowerIds(index);
   const featOnlyPowers = featGrantedPowerIdsExcludedFromClassFeaturePicks(index);
-  const ownSelect = classFeatureSelectablePowerIds(index, group.parentFeatureId);
+  const ownSelect = classFeatureSelectablePowerIds(index, group.parentFeatureId, new Set(), {
+    classId,
+    characterLevel
+  });
   const candidates = new Set(group.powerIds);
   if (group.powerPoolIndex == null) {
     for (const pid of ownSelect) candidates.add(pid);
@@ -926,29 +962,32 @@ export function classFeaturePowerIdsForClass(
 export function isFixedClassPowerChoiceGroup(
   index: RulesIndex,
   group: ClassFeatureChoiceGroup,
-  classId: string | undefined
+  classId: string | undefined,
+  characterLevel: number = 1
 ): boolean {
   if (group.kind !== "power" || !classId) return false;
-  const legal = classFeaturePowerIdsForClass(index, group, classId);
+  const legal = classFeaturePowerIdsForClass(index, group, classId, characterLevel);
   return legal.length > 0 && legal.length === group.pickCount;
 }
 
 export function fixedClassPowerChoiceIds(
   index: RulesIndex,
   group: ClassFeatureChoiceGroup,
-  classId: string | undefined
+  classId: string | undefined,
+  characterLevel: number = 1
 ): string[] {
-  if (!isFixedClassPowerChoiceGroup(index, group, classId)) return [];
-  return classFeaturePowerIdsForClass(index, group, classId);
+  if (!isFixedClassPowerChoiceGroup(index, group, classId, characterLevel)) return [];
+  return classFeaturePowerIdsForClass(index, group, classId, characterLevel);
 }
 
 export function resolveClassPowerChoiceIdsForGroup(
   index: RulesIndex,
   group: ClassFeatureChoiceGroup,
   classId: string | undefined,
-  classSelections: Record<string, string> | undefined
+  classSelections: Record<string, string> | undefined,
+  characterLevel: number = 1
 ): string[] {
-  const fixed = fixedClassPowerChoiceIds(index, group, classId);
+  const fixed = fixedClassPowerChoiceIds(index, group, classId, characterLevel);
   if (fixed.length) return fixed;
   return parseClassPowerChoiceSelection(classSelections?.[group.key]);
 }
@@ -956,10 +995,11 @@ export function resolveClassPowerChoiceIdsForGroup(
 export function filterClassFeatureChoiceGroupsRequiringSelection(
   groups: ClassFeatureChoiceGroup[],
   index: RulesIndex,
-  classId: string | undefined
+  classId: string | undefined,
+  characterLevel: number = 1
 ): ClassFeatureChoiceGroup[] {
   return groups.filter(
-    (g) => g.kind !== "power" || !isFixedClassPowerChoiceGroup(index, g, classId)
+    (g) => g.kind !== "power" || !isFixedClassPowerChoiceGroup(index, g, classId, characterLevel)
   );
 }
 
@@ -982,7 +1022,7 @@ function collectClassFeaturePowerChoiceIdsForClass(
   const ids: string[] = [];
   for (const g of filterVisibleClassFeatureChoiceGroups(groups, rs, characterLevel)) {
     if (g.kind !== "power") continue;
-    ids.push(...resolveClassPowerChoiceIdsForGroup(index, g, classId, rs));
+    ids.push(...resolveClassPowerChoiceIdsForGroup(index, g, classId, rs, characterLevel));
   }
   return ids;
 }

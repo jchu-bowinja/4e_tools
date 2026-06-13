@@ -205,10 +205,10 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
         }
         continue;
       }
-      if (isFixedClassPowerChoiceGroup(index, group, build.classId)) {
+      if (isFixedClassPowerChoiceGroup(index, group, build.classId, build.level)) {
         continue;
       }
-      const legal = new Set(classFeaturePowerIdsForClass(index, group, build.classId));
+      const legal = new Set(classFeaturePowerIdsForClass(index, group, build.classId, build.level));
       const picks = parseClassPowerChoiceSelection(rs[group.key]);
       if (picks.length < group.pickCount) {
         errors.push(

@@ -295,9 +295,25 @@ import { FeatSourceFilterDropdown } from "./FeatSourceFilterDropdown";
 import { FeatTagPill } from "./FeatTagPill";
 import { RulesEntitySelect } from "../../ui/RulesEntitySelect";
 
+export type BuilderTab =
+  | "race"
+  | "class"
+  | "abilities"
+  | "skills"
+  | "feats"
+  | "powers"
+  | "theme"
+  | "paragonPath"
+  | "epicDestiny"
+  | "items";
+
 interface Props {
   index: RulesIndex;
   tooltipGlossary: Record<string, string>;
+  /** Test-only: skip localStorage and use this build on first render. */
+  initialBuild?: CharacterBuild;
+  /** Test-only: open this tab on first render. */
+  initialActiveTab?: BuilderTab;
 }
 
 /** Synthetic / pseudoclass rows from the CB extract — not offered as playable classes. */
@@ -582,17 +598,6 @@ function PowerConstructionSelects(props: {
 }
 
 const abilities: Array<keyof CharacterBuild["abilityScores"]> = ["STR", "CON", "DEX", "INT", "WIS", "CHA"];
-type BuilderTab =
-  | "race"
-  | "class"
-  | "abilities"
-  | "skills"
-  | "feats"
-  | "powers"
-  | "theme"
-  | "paragonPath"
-  | "epicDestiny"
-  | "items";
 
 function abilityModifier(score: number): number {
   return Math.floor((score - 10) / 2);
@@ -1039,8 +1044,14 @@ function BuilderPersistenceToolbar({
   );
 }
 
-export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Element {
+export function CharacterBuilderApp({
+  index,
+  tooltipGlossary,
+  initialBuild,
+  initialActiveTab
+}: Props): JSX.Element {
   const [build, setBuild] = useState<CharacterBuild>(() => {
+    if (initialBuild) return normalizeCharacterBuild(initialBuild, index);
     const loaded = loadBuild();
     return loaded ? normalizeCharacterBuild(loaded, index) : defaultBuild;
   });
@@ -1048,7 +1059,7 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   const [savedCharacters, setSavedCharacters] = useState(() => loadSavedCharacters());
   const [activeSavedCharacterId, setActiveSavedCharacterId] = useState("");
   const prevAutoGrantedSkillIdsRef = useRef<Set<string>>(new Set());
-  const [activeTab, setActiveTab] = useState<BuilderTab>("race");
+  const [activeTab, setActiveTab] = useState<BuilderTab>(initialActiveTab ?? "race");
   const [itemsCategory, setItemsCategory] = useState<ItemsCategory>("inventory");
   const [featSearch, setFeatSearch] = useState("");
   const [featFilterAllText, setFeatFilterAllText] = useState(false);
@@ -2627,8 +2638,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
   function renderClassFeaturePowerChoiceGroup(group: ClassFeatureChoiceGroup): JSX.Element {
     const rs = classSelectionsForFeatureChoices;
     const classId = build.classId;
-    if (isFixedClassPowerChoiceGroup(index, group, classId)) {
-      const fixedIds = fixedClassPowerChoiceIds(index, group, classId);
+    if (isFixedClassPowerChoiceGroup(index, group, classId, build.level)) {
+      const fixedIds = fixedClassPowerChoiceIds(index, group, classId, build.level);
       return (
         <div key={group.key} style={{ marginBottom: "0.75rem" }}>
           <div style={{ fontWeight: 600, fontSize: "0.82rem", color: "var(--text-primary)", marginBottom: "0.35rem" }}>
@@ -2647,9 +2658,15 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
       );
     }
     const picks = parseClassPowerChoiceSelection(rs[group.key]);
-    const resolvedIds = resolveClassPowerChoiceIdsForGroup(index, group, classId, rs);
+    const resolvedIds = resolveClassPowerChoiceIdsForGroup(
+      index,
+      group,
+      classId,
+      rs,
+      build.level
+    );
     const powerById = new Map(index.powers.map((p) => [p.id, p]));
-    const legalPowerIds = classFeaturePowerIdsForClass(index, group, classId);
+    const legalPowerIds = classFeaturePowerIdsForClass(index, group, classId, build.level);
     return (
       <div key={group.key} style={{ marginBottom: "0.75rem", maxWidth: "28rem" }}>
         <span style={{ display: "block", fontWeight: 600, marginBottom: "0.35rem", fontSize: "0.85rem" }}>
@@ -5256,7 +5273,12 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                     const legalSpellbook = new Set<string>();
                     if (spellbookBinding.kind === "mage-split") {
                       for (const g of spellbookBinding.groups) {
-                        for (const pid of classFeaturePowerIdsForClass(index, g, build.classId)) {
+                        for (const pid of classFeaturePowerIdsForClass(
+                          index,
+                          g,
+                          build.classId,
+                          build.level
+                        )) {
                           legalSpellbook.add(pid);
                         }
                       }
@@ -5264,7 +5286,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                       for (const pid of classFeaturePowerIdsForClass(
                         index,
                         spellbookBinding.group,
-                        build.classId
+                        build.classId,
+                        build.level
                       )) {
                         legalSpellbook.add(pid);
                       }
@@ -5304,7 +5327,12 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                         ? poolForSlot.filter((p) => {
                             const g = spellbookBinding.groups[pickIndex];
                             if (!g) return false;
-                            return classFeaturePowerIdsForClass(index, g, build.classId).includes(p.id);
+                            return classFeaturePowerIdsForClass(
+                              index,
+                              g,
+                              build.classId,
+                              build.level
+                            ).includes(p.id);
                           })
                         : poolForSlot;
                     let candidates = pool.filter(
@@ -6564,7 +6592,8 @@ export function CharacterBuilderApp({ index, tooltipGlossary }: Props): JSX.Elem
                         index,
                         g,
                         build.classId,
-                        classSelectionsForFeatureChoices
+                        classSelectionsForFeatureChoices,
+                        build.level
                       )
                         .map((pid) => index.powers.find((p) => p.id === pid)?.name)
                         .filter(Boolean);
