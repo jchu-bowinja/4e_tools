@@ -1,7 +1,7 @@
 import { getPowersForOwnerId, getThemeGrantedPowers } from "./classPowersQuery";
 import {
   applyClassFeaturePowerIdReplacementsToSet,
-  collectClassFeaturePowerReplacementMap
+  collectAutomaticPowerReplacementMap
 } from "./classFeaturePowerReplace";
 import {
   autoGrantedClassPowers,
@@ -75,7 +75,7 @@ export function collectCharacterPowerIdsForSelections(index: RulesIndex, build: 
 
   for (const pid of collectGrantedPowerIdsFromActiveClassFeatures(index, build)) ids.add(pid);
 
-  applyClassFeaturePowerIdReplacementsToSet(ids, collectClassFeaturePowerReplacementMap(index, build));
+  applyClassFeaturePowerIdReplacementsToSet(ids, collectAutomaticPowerReplacementMap(index, build));
 
   return ids;
 }

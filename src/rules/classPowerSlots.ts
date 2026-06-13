@@ -11,7 +11,7 @@ import { applyEssentialsBuildSuggestedPowerSlots } from "./classBuildOptions";
 import {
   applyClassFeaturePowerReplacementsToSlots,
   applyClassFeaturePowerSwapSelections,
-  collectClassFeaturePowerReplacementMap
+  collectAutomaticPowerReplacementMap
 } from "./classFeaturePowerReplace";
 import { activeFeatReplacementPowerIds } from "./featPowerReplace";
 import { activeParagonAtWillSwapPowerId } from "./paragonMulticlassing";
@@ -159,7 +159,7 @@ export function reconcileClassPowerSlotsForBuild(
   for (const id of activeFeatReplacementPowerIds(index, build)) allowed.add(id);
   const paragonAw = activeParagonAtWillSwapPowerId(build);
   if (paragonAw) allowed.add(paragonAw);
-  for (const replId of collectClassFeaturePowerReplacementMap(index, build).values()) {
+  for (const replId of collectAutomaticPowerReplacementMap(index, build).values()) {
     allowed.add(replId);
   }
 
@@ -226,7 +226,7 @@ export function reconcileClassPowerSlotsForBuild(
   };
   const withSwap = applyClassFeaturePowerSwapSelections(merged, index, defs);
   merged = { ...merged, classPowerSlots: withSwap };
-  const replacements = collectClassFeaturePowerReplacementMap(index, merged);
+  const replacements = collectAutomaticPowerReplacementMap(index, merged);
   const withReplace = applyClassFeaturePowerReplacementsToSlots(merged.classPowerSlots, replacements);
   const finalSlots = withReplace ?? merged.classPowerSlots;
   return {

@@ -3849,6 +3849,9 @@ def extract_feat_power_modifications(
 
 
 _POWER_REPLACE_SPEC_RE = re.compile(r"^(.+):([^,]+),(\d+)\+?$")
+_POWER_REPLACE_ID_PAIR_RE = re.compile(r"^(ID_[^:]+):(ID_.+)$")
+_POWER_REPLACE_NAME_TO_ID_RE = re.compile(r"^(.+):(ID_.+)$")
+_NOT_CLASS_POWER_REPLACE_RE = re.compile(r"^\$\$NOT_CLASS:(.+)$")
 
 
 def _normalize_power_replace_bucket(raw: str) -> Optional[str]:
@@ -3893,54 +3896,213 @@ def _build_power_id_to_name(powers_raw: List[Dict[str, Any]]) -> Dict[str, str]:
     return lookup
 
 
+def _build_power_id_to_row(powers_raw: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    return {
+        str(power.get("internal_id")): power
+        for power in powers_raw
+        if isinstance(power.get("internal_id"), str)
+    }
+
+
+def _usage_bucket_from_power_row(power: Dict[str, Any]) -> Optional[str]:
+    spec = power.get("specific") or {}
+    usage = str(spec.get("Power Usage") or "").lower()
+    power_type = str(spec.get("Power Type") or "").lower()
+    if "utility" in power_type:
+        return "utility"
+    if "daily" in usage:
+        return "daily"
+    if "encounter" in usage:
+        return "encounter"
+    if "at-will" in usage or "at will" in usage:
+        return "atWill"
+    return None
+
+
+def _min_slot_level_from_power_row(power: Dict[str, Any]) -> int:
+    spec = power.get("specific") or {}
+    level = parse_int_from_text(spec.get("Level"))
+    return level if level and level > 0 else 1
+
+
+def _resolve_power_id_for_feat_replace(
+    feat: Dict[str, Any],
+    name_or_id: str,
+    power_name_to_id: Dict[str, str],
+    power_normalized_to_id: Dict[str, str],
+    power_id_to_name: Dict[str, str],
+    powers_raw: List[Dict[str, Any]],
+    display_ids: List[str],
+    display_index: int,
+) -> Optional[str]:
+    raw = str(name_or_id or "").strip()
+    if not raw:
+        return None
+    if raw.startswith("ID_FMP_POWER_") and raw in power_id_to_name:
+        return raw
+    resolved = _resolve_power_id(raw, power_name_to_id, power_normalized_to_id, power_id_to_name)
+    if resolved:
+        return resolved
+    if display_index < len(display_ids):
+        return display_ids[display_index]
+    feat_name = str(feat.get("name") or "").lower()
+    needle = raw.lower()
+    candidates: List[Dict[str, Any]] = []
+    for power in powers_raw:
+        pname = str(power.get("name") or "")
+        if not pname:
+            continue
+        if needle in pname.lower() or _normalize_power_match_key(needle) in _normalize_power_match_key(pname):
+            candidates.append(power)
+    if len(candidates) == 1:
+        return str(candidates[0].get("internal_id"))
+    if len(candidates) > 1 and feat_name:
+        feat_tokens = [tok for tok in re.split(r"[^a-z0-9]+", feat_name) if len(tok) > 3]
+        for power in candidates:
+            pname = str(power.get("name") or "").lower()
+            if any(tok in pname for tok in feat_tokens):
+                return str(power.get("internal_id"))
+    return None
+
+
 def extract_feat_power_replace_offers(
     feat: Dict[str, Any],
     power_name_to_id: Dict[str, str],
     power_id_to_name: Dict[str, str],
+    power_normalized_to_id: Optional[Dict[str, str]] = None,
+    powers_raw: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """
     Named `rules.replace` rows with `power-replace` (weapon mastery, gythka chain, etc.).
-    Skips multiclass `encounter swap` style rows (no power-replace attribute).
+    Skips multiclass `encounter swap` style rows (no `power-replace` attribute).
+    Also emits automatic `powerReplacementRules` for heritage-style `ID_NEW:ID_OLD` rows.
     """
     rules = feat.get("rules") if isinstance(feat.get("rules"), dict) else {}
     spec = feat.get("specific") if isinstance(feat.get("specific"), dict) else {}
     display_raw = str(spec.get("_DisplayPowers") or "").strip()
     display_ids = [x.strip() for x in display_raw.split(",") if x.strip()] if display_raw else []
+    power_rows = powers_raw or []
+    power_norm = power_normalized_to_id or {}
+    power_by_id = _build_power_id_to_row(power_rows)
 
     offers: List[Dict[str, Any]] = []
-    for idx, rep in enumerate(rules.get("replace") or []):
+    replacement_rules: List[Dict[str, str]] = []
+    replace_idx = 0
+    for rep in rules.get("replace") or []:
         if not isinstance(rep, dict):
             continue
         attrs = rep.get("attrs") or {}
         pr = attrs.get("power-replace")
         if not isinstance(pr, str) or not pr.strip():
             continue
+        pr = pr.strip()
+        optional = str(attrs.get("optional", "")).strip().lower() == "true"
+
+        id_pair = _POWER_REPLACE_ID_PAIR_RE.match(pr)
+        if id_pair:
+            replacement_rules.append(
+                {
+                    "replacementPowerId": id_pair.group(1).strip(),
+                    "originalPowerId": id_pair.group(2).strip(),
+                }
+            )
+            replace_idx += 1
+            continue
+
+        not_class = _NOT_CLASS_POWER_REPLACE_RE.match(pr)
+        if not_class:
+            bucket = _normalize_power_replace_bucket(not_class.group(1))
+            if bucket:
+                offers.append(
+                    {
+                        "replacementPowerName": "Non-class power",
+                        "usageBucket": bucket,
+                        "minSlotGainLevel": 1,
+                        "optional": optional,
+                        "requireNonClassReplacement": True,
+                    }
+                )
+            replace_idx += 1
+            continue
+
+        name_to_id = _POWER_REPLACE_NAME_TO_ID_RE.match(pr)
+        if name_to_id:
+            replacement_name = name_to_id.group(1).strip()
+            original_id = name_to_id.group(2).strip()
+            repl_id = _resolve_power_id_for_feat_replace(
+                feat,
+                replacement_name,
+                power_name_to_id,
+                power_norm,
+                power_id_to_name,
+                power_rows,
+                display_ids,
+                replace_idx,
+            )
+            if repl_id and original_id:
+                if optional:
+                    original_row = power_by_id.get(original_id)
+                    bucket = _usage_bucket_from_power_row(original_row) if original_row else "encounter"
+                    min_level = _min_slot_level_from_power_row(original_row) if original_row else 1
+                    offers.append(
+                        {
+                            "replacementPowerId": repl_id,
+                            "replacementPowerName": power_id_to_name.get(repl_id) or replacement_name,
+                            "usageBucket": bucket or "encounter",
+                            "minSlotGainLevel": min_level,
+                            "optional": True,
+                            "originalPowerId": original_id,
+                        }
+                    )
+                else:
+                    replacement_rules.append(
+                        {
+                            "replacementPowerId": repl_id,
+                            "originalPowerId": original_id,
+                        }
+                    )
+            replace_idx += 1
+            continue
+
         parsed = _parse_power_replace_spec(pr)
         if not parsed:
+            replace_idx += 1
             continue
         name_or_id, bucket, min_level = parsed
         repl_id: Optional[str] = None
         if name_or_id.startswith("ID_FMP_POWER_"):
             repl_id = name_or_id
-        elif idx < len(display_ids):
-            repl_id = display_ids[idx]
         else:
-            repl_id = power_name_to_id.get(name_or_id.lower())
+            repl_id = _resolve_power_id_for_feat_replace(
+                feat,
+                name_or_id,
+                power_name_to_id,
+                power_norm,
+                power_id_to_name,
+                power_rows,
+                display_ids,
+                replace_idx,
+            )
         if not repl_id:
+            replace_idx += 1
             continue
         repl_name = power_id_to_name.get(repl_id) or name_or_id
-        optional = str(attrs.get("optional", "")).strip().lower() == "true"
-        offers.append(
-            {
-                "replacementPowerId": repl_id,
-                "replacementPowerName": repl_name,
-                "usageBucket": bucket,
-                "minSlotGainLevel": min_level,
-                "optional": optional,
-            }
-        )
+        offer: Dict[str, Any] = {
+            "replacementPowerId": repl_id,
+            "replacementPowerName": repl_name,
+            "usageBucket": bucket,
+            "minSlotGainLevel": min_level,
+            "optional": optional,
+        }
+        offers.append(offer)
+        replace_idx += 1
 
-    return {"powerReplaceOffers": offers}
+    out: Dict[str, Any] = {}
+    if offers:
+        out["powerReplaceOffers"] = offers
+    if replacement_rules:
+        out["powerReplacementRules"] = replacement_rules
+    return out
 
 
 _MULTICLASS_SLOT_BUCKET: Dict[str, str] = {
@@ -4887,7 +5049,11 @@ def build_index(input_path: Path, output_dir: Path) -> None:
             feat_grants.get("grantedPowerIds"),
         )
         feat_power_replace = extract_feat_power_replace_offers(
-            feat, power_name_to_id, power_id_to_name
+            feat,
+            power_name_to_id,
+            power_id_to_name,
+            power_normalized_to_id,
+            powers_raw,
         )
         feat_multiclass_slot_swap = extract_feat_multiclass_slot_swap_offers(feat)
         feat_grants = _feat_append_heritage_internal_key(feat_grants, str(feat.get("name") or ""))

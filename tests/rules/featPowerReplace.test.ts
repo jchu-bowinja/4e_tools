@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildClassPowerSlotDefinitions } from "../../src/rules/classPowerSlots";
 import {
   collectFeatPowerReplaceRows,
+  collectFeatPowerReplacementMap,
   disableFeatPowerReplace,
   eligibleSlotsForReplaceOffer,
   enableFeatPowerReplace,
@@ -129,5 +130,31 @@ describe("featPowerReplace", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].feat.name).toBe("Gythka Expert");
     expect(rows[0].eligibleSlots.length).toBeGreaterThan(0);
+  });
+
+  it("collectFeatPowerReplacementMap applies heritage automatic swaps", () => {
+    const heritageFeat: Feat = {
+      id: "ID_FMP_FEAT_HERITAGE",
+      name: "Krinth Heritage",
+      slug: "krinth-heritage",
+      prereqTokens: [],
+      powerReplacementRules: [
+        { replacementPowerId: "ID_FMP_POWER_NEW", originalPowerId: "ID_FMP_POWER_OLD" }
+      ],
+      raw: {}
+    };
+    const miniIndex = { ...index, feats: [...index.feats, heritageFeat] } as RulesIndex;
+    const build: CharacterBuild = {
+      name: "Test",
+      level: 5,
+      classId: "ID_FMP_CLASS_1",
+      abilityScores: { STR: 10, CON: 10, DEX: 10, INT: 10, WIS: 10, CHA: 10 },
+      trainedSkillIds: [],
+      featIds: ["ID_FMP_FEAT_HERITAGE"],
+      powerIds: [],
+      classPowerSlots: { "encounter:1": "ID_FMP_POWER_OLD" }
+    };
+    const map = collectFeatPowerReplacementMap(miniIndex, build);
+    expect(map.get("ID_FMP_POWER_OLD")).toBe("ID_FMP_POWER_NEW");
   });
 });

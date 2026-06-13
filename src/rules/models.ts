@@ -156,11 +156,16 @@ export interface FeatArmorModification {
 
 /** ETL: optional class slot swap from `rules.replace` power-replace (e.g. Gythka Expert). */
 export interface FeatPowerReplaceOffer {
-  replacementPowerId: string;
+  /** Omitted when `requireNonClassReplacement` (user picks a non-class power). */
+  replacementPowerId?: string;
   replacementPowerName: string;
   usageBucket: "atWill" | "encounter" | "daily" | "utility";
   minSlotGainLevel: number;
   optional: boolean;
+  /** Wrath-style swaps: only slots currently holding this power id are eligible. */
+  originalPowerId?: string;
+  /** Secrets of Belial-style: user picks any legal non-class power for the bucket. */
+  requireNonClassReplacement?: boolean;
 }
 
 /** PHB Novice / Acolyte / Adept (and PHB3 psionic variants): swap one class slot for a user-picked multiclass power. */
@@ -218,6 +223,8 @@ export interface Feat extends RulesEntity {
   modifiedArmorNames?: string[];
   /** ETL: named `power-replace` swap offers (weapon mastery, gythka chain, …). */
   powerReplaceOffers?: FeatPowerReplaceOffer[];
+  /** ETL: automatic `power-replace: NEW:OLD` swaps while this feat is selected (heritage, Razor Storm, …). */
+  powerReplacementRules?: ClassFeaturePowerReplacementRule[];
   multiclassSlotSwapOffers?: FeatMulticlassSlotSwapOffer[];
   /** ETL: `rules.grant` entries with type Class Feature. */
   grantedClassFeatureIds?: string[];

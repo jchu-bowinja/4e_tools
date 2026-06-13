@@ -9,6 +9,7 @@ import type {
   ClassRoleBucket,
   RulesIndex
 } from "./models";
+import { collectFeatPowerReplacementMap } from "./featPowerReplace";
 import { classRoleBucket } from "./roleProgressionFeatures";
 import { parseFeatureLevel } from "./supportTraits";
 
@@ -79,6 +80,18 @@ export function collectClassFeaturePowerReplacementMap(
     for (const rule of parsePowerReplacementRules(feature)) {
       replacements.set(rule.originalPowerId, rule.replacementPowerId);
     }
+  }
+  return replacements;
+}
+
+/** Class-feature and feat automatic power id swaps (feat rules override on collision). */
+export function collectAutomaticPowerReplacementMap(
+  index: RulesIndex,
+  build: CharacterBuild
+): Map<string, string> {
+  const replacements = collectClassFeaturePowerReplacementMap(index, build);
+  for (const [originalPowerId, replacementPowerId] of collectFeatPowerReplacementMap(index, build)) {
+    replacements.set(originalPowerId, replacementPowerId);
   }
   return replacements;
 }

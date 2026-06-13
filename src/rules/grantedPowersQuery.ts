@@ -1,7 +1,7 @@
 import { collectClassFeatureIdsFromClass } from "./characterClassFeatures";
 import {
   applyClassFeaturePowerIdReplacements,
-  collectClassFeaturePowerReplacementMap
+  collectAutomaticPowerReplacementMap
 } from "./classFeaturePowerReplace";
 import type { CharacterBuild, ClassFeature, Feat, Power, Race, RacialTrait, RulesIndex } from "./models";
 import {
@@ -150,7 +150,7 @@ export function collectGrantedPowerIdsFromActiveClassFeatures(
       out.push(pid);
     }
   }
-  const replacements = collectClassFeaturePowerReplacementMap(index, build);
+  const replacements = collectAutomaticPowerReplacementMap(index, build);
   if (replacements.size === 0) return out;
   return applyClassFeaturePowerIdReplacements(out, replacements);
 }

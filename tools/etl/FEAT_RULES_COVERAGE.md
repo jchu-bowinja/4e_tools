@@ -17,6 +17,7 @@ For feats (and the same helpers for themes, paragon paths, epic destinies):
 | `rules.modify` type Class Feature / Utility | `powerModifications` | Virtue patches, cantrip augmentations |
 | `rules.modify` without type (Second Wind, granted-power metadata) | `powerModifications` | Usage/keyword patches on named or granted powers |
 | `rules.replace` `power-replace` + `_DisplayPowers` | `powerReplaceOffers` | Named optional class slot swaps (Gythka, weapon mastery, …) |
+| `rules.replace` `power-replace` `ID_NEW:ID_OLD` | `powerReplacementRules` | Automatic heritage / upgrade swaps while feat is selected |
 | `rules.replace` `multiclass` + `Level` (no `power-replace`) | `multiclassSlotSwapOffers` | PHB Novice / Acolyte / Adept + PHB3 psionic slot swaps (user picks multiclass power) |
 | `rules.grant` type Proficiency | `proficiencyGrants` | Weapon/armor/shield/implement validation and attack previews |
 | `rules.grant` type Multiclass | `hasMulticlassGrant` | Multiclass feat detection in builder summary |
@@ -91,6 +92,14 @@ python tools/etl/audit_feat_modify_gaps.py
 ```
 
 Exit code **0** means every feat with `rules.modify` has `powerModifications` and/or `weaponModifications` indexed.
+
+## Replace indexing audit
+
+```bash
+python tools/etl/audit_feat_replace_gaps.py
+```
+
+Exit code **0** means every feat with `rules.replace` has `powerReplaceOffers`, `powerReplacementRules`, and/or `multiclassSlotSwapOffers` indexed.
 
 ## Machine-readable list of heavy feats
 

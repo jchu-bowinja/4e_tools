@@ -8,7 +8,7 @@ export function getFeatPowerReplaceOffers(feat: Feat): FeatPowerReplaceOffer[] {
 /** Named `power-replace` offer (fixed replacement power), not multiclass slot swap. */
 export function getNamedFeatPowerReplaceOffer(feat: Feat): FeatPowerReplaceOffer | undefined {
   const offers = getFeatPowerReplaceOffers(feat);
-  return offers[0];
+  return offers.find((o) => o.replacementPowerId || o.requireNonClassReplacement);
 }
 
 /** @deprecated Use getNamedFeatPowerReplaceOffer for named swaps only. */
@@ -27,18 +27,38 @@ export function replacementPowerIdForActiveSwap(
   if (!feat) return undefined;
   if (feat.multiclassSlotSwapOffers?.length) return state.replacementPowerId;
   const named = getNamedFeatPowerReplaceOffer(feat);
-  if (named) return named.replacementPowerId;
+  if (named?.replacementPowerId) return named.replacementPowerId;
   return state.replacementPowerId;
+}
+
+/** Automatic power id swaps from selected feats (heritage, Improved Razor Storm, …). */
+export function collectFeatPowerReplacementMap(
+  index: RulesIndex,
+  build: Pick<CharacterBuild, "featIds">
+): Map<string, string> {
+  const replacements = new Map<string, string>();
+  for (const featId of build.featIds) {
+    const feat = index.feats.find((f) => f.id === featId);
+    if (!feat?.powerReplacementRules?.length) continue;
+    for (const rule of feat.powerReplacementRules) {
+      replacements.set(rule.originalPowerId, rule.replacementPowerId);
+    }
+  }
+  return replacements;
 }
 
 /** Class slots eligible for a feat’s power-replace offer at the character’s level. */
 export function eligibleSlotsForReplaceOffer(
   slotDefs: ClassPowerSlotDef[],
-  offer: FeatPowerReplaceOffer
+  offer: FeatPowerReplaceOffer,
+  classPowerSlots?: Record<string, string>
 ): ClassPowerSlotDef[] {
-  return slotDefs.filter(
-    (d) => d.bucket === offer.usageBucket && d.gainLevel >= offer.minSlotGainLevel
-  );
+  return slotDefs.filter((d) => {
+    if (d.bucket !== offer.usageBucket || d.gainLevel < offer.minSlotGainLevel) return false;
+    if (!offer.originalPowerId || !classPowerSlots) return true;
+    const pick = classPowerSlots[d.key]?.trim();
+    return pick === offer.originalPowerId;
+  });
 }
 
 /** Replacement power ids from active swaps on selected feats (allowed in class slots). */
@@ -132,8 +152,8 @@ export function collectFeatPowerReplaceRows(
     const feat = index.feats.find((f) => f.id === featId);
     if (!feat) continue;
     const offer = getNamedFeatPowerReplaceOffer(feat);
-    if (!offer) continue;
-    const eligible = eligibleSlotsForReplaceOffer(slotDefs, offer);
+    if (!offer?.replacementPowerId) continue;
+    const eligible = eligibleSlotsForReplaceOffer(slotDefs, offer, build.classPowerSlots);
     if (eligible.length === 0) continue;
     rows.push({
       feat,
@@ -162,11 +182,11 @@ export function pruneFeatPowerReplacements(
     }
     const feat = index.feats.find((f) => f.id === featId);
     const offer = feat ? getNamedFeatPowerReplaceOffer(feat) : undefined;
-    if (!offer) {
+    if (!offer?.replacementPowerId) {
       next = disableFeatPowerReplace(next, featId);
       continue;
     }
-    const eligible = eligibleSlotsForReplaceOffer(slotDefs, offer);
+    const eligible = eligibleSlotsForReplaceOffer(slotDefs, offer, build.classPowerSlots);
     const slotOk = eligible.some((d) => d.key === state.slotKey);
     if (!slotOk) {
       next = disableFeatPowerReplace(next, featId);
