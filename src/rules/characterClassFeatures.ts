@@ -19,12 +19,13 @@ import {
   traitNameForDisplay,
   type TraitDisplayRow
 } from "./supportTraits";
-import { collectActiveTraitPackageIds } from "./traitPackageIds";
+import { collectActiveDomainLabels, collectActiveTraitPackageIds } from "./traitPackageIds";
 
 function grantRequirementMet(
   requires: string | undefined,
   activeIds: Set<string>,
   activeTraitPackages: Set<string>,
+  activeDomainLabels: Set<string>,
   classSelections: Record<string, string> | undefined
 ): boolean {
   if (!requires?.trim()) return true;
@@ -34,6 +35,7 @@ function grantRequirementMet(
   for (const req of parts) {
     if (activeIds.has(req)) return true;
     if (activeTraitPackages.has(req)) return true;
+    if (activeDomainLabels.has(req)) return true;
     if (classSelections && Object.values(classSelections).includes(req)) return true;
   }
   return false;
@@ -57,6 +59,7 @@ export function expandClassFeatureIdsWithGrants(
   while (changed) {
     changed = false;
     const traitPackages = collectActiveTraitPackageIds(index, seen);
+    const domainLabels = collectActiveDomainLabels(index, seen);
     for (const fid of [...seen]) {
       const feature = byId.get(fid);
       if (!feature) continue;
@@ -69,7 +72,7 @@ export function expandClassFeatureIdsWithGrants(
         const child = byId.get(childId);
         if (!child || !featureIsAvailableAtLevel(child, characterLevel)) continue;
         const requires = grantRequiresForChild(feature, childId);
-        if (!grantRequirementMet(requires, seen, traitPackages, classSelections)) continue;
+        if (!grantRequirementMet(requires, seen, traitPackages, domainLabels, classSelections)) continue;
         seen.add(childId);
         changed = true;
       }

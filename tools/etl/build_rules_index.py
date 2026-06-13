@@ -606,6 +606,28 @@ def build_trait_package_id_by_class_feature_id(
     return out
 
 
+def build_domain_label_by_class_feature_id(
+    features_by_id: Dict[str, Dict[str, Any]],
+    features_by_name: Dict[str, Dict[str, Any]],
+) -> Dict[str, str]:
+    """Map Warpriest domain pick class feature ids to grant `requires` labels (Storm Domain, …)."""
+    labels = _domain_package_names_from_grants(features_by_name)
+    if not labels:
+        return {}
+    out: Dict[str, str] = {}
+    labels_sorted = sorted(labels, key=len, reverse=True)
+    for cf in features_by_id.values():
+        fid = str(cf.get("internal_id") or "")
+        name_lower = str(cf.get("name") or "").lower()
+        if not fid.startswith("ID_"):
+            continue
+        for label in labels_sorted:
+            if label.lower() in name_lower:
+                out[fid] = label
+                break
+    return out
+
+
 def extract_class_feature_power_rules(row: Dict[str, Any]) -> Dict[str, Any]:
     rules = row.get("rules") if isinstance(row.get("rules"), dict) else {}
     replacements: List[Dict[str, str]] = []
@@ -4598,8 +4620,20 @@ def build_index(input_path: Path, output_dir: Path) -> None:
         entry.update(power_rules)
         class_features.append(entry)
 
+    class_features_raw_by_id = {
+        str(r.get("internal_id")): r for r in class_features_raw if r.get("internal_id")
+    }
+    class_features_raw_by_name: Dict[str, Dict[str, Any]] = {}
+    for row in class_features_raw:
+        name = str(row.get("name") or "").strip()
+        if name:
+            class_features_raw_by_name[name] = row
+
     trait_package_id_by_class_feature_id = build_trait_package_id_by_class_feature_id(
-        {str(r.get("internal_id")): r for r in class_features_raw if r.get("internal_id")}
+        class_features_raw_by_id
+    )
+    domain_label_by_class_feature_id = build_domain_label_by_class_feature_id(
+        class_features_raw_by_id, class_features_raw_by_name
     )
 
     feats: List[Dict[str, Any]] = []
@@ -4974,6 +5008,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
         "classBuildOptionsByClassId": class_build_options_by_class,
         "classFeatureChoiceGroupsByClassId": class_feature_choice_groups_by_class,
         "traitPackageIdByClassFeatureId": trait_package_id_by_class_feature_id,
+        "domainLabelByClassFeatureId": domain_label_by_class_feature_id,
         "paragonPathClassFeaturePowerIds": paragon_path_class_feature_power_ids,
         "featGrantedPowerIdsExcludedFromClassFeaturePicks": (
             feat_granted_power_ids_excluded_from_class_feature_picks

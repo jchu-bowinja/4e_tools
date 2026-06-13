@@ -586,6 +586,8 @@ export interface RulesIndex {
   grantedClassFeatureNamesBySupportId?: Record<string, string[]>;
   /** Essentials pact/domain/school picks → trait package internal id (for `requires` on grant chains). */
   traitPackageIdByClassFeatureId?: Record<string, string>;
+  /** Warpriest domain picks → compendium `requires` label (Storm Domain, …). */
+  domainLabelByClassFeatureId?: Record<string, string>;
   /** Class build options (choice features) with description/rules/powers, keyed by class id. */
   classBuildOptionsByClassId?: Record<
     string,

@@ -2,6 +2,7 @@ import unittest
 
 from build_rules_index import (
     _extract_class_feature_mechanical_effects,
+    build_domain_label_by_class_feature_id,
     build_trait_package_id_by_class_feature_id,
     extract_class_feature_power_rules,
     extract_feat_power_modifications,
@@ -128,6 +129,48 @@ class ClassFeaturePowerRulesTest(unittest.TestCase):
         }
         out = build_trait_package_id_by_class_feature_id(features_by_id)
         self.assertEqual(out["ID_FMP_CLASS_FEATURE_3699"], "ID_FMP_TRAIT_PACKAGE_824")
+
+    def test_domain_label_map_from_warpriest_picks(self):
+        features_by_id = {
+            "ID_FMP_CLASS_FEATURE_3098": {
+                "internal_id": "ID_FMP_CLASS_FEATURE_3098",
+                "name": "Level 3 Domain Encounter Power",
+                "rules": {
+                    "grant": [
+                        {
+                            "attrs": {
+                                "name": "ID_FMP_CLASS_FEATURE_2969",
+                                "type": "Class Feature",
+                                "requires": "Storm Domain",
+                            }
+                        },
+                        {
+                            "attrs": {
+                                "name": "ID_FMP_CLASS_FEATURE_2983",
+                                "type": "Class Feature",
+                                "requires": "Sun Domain",
+                            }
+                        },
+                    ]
+                },
+            },
+            "ID_FMP_CLASS_FEATURE_2822": {
+                "internal_id": "ID_FMP_CLASS_FEATURE_2822",
+                "name": "Storm Domain Features and Powers",
+            },
+            "ID_FMP_CLASS_FEATURE_2841": {
+                "internal_id": "ID_FMP_CLASS_FEATURE_2841",
+                "name": "Sun Domain Features",
+            },
+        }
+        features_by_name = {
+            "Level 3 Domain Encounter Power": features_by_id["ID_FMP_CLASS_FEATURE_3098"],
+            "Storm Domain Features and Powers": features_by_id["ID_FMP_CLASS_FEATURE_2822"],
+            "Sun Domain Features": features_by_id["ID_FMP_CLASS_FEATURE_2841"],
+        }
+        out = build_domain_label_by_class_feature_id(features_by_id, features_by_name)
+        self.assertEqual(out["ID_FMP_CLASS_FEATURE_2822"], "Storm Domain")
+        self.assertEqual(out["ID_FMP_CLASS_FEATURE_2841"], "Sun Domain")
 
 
 if __name__ == "__main__":
