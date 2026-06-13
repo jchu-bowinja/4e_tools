@@ -1,6 +1,10 @@
 import unittest
 
-from build_monster_index import _repair_susceptibility_row
+from build_monster_index import (
+    _postprocess_immunity_strings,
+    _repair_immunity_segments,
+    _repair_susceptibility_row,
+)
 
 
 class TestMonsterSusceptibilityRepair(unittest.TestCase):
@@ -90,6 +94,24 @@ class TestMonsterSusceptibilityRepair(unittest.TestCase):
             }
         )
         self.assertEqual(out["name"], "Special")
+
+
+class TestMonsterImmunityRepair(unittest.TestCase):
+    def test_mutant_arbalester_parenthetical_merge(self) -> None:
+        raw = ["Disease", "poison (and push", "pull", "slide when chained)"]
+        self.assertEqual(
+            _repair_immunity_segments(raw),
+            ["Disease", "poison (and push, pull, slide when chained)"],
+        )
+
+    def test_postprocess_dedupes_and_normalizes(self) -> None:
+        out = _postprocess_immunity_strings(
+            ["Disease", "poison (and push", "pull", "slide when chained)"]
+        )
+        self.assertEqual(
+            out,
+            ["Disease", "poison (and push, pull, slide when chained)"],
+        )
 
 
 if __name__ == "__main__":

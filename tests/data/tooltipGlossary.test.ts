@@ -3,6 +3,7 @@ import type { RulesIndex } from "../../src/rules/models";
 import {
   abilityTooltipResolveTerms,
   displayTextForGlossaryRow,
+  expandImmunityDisplaySegments,
   loadTooltipGlossary,
   resolveTooltipText,
   sanitizeGlossaryRows,
@@ -276,6 +277,33 @@ describe("close blast / close burst with generated glossary aliases", () => {
     );
     expect(resolveTooltipText({ terms: ["Close burst 3"], glossaryByName: glossary })).toBe(
       definitionText
+    );
+  });
+});
+
+describe("expandImmunityDisplaySegments", () => {
+  it("keeps parenthetical comma lists as one segment", () => {
+    expect(
+      expandImmunityDisplaySegments([
+        "Disease",
+        "poison (and push, pull, slide when chained)"
+      ])
+    ).toEqual(["Disease", "poison (and push, pull, slide when chained)"]);
+  });
+});
+
+describe("monster builtin fallbacks", () => {
+  it("resolves filth fever via built-in fallback", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => []
+      }))
+    );
+    const glossary = await loadTooltipGlossary();
+    expect(resolveTooltipText({ terms: ["filth fever"], glossaryByName: glossary })).toContain(
+      "Filth fever"
     );
   });
 });

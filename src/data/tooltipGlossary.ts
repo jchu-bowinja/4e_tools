@@ -15,7 +15,12 @@ export interface GlossaryTermRow {
 }
 
 function normalizeTerm(value: string): string {
-  return value.trim().toLowerCase().replace(/\s+/g, " ");
+  return value
+    .trim()
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .toLowerCase()
+    .replace(/\s+/g, " ");
 }
 
 export function isNumberedRangeAlias(value: string): boolean {
@@ -156,7 +161,77 @@ const BUILTIN_FALLBACK_DEFINITIONS: Record<string, string> = {
   adaptive:
     "Adaptive resistance changes situationally; see the creature's powers or tactical notes for current values.",
   determined:
-    "Determined when used in a stat block; see this creature's powers or the encounter setup for how this applies."
+    "Determined when used in a stat block; see this creature's powers or the encounter setup for how this applies.",
+  "all damage":
+    "This creature resists or is vulnerable to all damage types unless the stat block lists exceptions.",
+  "all damage from outside the tower":
+    "Damage dealt from outside the named structure is reduced or negated; see the creature's encounter text for the tower boundary.",
+  "by current shape":
+    "Resistance value depends on the creature's current form; see its powers or stat block notes for the active shape.",
+  "chromatic pillar":
+    "Chromatic pillar is a Tiamat-themed defensive effect; see this creature's powers for how the pillar interacts with damage.",
+  "copper defense":
+    "Copper Defense is a named defensive trait on copper-themed creatures; see its powers for how damage is reduced.",
+  "effects targeting ac":
+    "Effects that target AC against this creature are reduced or ignored; see its powers for the exact interaction.",
+  "necrotic damage":
+    "Necrotic damage is a damage type that often weakens or withers the target; many undead resist or are immune to it.",
+  opportunity:
+    "Opportunity refers to opportunity-attack interactions in this stat block; see the creature's traits for when it can make or ignore opportunity attacks.",
+  "planephase form":
+    "While in planephase form the creature has altered defenses and resistances; see its powers for entering, leaving, and current values.",
+  "podspawn shares any resistances that its pod demon progenitor has":
+    "This podspawn inherits resistances from its pod demon progenitor; use the progenitor's current resistances.",
+  "poison only":
+    "Only poison damage is resisted or affected; other damage types are handled normally unless noted elsewhere.",
+  "target of that attack takes an extra 5 cold damage":
+    "A rider on a specific attack: the target takes additional cold damage beyond the attack's normal hit line.",
+  "terrible slaughter":
+    "Terrible Slaughter is a named defensive or damage-reduction trait; see this creature's powers for when it applies.",
+  "arrow of fate":
+    "Arrow of Fate is a named vulnerability on this creature; see encounter text or powers for what triggers extra damage.",
+  "attacks by characters below 20th level":
+    "Characters below 20th level cannot affect this creature with attacks; higher-level characters interact normally.",
+  "attacks by characters below level 15":
+    "Characters below 15th level cannot affect this creature with attacks; higher-level characters interact normally.",
+  "attacks by characters below level 20":
+    "Characters below 20th level cannot affect this creature with attacks; higher-level characters interact normally.",
+  "attacks by creatures of lower than 20th level":
+    "Creatures below 20th level cannot affect this creature with attacks; higher-level creatures interact normally.",
+  "attacks and damage while in dedrick beynar's space and while dedrick has 1 or more hit points":
+    "This creature is protected while sharing Dedrick Beynar's space and Dedrick remains alive; see the encounter for details.",
+  "can't be teleported against its will; resist see also planar warp":
+    "This creature cannot be teleported unwillingly; see planar warp and related traits for resistance details.",
+  "filth fever":
+    "Filth fever is a disease often spread by filth or vermin; see the Disease rules and this creature's attack for the effect.",
+  "greater moon fever":
+    "Greater moon fever is an advanced lycanthropy-related disease; see the Disease rules and this creature's attacks.",
+  "greater moon frenzy":
+    "Greater moon frenzy is a severe lycanthropy-related disease; see the Disease rules and this creature's attacks.",
+  lockjaw:
+    "Lockjaw is a disease that stiffens the victim; see the Disease rules and this creature's attack for the effect.",
+  "meenlock corruption":
+    "Meenlock corruption is a disease spread by meenlocks; see the Disease rules and this creature's powers.",
+  "moon frenzy":
+    "Moon frenzy is a lycanthropy-related disease; see the Disease rules and this creature's attacks.",
+  "moon rage":
+    "Moon rage is a lycanthropy-related disease; see the Disease rules and this creature's attacks.",
+  "moontusk fever":
+    "Moontusk fever is a disease associated with wereboar and similar creatures; see the Disease rules.",
+  "noxious breath":
+    "Noxious breath is a disease or affliction delivered by this creature's breath weapon or aura; see its powers.",
+  "rot grub infestation":
+    "Rot grub infestation is a disease caused by rot grubs; see the Disease rules and this creature's attacks.",
+  "sewer fever":
+    "Sewer fever is a disease common to wererats and sewer denizens; see the Disease rules.",
+  "chaos phage":
+    "Chaos phage is a plaguechanged disease; see the Disease rules and this creature's powers.",
+  "bluefire burst":
+    "Bluefire burst is a plaguechanged disease; see the Disease rules and this creature's powers.",
+  "poison (and push, pull, slide when chained)":
+    "Immune to poison and to forced movement (push, pull, slide) while chained; see the creature's traits for when the chain applies.",
+  "all damage dealt to the spawn during its turn":
+    "The spawn is immune to all damage dealt to it during its own turn; damage on other turns applies normally."
 };
 
 /**
@@ -201,6 +276,46 @@ export function mergeBuiltinTooltipLookupMap(glossaryByName: Record<string, stri
     if (!out[nk]) out[nk] = text;
   }
   return out;
+}
+
+function splitCommaImmunitySegments(raw: string): string[] {
+  return String(raw ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function mergeImmunityCommaFragments(segments: string[]): string[] {
+  const merged: string[] = [];
+  for (const seg of segments) {
+    const st = String(seg ?? "").trim();
+    if (!st) continue;
+    if (!merged.length) {
+      merged.push(st);
+      continue;
+    }
+    const prev = merged[merged.length - 1] ?? "";
+    const openParens = (prev.match(/\(/g) ?? []).length - (prev.match(/\)/g) ?? []).length;
+    if (
+      openParens > 0 ||
+      ["pull", "push"].includes(st.toLowerCase()) ||
+      (st.endsWith(")") && !st.includes("("))
+    ) {
+      merged[merged.length - 1] = `${prev}, ${st}`;
+      continue;
+    }
+    merged.push(st);
+  }
+  return merged;
+}
+
+/** Display segments for monster immunity lines; keeps parenthetical comma lists intact. */
+export function expandImmunityDisplaySegments(immunities: string[] | null | undefined): string[] {
+  const segments: string[] = [];
+  for (const imm of immunities ?? []) {
+    segments.push(...splitCommaImmunitySegments(String(imm ?? "")));
+  }
+  return mergeImmunityCommaFragments(segments);
 }
 
 /** Splits attack-style lines (`Acrobatics (Dex) vs Reflex`) into separate lookup strings. */

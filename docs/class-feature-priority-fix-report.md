@@ -29,6 +29,9 @@ Run after ETL changes (`python tools/etl/build_rules_index.py`):
 # Level-1 class feature power picks with empty powerIds
 python tools/etl/audit_class_feature_choice_power_ids.py
 
+# Class-feature weapon modify rows vs indexed mechanicalEffects
+python tools/etl/audit_class_feature_weapon_modify_gaps.py
+
 # Racial/class build coverage gaps
 python tools/etl/list_race_class_selection_gaps.py
 

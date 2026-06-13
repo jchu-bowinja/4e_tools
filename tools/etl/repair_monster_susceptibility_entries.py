@@ -16,7 +16,10 @@ _ETL = Path(__file__).resolve().parent
 if str(_ETL) not in sys.path:
     sys.path.insert(0, str(_ETL))
 
-from build_monster_index import _repair_susceptibility_row  # noqa: E402
+from build_monster_index import (  # noqa: E402
+    _postprocess_immunity_strings,
+    _repair_susceptibility_row,
+)
 
 
 def _repair_list(rows: list) -> tuple[list, bool]:
@@ -42,6 +45,12 @@ def repair_entry(entry: dict) -> bool:
         fixed, key_changed = _repair_list(rows)
         if key_changed:
             entry[key] = fixed
+            changed = True
+    immunities = entry.get("immunities")
+    if isinstance(immunities, list):
+        fixed = _postprocess_immunity_strings([str(x) for x in immunities])
+        if fixed != immunities:
+            entry["immunities"] = fixed
             changed = True
     return changed
 

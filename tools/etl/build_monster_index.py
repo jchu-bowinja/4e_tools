@@ -653,31 +653,61 @@ def _split_comma_immunity_segments(raw: str) -> List[str]:
     return [s.strip() for s in str(raw or "").split(",") if s.strip()]
 
 
+def _merge_immunity_comma_fragments(segments: List[str]) -> List[str]:
+    """Rejoin comma-split parenthetical clauses (e.g. poison (and push, pull, slide when chained))."""
+    merged: List[str] = []
+    for seg in segments:
+        st = str(seg or "").strip()
+        if not st:
+            continue
+        if not merged:
+            merged.append(st)
+            continue
+        prev = merged[-1]
+        open_parens = prev.count("(") - prev.count(")")
+        if open_parens > 0:
+            merged[-1] = f"{prev}, {st}"
+            continue
+        if st.lower() in {"pull", "push"} or (st.endswith(")") and "(" not in st):
+            merged[-1] = f"{prev}, {st}"
+            continue
+        merged.append(st)
+    return merged
+
+
+def _repair_immunity_segments(immunities: List[str]) -> List[str]:
+    if not immunities:
+        return immunities
+    segments: List[str] = []
+    for imm in immunities:
+        segments.extend(_split_comma_immunity_segments(str(imm)))
+    return _merge_immunity_comma_fragments(segments)
+
+
 def _postprocess_immunity_strings(immunities: List[str]) -> List[str]:
     """Fix known source typos and split fused segments so immunity lists comma-split cleanly."""
     seen: Set[str] = set()
     out: List[str] = []
-    for imm in immunities:
-        for seg in _split_comma_immunity_segments(str(imm)):
-            st = seg.strip()
-            if not st:
-                continue
-            sl = st.lower()
-            if sl == "poison. sleep":
-                for part in ("poison", "sleep"):
-                    lk = part.lower()
-                    if lk not in seen:
-                        seen.add(lk)
-                        out.append(part)
-                continue
-            if sl == "ilusion":
-                st = "illusion"
-            elif sl == "pertrification":
-                st = "petrification"
-            lk = st.lower()
-            if lk not in seen:
-                seen.add(lk)
-                out.append(_normalize_text(st))
+    for seg in _repair_immunity_segments(immunities):
+        st = seg.strip()
+        if not st:
+            continue
+        sl = st.lower()
+        if sl == "poison. sleep":
+            for part in ("poison", "sleep"):
+                lk = part.lower()
+                if lk not in seen:
+                    seen.add(lk)
+                    out.append(part)
+            continue
+        if sl == "ilusion":
+            st = "illusion"
+        elif sl == "pertrification":
+            st = "petrification"
+        lk = st.lower()
+        if lk not in seen:
+            seen.add(lk)
+            out.append(_normalize_text(st))
     return out
 
 

@@ -12,6 +12,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import type { RulesIndex } from "../../rules/models";
+import { expandImmunityDisplaySegments } from "../../data/tooltipGlossary";
 import { FloatingHoverPanel } from "../../ui/FloatingHoverPanel";
 import { useGlossaryTooltip } from "../../ui/useGlossaryTooltip";
 import { resolveMonsterGlossaryHoverSections, resolveMonsterStyleTooltip } from "./monsterTooltipResolve";
@@ -2155,10 +2156,7 @@ function MonsterStatBlockCard({
             <span className="monster-stat-block-k monster-stat-block-vitals__label-col">Immune</span>
             <div className="monster-stat-block-vitals__value-col">
               {(() => {
-                const segments: string[] = [];
-                for (const imm of monster.immunities ?? []) {
-                  segments.push(...splitCommaListSegments(String(imm ?? "")));
-                }
+                const segments = expandImmunityDisplaySegments(monster.immunities);
                 return segments.map((text, idx) => (
                   <span key={`${statBlockKeyPrefix}-imm-${idx}`}>
                     {idx > 0 ? ", " : null}

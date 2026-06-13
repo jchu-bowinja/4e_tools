@@ -38,7 +38,7 @@ class TestCompendiumIngest(unittest.TestCase):
                 "Short Description": "You grew up in the desert.",
             },
         }
-        out = _background_index_entry(row, set(), set(), [])
+        out = _background_index_entry(row, set(), set(), None, [])
         self.assertEqual(out["backgroundType"], "Geography")
         self.assertEqual(out["associatedSkills"], ["Endurance", "Nature"])
         self.assertIn("Endurance", out["benefit"])
