@@ -287,6 +287,36 @@ def _extract_senses(root: ET.Element) -> List[Dict[str, Any]]:
     return senses
 
 
+_STANDARD_DAMAGE_TYPES = frozenset(
+    {
+        "acid",
+        "cold",
+        "fire",
+        "force",
+        "lightning",
+        "necrotic",
+        "poison",
+        "psychic",
+        "radiant",
+        "thunder",
+    }
+)
+
+
+def _title_case_damage_keyword_phrase(raw: str) -> str:
+    """Cold, Necrotic, Nonmagical Fire — match typical resistance name casing."""
+    small = {"and", "or", "of", "the", "to", "from", "vs", "vs."}
+    parts: List[str] = []
+    for w in raw.strip().split():
+        if not w:
+            continue
+        if w.lower() in small:
+            parts.append(w.lower())
+        else:
+            parts.append(w[:1].upper() + w[1:].lower())
+    return " ".join(parts)
+
+
 def _extract_susceptibilities(root: ET.Element, section_name: str) -> List[Dict[str, Any]]:
     section = _find_first_section(root, section_name)
     if section is None:
@@ -306,37 +336,229 @@ def _extract_susceptibilities(root: ET.Element, section_name: str) -> List[Dict[
         if details:
             row["details"] = details
         if row:
-            rows.append(row)
+            rows.append(_repair_susceptibility_row(row))
     return rows
 
 
-# Source XML sometimes puts resistances inside Immunities as a bare name like "10 cold".
-_NUMERIC_PREFIX_IMMUNITY_PATTERN = re.compile(r"^(\d+)\s+(.+)$")
-
-_STANDARD_DAMAGE_TYPES = frozenset(
+# Names that are XML clause fragments, not damage types or attack scopes.
+_SUSCEPTIBILITY_NAME_FRAGMENTS = frozenset(
     {
-        "acid",
-        "cold",
-        "fire",
+        "against",
+        "all",
+        "damage",
+        "half",
+        "see",
+        "to",
+        "while",
+        "his",
+        "her",
+        "its",
+        "it",
+        "if",
+        "the",
+        "a",
+        "an",
+        "of",
+        "and",
+        "or",
+        "from",
+        "that",
+        "this",
+        "when",
+        "for",
+        "critical",
+        "takes",
+        "monster",
+        "melee",
+        "one",
+        "fi",
+        "determined",
+    }
+)
+
+_KNOWN_SUSCEPTIBILITY_KEYWORDS = frozenset(
+    {
+        *_STANDARD_DAMAGE_TYPES,
+        "insubstantial",
+        "variable",
+        "adaptive",
+        "disease",
+        "sleep",
+        "charm",
+        "divine",
+        "silver",
+        "regeneration",
+        "electricity",
         "force",
-        "lightning",
-        "necrotic",
-        "poison",
         "psychic",
-        "radiant",
-        "thunder",
+        "ongoing",
+        "close",
     }
 )
 
 
-def _title_case_damage_keyword_phrase(raw: str) -> str:
-    """Cold, Necrotic, Nonmagical Fire — match typical resistance name casing."""
-    parts: List[str] = []
-    for w in raw.strip().split():
-        if not w:
-            continue
-        parts.append(w[:1].upper() + w[1:].lower())
-    return " ".join(parts)
+def _is_damage_type_name(name: str) -> bool:
+    low = name.lower().strip()
+    if not low or low in _SUSCEPTIBILITY_NAME_FRAGMENTS or low == "0":
+        return False
+    words = [w for w in low.split() if w]
+    if not words:
+        return False
+    if words[0] in _KNOWN_SUSCEPTIBILITY_KEYWORDS:
+        return True
+    if len(words) >= 2 and words[-1] in _STANDARD_DAMAGE_TYPES:
+        return True
+    if len(words) == 2 and words[0] == "nonmagical" and words[1] in _STANDARD_DAMAGE_TYPES:
+        return True
+    if low in {"variable resist", "variable resistance"}:
+        return True
+    return False
+
+
+def _scope_label_from_details(details: str) -> str:
+    """Turn split-clause tails into a short label (area and close attacks -> Area and Close)."""
+    text = str(details or "").strip().rstrip(".")
+    if not text:
+        return ""
+    if ";" in text:
+        text = text.split(";", 1)[0].strip()
+    if re.search(r"target\s+ac\b", text, flags=re.I):
+        return "Effects Targeting AC"
+    text = re.sub(r"^(?:damage\s+)?(?:against|from)\s+", "", text, flags=re.I)
+    text = re.sub(r"^that\s+", "", text, flags=re.I)
+    text = re.sub(r"^effects?\s+that\s+", "", text, flags=re.I)
+    text = re.sub(r"^also\s+", "", text, flags=re.I)
+    if re.fullmatch(r"hits?", text, flags=re.I):
+        return "Critical Hits"
+    text = re.sub(r"\s+attacks?\s*$", "", text, flags=re.I)
+    if not text:
+        return ""
+    return _title_case_damage_keyword_phrase(text)
+
+
+def _finalize_susceptibility_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Drop details that only repeat the repaired label; keep repair idempotent."""
+    name = str(row.get("name") or "").strip()
+    details = str(row.get("details") or "").strip()
+    if not name or not details:
+        return row
+    if details[0].islower() and _scope_label_from_details(details) == name:
+        out = dict(row)
+        out.pop("details", None)
+        return out
+    return row
+
+
+def _repair_susceptibility_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Merge split resistance/weakness clauses so name is not a junk token (against, half, see, …)."""
+    name = str(row.get("name") or "").strip()
+    details = str(row.get("details") or "").strip()
+    if not name:
+        return row
+
+    low = name.lower()
+    if low == "insubstantial":
+        out = dict(row)
+        out["name"] = "Insubstantial"
+        return out
+
+    if _is_damage_type_name(name):
+        return row
+
+    if low in _SUSCEPTIBILITY_NAME_FRAGMENTS or low == "0":
+        out = dict(row)
+        if low == "half":
+            scope = _scope_label_from_details(details)
+            out["name"] = scope or "Half damage"
+            if details:
+                out["details"] = f"Half {details}".strip()
+        elif low == "against":
+            scope = _scope_label_from_details(details)
+            out["name"] = scope or "Attacks"
+        elif low == "damage":
+            scope = _scope_label_from_details(details)
+            out["name"] = scope or "Damage"
+        elif low == "all":
+            out["name"] = "All damage"
+        elif low == "see":
+            scope = _scope_label_from_details(details)
+            out["name"] = scope or _title_case_damage_keyword_phrase(details)
+            if details and scope:
+                out["details"] = f"See also {details}".strip()
+        elif low == "to":
+            scope = _scope_label_from_details(details)
+            out["name"] = scope or _title_case_damage_keyword_phrase(details)
+        elif low == "critical":
+            out["name"] = _scope_label_from_details(details) or "Critical Hits"
+        elif low == "while":
+            out["name"] = "Special"
+            out["details"] = f"While {details}".strip() if details else "While"
+        elif low == "takes":
+            detail_text = re.sub(r"^half\s+damage\s+from\s+", "", details, flags=re.I)
+            scope = _scope_label_from_details(detail_text or details)
+            out["name"] = scope or "Half damage"
+            if details:
+                out["details"] = f"Takes {details}".strip()
+        elif low in {"his", "her", "its", "it", "if"}:
+            out["name"] = "Special"
+            combined = f"{name} {details}".strip()
+            if combined:
+                out["details"] = combined
+        elif low == "monster":
+            out["name"] = "Special"
+            combined = f"{name} {details}".strip()
+            if combined:
+                out["details"] = combined
+        elif low == "0":
+            out["name"] = "Special"
+        else:
+            scope = _scope_label_from_details(details)
+            out["name"] = scope or _title_case_damage_keyword_phrase(name)
+        return _finalize_susceptibility_row(out)
+
+    if re.fullmatch(r"and\s+ranged", name, flags=re.I):
+        out = dict(row)
+        out["name"] = "Ranged"
+        if details:
+            out["details"] = details
+        return _finalize_susceptibility_row(out)
+
+    if re.fullmatch(r"target\s+ac", name, flags=re.I):
+        out = dict(row)
+        out["name"] = _scope_label_from_details(details) or "Effects Targeting AC"
+        return _finalize_susceptibility_row(out)
+
+    if low == "re" and details.lower() in {"", "re"}:
+        out = dict(row)
+        out["name"] = "Fire"
+        out.pop("details", None)
+        return out
+
+    amount = row.get("amount")
+    if (
+        details
+        and amount in (0, "0", None)
+        and len(name) > 30
+        and name.lower().rstrip(".") in details.lower().rstrip(".")
+    ):
+        out = dict(row)
+        out["name"] = "Special"
+        out["details"] = details
+        return _finalize_susceptibility_row(out)
+
+    if details and details[0].islower() and not _is_damage_type_name(name):
+        if _scope_label_from_details(details) == name:
+            return _finalize_susceptibility_row(row)
+        out = dict(row)
+        out["name"] = "Special"
+        out["details"] = f"{name} {details}".strip()
+        return _finalize_susceptibility_row(out)
+
+    return _finalize_susceptibility_row(row)
+
+
+# Source XML sometimes puts resistances inside Immunities as a bare name like "10 cold".
+_NUMERIC_PREFIX_IMMUNITY_PATTERN = re.compile(r"^(\d+)\s+(.+)$")
 
 
 def _normalize_keyword_token(raw: str) -> str:
