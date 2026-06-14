@@ -3557,7 +3557,8 @@ def _should_index_power_modify(attrs: Dict[str, Any], gtype: str) -> bool:
 
 def _append_power_modification_entry(
     entries: List[Dict[str, Any]],
-    seen_power_names: Set[str],
+    seen_power_fields: Set[tuple[str, str]],
+    seen_power_targets: Set[str],
     target_name: str,
     field: str,
     value: str,
@@ -3568,10 +3569,12 @@ def _append_power_modification_entry(
     class_feature_id_by_name: Optional[Dict[str, str]],
 ) -> None:
     pname = _INTERNAL_POWER_DISPLAY_NAMES.get(target_name, target_name)
-    key = pname.lower()
-    if key in seen_power_names:
+    field_key = (field or feat_name).strip().lower()
+    dedupe_key = (pname.lower(), field_key)
+    if dedupe_key in seen_power_fields:
         return
-    seen_power_names.add(key)
+    seen_power_fields.add(dedupe_key)
+    seen_power_targets.add(pname.lower())
     pid = _resolve_power_id(pname, power_name_to_id, power_normalized_to_id, power_id_to_name)
     cfid = None
     if not pid and class_feature_id_by_name:
@@ -3724,7 +3727,8 @@ def extract_feat_power_modifications(
     entries: List[Dict[str, Any]] = []
     weapon_entries: List[Dict[str, Any]] = []
     armor_entries: List[Dict[str, Any]] = []
-    seen_power_names: Set[str] = set()
+    seen_power_fields: Set[tuple[str, str]] = set()
+    seen_power_targets: Set[str] = set()
     seen_weapon_names: Set[str] = set()
     seen_armor_names: Set[str] = set()
 
@@ -3780,7 +3784,8 @@ def extract_feat_power_modifications(
         for target in _power_modify_targets_from_attrs(attrs, feat_name, grant_power_ids, power_id_to_name):
             _append_power_modification_entry(
                 entries,
-                seen_power_names,
+                seen_power_fields,
+                seen_power_targets,
                 target,
                 field,
                 value,
@@ -3793,11 +3798,12 @@ def extract_feat_power_modifications(
 
     synthesized: List[Dict[str, Any]] = []
     for pname in _parse_associated_power_names(spec):
-        if pname.lower() in seen_power_names:
+        if pname.lower() in seen_power_targets:
             continue
         _append_power_modification_entry(
             entries,
-            seen_power_names,
+            seen_power_fields,
+            seen_power_targets,
             pname,
             feat_name,
             "",

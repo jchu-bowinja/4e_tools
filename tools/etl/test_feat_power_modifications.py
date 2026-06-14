@@ -90,6 +90,39 @@ class TestFeatPowerModifications(unittest.TestCase):
         self.assertEqual(out["modifiedPowerIds"], ["ID_CMD", "ID_TWIN"])
         self.assertEqual(len(feat["rules"]["modify"]), 2)
 
+    def test_multiple_fields_on_same_power(self):
+        feat = {
+            "name": "Healing Word",
+            "specific": {},
+            "rules": {
+                "modify": [
+                    {
+                        "attrs": {
+                            "name": "ID_FMP_POWER_1455",
+                            "type": "Power",
+                            "Field": "Display",
+                            "value": "Cleric Utility",
+                        }
+                    },
+                    {
+                        "attrs": {
+                            "name": "ID_FMP_POWER_1455",
+                            "type": "Power",
+                            "Field": "Power Type",
+                            "value": "Utility",
+                        }
+                    },
+                ]
+            },
+        }
+        id_to_name = {"ID_FMP_POWER_1455": "Healing Word"}
+        out = extract_feat_power_modifications(feat, {}, {}, id_to_name, {})
+        self.assertEqual(len(out["powerModifications"]), 2)
+        self.assertEqual(
+            {entry["field"] for entry in out["powerModifications"]},
+            {"Display", "Power Type"},
+        )
+
     def test_associated_powers_not_duplicated_when_modify_exists(self):
         feat = {
             "name": "Power of Creation",

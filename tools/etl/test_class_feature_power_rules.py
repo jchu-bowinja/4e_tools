@@ -72,13 +72,25 @@ class ClassFeaturePowerRulesTest(unittest.TestCase):
                             "Field": "Display",
                             "value": "Cleric Utility",
                         }
-                    }
+                    },
+                    {
+                        "attrs": {
+                            "name": "ID_FMP_POWER_1455",
+                            "type": "Power",
+                            "Field": "Power Type",
+                            "value": "Utility",
+                        }
+                    },
                 ]
             },
         }
-        out = extract_feat_power_modifications(row, {}, {}, {}, {})
-        self.assertEqual(out["powerModifications"][0]["field"], "Display")
-        self.assertEqual(out["powerModifications"][0]["powerId"], "ID_FMP_POWER_1455")
+        out = extract_feat_power_modifications(row, {}, {}, {"ID_FMP_POWER_1455": "Healing Word"}, {})
+        self.assertEqual(len(out["powerModifications"]), 2)
+        fields = {entry["field"] for entry in out["powerModifications"]}
+        self.assertEqual(fields, {"Display", "Power Type"})
+        self.assertTrue(
+            all(entry["powerId"] == "ID_FMP_POWER_1455" for entry in out["powerModifications"])
+        )
 
 
     def test_powerswap_rule_without_fixed_power_list(self):
