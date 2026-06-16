@@ -21,10 +21,6 @@ export function totalFeatSlots(level: number, extraRacialFeatSlots = 0): number 
   return n + Math.max(0, extraRacialFeatSlots);
 }
 
-export function isHumanRace(raceName: string | undefined): boolean {
-  return (raceName || "").trim().toLowerCase() === "human";
-}
-
 /** Class attack encounter powers known by level (PHB progression). */
 export function expectedClassEncounterAttackSlots(level: number): number {
   if (level <= 2) return 1;

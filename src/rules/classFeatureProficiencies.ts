@@ -5,8 +5,6 @@ import {
   weaponAttackAbilityFromMechanicalEffects
 } from "./mechanicalEffects";
 
-export const ARCHER_WARLORD_CLASS_FEATURE_ID = "ID_FMP_CLASS_FEATURE_2286";
-
 const INTERNAL_PROFICIENCY_PREFIX = "ID_INTERNAL_PROFICIENCY_";
 
 function norm(s: string): string {
@@ -54,26 +52,18 @@ function parseInternalProficiencyGrantId(internalId: string): ProficiencyGrant |
   return { kind: "weaponCategory", value: val.toLowerCase(), label: val };
 }
 
-export function hasArcherWarlordSelection(build: CharacterBuild): boolean {
-  return Object.values(build.classSelections ?? {}).includes(ARCHER_WARLORD_CLASS_FEATURE_ID);
-}
-
-/** Drops armor proficiency phrases from active class-feature mechanical effects (e.g. Archer Warlord). */
+/**
+ * Drops armor proficiency phrases declared by active class-feature
+ * `mechanicalEffects` (e.g. Archer Warlord removes chainmail / light shields).
+ * Fully data-driven: the removal phrases come from the indexed feature, not
+ * from any hardcoded feature id.
+ */
 export function effectiveClassArmorProficienciesText(
   classArmorProficienciesText: string,
   build: CharacterBuild,
   index?: RulesIndex
 ): string {
-  if (!index) {
-    if (!hasArcherWarlordSelection(build)) return classArmorProficienciesText;
-    return classArmorProficienciesText
-      .replace(/\bchainmail\b/gi, "")
-      .replace(/\blight shields?\b/gi, "")
-      .replace(/,\s*,/g, ",")
-      .replace(/;\s*;/g, ";")
-      .replace(/^[\s,;]+|[\s,;]+$/g, "")
-      .trim();
-  }
+  if (!index) return classArmorProficienciesText;
   const effects = collectActiveClassFeatureMechanicalEffects(index, build);
   if (!effects.length) return classArmorProficienciesText;
   return applyArmorProficiencyPhraseRemovals(classArmorProficienciesText, effects);

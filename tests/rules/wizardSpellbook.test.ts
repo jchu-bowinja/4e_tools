@@ -12,13 +12,23 @@ import {
   wizardSpellbookRitualIdsUsedOutsideSlot,
   spellbookPoolIndexForClassSlotDef,
   visibleWizardSpellbookRitualMilestones,
-  WIZARD_SPELLBOOK_CLASS_FEATURE_ID,
   WIZARD_SPELLBOOK_POWER_PICKS_PER_POOL,
   wizardSpellbookPowerSelectionKey,
   wizardSpellbookRitualSelectionKey
 } from "../../src/rules/wizardSpellbook";
-import type { ClassDef, RulesIndex } from "../../src/rules/models";
+import type { ClassDef, ClassFeature, RulesIndex } from "../../src/rules/models";
 import type { ClassPowerSlotDef } from "../../src/rules/classPowerSlots";
+
+// Fixture id only; runtime identifies the Spellbook feature by its spellbookKind flag.
+const WIZARD_SPELLBOOK_CLASS_FEATURE_ID = "ID_FMP_CLASS_FEATURE_318";
+
+const spellbookFeature: ClassFeature = {
+  id: WIZARD_SPELLBOOK_CLASS_FEATURE_ID,
+  name: "Spellbook",
+  slug: "spellbook",
+  spellbookKind: "wizard",
+  raw: {}
+};
 
 const wizard: ClassDef = {
   id: "ID_FMP_CLASS_9",
@@ -43,6 +53,7 @@ describe("wizardSpellbook", () => {
           kind: "power",
           parentFeatureId: WIZARD_SPELLBOOK_CLASS_FEATURE_ID,
           parentFeatureName: "Spellbook",
+          spellbookKind: "wizard",
           pickCount: 1,
           powerIds: ["ID_FMP_POWER_1"],
           powerPoolIndex: 0,
@@ -53,6 +64,7 @@ describe("wizardSpellbook", () => {
           kind: "power",
           parentFeatureId: WIZARD_SPELLBOOK_CLASS_FEATURE_ID,
           parentFeatureName: "Spellbook",
+          spellbookKind: "wizard",
           pickCount: 1,
           powerIds: ["ID_FMP_POWER_2"],
           powerPoolIndex: 7,
@@ -70,9 +82,7 @@ describe("wizardSpellbook", () => {
   it("re-applies ritual book minimums on unified inventory edits", () => {
     const index = {
       classes: [wizard],
-      classFeatures: [
-        { id: WIZARD_SPELLBOOK_CLASS_FEATURE_ID, name: "Spellbook", slug: "spellbook", raw: {} }
-      ],
+      classFeatures: [spellbookFeature],
       grantedClassFeatureNamesBySupportId: { [wizard.id]: ["Spellbook"] }
     } as unknown as RulesIndex;
     const build = {
@@ -94,9 +104,7 @@ describe("wizardSpellbook", () => {
   it("requires at least one book copy per spellbook free ritual pick", () => {
     const index = {
       classes: [wizard],
-      classFeatures: [
-        { id: WIZARD_SPELLBOOK_CLASS_FEATURE_ID, name: "Spellbook", slug: "spellbook", raw: {} }
-      ],
+      classFeatures: [spellbookFeature],
       grantedClassFeatureNamesBySupportId: { [wizard.id]: ["Spellbook"] }
     } as unknown as RulesIndex;
     const build = {
@@ -157,7 +165,7 @@ describe("wizardSpellbook", () => {
     };
     expect(spellbookPoolIndexForClassSlotDef(daily1, index)).toBe(0);
     expect(spellbookPoolIndexForClassSlotDef(util2, index)).toBe(7);
-    expect(wizardSpellbookPowerSelectionKey(0)).toBe(
+    expect(wizardSpellbookPowerSelectionKey(0, WIZARD_SPELLBOOK_CLASS_FEATURE_ID)).toBe(
       "classPower:ID_FMP_CLASS_FEATURE_318:0"
     );
   });
@@ -185,6 +193,7 @@ describe("wizardSpellbook", () => {
           id: WIZARD_SPELLBOOK_CLASS_FEATURE_ID,
           name: "Spellbook",
           slug: "spellbook",
+          spellbookKind: "wizard",
           raw: {
             rules: {
               select: [{ attrs: { type: "Power", Category: "$$CLASS,daily,1", Level: "1", spellbook: "Power Daily 1" } }]
@@ -223,7 +232,7 @@ describe("wizardSpellbook", () => {
   it("rejects duplicate rituals across milestones", () => {
     const index = {
       classes: [wizard],
-      classFeatures: [{ id: WIZARD_SPELLBOOK_CLASS_FEATURE_ID, name: "Spellbook", slug: "spellbook", raw: {} }],
+      classFeatures: [spellbookFeature],
       rituals: [
         { id: "ID_RITUAL_A", name: "A", slug: "a", level: 1, raw: {} },
         { id: "ID_RITUAL_B", name: "B", slug: "b", level: 1, raw: {} }

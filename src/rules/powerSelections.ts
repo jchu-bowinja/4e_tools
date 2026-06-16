@@ -1,4 +1,4 @@
-import { getPowersForOwnerId, getThemeGrantedPowers } from "./classPowersQuery";
+import { gateGrantedPowerIds, getPowersForOwnerId, getThemeGrantedPowers } from "./classPowersQuery";
 import {
   applyClassFeaturePowerIdReplacementsToSet,
   collectAutomaticPowerReplacementMap
@@ -56,11 +56,13 @@ export function collectCharacterPowerIdsForSelections(index: RulesIndex, build: 
     for (const pid of collectParagonPathClassFeaturePowerIds(index, paragon.id, build.level)) {
       ids.add(pid);
     }
+    for (const p of gateGrantedPowerIds(index, paragon.grantedPowerIds, build.level)) ids.add(p.id);
   }
   const epic = index.epicDestinies.find((d) => d.id === build.epicDestinyId);
   if (epic) {
     for (const p of getPowersForOwnerId(index, epic.id, build.level, "attack")) ids.add(p.id);
     for (const p of getPowersForOwnerId(index, epic.id, build.level, "utility")) ids.add(p.id);
+    for (const p of gateGrantedPowerIds(index, epic.grantedPowerIds, build.level)) ids.add(p.id);
   }
 
   for (const fid of build.featIds) {

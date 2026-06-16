@@ -37,7 +37,16 @@ function emptyBuild(overrides: Partial<CharacterBuild> = {}): CharacterBuild {
 describe("ritualCasting", () => {
   it("detects Ritual Caster feat", () => {
     const index = minimalIndex({
-      feats: [{ id: "f1", name: "Ritual Caster", slug: "ritual-caster", raw: {} }]
+      feats: [
+        {
+          id: "f1",
+          name: "Ritual Caster",
+          slug: "ritual-caster",
+          grantsRitualCasting: true,
+          prereqTokens: [],
+          raw: {}
+        }
+      ]
     });
     const build = emptyBuild({ featIds: ["f1"] });
     expect(characterHasRitualCasting(index, build)).toBe(true);

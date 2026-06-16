@@ -2,12 +2,13 @@ import { describe, expect, it } from "vitest";
 import { CLASS_FEATURE_CHOICE_NONE, getClassFeatureChoiceGroups } from "../../src/rules/classFeatureChoices";
 import { collectClassFeatureIdsFromClass } from "../../src/rules/characterClassFeatures";
 import {
-  ARCHER_WARLORD_CLASS_FEATURE_ID,
   effectiveClassArmorProficienciesText,
-  hasArcherWarlordSelection,
   proficiencyGrantsFromClassFeatureRaw,
   weaponAttackAbilityForCharacter
 } from "../../src/rules/classFeatureProficiencies";
+
+// Fixture id only; runtime no longer hardcodes this (behavior is data-driven).
+const ARCHER_WARLORD_CLASS_FEATURE_ID = "ID_FMP_CLASS_FEATURE_2286";
 import { computeClassGrantedProficiencyDisplayLines } from "../../src/rules/characterProficiencyDisplay";
 import { collectCharacterProficiencyGrants } from "../../src/rules/featProficiencies";
 import type { CharacterBuild, ClassDef, ClassFeature, RulesIndex, Weapon } from "../../src/rules/models";
@@ -120,10 +121,9 @@ describe("Archer Warlord", () => {
         [`classFeatureOptional:${ARCHER_WARLORD_CLASS_FEATURE_ID}`]: ARCHER_WARLORD_CLASS_FEATURE_ID
       }
     };
-    expect(hasArcherWarlordSelection(build)).toBe(true);
     const armor = String(warlordClass.raw.specific?.["Armor Proficiencies"]);
-    expect(effectiveClassArmorProficienciesText(armor, build)).not.toMatch(/chainmail/i);
-    expect(effectiveClassArmorProficienciesText(armor, build)).not.toMatch(/light shield/i);
+    expect(effectiveClassArmorProficienciesText(armor, build, index)).not.toMatch(/chainmail/i);
+    expect(effectiveClassArmorProficienciesText(armor, build, index)).not.toMatch(/light shield/i);
 
     const grants = collectCharacterProficiencyGrants(index, build);
     expect(grants.some((g) => g.kind === "weaponCategory" && g.value.includes("military ranged"))).toBe(

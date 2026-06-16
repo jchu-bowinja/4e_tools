@@ -50,6 +50,8 @@ export interface Race extends RulesEntity {
   size?: string | null;
   abilitySummary?: string | null;
   languages?: string | null;
+  /** ETL: race defers its ability bonus to the chosen subrace (compendium "See the Race Chosen"). */
+  abilityBonusSource?: "subrace";
   raw: Record<string, unknown>;
 }
 
@@ -211,6 +213,8 @@ export interface Feat extends RulesEntity {
   nadBonusesFromSpecific?: NadBonusesFromSpecific;
   /** ETL: `rules.grant` entries with type Power. */
   grantedPowerIds?: string[];
+  /** ETL: feat grants ritual mastery (e.g. "Ritual Caster"); runtime never name-matches. */
+  grantsRitualCasting?: boolean;
   /** ETL: powers augmented via rules.modify / Associated Powers (not granted). */
   modifiedPowerIds?: string[];
   /** ETL: structured power augmentations (Corellon's Wrath Style, Gulg Hunter Practice, etc.). */
@@ -380,6 +384,16 @@ export interface ClassFeature extends RulesEntity {
   powerReplacementRules?: ClassFeaturePowerReplacementRule[];
   /** ETL: player picks one listed power for a class slot (`powerswap`). */
   powerSwapRules?: ClassFeaturePowerSwapRule[];
+  /** ETL: feature grants ritual mastery (e.g. "Ritual Casting"); runtime never name-matches. */
+  grantsRitualCasting?: boolean;
+  /** ETL: DMG2 role milestone power swap (e.g. "Level 3 Defender Encounter Power"). */
+  roleProgression?: { role: ClassRoleBucket; kind: "encounter" | "utility" };
+  /** Overlay: spellbook mechanic this feature implements (Wizard's / Mage's Spellbook). */
+  spellbookKind?: "wizard" | "mage";
+  /** Overlay: spellbook powers chosen per daily/utility milestone (PHB Spellbook = 2). */
+  spellbookPowerPicksPerPool?: number;
+  /** Overlay: free ritual slots granted by the Spellbook feature, by character level. */
+  spellbookRitualMilestones?: { level: number; pickCount: number }[];
   raw: Record<string, unknown>;
 }
 
@@ -387,6 +401,10 @@ export interface ClassFeature extends RulesEntity {
 export interface Theme extends RulesEntity {
   prereqsRaw?: string | null;
   prereqTokens: PrereqToken[];
+  /** ETL: powers granted by this theme's `rules.grant` rows. */
+  grantedPowerIds?: string[];
+  /** ETL: class-feature ids granted by this theme. */
+  grantedClassFeatureIds?: string[];
   statAdds?: StatAddEntry[];
   nadBonusesFromSpecific?: NadBonusesFromSpecific;
   raw: Record<string, unknown>;
@@ -408,6 +426,10 @@ export interface ParagonPath extends RulesEntity {
 export interface EpicDestiny extends RulesEntity {
   prereqsRaw?: string | null;
   prereqTokens: PrereqToken[];
+  /** ETL: powers granted by this destiny's `rules.grant` rows. */
+  grantedPowerIds?: string[];
+  /** ETL: class-feature ids granted by this destiny. */
+  grantedClassFeatureIds?: string[];
   statAdds?: StatAddEntry[];
   nadBonusesFromSpecific?: NadBonusesFromSpecific;
   raw: Record<string, unknown>;
@@ -655,6 +677,12 @@ export interface RulesIndex {
       minLevel?: number;
       optional?: boolean;
       powerIds?: string[];
+      spellbookKind?: "wizard" | "mage";
+      schoolFilter?: {
+        restrictToPrereqsFromGroupKeys: string[];
+        excludePrereqsFromGroupKeys?: string[];
+        autoResolveSingleOption?: boolean;
+      };
       visibleWhen?: { groupKey: string; optionId: string };
       options?: Array<{
         id: string;

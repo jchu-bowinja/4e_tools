@@ -45,7 +45,7 @@ import {
   upcomingClassPowerSlotMilestones
 } from "../../rules/classPowerSlots";
 import { getClassPowersForLevelRange, validateCharacterBuild } from "../../rules/characterValidator";
-import { getPowersForOwnerId, getThemeGrantedPowers, type GatedPower, getAllEpicDestinyGrantedPowers, getAllParagonPathGrantedPowers, getAllThemeGrantedPowers } from "../../rules/classPowersQuery";
+import { gateGrantedPowerIds, getPowersForOwnerId, getThemeGrantedPowers, type GatedPower, getAllEpicDestinyGrantedPowers, getAllParagonPathGrantedPowers, getAllThemeGrantedPowers } from "../../rules/classPowersQuery";
 import {
   dilettanteRacePowerGroupsForBuild,
   getDilettanteCandidatePowersForBuild,
@@ -56,7 +56,6 @@ import {
   autoGrantedClassPowers,
   bonusClassAtWillSlotFromRaceBuild,
   findHumanPowerSelectionBundleSlot,
-  ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION,
   collectFeatGrantedPowersForBuild,
   collectFeatModifiedPowersForBuild,
   racePowerGroupsForRace,
@@ -126,12 +125,12 @@ import {
   isFixedClassPowerChoiceGroup,
   parseClassPowerChoiceSelection,
   applyClassFeatureChoiceOptionFilters,
-  filterMageExpertMageChoiceOptions,
-  isAutoMageLevel8ExpertMageGroup,
+  filterSchoolProgressionChoiceOptions,
+  isAutoResolvedSchoolProgressionGroup,
   pruneHiddenClassFeatureSelections,
-  pruneInvalidMageExpertMageSelections,
+  pruneInvalidSchoolProgressionSelections,
   resolveClassFeatureChoiceIdsForGroup,
-  resolveMageLevel8ExpertMageOptionId,
+  resolveAutoSchoolProgressionOptionId,
   resolveClassPowerChoiceIdsForGroup
 } from "../../rules/classFeatureChoices";
 import {
@@ -1183,8 +1182,8 @@ export function CharacterBuilderApp({
     [index, build, isHybridBuild]
   );
   const wizardSpellbookRitualMilestones = useMemo(
-    () => visibleWizardSpellbookRitualMilestones(build.level),
-    [build.level]
+    () => visibleWizardSpellbookRitualMilestones(build.level, index),
+    [build.level, index]
   );
   const wizardFreeRitualMinBookQty = useMemo(
     () => minRitualBookQuantityForWizardFreeRituals(index, build),
@@ -1801,8 +1800,10 @@ export function CharacterBuilderApp({
       build.paragonPathId,
       build.level
     );
+    const path = index.paragonPaths.find((p) => p.id === build.paragonPathId);
+    const directGrants = gateGrantedPowerIds(index, path?.grantedPowerIds, build.level);
     const seen = new Set<string>();
-    const merged = [...atk, ...util, ...featurePowers].filter((p) => {
+    const merged = [...atk, ...util, ...featurePowers, ...directGrants].filter((p) => {
       if (seen.has(p.id)) return false;
       seen.add(p.id);
       return true;
@@ -1818,12 +1819,21 @@ export function CharacterBuilderApp({
     if (!build.epicDestinyId || build.level < 21) return [];
     const atk = getPowersForOwnerId(index, build.epicDestinyId, build.level, "attack");
     const util = getPowersForOwnerId(index, build.epicDestinyId, build.level, "utility");
-    return [...atk, ...util].sort((a, b) => {
-      const la = a.level ?? 0;
-      const lb = b.level ?? 0;
-      if (la !== lb) return la - lb;
-      return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
-    });
+    const destiny = index.epicDestinies.find((d) => d.id === build.epicDestinyId);
+    const directGrants = gateGrantedPowerIds(index, destiny?.grantedPowerIds, build.level);
+    const seen = new Set<string>();
+    return [...atk, ...util, ...directGrants]
+      .filter((p) => {
+        if (seen.has(p.id)) return false;
+        seen.add(p.id);
+        return true;
+      })
+      .sort((a, b) => {
+        const la = a.level ?? 0;
+        const lb = b.level ?? 0;
+        if (la !== lb) return la - lb;
+        return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+      });
   }, [index, build.epicDestinyId, build.level]);
   const paragonMcGrantedPowers = useMemo(() => {
     if (!build.paragonMulticlassing) return [];
@@ -3966,7 +3976,7 @@ export function CharacterBuilderApp({
                                         classFeatureChoiceGroups,
                                         build.level
                                       );
-                                      next = pruneInvalidMageExpertMageSelections(
+                                      next = pruneInvalidSchoolProgressionSelections(
                                         index,
                                         next,
                                         classFeatureChoiceGroups
@@ -4008,10 +4018,10 @@ export function CharacterBuilderApp({
                       const pickedId =
                         rs[group.key] || (group.optional ? "__none__" : "");
                       const picked = group.options.find((o) => o.id === pickedId);
-                      if (isAutoMageLevel8ExpertMageGroup(index, group, rs)) {
-                        const autoId = resolveMageLevel8ExpertMageOptionId(index, group, rs);
+                      if (isAutoResolvedSchoolProgressionGroup(index, group, rs)) {
+                        const autoId = resolveAutoSchoolProgressionOptionId(index, group, rs);
                         const autoOption =
-                          filterMageExpertMageChoiceOptions(index, group, rs).find(
+                          filterSchoolProgressionChoiceOptions(index, group, rs).find(
                             (o) => o.id === autoId
                           ) ?? picked;
                         return (
@@ -4083,7 +4093,7 @@ export function CharacterBuilderApp({
                                 classFeatureChoiceGroups,
                                 build.level
                               );
-                              next = pruneInvalidMageExpertMageSelections(
+                              next = pruneInvalidSchoolProgressionSelections(
                                 index,
                                 next,
                                 classFeatureChoiceGroups

@@ -6,9 +6,6 @@ import {
   collectSelectablePowerIdsFromRacialTrait,
   HUMAN_POWER_OPTION_RACE_KEY,
   findHumanPowerSelectionBundleSlot,
-  ID_RACIAL_TRAIT_BONUS_AT_WILL,
-  ID_RACIAL_TRAIT_HEROIC_EFFORT,
-  ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION,
   collectFeatModifiedPowersForBuild,
   parseFeatAssociatedPowerNames,
   raceGrantsBonusClassAtWillSlot,
@@ -18,6 +15,11 @@ import {
   resolveFeatModifiedPowers,
   resolvePowersByLooseNames
 } from "../../src/rules/grantedPowersQuery";
+
+// Fixture ids only; the runtime identifies these traits by ETL flags, not ids.
+const ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION = "ID_FMP_RACIAL_TRAIT_2966";
+const ID_RACIAL_TRAIT_BONUS_AT_WILL = "ID_FMP_RACIAL_TRAIT_356";
+const ID_RACIAL_TRAIT_HEROIC_EFFORT = "ID_FMP_RACIAL_TRAIT_2965";
 import type { Feat, Race, RacialTrait, RulesIndex } from "../../src/rules/models";
 
 describe("collectPowerIdsFromRacialTrait", () => {
@@ -256,6 +258,9 @@ describe("bonus class at-will from racial traits", () => {
       id: ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION,
       name: "Human Power Selection",
       slug: "hps",
+      grantsBonusClassAtWillByDefault: true,
+      heroicEffortTraitId: ID_RACIAL_TRAIT_HEROIC_EFFORT,
+      bonusAtWillTraitId: ID_RACIAL_TRAIT_BONUS_AT_WILL,
       raw: {
         specific: {
           _PARSED_SUB_FEATURES: `${ID_RACIAL_TRAIT_HEROIC_EFFORT},${ID_RACIAL_TRAIT_BONUS_AT_WILL}`
@@ -273,24 +278,28 @@ describe("bonus class at-will from racial traits", () => {
       ],
       [
         ID_RACIAL_TRAIT_BONUS_AT_WILL,
-        { id: ID_RACIAL_TRAIT_BONUS_AT_WILL, name: "Bonus At-Will Power", slug: "baw", raw: {} }
+        { id: ID_RACIAL_TRAIT_BONUS_AT_WILL, name: "Bonus At-Will Power", slug: "baw", grantsBonusClassAtWill: true, raw: {} }
       ]
     ]);
-    expect(raceGrantsBonusClassAtWillSlot(race as Parameters<typeof raceGrantsBonusClassAtWillSlot>[0], map, [], {})).toBe(true);
+    const hpsIndex = { racialTraits: [...map.values()] } as unknown as RulesIndex;
+    expect(
+      raceGrantsBonusClassAtWillSlot(race as Parameters<typeof raceGrantsBonusClassAtWillSlot>[0], map, [], {}, hpsIndex)
+    ).toBe(true);
     expect(
       raceGrantsBonusClassAtWillSlot(race as Parameters<typeof raceGrantsBonusClassAtWillSlot>[0], map, [], {
         [HUMAN_POWER_OPTION_RACE_KEY]: ID_RACIAL_TRAIT_HEROIC_EFFORT
-      })
+      }, hpsIndex)
     ).toBe(false);
     const slot = findHumanPowerSelectionBundleSlot(
       race as Parameters<typeof findHumanPowerSelectionBundleSlot>[0],
-      map
+      map,
+      hpsIndex
     );
     expect(slot?.selectionKey).toBe("subrace");
     expect(
       raceGrantsBonusClassAtWillSlot(race as Parameters<typeof raceGrantsBonusClassAtWillSlot>[0], map, [], {
         subrace: ID_RACIAL_TRAIT_HEROIC_EFFORT
-      })
+      }, hpsIndex)
     ).toBe(false);
   });
 

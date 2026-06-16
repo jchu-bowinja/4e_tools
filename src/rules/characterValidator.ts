@@ -33,7 +33,7 @@ import { resolveRaceAbilityBonusInfo } from "./abilityScores";
 import {
   CLASS_FEATURE_CHOICE_NONE,
   classFeaturePowerIdsForClass,
-  filterMageSchoolProgressionChoiceOptions,
+  filterSchoolProgressionChoiceOptions,
   filterVisibleClassFeatureChoiceGroups,
   effectiveClassSelectionsForChoiceGroups,
   getClassFeatureChoiceGroups,
@@ -177,7 +177,7 @@ export function validateCharacterBuild(index: RulesIndex, build: CharacterBuild)
           continue;
         }
         const legal = new Set(
-          filterMageSchoolProgressionChoiceOptions(index, group, rs).map((o) => o.id)
+          filterSchoolProgressionChoiceOptions(index, group, rs).map((o) => o.id)
         );
         const picks = resolveClassFeatureChoiceIdsForGroup(group, rs);
         if (picks.length < group.pickCount) {

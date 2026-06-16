@@ -1,20 +1,20 @@
 import { describe, expect, it } from "vitest";
 import index from "../../generated/rules_index.json";
 import {
-  filterMageExpertMageChoiceOptions,
-  filterMageMasterMageChoiceOptions,
+  filterSchoolProgressionChoiceOptions,
   getClassFeatureChoiceGroups,
-  MAGE_APPRENTICE_L1_CHOICE_KEY,
-  MAGE_APPRENTICE_L4_CHOICE_KEY,
-  MAGE_EXPERT_L5_CHOICE_KEY,
-  MAGE_EXPERT_L8_CHOICE_KEY,
-  MAGE_MASTER_CHOICE_KEY,
-  syncMageLevel8ExpertMageSelection
+  syncAutoResolvedSchoolProgressionSelections
 } from "../../src/rules/classFeatureChoices";
 import type { RulesIndex } from "../../src/rules/models";
 
 const rules = index as RulesIndex;
 const mage = rules.classes.find((c) => c.slug === "mage")!;
+
+const MAGE_APPRENTICE_L1_CHOICE_KEY = "classFeature:ID_FMP_CLASS_FEATURE_2867";
+const MAGE_APPRENTICE_L4_CHOICE_KEY = "classFeature:ID_FMP_CLASS_FEATURE_3043:4";
+const MAGE_EXPERT_L5_CHOICE_KEY = "classFeature:ID_FMP_CLASS_FEATURE_2871:5";
+const MAGE_EXPERT_L8_CHOICE_KEY = "classFeature:ID_FMP_CLASS_FEATURE_3050:8";
+const MAGE_MASTER_CHOICE_KEY = "classFeature:ID_FMP_CLASS_FEATURE_2872:10";
 
 describe("mage Apprentice Mage choices", () => {
   it("class feature choice groups are ordered by minLevel", () => {
@@ -45,7 +45,7 @@ describe("mage Apprentice Mage choices", () => {
       [MAGE_APPRENTICE_L1_CHOICE_KEY]: "ID_FMP_CLASS_FEATURE_2878",
       [MAGE_APPRENTICE_L4_CHOICE_KEY]: "ID_FMP_CLASS_FEATURE_3217"
     };
-    const names = filterMageExpertMageChoiceOptions(rules, l5, selections).map((o) => o.name);
+    const names = filterSchoolProgressionChoiceOptions(rules, l5, selections).map((o) => o.name);
     expect(names).toEqual(["Enchantment Expert", "Pyromancy Expert"]);
   });
 
@@ -57,7 +57,7 @@ describe("mage Apprentice Mage choices", () => {
       [MAGE_APPRENTICE_L4_CHOICE_KEY]: "ID_FMP_CLASS_FEATURE_3217",
       [MAGE_EXPERT_L5_CHOICE_KEY]: "ID_FMP_CLASS_FEATURE_2807"
     };
-    const names = filterMageExpertMageChoiceOptions(rules, l8, selections).map((o) => o.name);
+    const names = filterSchoolProgressionChoiceOptions(rules, l8, selections).map((o) => o.name);
     expect(names).toEqual(["Pyromancy Expert"]);
   });
 
@@ -68,7 +68,7 @@ describe("mage Apprentice Mage choices", () => {
       [MAGE_APPRENTICE_L4_CHOICE_KEY]: "ID_FMP_CLASS_FEATURE_3217",
       [MAGE_EXPERT_L5_CHOICE_KEY]: "ID_FMP_CLASS_FEATURE_2807"
     };
-    const synced = syncMageLevel8ExpertMageSelection(rules, mage.id, selections, groups, 8);
+    const synced = syncAutoResolvedSchoolProgressionSelections(rules, selections, groups, 8);
     expect(synced[MAGE_EXPERT_L8_CHOICE_KEY]).toBe("ID_FMP_CLASS_FEATURE_3218");
   });
 
@@ -79,7 +79,7 @@ describe("mage Apprentice Mage choices", () => {
       [MAGE_EXPERT_L5_CHOICE_KEY]: "ID_FMP_CLASS_FEATURE_2807",
       [MAGE_EXPERT_L8_CHOICE_KEY]: "ID_FMP_CLASS_FEATURE_3218"
     };
-    const names = filterMageMasterMageChoiceOptions(rules, master, selections).map((o) => o.name);
+    const names = filterSchoolProgressionChoiceOptions(rules, master, selections).map((o) => o.name);
     expect(names).toEqual(["Enchantment Master", "Pyromancy Master"]);
   });
 });

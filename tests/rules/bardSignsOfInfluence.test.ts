@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   CLASS_FEATURE_CHOICE_NONE,
-  SIGNS_OF_INFLUENCE_CLASS_FEATURE_ID,
   filterVisibleClassFeatureChoiceGroups,
   getClassFeatureChoiceGroups
 } from "../../src/rules/classFeatureChoices";
 import { collectClassFeatureIdsFromClass } from "../../src/rules/characterClassFeatures";
 import { validateCharacterBuild } from "../../src/rules/characterValidator";
 import type { CharacterBuild, ClassDef, ClassFeature, RulesIndex } from "../../src/rules/models";
+
+const SIGNS_OF_INFLUENCE_CLASS_FEATURE_ID = "ID_FMP_CLASS_FEATURE_4139";
 
 const bardClass: ClassDef = {
   id: "ID_FMP_CLASS_104",

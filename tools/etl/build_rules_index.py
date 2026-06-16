@@ -37,6 +37,13 @@ ABILITY_MAP = {
 
 
 from prereq_parser import ParseResult, build_prereq_lookups_from_raw, parse_prereqs  # noqa: E402
+from overlay import load_overlay  # noqa: E402
+
+# Declarative behavior overlay (tools/etl/overrides/*.json). The canonical home
+# for entity-specific data so neither this ETL nor the runtime branches on
+# specific compendium ids or names. See docs/data-overlay.md.
+_OVERRIDES_DIR = _ETL_DIR / "overrides"
+_OVERLAY = load_overlay(_OVERRIDES_DIR)
 
 
 def normalize_name(name: str) -> str:
@@ -324,54 +331,30 @@ def parse_int_from_text(text: Any) -> Optional[int]:
     return int(match.group(1)) if match else None
 
 
-ARCHER_WARLORD_CLASS_FEATURE_ID = "ID_FMP_CLASS_FEATURE_2286"
-PARAGON_POWER_POINTS_CLASS_FEATURE_ID = "ID_FMP_CLASS_FEATURE_1818"
-HUMAN_POWER_SELECTION_TRAIT_ID = "ID_FMP_RACIAL_TRAIT_2966"
-BONUS_AT_WILL_TRAIT_ID = "ID_FMP_RACIAL_TRAIT_356"
-HEROIC_EFFORT_TRAIT_ID = "ID_FMP_RACIAL_TRAIT_2965"
+# These were inline literals; behavior now lives in tools/etl/overrides/*.json.
+ARCHER_WARLORD_CLASS_FEATURE_ID = _OVERLAY.global_value("archerWarlordClassFeatureId", "")
+PARAGON_POWER_POINTS_CLASS_FEATURE_ID = _OVERLAY.global_value(
+    "paragonPowerPointsClassFeatureId", ""
+)
+HUMAN_POWER_SELECTION_TRAIT_ID = _OVERLAY.global_value("humanPowerSelectionTraitId", "")
+BONUS_AT_WILL_TRAIT_ID = _OVERLAY.global_value("bonusAtWillTraitId", "")
+HEROIC_EFFORT_TRAIT_ID = _OVERLAY.global_value("heroicEffortTraitId", "")
 
 # PHB3 Psionic Augmentation cumulative power points by character level (1–30).
 PSIONIC_POWER_POINTS_BY_LEVEL: Dict[str, int] = {
-    str(lv): pp
-    for lv, pp in [
-        (1, 2),
-        (2, 2),
-        (3, 4),
-        (4, 4),
-        (5, 4),
-        (6, 4),
-        (7, 6),
-        (8, 6),
-        (9, 6),
-        (10, 6),
-        (11, 6),
-        (12, 6),
-        (13, 7),
-        (14, 7),
-        (15, 7),
-        (16, 7),
-        (17, 9),
-        (18, 9),
-        (19, 9),
-        (20, 9),
-        (21, 11),
-        (22, 11),
-        (23, 13),
-        (24, 13),
-        (25, 13),
-        (26, 13),
-        (27, 15),
-        (28, 15),
-        (29, 15),
-        (30, 15),
-    ]
+    str(lv): int(pp)
+    for lv, pp in (_OVERLAY.global_value("psionicPowerPointsByLevel", {}) or {}).items()
 }
 
 # PHB3 hybrid psionic augmentation: power points vs encounter use at these levels.
-HYBRID_PSIONIC_AUGMENTATION_BREAKPOINTS: List[int] = [7, 13, 17, 23, 27]
+HYBRID_PSIONIC_AUGMENTATION_BREAKPOINTS: List[int] = list(
+    _OVERLAY.global_value("hybridPsionicAugmentationBreakpoints", []) or []
+)
 
 # PHB3 paragon multiclass: non-psionic primary → psionic secondary loses this many at-will slots at 11+.
-PARAGON_MC_NON_PSIONIC_TO_PSIONIC_AT_WILL_PENALTY = 1
+PARAGON_MC_NON_PSIONIC_TO_PSIONIC_AT_WILL_PENALTY = _OVERLAY.global_value(
+    "paragonMulticlassNonPsionicToPsionicAtWillPenalty", 0
+)
 
 
 def _parse_comma_internal_ids(raw: Any) -> List[str]:
@@ -446,6 +429,31 @@ def _extract_racial_trait_index_fields(
         ):
             out["powerBundleMode"] = "subtraitFirst"
     return out
+
+
+_ROLE_PROGRESSION_NAME_RE = re.compile(
+    r"^Level\s+(\d+)\s+(Defender|Leader|Striker|Controller)\s+(Encounter|Utility)\s+Power$",
+    re.IGNORECASE,
+)
+
+
+def _ritual_casting_feature_names() -> set:
+    return {
+        str(n).strip().lower()
+        for n in (_OVERLAY.global_value("ritualCastingFeatureNames") or [])
+    }
+
+
+def _ritual_caster_feat_names() -> set:
+    return {str(n).strip() for n in (_OVERLAY.global_value("ritualCasterFeatNames") or [])}
+
+
+def _role_progression_from_name(name: str) -> Optional[Dict[str, str]]:
+    """DMG2 role milestone power swap metadata from a feature name (e.g. "Level 3 Defender Encounter Power")."""
+    match = _ROLE_PROGRESSION_NAME_RE.match(str(name or "").strip())
+    if not match:
+        return None
+    return {"role": match.group(2).lower(), "kind": match.group(3).lower()}
 
 
 def _extract_class_feature_mechanical_effects(row: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -1361,10 +1369,8 @@ def _trait_package_names_for_class(
     return names
 
 
-HUNTER_SCOUT_ASPECT_L7_POWER_NAMES: Tuple[str, ...] = (
-    "Aspect of the Charging Ram",
-    "Aspect of the Hungry Shark",
-    "Aspect of the Soaring Hawk",
+HUNTER_SCOUT_ASPECT_L7_POWER_NAMES: Tuple[str, ...] = tuple(
+    _OVERLAY.global_value("hunterScoutAspectL7PowerNames", []) or []
 )
 
 
@@ -1599,26 +1605,20 @@ def _options_from_class_feature_select(
     return options
 
 
-WIZARD_MAGE_CANTRIP_POWER_NAMES: Tuple[str, ...] = (
-    "Chameleon's Mask",
-    "Disrupt Undead",
-    "Ghost Sound",
-    "Light",
-    "Mage Hand",
-    "Prestidigitation",
-    "Spook",
-    "Suggestion",
-    "Water Stride",
-    "Whispering Wind",
+WIZARD_MAGE_CANTRIP_POWER_NAMES: Tuple[str, ...] = tuple(
+    _OVERLAY.global_value("wizardMageCantripPowerNames", []) or []
 )
 
 MAGE_CANTRIPS_FEATURE_IDS: frozenset = frozenset(
-    {"ID_FMP_CLASS_FEATURE_2870", "ID_FMP_CLASS_FEATURE_130"}
+    _OVERLAY.global_value("mageCantripsFeatureIds", []) or []
 )
 
 # Optional class features not listed on `_PARSED_CLASS_FEATURE` (HotF Signs of Influence on bard).
 OPTIONAL_CLASS_FEATURE_NAMES_BY_CLASS_ID: Dict[str, List[str]] = {
-    "ID_FMP_CLASS_104": ["Signs of Influence"],
+    str(k): list(v)
+    for k, v in (
+        _OVERLAY.global_value("optionalClassFeatureNamesByClassId", {}) or {}
+    ).items()
 }
 
 
@@ -2392,6 +2392,57 @@ def _append_missing_trait_package_parent_groups(
         )
         existing_parents.add(parent_name)
     return groups
+
+
+_MAGE_SPELLBOOK_GROUP_NAME = re.compile(
+    r"^Level \d+ Mage (Encounter|Daily|Utility) Powers$", re.IGNORECASE
+)
+
+
+def _tag_spellbook_power_choice_groups(
+    groups_by_class: Dict[str, List[Dict[str, Any]]]
+) -> None:
+    """Tag spellbook power pools with `spellbookKind` so the runtime reads a flag.
+
+    Wizard pools are identified by their parent feature's overlay `spellbookKind`;
+    Mage pools by the compendium parent-feature name pattern. Detection stays in
+    the ETL (per docs/data-overlay.md) and the runtime never branches on ids/names.
+    """
+    wizard_feature_ids = {
+        fid
+        for fid, fields in _OVERLAY.entity_overrides("classFeatures").items()
+        if (fields or {}).get("spellbookKind") == "wizard"
+    }
+    for groups in groups_by_class.values():
+        for group in groups:
+            if group.get("kind") != "power":
+                continue
+            parent_id = str(group.get("parentFeatureId") or "")
+            parent_name = str(group.get("parentFeatureName") or "")
+            if parent_id in wizard_feature_ids:
+                group["spellbookKind"] = "wizard"
+            elif _MAGE_SPELLBOOK_GROUP_NAME.match(parent_name):
+                group["spellbookKind"] = "mage"
+
+
+def _tag_school_progression_choice_groups(
+    groups_by_class: Dict[str, List[Dict[str, Any]]]
+) -> None:
+    """Attach declarative `schoolFilter` metadata to progressive school picks.
+
+    Mage Apprentice -> Expert -> Master school choices are gated so each tier
+    only offers schools chosen at the prior tier. The mapping lives in the
+    overlay (`classFeatureChoiceGroupSchoolFilters`, keyed by group key) so the
+    runtime applies a generic prereq-name filter instead of branching on ids.
+    """
+    filters = _OVERLAY.global_value("classFeatureChoiceGroupSchoolFilters") or {}
+    if not filters:
+        return
+    for groups in groups_by_class.values():
+        for group in groups:
+            spec = filters.get(str(group.get("key") or ""))
+            if spec:
+                group["schoolFilter"] = spec
 
 
 def build_class_feature_choice_groups_by_class(
@@ -3499,19 +3550,16 @@ def _normalize_power_match_key(name: str) -> str:
     return re.sub(r"[^a-z0-9]", "", s)
 
 
-# Known compendium typos / shorthand in feat Associated Powers or modify rows.
+# Known compendium typos / shorthand in feat Associated Powers or modify rows
+# (authored in tools/etl/overrides/*.json).
 _FEAT_POWER_NAME_ALIASES: Dict[str, str] = {
-    "command's strike": "commander's strike",
-    "predator's strike": "predator strike",
-    "overhwleming strike": "overwhelming strike",
-    "haunting sounds": "ghost sound",
-    "ghost sounds": "ghost sound",
-    # Hand of Fury feat: modify name is wrong in Dragon 387; targets Hand of Radiance.
-    "hand of fury": "hand of radiance",
+    str(k): str(v)
+    for k, v in (_OVERLAY.global_value("featPowerNameAliases", {}) or {}).items()
 }
 
 _INTERNAL_POWER_DISPLAY_NAMES: Dict[str, str] = {
-    "ID_INTERNAL_POWER_MELEE_BASIC_ATTACK": "Melee Basic Attack",
+    str(k): str(v)
+    for k, v in (_OVERLAY.global_value("internalPowerDisplayNames", {}) or {}).items()
 }
 
 
@@ -4134,26 +4182,10 @@ def _feat_has_power_usage_encounter_modify(rules: Dict[str, Any]) -> bool:
 
 
 # PHB3 psionic swap feats share `encounter|Augmentable At-Will` in data; direction is feat-specific.
+# Psionic multiclass slot-swap directions (authored in tools/etl/overrides/*.json).
 _PSIONIC_MULTICLASS_SWAP_BY_FEAT: Dict[str, Dict[str, Any]] = {
-    "psionic complement": {
-        "usageBucket": "atWill",
-        "replacementUsageBucket": "atWill",
-        "requireAugmentableSlot": True,
-        "requireAugmentableReplacement": True,
-    },
-    "psionic dabbler": {
-        "usageBucket": "encounter",
-        "replacementUsageBucket": "atWill",
-        "requireAugmentableReplacement": True,
-        "replacementUsedAsEncounter": True,
-        "powerPointSwapChange": "gain",
-    },
-    "psionic conventionalist": {
-        "usageBucket": "atWill",
-        "replacementUsageBucket": "encounter",
-        "requireAugmentableSlot": True,
-        "powerPointSwapChange": "lose",
-    },
+    str(k): dict(v)
+    for k, v in (_OVERLAY.global_value("psionicMulticlassSwapByFeat", {}) or {}).items()
 }
 
 
@@ -4812,6 +4844,8 @@ def build_index(input_path: Path, output_dir: Path) -> None:
         powers_by_name,
         powers_by_class_id,
     )
+    _tag_spellbook_power_choice_groups(class_feature_choice_groups_by_class)
+    _tag_school_progression_choice_groups(class_feature_choice_groups_by_class)
     paragon_path_class_feature_power_ids = sorted(
         _paragon_path_class_feature_power_ids(paragon_raw, features_by_id)
     )
@@ -4839,19 +4873,21 @@ def build_index(input_path: Path, output_dir: Path) -> None:
 
     races: List[Dict[str, Any]] = []
     for race in races_raw:
-        races.append(
-            {
-                "id": race.get("internal_id"),
-                "name": race.get("name"),
-                "slug": normalize_name(race.get("name", "")),
-                "source": race.get("source"),
-                "speed": parse_int_from_text((race.get("specific") or {}).get("Speed")),
-                "size": (race.get("specific") or {}).get("Size"),
-                "abilitySummary": (race.get("specific") or {}).get("Ability Scores"),
-                "languages": (race.get("specific") or {}).get("Languages"),
-                "raw": race,
-            }
-        )
+        ability_text = str((race.get("specific") or {}).get("Ability Scores") or "")
+        race_entry: Dict[str, Any] = {
+            "id": race.get("internal_id"),
+            "name": race.get("name"),
+            "slug": normalize_name(race.get("name", "")),
+            "source": race.get("source"),
+            "speed": parse_int_from_text((race.get("specific") or {}).get("Speed")),
+            "size": (race.get("specific") or {}).get("Size"),
+            "abilitySummary": (race.get("specific") or {}).get("Ability Scores"),
+            "languages": (race.get("specific") or {}).get("Languages"),
+            "raw": race,
+        }
+        if re.search(r"see\s+the\s+race\s+chosen", ability_text, re.IGNORECASE):
+            race_entry["abilityBonusSource"] = "subrace"
+        races.append(race_entry)
 
     languages: List[Dict[str, Any]] = []
     for row in languages_raw:
@@ -4979,6 +5015,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
         )
         power_rules = extract_class_feature_power_rules(row)
         granted_cf_ids = _granted_class_feature_ids_from_row(row)
+        feature_name = str(row.get("name") or "")
         entry: Dict[str, Any] = {
             "id": row.get("internal_id"),
             "name": row.get("name"),
@@ -4990,6 +5027,11 @@ def build_index(input_path: Path, output_dir: Path) -> None:
         }
         if mechanical:
             entry["mechanicalEffects"] = mechanical
+        if feature_name.strip().lower() in _ritual_casting_feature_names():
+            entry["grantsRitualCasting"] = True
+        role_progression = _role_progression_from_name(feature_name)
+        if role_progression and power_rules.get("powerSwapRules"):
+            entry["roleProgression"] = role_progression
         if power_mods.get("modifiedPowerIds"):
             entry["modifiedPowerIds"] = power_mods["modifiedPowerIds"]
         if power_mods.get("powerModifications"):
@@ -5063,27 +5105,28 @@ def build_index(input_path: Path, output_dir: Path) -> None:
         )
         feat_multiclass_slot_swap = extract_feat_multiclass_slot_swap_offers(feat)
         feat_grants = _feat_append_heritage_internal_key(feat_grants, str(feat.get("name") or ""))
-        feats.append(
-            {
-                "id": feat.get("internal_id"),
-                "name": feat.get("name"),
-                "slug": normalize_name(feat.get("name", "")),
-                "source": feat.get("source"),
-                "tier": feat_tier,
-                "shortDescription": spec.get("Short Description"),
-                "prereqsRaw": feat.get("prereqs"),
-                "prereqTokens": feat_prereq_tokens,
-                "category": feat_meta["category"],
-                "tags": feat_meta["tags"],
-                "prereqSummary": feat_meta["prereqSummary"],
-                "raw": feat,
-                **support_entity_stat_bonuses(feat),
-                **feat_grants,
-                **feat_power_mods,
-                **feat_power_replace,
-                **feat_multiclass_slot_swap,
-            }
-        )
+        feat_entry: Dict[str, Any] = {
+            "id": feat.get("internal_id"),
+            "name": feat.get("name"),
+            "slug": normalize_name(feat.get("name", "")),
+            "source": feat.get("source"),
+            "tier": feat_tier,
+            "shortDescription": spec.get("Short Description"),
+            "prereqsRaw": feat.get("prereqs"),
+            "prereqTokens": feat_prereq_tokens,
+            "category": feat_meta["category"],
+            "tags": feat_meta["tags"],
+            "prereqSummary": feat_meta["prereqSummary"],
+            "raw": feat,
+            **support_entity_stat_bonuses(feat),
+            **feat_grants,
+            **feat_power_mods,
+            **feat_power_replace,
+            **feat_multiclass_slot_swap,
+        }
+        if str(feat.get("name") or "").strip() in _ritual_caster_feat_names():
+            feat_entry["grantsRitualCasting"] = True
+        feats.append(feat_entry)
 
     powers: List[Dict[str, Any]] = []
     for power in powers_raw:
@@ -5232,6 +5275,15 @@ def build_index(input_path: Path, output_dir: Path) -> None:
                         "detail": a,
                     }
                 )
+        theme_grants = extract_grants_from_rules(
+            row.get("rules"),
+            class_name_to_id,
+            skill_training_by_id,
+            skill_name_to_id,
+            class_feature_name_lookup,
+            class_feature_id_by_name,
+            language_id_to_name,
+        )
         themes.append(
             {
                 "id": row.get("internal_id"),
@@ -5242,6 +5294,7 @@ def build_index(input_path: Path, output_dir: Path) -> None:
                 "prereqTokens": parse.tokens,
                 "raw": row,
                 **support_entity_stat_bonuses(row),
+                **theme_grants,
             }
         )
 
@@ -5325,6 +5378,15 @@ def build_index(input_path: Path, output_dir: Path) -> None:
                         "detail": a,
                     }
                 )
+        destiny_grants = extract_grants_from_rules(
+            row.get("rules"),
+            class_name_to_id,
+            skill_training_by_id,
+            skill_name_to_id,
+            class_feature_name_lookup,
+            class_feature_id_by_name,
+            language_id_to_name,
+        )
         epic_destinies.append(
             {
                 "id": row.get("internal_id"),
@@ -5335,8 +5397,46 @@ def build_index(input_path: Path, output_dir: Path) -> None:
                 "prereqTokens": parse.tokens,
                 "raw": row,
                 **support_entity_stat_bonuses(row),
+                **destiny_grants,
             }
         )
+
+    # Apply the declarative overlay (tools/etl/overrides/*.json) onto built rows
+    # so entity-specific behavior lives in data, then report unknown ids.
+    _entity_collections: Dict[str, List[Dict[str, Any]]] = {
+        "races": races,
+        "classes": classes,
+        "feats": feats,
+        "powers": powers,
+        "skills": skills,
+        "languages": languages,
+        "racialTraits": racial_traits,
+        "classFeatures": class_features,
+        "armors": armors,
+        "weapons": weapons,
+        "implements": implements,
+        "abilityScores": ability_scores,
+        "themes": themes,
+        "paragonPaths": paragon_paths,
+        "epicDestinies": epic_destinies,
+        "hybridClasses": hybrid_classes,
+        "proficiencies": proficiencies,
+        "backgrounds": backgrounds,
+        "magicItems": magic_items,
+        "gear": gear,
+        "rituals": rituals,
+        "martialPractices": martial_practices,
+        "alchemyItems": alchemy_items,
+    }
+    for _collection_name, _rows in _entity_collections.items():
+        _OVERLAY.apply_to_rows(_collection_name, _rows)
+    _OVERLAY.validate(
+        {
+            name: {str(r.get("id")) for r in rows if r.get("id")}
+            for name, rows in _entity_collections.items()
+        },
+        anomalies,
+    )
 
     index = {
         "meta": {

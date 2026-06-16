@@ -1,0 +1,142 @@
+{
+  "classFeatures": {
+    "ID_FMP_CLASS_FEATURE_318": {
+      "spellbookKind": "wizard",
+      "spellbookPowerPicksPerPool": 2,
+      "spellbookRitualMilestones": [
+        { "level": 1, "pickCount": 3 },
+        { "level": 5, "pickCount": 2 },
+        { "level": 11, "pickCount": 2 },
+        { "level": 15, "pickCount": 2 },
+        { "level": 21, "pickCount": 2 },
+        { "level": 25, "pickCount": 2 }
+      ]
+    },
+    "ID_FMP_CLASS_FEATURE_2868": {
+      "spellbookKind": "mage"
+    }
+  },
+  "global": {
+    "archerWarlordClassFeatureId": "ID_FMP_CLASS_FEATURE_2286",
+    "paragonPowerPointsClassFeatureId": "ID_FMP_CLASS_FEATURE_1818",
+    "humanPowerSelectionTraitId": "ID_FMP_RACIAL_TRAIT_2966",
+    "bonusAtWillTraitId": "ID_FMP_RACIAL_TRAIT_356",
+    "heroicEffortTraitId": "ID_FMP_RACIAL_TRAIT_2965",
+    "psionicPowerPointsByLevel": {
+      "1": 2,
+      "2": 2,
+      "3": 4,
+      "4": 4,
+      "5": 4,
+      "6": 4,
+      "7": 6,
+      "8": 6,
+      "9": 6,
+      "10": 6,
+      "11": 6,
+      "12": 6,
+      "13": 7,
+      "14": 7,
+      "15": 7,
+      "16": 7,
+      "17": 9,
+      "18": 9,
+      "19": 9,
+      "20": 9,
+      "21": 11,
+      "22": 11,
+      "23": 13,
+      "24": 13,
+      "25": 13,
+      "26": 13,
+      "27": 15,
+      "28": 15,
+      "29": 15,
+      "30": 15
+    },
+    "hybridPsionicAugmentationBreakpoints": [7, 13, 17, 23, 27],
+    "paragonMulticlassNonPsionicToPsionicAtWillPenalty": 1,
+    "wizardMageCantripPowerNames": [
+      "Chameleon's Mask",
+      "Disrupt Undead",
+      "Ghost Sound",
+      "Light",
+      "Mage Hand",
+      "Prestidigitation",
+      "Spook",
+      "Suggestion",
+      "Water Stride",
+      "Whispering Wind"
+    ],
+    "mageCantripsFeatureIds": [
+      "ID_FMP_CLASS_FEATURE_2870",
+      "ID_FMP_CLASS_FEATURE_130"
+    ],
+    "optionalClassFeatureNamesByClassId": {
+      "ID_FMP_CLASS_104": ["Signs of Influence"]
+    },
+    "hunterScoutAspectL7PowerNames": [
+      "Aspect of the Charging Ram",
+      "Aspect of the Hungry Shark",
+      "Aspect of the Soaring Hawk"
+    ],
+    "psionicMulticlassSwapByFeat": {
+      "psionic complement": {
+        "usageBucket": "atWill",
+        "replacementUsageBucket": "atWill",
+        "requireAugmentableSlot": true,
+        "requireAugmentableReplacement": true
+      },
+      "psionic dabbler": {
+        "usageBucket": "encounter",
+        "replacementUsageBucket": "atWill",
+        "requireAugmentableReplacement": true,
+        "replacementUsedAsEncounter": true,
+        "powerPointSwapChange": "gain"
+      },
+      "psionic conventionalist": {
+        "usageBucket": "atWill",
+        "replacementUsageBucket": "encounter",
+        "requireAugmentableSlot": true,
+        "powerPointSwapChange": "lose"
+      }
+    },
+    "featPowerNameAliases": {
+      "command's strike": "commander's strike",
+      "predator's strike": "predator strike",
+      "overhwleming strike": "overwhelming strike",
+      "haunting sounds": "ghost sound",
+      "ghost sounds": "ghost sound",
+      "hand of fury": "hand of radiance"
+    },
+    "internalPowerDisplayNames": {
+      "ID_INTERNAL_POWER_MELEE_BASIC_ATTACK": "Melee Basic Attack"
+    },
+    "ritualCastingFeatureNames": ["Ritual Casting"],
+    "ritualCasterFeatNames": ["Ritual Caster"],
+    "classFeatureChoiceGroupSchoolFilters": {
+      "classFeature:ID_FMP_CLASS_FEATURE_2871:5": {
+        "restrictToPrereqsFromGroupKeys": [
+          "classFeature:ID_FMP_CLASS_FEATURE_2867",
+          "classFeature:ID_FMP_CLASS_FEATURE_3043:4"
+        ]
+      },
+      "classFeature:ID_FMP_CLASS_FEATURE_3050:8": {
+        "restrictToPrereqsFromGroupKeys": [
+          "classFeature:ID_FMP_CLASS_FEATURE_2867",
+          "classFeature:ID_FMP_CLASS_FEATURE_3043:4"
+        ],
+        "excludePrereqsFromGroupKeys": [
+          "classFeature:ID_FMP_CLASS_FEATURE_2871:5"
+        ],
+        "autoResolveSingleOption": true
+      },
+      "classFeature:ID_FMP_CLASS_FEATURE_2872:10": {
+        "restrictToPrereqsFromGroupKeys": [
+          "classFeature:ID_FMP_CLASS_FEATURE_2871:5",
+          "classFeature:ID_FMP_CLASS_FEATURE_3050:8"
+        ]
+      }
+    }
+  }
+}

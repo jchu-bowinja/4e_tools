@@ -199,40 +199,18 @@ export function paragonMulticlassPrimaryAtWillSlotPenalty(
   return penalty;
 }
 
-/** Compendium class feature: +2 power points at paragon tier (PHB3). */
-export const PARAGON_POWER_POINTS_CLASS_FEATURE_ID = "ID_FMP_CLASS_FEATURE_1818";
-
-function paragonPathGrantEntries(path: ParagonPath): { featureId: string; grantLevel: number }[] {
-  const out: { featureId: string; grantLevel: number }[] = [];
-  const rules = path.raw?.rules as { grant?: unknown } | undefined;
-  const grant = rules?.grant;
-  const rows = Array.isArray(grant) ? grant : grant ? [grant] : [];
-  for (const row of rows) {
-    if (!row || typeof row !== "object") continue;
-    const attrs = (row as { attrs?: Record<string, unknown> }).attrs ?? {};
-    const gtype = String(attrs.type ?? "").toLowerCase();
-    if (gtype !== "class feature") continue;
-    const featureId = String(attrs.name ?? "").trim();
-    if (!featureId.startsWith("ID_")) continue;
-    const grantLevel = Math.max(1, parseInt(String(attrs.Level ?? "11"), 10) || 11);
-    out.push({ featureId, grantLevel });
-  }
-  return out;
-}
-
-/** Selected paragon path grants Paragon Power Points at the character's level. */
+/**
+ * Selected paragon path grants Paragon Power Points at the character's level.
+ * Data-driven: relies on the ETL `grantsParagonPowerPoints` flag (computed from
+ * the Paragon Power Points class-feature grant) plus a generic power-point
+ * statAdd heuristic; no hardcoded feature id.
+ */
 export function paragonPathGrantsParagonPowerPoints(
   path: ParagonPath | undefined,
   characterLevel: number
 ): boolean {
   if (!path || characterLevel < 11) return false;
   if (path.grantsParagonPowerPoints) return true;
-  if (path.grantedClassFeatureIds?.includes(PARAGON_POWER_POINTS_CLASS_FEATURE_ID)) return true;
-  for (const { featureId, grantLevel } of paragonPathGrantEntries(path)) {
-    if (featureId === PARAGON_POWER_POINTS_CLASS_FEATURE_ID && characterLevel >= grantLevel) {
-      return true;
-    }
-  }
   for (const sa of path.statAdds ?? []) {
     const name = String(sa.name ?? "").toLowerCase();
     if (name.includes("power point")) {

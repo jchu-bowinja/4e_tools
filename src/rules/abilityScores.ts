@@ -50,6 +50,7 @@ function raceAbilityScoresText(race: Race | undefined): string {
 }
 
 export function raceDefersAbilityBonusToSubrace(race: Race | undefined): boolean {
+  if (race?.abilityBonusSource === "subrace") return true;
   return /see\s+the\s+race\s+chosen/i.test(raceAbilityScoresText(race));
 }
 

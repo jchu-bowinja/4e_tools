@@ -46,8 +46,18 @@ export interface ClassFeatureChoiceVisibleWhen {
   optionId: string;
 }
 
-/** Heroes of the Feywild optional bard feature (two picks at 1st, +1 at 13th and 17th). */
-export const SIGNS_OF_INFLUENCE_CLASS_FEATURE_ID = "ID_FMP_CLASS_FEATURE_4139";
+/**
+ * ETL-emitted gate for progressive school picks (Mage Apprentice -> Expert -> Master):
+ * options are restricted to schools chosen in earlier tiers via prereq-name matching.
+ */
+export interface ClassFeatureChoiceSchoolFilter {
+  /** Allow an option only if its prereq matches the *name* of a feature picked in these groups. */
+  restrictToPrereqsFromGroupKeys: string[];
+  /** Exclude an option if its prereq matches the *prereq* of a feature picked in these groups. */
+  excludePrereqsFromGroupKeys?: string[];
+  /** When exactly one option remains, auto-resolve the pick (Level 8 Expert Mage). */
+  autoResolveSingleOption?: boolean;
+}
 
 export interface ClassFeatureChoiceGroup {
   key: string;
@@ -66,6 +76,10 @@ export interface ClassFeatureChoiceGroup {
   /** Set when one class feature has multiple compendium power select pools (cleric Channel Divinity). */
   powerPoolIndex?: number;
   powerPoolCount?: number;
+  /** ETL: tags spellbook power pools so the runtime never branches on feature ids/names. */
+  spellbookKind?: "wizard" | "mage";
+  /** ETL: progressive school-pick gating (Mage), so the runtime never branches on ids/names. */
+  schoolFilter?: ClassFeatureChoiceSchoolFilter;
   /** When true, empty / `CLASS_FEATURE_CHOICE_NONE` means the optional feature is not taken. */
   optional?: boolean;
 }
@@ -524,6 +538,8 @@ export function getClassFeatureChoiceGroups(
       visibleWhen,
       powerPoolIndex: poolIndex,
       powerPoolCount: slotMatch ? undefined : undefined,
+      spellbookKind: (g as { spellbookKind?: "wizard" | "mage" }).spellbookKind,
+      schoolFilter: (g as { schoolFilter?: ClassFeatureChoiceSchoolFilter }).schoolFilter,
       options: (g.options ?? []).map((o) => ({
         id: String(o.id),
         name: String(o.name || o.id),
@@ -598,26 +614,21 @@ export function sortClassFeatureChoiceGroupsByLevel(
   });
 }
 
-export const MAGE_APPRENTICE_L1_CHOICE_KEY = "classFeature:ID_FMP_CLASS_FEATURE_2867";
-export const MAGE_APPRENTICE_L4_CHOICE_KEY = "classFeature:ID_FMP_CLASS_FEATURE_3043:4";
-export const MAGE_EXPERT_L5_CHOICE_KEY = "classFeature:ID_FMP_CLASS_FEATURE_2871:5";
-export const MAGE_EXPERT_L8_CHOICE_KEY = "classFeature:ID_FMP_CLASS_FEATURE_3050:8";
-export const MAGE_MASTER_CHOICE_KEY = "classFeature:ID_FMP_CLASS_FEATURE_2872:10";
-export const MAGE_CLASS_ID = "ID_FMP_CLASS_722";
-
 function classFeaturePrereqName(cf: ClassFeature | undefined): string {
   if (!cf) return "";
   const raw = cf.raw as { prereqs?: string };
   return String(raw.prereqs ?? "").trim();
 }
 
-function mageApprenticeSchoolNames(
+/** Names of class features picked in the given single-pick groups (e.g. chosen schools). */
+function pickedFeatureNames(
   index: RulesIndex,
-  selections: Record<string, string>
+  selections: Record<string, string>,
+  groupKeys: string[]
 ): Set<string> {
   const { byId } = buildClassFeatureLookups(index);
   const names = new Set<string>();
-  for (const key of [MAGE_APPRENTICE_L1_CHOICE_KEY, MAGE_APPRENTICE_L4_CHOICE_KEY]) {
+  for (const key of groupKeys) {
     const id = selections[key]?.trim();
     if (!id?.startsWith("ID_")) continue;
     const cf = byId.get(id);
@@ -626,159 +637,119 @@ function mageApprenticeSchoolNames(
   return names;
 }
 
-function expertOptionAllowedForApprentice(
+/** Prereq names of the class features picked in the given single-pick groups. */
+function pickedFeaturePrereqNames(
   index: RulesIndex,
-  optionId: string,
-  apprenticeNames: Set<string>
-): boolean {
-  if (!apprenticeNames.size) return true;
-  const cf = index.classFeatures?.find((f) => f.id === optionId);
-  const prereq = classFeaturePrereqName(cf);
-  return !!prereq && apprenticeNames.has(prereq);
+  selections: Record<string, string>,
+  groupKeys: string[]
+): Set<string> {
+  const { byId } = buildClassFeatureLookups(index);
+  const names = new Set<string>();
+  for (const key of groupKeys) {
+    const id = selections[key]?.trim();
+    if (!id?.startsWith("ID_")) continue;
+    const prereq = classFeaturePrereqName(byId.get(id));
+    if (prereq) names.add(prereq);
+  }
+  return names;
 }
 
-/** Level 5/8 Expert Mage: only schools chosen at Apprentice Mage (L8 = the other school vs L5). */
-export function filterMageExpertMageChoiceOptions(
+/**
+ * Progressive school-pick gating (Mage Apprentice → Expert → Master), driven entirely by the
+ * ETL-emitted `group.schoolFilter` metadata so the runtime never branches on specific ids/names.
+ * An option is kept when its prereq matches a school chosen in an earlier tier; the exclude list
+ * drops schools already taken in a sibling tier (Level 8 Expert = the school not taken at Level 5).
+ */
+export function filterSchoolProgressionChoiceOptions(
   index: RulesIndex,
   group: ClassFeatureChoiceGroup,
   selections: Record<string, string>
 ): ClassFeatureChoiceOption[] {
-  const isL5 =
-    group.key === MAGE_EXPERT_L5_CHOICE_KEY || group.parentFeatureName === "Level 5 Expert Mage";
-  const isL8 =
-    group.key === MAGE_EXPERT_L8_CHOICE_KEY || group.parentFeatureName === "Level 8 Expert Mage";
-  if (!isL5 && !isL8) return group.options;
+  const filter = group.schoolFilter;
+  if (!filter) return group.options;
+  const { byId } = buildClassFeatureLookups(index);
+  const optionPrereq = (id: string) => classFeaturePrereqName(byId.get(id));
 
-  const apprentices = mageApprenticeSchoolNames(index, selections);
-  if (!apprentices.size) return group.options;
-
-  let allowed = group.options.filter((o) =>
-    expertOptionAllowedForApprentice(index, o.id, apprentices)
+  let allowed = group.options;
+  const restrictNames = pickedFeatureNames(
+    index,
+    selections,
+    filter.restrictToPrereqsFromGroupKeys
   );
-
-  if (isL8) {
-    const l5Id = selections[MAGE_EXPERT_L5_CHOICE_KEY]?.trim();
-    if (l5Id?.startsWith("ID_")) {
-      const l5Prereq = classFeaturePrereqName(index.classFeatures?.find((f) => f.id === l5Id));
-      if (l5Prereq) {
-        allowed = allowed.filter((o) => {
-          const prereq = classFeaturePrereqName(index.classFeatures?.find((f) => f.id === o.id));
-          return prereq && prereq !== l5Prereq;
-        });
-      }
-    }
+  if (restrictNames.size) {
+    allowed = allowed.filter((o) => {
+      const prereq = optionPrereq(o.id);
+      return !!prereq && restrictNames.has(prereq);
+    });
   }
-
+  const excludeNames = pickedFeaturePrereqNames(
+    index,
+    selections,
+    filter.excludePrereqsFromGroupKeys ?? []
+  );
+  if (excludeNames.size) {
+    allowed = allowed.filter((o) => {
+      const prereq = optionPrereq(o.id);
+      return !!prereq && !excludeNames.has(prereq);
+    });
+  }
   return allowed;
 }
 
-function mageExpertSchoolNames(
-  index: RulesIndex,
-  selections: Record<string, string>
-): Set<string> {
-  const { byId } = buildClassFeatureLookups(index);
-  const names = new Set<string>();
-  for (const key of [MAGE_EXPERT_L5_CHOICE_KEY, MAGE_EXPERT_L8_CHOICE_KEY]) {
-    const id = selections[key]?.trim();
-    if (!id?.startsWith("ID_")) continue;
-    const cf = byId.get(id);
-    if (cf?.name) names.add(cf.name);
-  }
-  return names;
-}
-
-function masterOptionAllowedForExpert(
-  index: RulesIndex,
-  optionId: string,
-  expertNames: Set<string>
-): boolean {
-  if (!expertNames.size) return true;
-  const cf = index.classFeatures?.find((f) => f.id === optionId);
-  const prereq = classFeaturePrereqName(cf);
-  return !!prereq && expertNames.has(prereq);
-}
-
-/** Master Mage (level 10): only schools chosen at Level 5 and Level 8 Expert Mage. */
-export function filterMageMasterMageChoiceOptions(
-  index: RulesIndex,
-  group: ClassFeatureChoiceGroup,
-  selections: Record<string, string>
-): ClassFeatureChoiceOption[] {
-  const isMaster =
-    group.key === MAGE_MASTER_CHOICE_KEY || group.parentFeatureName === "Master Mage";
-  if (!isMaster) return group.options;
-
-  const experts = mageExpertSchoolNames(index, selections);
-  if (!experts.size) return group.options;
-
-  return group.options.filter((o) => masterOptionAllowedForExpert(index, o.id, experts));
-}
-
-/** Apprentice → Expert → Master mage school pick filtering. */
-export function filterMageSchoolProgressionChoiceOptions(
-  index: RulesIndex,
-  group: ClassFeatureChoiceGroup,
-  selections: Record<string, string>
-): ClassFeatureChoiceOption[] {
-  const master = filterMageMasterMageChoiceOptions(index, group, selections);
-  if (master !== group.options) return master;
-  return filterMageExpertMageChoiceOptions(index, group, selections);
-}
-
-/** Level 8 Expert Mage: the school not taken at level 5 (when that pick is known). */
-export function resolveMageLevel8ExpertMageOptionId(
+/** Auto-resolvable school pick (e.g. Level 8 Expert Mage = the school not taken at Level 5). */
+export function resolveAutoSchoolProgressionOptionId(
   index: RulesIndex,
   group: ClassFeatureChoiceGroup,
   selections: Record<string, string>
 ): string | undefined {
-  const allowed = filterMageExpertMageChoiceOptions(index, group, selections);
+  if (!group.schoolFilter?.autoResolveSingleOption) return undefined;
+  const allowed = filterSchoolProgressionChoiceOptions(index, group, selections);
   return allowed.length === 1 ? allowed[0]?.id : undefined;
 }
 
-export function isAutoMageLevel8ExpertMageGroup(
+export function isAutoResolvedSchoolProgressionGroup(
   index: RulesIndex,
   group: ClassFeatureChoiceGroup,
   selections: Record<string, string>
 ): boolean {
-  if (
-    group.key !== MAGE_EXPERT_L8_CHOICE_KEY &&
-    group.parentFeatureName !== "Level 8 Expert Mage"
-  ) {
-    return false;
-  }
-  return resolveMageLevel8ExpertMageOptionId(index, group, selections) != null;
+  return resolveAutoSchoolProgressionOptionId(index, group, selections) != null;
 }
 
-export function syncMageLevel8ExpertMageSelection(
+/** Auto-fill / prune auto-resolvable school picks once their tier is reachable. */
+export function syncAutoResolvedSchoolProgressionSelections(
   index: RulesIndex,
-  classId: string | undefined,
   selections: Record<string, string> | undefined,
   groups: ClassFeatureChoiceGroup[],
   characterLevel: number
 ): Record<string, string> {
-  const base = { ...(selections ?? {}) };
-  if (characterLevel < 8 || classId !== MAGE_CLASS_ID) return base;
+  let base = { ...(selections ?? {}) };
+  let changed = false;
+  for (const group of groups) {
+    if (!group.schoolFilter?.autoResolveSingleOption) continue;
+    if (characterLevel < (group.minLevel ?? 1)) continue;
 
-  const group = groups.find((g) => g.key === MAGE_EXPERT_L8_CHOICE_KEY);
-  if (!group) return base;
+    const autoId = resolveAutoSchoolProgressionOptionId(index, group, base);
+    if (autoId) {
+      if (base[group.key] !== autoId) {
+        base = { ...base, [group.key]: autoId };
+        changed = true;
+      }
+      continue;
+    }
 
-  const autoId = resolveMageLevel8ExpertMageOptionId(index, group, base);
-  if (autoId) {
-    if (base[MAGE_EXPERT_L8_CHOICE_KEY] === autoId) return base;
-    return { ...base, [MAGE_EXPERT_L8_CHOICE_KEY]: autoId };
+    const picked = base[group.key]?.trim();
+    if (!picked?.startsWith("ID_")) continue;
+    const legal = new Set(
+      filterSchoolProgressionChoiceOptions(index, group, base).map((o) => o.id)
+    );
+    if (!legal.has(picked)) {
+      const next = { ...base };
+      delete next[group.key];
+      base = next;
+      changed = true;
+    }
   }
-
-  const picked = base[MAGE_EXPERT_L8_CHOICE_KEY]?.trim();
-  if (!picked?.startsWith("ID_")) return base;
-
-  const legal = new Set(
-    filterMageSchoolProgressionChoiceOptions(index, group, base).map((o) => o.id)
-  );
-  if (legal.has(picked)) return base;
-
-  const next = { ...base };
-  delete next[MAGE_EXPERT_L8_CHOICE_KEY];
-  return next;
+  return changed ? base : { ...(selections ?? {}) };
 }
 
 export function applyClassFeatureChoiceOptionFilters(
@@ -787,12 +758,12 @@ export function applyClassFeatureChoiceOptionFilters(
   selections: Record<string, string>
 ): ClassFeatureChoiceGroup[] {
   return groups.map((g) => {
-    const options = filterMageSchoolProgressionChoiceOptions(index, g, selections);
+    const options = filterSchoolProgressionChoiceOptions(index, g, selections);
     return options === g.options ? g : { ...g, options };
   });
 }
 
-export function pruneInvalidMageExpertMageSelections(
+export function pruneInvalidSchoolProgressionSelections(
   index: RulesIndex,
   selections: Record<string, string>,
   groups: ClassFeatureChoiceGroup[]
@@ -801,7 +772,7 @@ export function pruneInvalidMageExpertMageSelections(
   let changed = false;
   for (const g of groups) {
     if (g.kind !== "classFeature") continue;
-    const legal = new Set(filterMageSchoolProgressionChoiceOptions(index, g, next).map((o) => o.id));
+    const legal = new Set(filterSchoolProgressionChoiceOptions(index, g, next).map((o) => o.id));
     const picked = next[g.key]?.trim();
     if (picked?.startsWith("ID_") && !legal.has(picked)) {
       delete next[g.key];
@@ -934,9 +905,9 @@ export function effectiveClassSelectionsForChoiceGroups(
 ): Record<string, string> {
   let next =
     migrateLegacyClassPowerSelections(index, classId, classSelections, groups) ?? {};
-  next = pruneInvalidMageExpertMageSelections(index, next, groups);
+  next = pruneInvalidSchoolProgressionSelections(index, next, groups);
   if (characterLevel != null) {
-    next = syncMageLevel8ExpertMageSelection(index, classId, next, groups, characterLevel);
+    next = syncAutoResolvedSchoolProgressionSelections(index, next, groups, characterLevel);
   }
   return next;
 }

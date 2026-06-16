@@ -17,19 +17,10 @@ import { collectCharacterClassFeatureIds } from "./characterClassFeatures";
 import type { CharacterBuild, RulesIndex } from "./models";
 import { resolveBaseAugmentablePowerId } from "./psionicPowerAugments";
 
-/** PHB Wizard — Spellbook class feature. */
-export const WIZARD_SPELLBOOK_CLASS_FEATURE_ID = "ID_FMP_CLASS_FEATURE_318";
-
-/** Essentials Mage — Mage's Spellbook (level-gated encounter / daily / utility pools). */
-export const MAGE_SPELLBOOK_CLASS_FEATURE_ID = "ID_FMP_CLASS_FEATURE_2868";
-
-const MAGE_SPELLBOOK_POWER_PARENT =
-  /^Level (\d+) Mage (Encounter|Daily|Utility) Powers$/i;
-
-/** Two spellbook powers per daily / utility milestone (PHB). */
+/** Default PHB spellbook power picks per daily/utility milestone (overlay can override). */
 export const WIZARD_SPELLBOOK_POWER_PICKS_PER_POOL = 2;
 
-/** Free ritual slots by character level (PHB Spellbook / Wizards and Rituals). */
+/** Default PHB free ritual slots by character level (overlay can override per feature). */
 export const WIZARD_SPELLBOOK_RITUAL_MILESTONES = [
   { level: 1, pickCount: 3 },
   { level: 5, pickCount: 2 },
@@ -39,14 +30,29 @@ export const WIZARD_SPELLBOOK_RITUAL_MILESTONES = [
   { level: 25, pickCount: 2 }
 ] as const;
 
-export type WizardSpellbookRitualMilestone = (typeof WIZARD_SPELLBOOK_RITUAL_MILESTONES)[number];
+export type WizardSpellbookRitualMilestone = { level: number; pickCount: number };
+
+/** Wizard spellbook feature id, resolved from the ETL `spellbookKind` flag. */
+function wizardSpellbookFeatureId(index: RulesIndex): string | undefined {
+  return index.classFeatures?.find((f) => f.spellbookKind === "wizard")?.id;
+}
+
+function wizardSpellbookPowerPicksPerPool(index: RulesIndex): number {
+  const feature = index.classFeatures?.find((f) => f.spellbookKind === "wizard");
+  return feature?.spellbookPowerPicksPerPool ?? WIZARD_SPELLBOOK_POWER_PICKS_PER_POOL;
+}
+
+function wizardSpellbookRitualMilestones(index?: RulesIndex): WizardSpellbookRitualMilestone[] {
+  const feature = index?.classFeatures?.find((f) => f.spellbookKind === "wizard");
+  return feature?.spellbookRitualMilestones ?? [...WIZARD_SPELLBOOK_RITUAL_MILESTONES];
+}
 
 export function wizardSpellbookRitualSelectionKey(milestoneLevel: number): string {
   return `wizardSpellbookRitual:${milestoneLevel}`;
 }
 
-export function wizardSpellbookPowerSelectionKey(poolIndex: number): string {
-  return `classPower:${WIZARD_SPELLBOOK_CLASS_FEATURE_ID}:${poolIndex}`;
+export function wizardSpellbookPowerSelectionKey(poolIndex: number, featureId: string): string {
+  return `classPower:${featureId}:${poolIndex}`;
 }
 
 export function parseWizardSpellbookPowerSelection(raw: string | undefined): string[] {
@@ -77,7 +83,7 @@ export function findWizardSpellbookPowerGroup(
   groups: ClassFeatureChoiceGroup[],
   poolIndex: number
 ): ClassFeatureChoiceGroup | undefined {
-  return groups.find((g) => g.key === wizardSpellbookPowerSelectionKey(poolIndex));
+  return groups.find((g) => isWizardSpellbookPowerGroup(g) && g.powerPoolIndex === poolIndex);
 }
 
 /** Power ids chosen in other spellbook pool slots (for dropdown exclusion). */
@@ -88,10 +94,12 @@ export function wizardSpellbookPowerIdsUsedOutsidePoolPick(
   pickIndex: number
 ): Set<string> {
   const used = new Set<string>();
+  const featureId = wizardSpellbookFeatureId(index);
+  if (!featureId) return used;
   for (const row of spellbookSelectRows(index)) {
     const idx = row.poolIndex;
     const picks = parseWizardSpellbookPowerSelection(
-      classSelections?.[wizardSpellbookPowerSelectionKey(idx)]
+      classSelections?.[wizardSpellbookPowerSelectionKey(idx, featureId)]
     );
     picks.forEach((id, i) => {
       if (!id) return;
@@ -127,19 +135,11 @@ export type SpellbookSlotBinding =
   | { kind: "mage-split"; groups: ClassFeatureChoiceGroup[] };
 
 export function isWizardSpellbookPowerGroup(group: ClassFeatureChoiceGroup): boolean {
-  return (
-    group.kind === "power" &&
-    group.parentFeatureId === WIZARD_SPELLBOOK_CLASS_FEATURE_ID &&
-    group.powerPoolIndex != null
-  );
+  return group.kind === "power" && group.spellbookKind === "wizard" && group.powerPoolIndex != null;
 }
 
 export function isMageSpellbookPowerGroup(group: ClassFeatureChoiceGroup): boolean {
-  return (
-    group.kind === "power" &&
-    group.powerPoolIndex != null &&
-    MAGE_SPELLBOOK_POWER_PARENT.test(group.parentFeatureName)
-  );
+  return group.kind === "power" && group.spellbookKind === "mage" && group.powerPoolIndex != null;
 }
 
 /** Power pools chosen via spellbook rules on the Powers tab (not the class-feature power section). */
@@ -147,12 +147,23 @@ export function isClassSpellbookPowerGroup(group: ClassFeatureChoiceGroup): bool
   return isWizardSpellbookPowerGroup(group) || isMageSpellbookPowerGroup(group);
 }
 
+function characterHasSpellbookKind(
+  index: RulesIndex,
+  build: CharacterBuild,
+  kind: "wizard" | "mage"
+): boolean {
+  const byId = new Map((index.classFeatures ?? []).map((f) => [f.id, f]));
+  return collectCharacterClassFeatureIds(index, build).some(
+    (fid) => byId.get(fid)?.spellbookKind === kind
+  );
+}
+
 export function characterHasWizardSpellbook(index: RulesIndex, build: CharacterBuild): boolean {
-  return collectCharacterClassFeatureIds(index, build).includes(WIZARD_SPELLBOOK_CLASS_FEATURE_ID);
+  return characterHasSpellbookKind(index, build, "wizard");
 }
 
 export function characterHasMageSpellbook(index: RulesIndex, build: CharacterBuild): boolean {
-  return collectCharacterClassFeatureIds(index, build).includes(MAGE_SPELLBOOK_CLASS_FEATURE_ID);
+  return characterHasSpellbookKind(index, build, "mage");
 }
 
 export function characterHasClassSpellbook(index: RulesIndex, build: CharacterBuild): boolean {
@@ -204,7 +215,7 @@ export function resolveSpellbookSlotBinding(
 }
 
 export function spellbookSelectionKeyForBinding(binding: SpellbookSlotBinding): string {
-  if (binding.kind === "wizard") return wizardSpellbookPowerSelectionKey(binding.poolIndex);
+  if (binding.kind === "wizard") return binding.group.key;
   if (binding.kind === "mage-combined") return binding.group.key;
   return binding.groups[0]?.key ?? "";
 }
@@ -250,10 +261,7 @@ export function syncClassSpellbookPowerSelectionsFromClassSlots(
       continue;
     }
 
-    const key =
-      binding.kind === "wizard"
-        ? wizardSpellbookPowerSelectionKey(binding.poolIndex)
-        : binding.group.key;
+    const key = binding.group.key;
     const picks = parseWizardSpellbookPowerSelection(next[key]);
     if (picks[0] === slotPower) continue;
     const updated = [...picks];
@@ -279,7 +287,7 @@ export function classSpellbookPowerIdsUsedOutsidePick(
     const picks = parseWizardSpellbookPowerSelection(classSelections?.[g.key]);
     picks.forEach((id, i) => {
       if (!id) return;
-      if (binding.kind === "wizard" && g.key === wizardSpellbookPowerSelectionKey(binding.poolIndex)) {
+      if (binding.kind === "wizard" && g.key === binding.group.key) {
         if (i === pickIndex) return;
       } else if (binding.kind === "mage-combined" && g.key === binding.group.key) {
         if (i === pickIndex) return;
@@ -290,12 +298,13 @@ export function classSpellbookPowerIdsUsedOutsidePick(
       used.add(id);
     });
   }
-  if (characterHasWizardSpellbook(index, build)) {
+  const featureId = wizardSpellbookFeatureId(index);
+  if (featureId && characterHasWizardSpellbook(index, build)) {
     for (const row of spellbookSelectRows(index)) {
       const idx = row.poolIndex;
       if (binding.kind === "wizard" && idx === binding.poolIndex) continue;
       const picks = parseWizardSpellbookPowerSelection(
-        classSelections?.[wizardSpellbookPowerSelectionKey(idx)]
+        classSelections?.[wizardSpellbookPowerSelectionKey(idx, featureId)]
       );
       picks.forEach((id) => {
         if (id) used.add(id);
@@ -375,7 +384,7 @@ function classFeatureSelectRules(
 
 /** Compendium `rules.select` rows for Spellbook (daily / utility pools in order). */
 export function spellbookSelectRowsFromIndex(index: RulesIndex): SpellbookSelectRow[] {
-  const cf = index.classFeatures?.find((f) => f.id === WIZARD_SPELLBOOK_CLASS_FEATURE_ID);
+  const cf = index.classFeatures?.find((f) => f.spellbookKind === "wizard");
   const rows: SpellbookSelectRow[] = [];
   let poolIndex = 0;
   for (const item of classFeatureSelectRules(cf)) {
@@ -423,7 +432,7 @@ export function applyWizardSpellbookPowerGroupRules(
     const row = spellbookRowByPoolIndex(index, g.powerPoolIndex);
     return {
       ...g,
-      pickCount: WIZARD_SPELLBOOK_POWER_PICKS_PER_POOL,
+      pickCount: wizardSpellbookPowerPicksPerPool(index),
       minLevel: row?.minLevel ?? g.minLevel,
       spellbookSlotLabel: row?.slotLabel
     };
@@ -461,8 +470,11 @@ export function wizardSpellbookPowerChoiceLabel(
   return `Spellbook — ${label} (${picks} pick${picks === 1 ? "" : "s"})`;
 }
 
-export function visibleWizardSpellbookRitualMilestones(characterLevel: number): WizardSpellbookRitualMilestone[] {
-  return WIZARD_SPELLBOOK_RITUAL_MILESTONES.filter((m) => characterLevel >= m.level);
+export function visibleWizardSpellbookRitualMilestones(
+  characterLevel: number,
+  index?: RulesIndex
+): WizardSpellbookRitualMilestone[] {
+  return wizardSpellbookRitualMilestones(index).filter((m) => characterLevel >= m.level);
 }
 
 export function parseWizardSpellbookRitualSelection(raw: string | undefined): string[] {
@@ -566,7 +578,7 @@ export function validateWizardSpellbookRituals(
   const errors: string[] = [];
   const ritualsById = new Map((index.rituals ?? []).map((r) => [r.id, r]));
 
-  for (const m of visibleWizardSpellbookRitualMilestones(build.level)) {
+  for (const m of visibleWizardSpellbookRitualMilestones(build.level, index)) {
     const key = wizardSpellbookRitualSelectionKey(m.level);
     const picks = parseWizardSpellbookRitualSelection(build.classSelections?.[key]);
     if (picks.length < m.pickCount) {

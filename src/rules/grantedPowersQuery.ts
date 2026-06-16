@@ -258,17 +258,13 @@ export function racePowerSelectSelectionKey(traitId: string): string {
 /** Stored in `CharacterBuild.raceSelections` when the race lists Human Power Selection (`2966`). */
 export const HUMAN_POWER_OPTION_RACE_KEY = "humanPowerOption";
 
-export const ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION = "ID_FMP_RACIAL_TRAIT_2966";
-export const ID_RACIAL_TRAIT_BONUS_AT_WILL = "ID_FMP_RACIAL_TRAIT_356";
-export const ID_RACIAL_TRAIT_HEROIC_EFFORT = "ID_FMP_RACIAL_TRAIT_2965";
-
+/** Human Power Selection parent trait, identified by its ETL flag (no hardcoded id). */
 function humanPowerSelectionParentId(index: RulesIndex | undefined): string {
-  const fromIndex = index?.racialTraits?.find((t) => t.grantsBonusClassAtWillByDefault)?.id;
-  return fromIndex ?? ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION;
+  return index?.racialTraits?.find((t) => t.grantsBonusClassAtWillByDefault)?.id ?? "";
 }
 
-function heroicEffortTraitId(index: RulesIndex | undefined, trait: RacialTrait | undefined): string {
-  return trait?.heroicEffortTraitId ?? ID_RACIAL_TRAIT_HEROIC_EFFORT;
+function heroicEffortTraitId(_index: RulesIndex | undefined, trait: RacialTrait | undefined): string {
+  return trait?.heroicEffortTraitId ?? "";
 }
 
 /** Human Power Selection bundle slot, when present (selection key is often `subrace`). */
@@ -323,7 +319,6 @@ export function humanPowerSelectionGrantsBonusClassAtWill(
 /** PHB Bonus At-Will racial trait or any Power select with `$$CLASS,at-will,1` (extra class at-will pick). */
 export function racialTraitGrantsBonusClassAtWillSlot(trait: RacialTrait): boolean {
   if (trait.grantsBonusClassAtWill) return true;
-  if (trait.id === ID_RACIAL_TRAIT_BONUS_AT_WILL) return true;
   const cat = trait.powerSelectCategory?.trim();
   if (cat && categoryGrantsBonusClassAtWill(cat)) return true;
   const rules = trait.raw?.rules as Record<string, unknown> | undefined;
@@ -525,8 +520,8 @@ export function racePowerGroupsForRace(
     if (bundleParentIds.has(traitId)) {
       continue;
     }
-    /** Human Power sub-options: at-will pick is on the Powers tab; Heroic Effort is a fixed grant. */
-    if (traitId === ID_RACIAL_TRAIT_BONUS_AT_WILL || traitId === ID_RACIAL_TRAIT_HEROIC_EFFORT) {
+    /** Bonus At-Will: the at-will pick lives on the Powers tab, not a race power group. */
+    if (trait.grantsBonusClassAtWill) {
       const granted = collectPowerIdsFromRacialTrait(trait);
       if (granted.length > 0) {
         out.push({ traitId, traitName, choiceOnly: false, powerIds: granted });

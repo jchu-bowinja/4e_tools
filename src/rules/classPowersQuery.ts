@@ -239,6 +239,10 @@ export function getThemeGrantedPowers(
     }
   }
 
+  for (const pid of theme.grantedPowerIds ?? []) {
+    addPowerId(pid);
+  }
+
   for (const kind of ["attack", "utility"] as const) {
     for (const power of getPowersForOwnerId(index, themeId, maxLevel, kind)) {
       addPowerId(power.id);
@@ -292,6 +296,10 @@ export function getAllThemeGrantedPowers(
     }
   }
 
+  for (const pid of theme.grantedPowerIds ?? []) {
+    addPowerId(pid);
+  }
+
   for (const kind of ["attack", "utility"] as const) {
     for (const gated of getAllPowersForOwnerId(index, themeId, characterLevel, kind)) {
       if (seen.has(gated.power.id)) continue;
@@ -301,6 +309,28 @@ export function getAllThemeGrantedPowers(
   }
 
   return sortGatedPowers(index, out);
+}
+
+/** Gate directly-granted power ids (themes/paths/destinies) by character level. */
+export function gateGrantedPowerIds(
+  index: RulesIndex,
+  powerIds: readonly string[] | undefined,
+  maxLevel: number
+): Power[] {
+  if (!powerIds?.length || maxLevel < 1) return [];
+  const byPowerId = new Map(index.powers.map((p) => [p.id, p]));
+  const seen = new Set<string>();
+  const out: Power[] = [];
+  for (const pid of powerIds) {
+    if (seen.has(pid)) continue;
+    const power = byPowerId.get(pid);
+    if (!power) continue;
+    const lv = effectivePowerLevel(index, power);
+    if (lv >= 1 && lv > maxLevel) continue;
+    seen.add(pid);
+    out.push(power);
+  }
+  return out;
 }
 
 function collectAllParagonPathClassFeaturePowerIds(
@@ -349,6 +379,10 @@ export function getAllParagonPathGrantedPowers(
   for (const pid of collectAllParagonPathClassFeaturePowerIds(index, paragonPathId)) {
     addPowerId(pid);
   }
+  const path = index.paragonPaths.find((p) => p.id === paragonPathId);
+  for (const pid of path?.grantedPowerIds ?? []) {
+    addPowerId(pid);
+  }
 
   return sortGatedPowers(index, out);
 }
@@ -360,6 +394,7 @@ export function getAllEpicDestinyGrantedPowers(
   characterLevel: number
 ): GatedPower[] {
   if (!epicDestinyId || characterLevel < 1) return [];
+  const byPowerId = new Map(index.powers.map((p) => [p.id, p]));
   const seen = new Set<string>();
   const out: GatedPower[] = [];
   for (const kind of ["attack", "utility"] as const) {
@@ -368,6 +403,14 @@ export function getAllEpicDestinyGrantedPowers(
       seen.add(gated.power.id);
       out.push(gated);
     }
+  }
+  const destiny = index.epicDestinies.find((d) => d.id === epicDestinyId);
+  for (const pid of destiny?.grantedPowerIds ?? []) {
+    if (seen.has(pid)) continue;
+    const power = byPowerId.get(pid);
+    if (!power) continue;
+    seen.add(pid);
+    out.push(gatePower(index, power, characterLevel));
   }
   return sortGatedPowers(index, out);
 }

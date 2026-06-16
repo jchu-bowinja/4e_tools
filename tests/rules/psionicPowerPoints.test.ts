@@ -9,11 +9,13 @@ import {
   paragonMulticlassPrimaryAtWillSlotPenalty,
   paragonPathGrantsParagonPowerPoints,
   paragonTierPowerPointBonus,
-  PARAGON_POWER_POINTS_CLASS_FEATURE_ID,
   powerPointsForPrintedLevel,
   summarizePsionicPowerPointAdjustments
 } from "../../src/rules/psionicPowerPoints";
 import type { CharacterBuild, Feat, Power, RulesIndex } from "../../src/rules/models";
+
+// Fixture id only; the runtime relies on the ETL grantsParagonPowerPoints flag.
+const PARAGON_POWER_POINTS_CLASS_FEATURE_ID = "ID_FMP_CLASS_FEATURE_1818";
 
 const psionicClass = { id: "c_psion", name: "Psion", slug: "psion", powerSource: "Psionic", raw: {} };
 const martialClass = { id: "c_fighter", name: "Fighter", slug: "fighter", powerSource: "Martial", raw: {} };
@@ -444,6 +446,7 @@ describe("paragonTierPowerPointBonus", () => {
         name: "Cerulean Adept",
         slug: "cerulean-adept",
         prereqTokens: [],
+        grantsParagonPowerPoints: true,
         grantedClassFeatureIds: [
           PARAGON_POWER_POINTS_CLASS_FEATURE_ID,
           "ID_FMP_CLASS_FEATURE_1816"

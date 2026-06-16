@@ -1,9 +1,6 @@
 import type { ClassDef, ClassFeature, ClassRoleBucket, RulesIndex } from "./models";
 import { featureIsAvailableAtLevel, parseFeatureLevel } from "./supportTraits";
 
-const ROLE_PROGRESSION_NAME =
-  /^Level\s+(\d+)\s+(Defender|Leader|Striker|Controller)\s+(Encounter|Utility)\s+Power$/i;
-
 /** First role token from compendium class `Role` text (e.g. "Defender. You are…"). */
 export function classRoleBucket(cls: ClassDef | undefined): ClassRoleBucket | undefined {
   const raw = String(cls?.role ?? (cls?.raw?.specific as Record<string, unknown> | undefined)?.Role ?? "")
@@ -21,9 +18,7 @@ function roleFeatureAppliesToClass(
   classId: string | undefined,
   role: ClassRoleBucket | undefined
 ): boolean {
-  const match = ROLE_PROGRESSION_NAME.exec(feature.name.trim());
-  if (!match || !role) return false;
-  if (match[2]!.toLowerCase() !== role) return false;
+  if (!role || feature.roleProgression?.role !== role) return false;
   const swap = feature.powerSwapRules?.[0];
   if (swap?.classIds?.length && classId && !swap.classIds.includes(classId)) return false;
   return true;

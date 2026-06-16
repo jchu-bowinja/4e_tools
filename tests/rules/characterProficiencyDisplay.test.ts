@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { CLASS_FEATURE_CHOICE_NONE } from "../../src/rules/classFeatureChoices";
-import { ARCHER_WARLORD_CLASS_FEATURE_ID } from "../../src/rules/classFeatureProficiencies";
 import {
   computeCharacterProficiencyDisplayLines,
   computeClassGrantedProficiencyDisplayLines,
@@ -8,6 +7,9 @@ import {
 } from "../../src/rules/characterProficiencyDisplay";
 import { appendFeatProficiencyPhrasesToArmorLine } from "../../src/rules/featProficiencies";
 import type { CharacterBuild, ClassDef, ClassFeature, ProficiencyGrant, RulesIndex } from "../../src/rules/models";
+
+// Fixture id only; runtime no longer hardcodes this (behavior is data-driven).
+const ARCHER_WARLORD_CLASS_FEATURE_ID = "ID_FMP_CLASS_FEATURE_2286";
 
 describe("characterProficiencyDisplay", () => {
   const build = { featIds: [], classSelections: {} } as CharacterBuild;
@@ -119,15 +121,53 @@ describe("characterProficiencyDisplay", () => {
   });
 
   it("applies Archer Warlord armor adjustment before feat armor grants", () => {
+    const optionalKey = `classFeatureOptional:${ARCHER_WARLORD_CLASS_FEATURE_ID}`;
     const archerBuild = {
       featIds: [],
-      classSelections: { warlord: "ID_FMP_CLASS_FEATURE_2286" }
-    } as CharacterBuild;
+      classId: "ID_FMP_CLASS_8",
+      level: 1,
+      classSelections: { [optionalKey]: ARCHER_WARLORD_CLASS_FEATURE_ID }
+    } as unknown as CharacterBuild;
+    const archerIndex = {
+      classes: [{ id: "ID_FMP_CLASS_8", name: "Warlord", slug: "warlord", raw: {} }],
+      classFeatures: [
+        {
+          id: ARCHER_WARLORD_CLASS_FEATURE_ID,
+          name: "Archer Warlord",
+          slug: "archer-warlord",
+          mechanicalEffects: [
+            { type: "removeArmorProficiencyPhrases", phrases: ["chainmail", "light shields"] }
+          ],
+          raw: {}
+        }
+      ],
+      classFeatureChoiceGroupsByClassId: {
+        ID_FMP_CLASS_8: [
+          {
+            key: optionalKey,
+            kind: "classFeature",
+            parentFeatureId: ARCHER_WARLORD_CLASS_FEATURE_ID,
+            parentFeatureName: "Archer Warlord",
+            pickCount: 1,
+            optional: true,
+            options: [
+              {
+                id: ARCHER_WARLORD_CLASS_FEATURE_ID,
+                name: "Archer Warlord",
+                parentFeatureId: ARCHER_WARLORD_CLASS_FEATURE_ID,
+                parentFeatureName: "Archer Warlord"
+              }
+            ]
+          }
+        ]
+      }
+    } as unknown as RulesIndex;
     const grants: ProficiencyGrant[] = [{ kind: "armor", value: "plate", label: "Plate" }];
     const line = effectiveArmorProficiencyDisplayText(
       "Cloth, leather, hide, chainmail; light shields",
       archerBuild,
-      grants
+      grants,
+      archerIndex
     );
     expect(line).not.toMatch(/chainmail/i);
     expect(line).not.toMatch(/light shield/i);

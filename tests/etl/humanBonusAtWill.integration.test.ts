@@ -2,13 +2,15 @@ import { existsSync, readFileSync } from "node:fs";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
   bonusClassAtWillSlotFromRaceBuild,
-  HUMAN_POWER_OPTION_RACE_KEY,
-  ID_RACIAL_TRAIT_BONUS_AT_WILL,
-  ID_RACIAL_TRAIT_HEROIC_EFFORT,
-  ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION
+  HUMAN_POWER_OPTION_RACE_KEY
 } from "../../src/rules/grantedPowersQuery";
 import type { RulesIndex } from "../../src/rules/models";
 import { parseRacialTraitIdsFromRace } from "../../src/rules/racialTraits";
+
+// Fixture ids only; the runtime identifies these traits by ETL flags, not ids.
+const ID_RACIAL_TRAIT_HUMAN_POWER_SELECTION = "ID_FMP_RACIAL_TRAIT_2966";
+const ID_RACIAL_TRAIT_BONUS_AT_WILL = "ID_FMP_RACIAL_TRAIT_356";
+const ID_RACIAL_TRAIT_HEROIC_EFFORT = "ID_FMP_RACIAL_TRAIT_2965";
 
 const rulesIndexPath = "generated/rules_index.json";
 

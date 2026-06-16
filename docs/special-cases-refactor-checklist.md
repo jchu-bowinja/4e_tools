@@ -58,7 +58,7 @@ Update **Status** and **Owner** columns as work completes.
 | ID | Status | Item | Location | Current behavior | Proposed data | Tests |
 |----|--------|------|----------|------------------|---------------|-------|
 | SC-010 | `etl-done` | Archer Warlord feature | `classFeatureProficiencies.ts` + `mechanicalEffects.ts` | ETL `mechanicalEffects`; runtime uses index when passed | `mechanicalEffects` on feature row in index | `tests/rules/archerWarlord.test.ts`, `tests/rules/characterProficiencyDisplay.test.ts` |
-| SC-011 | `etl-done` | Signs of Influence (bard) | ETL `_supplement_mapped_optional_class_feature_groups`; index choice groups | HotF optional + level 1/13/17 gated sub-picks | Done via SC-002; keep `SIGNS_OF_INFLUENCE_CLASS_FEATURE_ID` export for tests | `tests/rules/bardSignsOfInfluence.test.ts` |
+| SC-011 | `etl-done` | Signs of Influence (bard) | ETL `_supplement_mapped_optional_class_feature_groups`; index choice groups | HotF optional + level 1/13/17 gated sub-picks | Done via SC-002; `SIGNS_OF_INFLUENCE_CLASS_FEATURE_ID` removed from `src/rules`, defined locally in test | `tests/rules/bardSignsOfInfluence.test.ts` |
 | SC-012 | `etl-done` | Human Power Selection traits | `grantedPowersQuery.ts` | Index `grantsBonusClassAtWillByDefault`, `heroicEffortTraitId`, `bonusAtWillTraitId`; legacy IDs as fallback | Same fields on racial trait row | `tests/etl/humanBonusAtWill.integration.test.ts`, `tests/rules/grantedPowersQuery.test.ts`, `tests/rules/activeRacialTraits.test.ts` |
 | SC-013 | `etl-done` | Paragon Power Points class feature | `psionicPowerPoints.ts` | `path.grantsParagonPowerPoints` from ETL; raw grant fallback | `paragonPath.grantsParagonPowerPoints` | `tests/rules/psionicPowerPoints.test.ts` |
 | SC-014 | `etl-done` | Mage cantrips feature ids | ETL `MAGE_CANTRIPS_FEATURE_IDS` only | Cantrip `powerIds` on choice groups | Covered by SC-001 | `tests/rules/classFeatureChoices.test.ts` |
@@ -126,7 +126,7 @@ Update **Status** and **Owner** columns as work completes.
 | ID | Status | Item | Location | Notes | Proposed | Tests |
 |----|--------|------|----------|-------|----------|-------|
 | SC-070 | `etl-done` | Subrace / bundle detection | `raceSubraces.ts` | `_SUBRACE_` id alias, power selection category | `list_race_class_selection_gaps.py` reports `racialPowerSelectIndexFields` | `tests/rules/raceSubraces.test.ts` |
-| SC-071 | `keep` | Dragonborn ability deferral | `abilityScores.ts` L154–187 | "See the Race Chosen" → subrace traits | Keep; optional ETL flag `abilityBonusSource: subrace` | `tests/rules/dragonbornAbility.integration.test.ts` |
+| SC-071 | `etl-done` | Dragonborn ability deferral | `abilityScores.ts` reads `race.abilityBonusSource`; text parse is fallback | "See the Race Chosen" → subrace traits | ETL flag `abilityBonusSource: "subrace"` on race row | `tests/rules/dragonbornAbility.integration.test.ts` |
 | SC-072 | `keep` | Active racial trait expansion | `activeRacialTraits.ts`; `racialTraitGrants.ts` | Grant children, bundle visibility | Keep | `tests/rules/activeRacialTraits.test.ts`, `racialTraitGrants` |
 
 ---
@@ -153,11 +153,26 @@ Update **Status** and **Owner** columns as work completes.
 | SC-094 | `done` | Parsed-but-ungranted L1 power picks | ETL `_append_ungranted_power_choice_groups` | Hexblade, Skald, Protector, Elementalist | `audit_class_feature_choice_power_ids.py` (0 L1 gaps) |
 | SC-095 | `done` | Extra power-select category shapes | ETL + `powerSelectCategory.ts` | `ID_FMP_CLASS_*,usage,level`; `$$Class,at-will`; feature-ref + `_PARSED_SUB_FEATURES` powers | `powerSelectCategory.test.ts` |
 | SC-096 | `done` | Trait package pact chains | `traitPackageIds.ts`; `characterClassFeatures.ts` grant expansion | `traitPackageIdByClassFeatureId` on index | `tests/rules/classFeaturePowerReplace.test.ts`, `characterClassFeatures.test.ts` |
-| SC-097 | `done` | DMG2 role-bucket power swaps | `roleProgressionFeatures.ts`; `classFeaturePowerReplace.ts` | `powerSwapRules` without fixed `powerIds`; filter by class role | `tests/rules/classFeaturePowerReplace.test.ts` |
+| SC-097 | `done` | DMG2 role-bucket power swaps | `roleProgressionFeatures.ts` reads `feature.roleProgression` flag (no name regex); `classFeaturePowerReplace.ts` | ETL `roleProgression {role, kind}` + `powerSwapRules`; filter by class role | `tests/rules/classFeaturePowerReplace.test.ts` |
 | SC-098 | `done` | Class feature `rules.replace` | `classFeaturePowerReplace.ts` | `powerReplacementRules` (auto) + `powerSwapRules` (player `classPowerSwap:*` keys) | `tests/rules/classFeaturePowerReplace.test.ts` |
 | SC-099 | `done` | Class feature `rules.modify Power` | `classFeaturePowerModifications.ts` | `powerModifications` on feature row | `tests/rules/classFeaturePowerModifications.test.ts`, `p1ClassFeatureMechanicalPatches.test.ts` |
 | SC-100 | `done` | Essentials build suggested powers | `classBuildOptions.ts` → `classPowerSlots.ts` | Pre-fill empty slots from `classBuildOptionsByClassId[].powerIds` | `tests/rules/classBuildOptions.test.ts` |
 | SC-101 | `done` | Warpriest domain label requires | `traitPackageIds.ts`; `characterClassFeatures.ts` | `domainLabelByClassFeatureId` satisfies string `requires` | `tests/rules/warpriestDomainGrants.test.ts` |
+
+---
+
+## Data-driven builder refactor closeout (2026-06-14)
+
+Closes the remaining sole-source runtime hardcodes, name heuristics, and the theme/epic-destiny grant gap. All entity-specific behavior now lives in compendium data + `tools/etl/overrides/*.json` (see `docs/data-overlay.md`); `src/rules/*.ts` is generic and the guard test `tests/rules/noEntitySpecificLiterals.test.ts` forbids concrete `ID_*_<n>` literals.
+
+| ID | Status | Item | Runtime | ETL / overlay | Tests |
+|----|--------|------|---------|---------------|-------|
+| SC-102 | `etl-done` | Wizard / Mage spellbook | `wizardSpellbook.ts` reads `spellbookKind` (+ picks/milestones) | Overlay `classFeatures.spellbookKind`; ETL tags power groups | `tests/rules/wizardSpellbook.test.ts`, `tests/rules/mageSpellbook.test.ts` |
+| SC-103 | `etl-done` | Mage school progression chain | `classFeatureChoices.ts` generic `filterSchoolProgressionChoiceOptions` (no Mage ids) | Overlay `classFeatureChoiceGroupSchoolFilters` → group `schoolFilter` | `tests/rules/mageApprenticeMage.test.ts` |
+| SC-104 | `etl-done` | Ritual casting / Ritual Caster | `ritualCasting.ts` reads `grantsRitualCasting` | Overlay `ritualCastingFeatureNames` / `ritualCasterFeatNames` → feature/feat flag | `tests/rules/ritualCasting.test.ts` |
+| SC-105 | `etl-done` | Theme granted powers/features | `classPowersQuery.ts` reads normalized `grantedPowerIds` | ETL `extract_grants_from_rules` for themes | `tests/rules/classPowersQuery.test.ts` |
+| SC-106 | `etl-done` | Epic destiny granted powers/features | `powerSelections.ts` / app read `grantedPowerIds` | ETL `extract_grants_from_rules` for epic destinies | `tests/rules/classPowersQuery.test.ts` |
+| SC-107 | `done` | Overlay infrastructure + guardrails | generic interpreters only | `tools/etl/overlay.py` deep-merge + unknown-id validation | `tools/etl/test_overlay.py`, `tests/rules/noEntitySpecificLiterals.test.ts` |
 
 ---
 
